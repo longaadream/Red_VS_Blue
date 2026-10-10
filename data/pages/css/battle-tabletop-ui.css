@@ -194,9 +194,8 @@ body .topbar {
   bottom: auto !important;
   width: max-content !important;
   max-width: var(--battle-tools-width, min(304px, 40vw)) !important;
-  justify-content: flex-start !important;
+  justify-content: flex-end !important;
   padding: 0 4px 4px 0 !important;
-  scrollbar-color: #8c795d #392d25;
 }
 body .topbar > [hidden], body .topbar > #spectatorStatus:empty { display: none !important; }
 body .topbar #spectatorStatus:not(:empty) { color: #f1dfbd; white-space: nowrap; text-shadow: 0 1px 2px #211a16; }

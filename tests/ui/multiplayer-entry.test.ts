@@ -2,23 +2,25 @@ import { readFileSync } from 'node:fs'
 import { createContext, Script } from 'node:vm'
 import { expect, it, vi } from 'vitest'
 const script = readFileSync('data/pages/js/multiplayer.js', 'utf8')
-type MockNode = { value:string; hidden:boolean; disabled:boolean; checked:boolean; textContent:string; children:MockNode[]; onclick:()=>void; onchange:()=>void; append(...items:MockNode[]):void; replaceChildren():void }
+const compatibilityScript = readFileSync('data/pages/js/compatibility-presentation.js', 'utf8')
+type MockNode = { value:string; hidden:boolean; disabled:boolean; checked:boolean; textContent:string; dataset:Record<string,string>; children:MockNode[]; onclick:()=>void; onchange:()=>void; append(...items:MockNode[]):void; appendChild(item:MockNode):void; replaceChildren():void }
 function setup(search = '') {
   const nodes = new Map<string, ReturnType<typeof node>>()
-  function node(): MockNode { return { value: '', hidden: false, disabled: false, checked: true, textContent: '', children: [] as ReturnType<typeof node>[], onclick: () => {}, onchange: () => {}, append(...items: ReturnType<typeof node>[]) { this.children.push(...items) }, replaceChildren() { this.children = [] } } }
+  function node(): MockNode { return { value: '', hidden: false, disabled: false, checked: true, textContent: '', dataset: {}, children: [] as ReturnType<typeof node>[], onclick: () => {}, onchange: () => {}, append(...items: ReturnType<typeof node>[]) { this.children.push(...items) }, appendChild(item: ReturnType<typeof node>) { this.children.push(item); this.textContent += item.textContent }, replaceChildren() { this.children = []; this.textContent = '' } } }
   const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id)! }
   get('serverKind').value = 'official'; get('gameMode').value = 'pve'
   const profile = { schemaVersion: 1, engineAbi: 'a', runnerRevision: 'b', resolvedProfileHash: 'c', authorityContentHash: 'd' }
-  const location = { href: '', search }, storage = { getItem: () => null, setItem: vi.fn() }
+  const location = { href: '', origin: 'https://rvb.test', search }, storage = { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() }
   const host = { ensureLocalAuthority: vi.fn(async () => ({ ok: true })), getMode: async () => ({ localUrl: 'http://127.0.0.1:2567', profileIdentity: profile, localAuthorityProfileIdentity: profile }), relayControl: vi.fn(async () => ({ ok: true, published: { url: 'https://play.redvsblue.top/hosts/ab', inviteCode: '12345678' } })), startHostBroadcast: vi.fn(async () => ({})) }
   const fetch = vi.fn(async (url: string) => ({ ok: true, json: async () => url.includes('/invites/') ? { url: 'https://play.redvsblue.top/hosts/ab' } : url.endsWith('/hosts') ? { hosts: [{ url: 'https://play.redvsblue.top/hosts/ab', name: 'A' }] } : url.endsWith('/rooms?mode=pve') ? { rooms: [{ id: 'pv', name: '旅途', players: 2, maxPlayers: 4, joinable: true }] } : url.endsWith('/rooms') ? { rooms: [{ id: 'full', mode: '1v1', players: [{}, {}], maxPlayers: 2, status: 'waiting' }] } : { ok: true, protocol: 'rvb-colyseus' } }))
   const utils = { readOfficialSession: () => ({ token: 'test', account: { id: 'test' } }), saveServerConfig: vi.fn(), appendServerParams: (p: URLSearchParams) => p }
   const listeners: Record<string, () => void> = {}
   const accepted = { takeIntent: vi.fn(async () => ({ origin:'https://play.redvsblue.top',hostId:'ab',roomId:'invited-room' })) }
   const catalog = vi.fn(async () => ({ profileIdentity: profile }))
-  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, setInterval: () => {}, window: { RvBHost: host, RvBUtils: utils, RvBRoomInvitations:accepted, addEventListener:(name:string,fn:()=>void)=>{listeners[name]=fn} }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: catalog }, RvBUtils: utils })
+  const context = createContext({ URL, URLSearchParams, AbortSignal, console, location, fetch, localStorage: storage, sessionStorage: storage, setInterval: () => {}, window: { RvBHost: host, RvBUtils: utils, RvBRoomInvitations:accepted, location, sessionStorage: storage, addEventListener:(name:string,fn:()=>void)=>{listeners[name]=fn} }, navigator: {}, document: { getElementById: get, createElement: node, querySelectorAll: (selector: string) => selector === '.modalError' ? [] : [...nodes.values()] }, RvBIdentity: { getIdentity: () => ({ displayName: '测试' }), ensureIdentity: async () => ({}) }, RvBColyseus: { requestCatalogIdentityAt: catalog }, RvBUtils: utils })
+  new Script(compatibilityScript).runInContext(context)
   new Script(script).runInContext(context)
-  return { get, location, host, fetch, listeners, accepted, catalog }
+  return { get, location, host, fetch, listeners, accepted, catalog, presentation: context.window.RvBCompatibilityPresentation }
 }
 it('accepts a social room invitation through the existing version check and faction-join route',async()=>{
   const test=setup('?acceptedInvite=1');test.listeners.DOMContentLoaded();await finished()
@@ -32,6 +34,24 @@ it('rejects resource mismatch before entering an invited room',async()=>{
   test.listeners.DOMContentLoaded();await finished()
   expect(test.location.href).toBe('')
   expect(test.get('error').textContent).toContain('资源版本不同')
+})
+it('keeps an ordinary multiplayer failure visible without an update button', async () => {
+  const test = setup('?acceptedInvite=1')
+  test.catalog.mockRejectedValue(new Error('普通网络错误'))
+  test.listeners.DOMContentLoaded(); await finished()
+  expect(test.get('error').hidden).toBe(false)
+  expect(test.get('error').textContent).toContain('普通网络错误')
+  expect(test.get('error').children).toHaveLength(0)
+})
+it('restores visibility when an ordinary failure follows a compatibility failure', async () => {
+  const test = setup('?acceptedInvite=1')
+  test.presentation.render(test.get('error'), { code: 'PROFILE_HASH_MISMATCH', message: '资源版本不同' })
+  expect(test.get('error').hidden).toBe(false)
+  test.catalog.mockRejectedValue(new Error('普通网络错误'))
+  test.listeners.DOMContentLoaded(); await finished()
+  expect(test.get('error').hidden).toBe(false)
+  expect(test.get('error').textContent).toContain('普通网络错误')
+  expect(test.get('error').children).toHaveLength(0)
 })
 async function finished() { await new Promise(resolve => setTimeout(resolve, 0)) }
 it('publishes a player host then opens the local PVE preparation', async () => {

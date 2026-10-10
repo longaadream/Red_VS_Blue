@@ -27,7 +27,9 @@ async function main() {
   const clientDist = path.join(root, 'electron-client', 'dist')
   if (fs.existsSync(clientDist) && fs.lstatSync(clientDist).isSymbolicLink()) throw Error('Unsafe client dist link')
   fs.rmSync(clientDist, { recursive: true, force: true })
-  const env = { ...process.env, NODE_OPTIONS: '--max-old-space-size=1024', RVB_BUILD_LOW_MEMORY: '1', NEXT_TELEMETRY_DISABLED: '1' }
+  const heapMb = Number(process.env.RVB_RELEASE_HEAP_MB || 2048)
+  if (!Number.isSafeInteger(heapMb) || heapMb < 1024 || heapMb > 8192) throw Error('RVB_RELEASE_HEAP_MB must be an integer from 1024 to 8192')
+  const env = { ...process.env, NODE_OPTIONS: `--max-old-space-size=${heapMb}`, RVB_BUILD_LOW_MEMORY: '1', NEXT_TELEMETRY_DISABLED: '1' }
   for (const args of [
     ['scripts/build-practice-ai.mjs'], ['scripts/build-tailwind.mjs'],
     ['node_modules/next/dist/bin/next', 'build', '--webpack'],

@@ -1,0 +1,48 @@
+{
+  "id": "twin-bridges",
+  "name": "双桥裂谷",
+  "layout": [
+    "####################",
+    "#........TT........#",
+    "#........TT........#",
+    "#..CC....TT..CC....#",
+    "#..................#",
+    "#........TT........#",
+    "#........TT........#",
+    "#.....CC.TT.....CC.#",
+    "#........TT........#",
+    "#........TT........#",
+    "#........TT........#",
+    "#..CC........CC....#",
+    "#........TT........#",
+    "#........TT........#",
+    "#........TT........#",
+    "####################"
+  ],
+  "legend": [
+    {
+      "char": "#",
+      "type": "wall",
+      "walkable": false,
+      "bulletPassable": false
+    },
+    {
+      "char": ".",
+      "type": "floor",
+      "walkable": true,
+      "bulletPassable": true
+    },
+    {
+      "char": "C",
+      "type": "cover",
+      "walkable": true,
+      "bulletPassable": false
+    },
+    {
+      "char": "T",
+      "type": "hole",
+      "walkable": false,
+      "bulletPassable": true
+    }
+  ]
+}

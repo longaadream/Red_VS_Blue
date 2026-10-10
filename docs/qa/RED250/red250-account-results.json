@@ -1,0 +1,55 @@
+{
+  "opponent": {
+    "dialogOpen": true,
+    "logoutHidden": true,
+    "logoutText": "退出登录"
+  },
+  "callsAfterOwnClick": 1,
+  "requests": [
+    {
+      "url": "https://mock.invalid/official/players/catalog",
+      "method": "GET"
+    },
+    {
+      "url": "https://mock.invalid/official/players/self",
+      "method": "GET"
+    },
+    {
+      "url": "https://mock.invalid/official/players/catalog",
+      "method": "GET"
+    },
+    {
+      "url": "https://mock.invalid/official/players/opponent",
+      "method": "GET"
+    }
+  ],
+  "own": {
+    "dialogOpen": true,
+    "dialogRect": {
+      "left": 200,
+      "top": 45,
+      "right": 1080,
+      "bottom": 674.984375,
+      "width": 880,
+      "height": 629.984375
+    },
+    "dialogDisplay": "block",
+    "dialogVisibility": "visible",
+    "dialogOpacity": "1",
+    "dialogZIndex": "2147483647",
+    "logoutHidden": false,
+    "logoutText": "退出登录",
+    "menuLogoutPresent": false,
+    "logoutRect": {
+      "left": 962.109375,
+      "top": 226,
+      "width": 84.890625,
+      "height": 44
+    },
+    "logoutDisplay": "block",
+    "logoutVisibility": "visible",
+    "logoutMinHeight": "44px",
+    "logoutBoxSizing": "border-box",
+    "logoutLineHeight": "normal"
+  }
+}

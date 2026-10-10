@@ -190,6 +190,36 @@ describe('RED-227 local skill choice sequence', () => {
     expect(h.submitted[0].action).not.toHaveProperty('skillChoices')
   })
 
+  it('submits a partial root when a public continuation target has no candidates', () => {
+    const h = harness([{
+      status: 'needs-input',
+      preparation: Object.assign(targetPreparation({ type: 'rule', id: 'rule-hidden-next', pieceId: 'source' }, 'cell', true), {
+        candidates: [],
+      }),
+    }])
+    h.context.pendingSkill = {
+      localChoiceDraft: true,
+      skillId: 'skill-a',
+      rootAction: {
+        type: 'useBasicSkill', playerId: 'player-red', pieceId: 'source', skillId: 'skill-a',
+        targetPieceId: 'first', selectionId: 'root-1', stateRevision: 12,
+      },
+      baseAction: {},
+      skillChoices: [],
+      preparation: targetPreparation({ type: 'rule', id: 'rule-first', pieceId: 'source' }, 'cell', true),
+      previewOrigin: 'click',
+    }
+
+    h.context.advanceLocalSkillTarget(null, 2, 3)
+
+    expect(h.installed).toHaveLength(0)
+    expect(h.submitted).toHaveLength(1)
+    expect(h.submitted[0].action).toMatchObject({
+      targetPieceId: 'first',
+      skillChoices: [{ targetX: 2, targetY: 3, promptKey }],
+    })
+  })
+
   it('retains root credentials for an option-first local draft', () => {
     const context = createContext({
       G: { targetingRevision: 7 },

@@ -26,5 +26,5 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, Math.floor(caster.attack * 0.75), 'magical', battle, 'ulquiorra-cero'); return { success: true, message: caster.name + '释放虚闪，造成' + (result.damage || 0) + '点魔法伤害' }; }"
+  "code": "function executeSkill(context) { var caster = context.piece; var target = selectTarget({ type: 'piece', range: 4, filter: 'enemy' }); if (!target || target.needsTargetSelection) return target; var result = dealDamage(caster, target, Math.floor(caster.attack * 0.5), 'magical', battle, 'ulquiorra-cero'); return { success: true, message: caster.name + '释放虚闪，造成' + (result.damage || 0) + '点魔法伤害' }; }"
 }

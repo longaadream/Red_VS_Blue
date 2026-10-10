@@ -942,8 +942,10 @@ export class TriggerSystem {
         let ruleOwnerPlayerId: string | undefined
         while (true) {
           ruleCtx = item.buildCtx(context)
-          const mutableBeforeEffect = mutableTriggerContextSnapshot(ruleCtx)
           applyTransactionInputs(ruleCtx, transactionInputs, battle)
+          // Answers belong to this consumer. Snapshot after injecting them so
+          // replay input is not written back as an effect for the next rule.
+          const mutableBeforeEffect = mutableTriggerContextSnapshot(ruleCtx)
           damageBeforeEffect = Number(ruleCtx.damage)
           ruleOwnerPlayerId = ruleCtx.ruleOwnerPlayerId
             || ruleCtx.playerId
@@ -1107,8 +1109,10 @@ export class TriggerSystem {
           let cardContext: TriggerContext
           while (true) {
             cardContext = { ...context }
-            const mutableBeforeEffect = mutableTriggerContextSnapshot(cardContext)
             applyTransactionInputs(cardContext, transactionInputs, battle)
+            // Keep reactive-card answers local; only explicit card mutations
+            // after input injection are propagated to the shared event.
+            const mutableBeforeEffect = mutableTriggerContextSnapshot(cardContext)
             result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
             writeBackMutableTriggerContext(cardContext, context, mutableBeforeEffect)
             if (!result?.needsOptionSelection && !result?.needsTargetSelection) break

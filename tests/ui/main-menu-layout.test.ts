@@ -52,6 +52,13 @@ describe('RED-171 game-style main menu layout contract', () => {
     expect(readFileSync(resolve(process.cwd(), 'data/pages/js/ranked-session.js'), 'utf8')).toContain('window.RvBUtils.readOfficialSession(selectedUrl)')
   })
 
+  it('keeps account logout in the profile and reserves the main menu exit for the application', () => {
+    expect(page).not.toContain('id="homeLogout"')
+    expect(page).toContain('id="applicationExitButton"')
+    expect(page).toContain('>退出程序</button>')
+    expect(readFileSync(resolve(process.cwd(), 'data/pages/js/home-account.js'), 'utf8')).toContain('setLogoutHandler')
+  })
+
   it('keeps the first-session tutorial visible without opening the training tab', () => {
     const shortcutIndex = page.indexOf('id="tutorialShortcut"')
     const tablistIndex = page.indexOf('class="mode-tabs"')

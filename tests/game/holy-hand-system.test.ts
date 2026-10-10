@@ -692,7 +692,7 @@ describe('Turalyon holy-hand mobility', () => {
     expect(cancelled.pendingTargetSelection).toBeUndefined()
     expect(cancelled.players[0]).toMatchObject({ actionPoints: 1, hand: [], discardPile: ['holy-heal'] })
     expect(cancelled.pieces.find((piece: any) => piece.instanceId === 'ally')).toMatchObject({ x: 1, y: 1 })
-    expect((cancelled.extensions as any).turalyonLightforgedTurns).toMatchObject({ turalyon: 1 })
+    expect((cancelled.extensions as any).turalyonLightforgedTurns).toBeUndefined()
 
     const destinationPending = applyBattleAction(pending, {
       type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'ally',
@@ -721,7 +721,7 @@ describe('Turalyon holy-hand mobility', () => {
     } as any) as any
     expect(ordinaryMove.pieces.find((piece: any) => piece.instanceId === 'ally')).toMatchObject({ x: 3, y: 1 })
     expect(ordinaryMove.players[0].actionPoints).toBe(0)
-    expect(ordinaryMove.actions.filter((action: any) => action.type === 'move')).toHaveLength(1)
+    expect(ordinaryMove.actions.filter((action: any) => action.type === 'move')).toHaveLength(2)
   })
 
   it('rolls the complete holy card action back when a later afterCardPlay consumer throws after march resumes', () => {
@@ -832,24 +832,18 @@ describe('Turalyon holy-hand mobility', () => {
     expect(first.pieces.find((piece: any) => piece.instanceId === 'turalyon-deterministic-ally'))
       .toMatchObject({ x: 2, y: 1, currentHp: 10 })
   })
-  it('crosses allies, stops at enemies and impassable terrain, and triggers only for the first holy card', () => {
-    const turalyon = makePiece({ instanceId: 'turalyon-corridor', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
+  it('uses normal movement targets without crossing occupied allies or enemies, and triggers each holy card', () => {
+    const turalyon = makePiece({ instanceId: 'turalyon-corridor', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 4, y: 4 }) as any
     turalyon.rules = [loadRuleById('rule-turalyon-lightforged-march', true)!]
-    const allyLaneMover = makePiece({ instanceId: 'ally-lane-mover', ownerPlayerId: 'player-red', x: 0, y: 1, moveRange: 3 })
-    const allyLaneBlocker = makePiece({ instanceId: 'ally-lane-blocker', ownerPlayerId: 'player-red', x: 1, y: 1 })
-    const enemyBlocker = makePiece({ instanceId: 'enemy-lane-blocker', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 1 })
-    const terrainLaneMover = makePiece({ instanceId: 'terrain-lane-mover', ownerPlayerId: 'player-red', x: 0, y: 3, moveRange: 3 })
-    const terrainLaneBlocker = makePiece({ instanceId: 'terrain-lane-blocker', ownerPlayerId: 'player-red', x: 1, y: 3 })
+    const mover = makePiece({ instanceId: 'normal-mover', ownerPlayerId: 'player-red', x: 0, y: 0, moveRange: 3 })
+    const allyBlocker = makePiece({ instanceId: 'ally-blocker', ownerPlayerId: 'player-red', x: 1, y: 0 })
+    const enemyBlocker = makePiece({ instanceId: 'enemy-blocker', ownerPlayerId: 'player-blue', faction: 'blue', x: 3, y: 0 })
     const state = makeState({
-      pieces: [turalyon, allyLaneMover, allyLaneBlocker, enemyBlocker, terrainLaneMover, terrainLaneBlocker],
+      pieces: [turalyon, mover, allyBlocker, enemyBlocker],
       width: 5,
       height: 5,
       turnNumber: 1,
     }) as any
-    for (const tile of state.map.tiles) {
-      tile.props.walkable = tile.y === 1 || tile.y === 3 || (tile.x === 0 && tile.y === 0)
-    }
-    state.map.tiles.find((tile: any) => tile.x === 3 && tile.y === 3).props.walkable = false
     state.players[0].actionPoints = 4
     state.players[0].hand = [1, 2].map(index => ({
       cardId: 'holy-charge', instanceId: `march-card-${index}`, ownerPlayerId: 'player-red', actionPointCost: 2,
@@ -857,18 +851,18 @@ describe('Turalyon holy-hand mobility', () => {
 
     const firstPending = applyBattleAction(state, { type: 'playCard', playerId: 'player-red', cardInstanceId: 'march-card-1' } as any) as any
     expect(firstPending.pendingTargetSelection.candidates).toEqual(expect.arrayContaining([
-      { type: 'piece', pieceId: 'ally-lane-mover' },
-      { type: 'piece', pieceId: 'terrain-lane-mover' },
+      { type: 'piece', pieceId: mover.instanceId },
     ]))
     const laneDestinationPending = applyBattleAction(firstPending, {
-      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: 'ally-lane-mover',
+      type: 'pendingTargetSelect', playerId: 'player-red', targetPieceId: mover.instanceId,
       selectionId: firstPending.pendingTargetSelection.selectionId,
       stateRevision: firstPending.pendingTargetSelection.stateRevision,
     } as any) as any
-    expect(laneDestinationPending.pendingTargetSelection.candidates).toContainEqual({ type: 'cell', x: 2, y: 1 })
-    expect(laneDestinationPending.pendingTargetSelection.candidates).not.toContainEqual({ type: 'cell', x: 4, y: 1 })
+    expect(laneDestinationPending.pendingTargetSelection.candidates).toContainEqual({ type: 'cell', x: 1, y: 1 })
+    expect(laneDestinationPending.pendingTargetSelection.candidates).not.toContainEqual({ type: 'cell', x: 1, y: 0 })
+    expect(laneDestinationPending.pendingTargetSelection.candidates).not.toContainEqual({ type: 'cell', x: 3, y: 0 })
     const firstResolved = applyBattleAction(laneDestinationPending, {
-      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 2, targetY: 1,
+      type: 'pendingTargetSelect', playerId: 'player-red', targetX: 1, targetY: 1,
       selectionId: laneDestinationPending.pendingTargetSelection.selectionId,
       stateRevision: laneDestinationPending.pendingTargetSelection.stateRevision,
     } as any) as any
@@ -876,12 +870,12 @@ describe('Turalyon holy-hand mobility', () => {
     const secondResolved = applyBattleAction(firstResolved, {
       type: 'playCard', playerId: 'player-red', cardInstanceId: 'march-card-2',
     } as any) as any
-    expect(secondResolved.pendingTargetSelection).toBeUndefined()
-    expect(secondResolved.players[0].actionPoints).toBe(0)
-    expect(secondResolved.players[0].hand).toHaveLength(0)
+    expect(secondResolved.pendingTargetSelection).toMatchObject({ targetType: 'piece' })
+    expect(secondResolved.players[0].actionPoints).toBe(2)
+    expect(secondResolved.players[0].hand).toHaveLength(1)
   })
 
-  it('uses straight-line normal-move geometry while allies are transparent blockers', () => {
+  it('uses normal-move geometry with the real move range and occupied-cell blockers', () => {
     const turalyon = makePiece({
       instanceId: 'turalyon-straight-march', templateId: 'turalyon', ownerPlayerId: 'player-red', x: 0, y: 0,
     }) as any
@@ -915,13 +909,12 @@ describe('Turalyon holy-hand mobility', () => {
     const candidates = destinationPending.pendingTargetSelection.candidates
 
     expect(candidates).not.toContainEqual({ type: 'cell', x: 7, y: 6 })
-    expect(candidates).toContainEqual({ type: 'cell', x: 8, y: 6 })
-    expect(candidates).not.toContainEqual({ type: 'cell', x: 10, y: 6 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 8, y: 6 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 8 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 9, y: 6 })
     expect(candidates).toContainEqual({ type: 'cell', x: 6, y: 7 })
-    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 9 })
-    expect(candidates).toContainEqual({ type: 'cell', x: 6, y: 1 })
-    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 0 })
-    expect(candidates).not.toContainEqual({ type: 'cell', x: 5, y: 5 })
+    expect(candidates).toContainEqual({ type: 'cell', x: 5, y: 5 })
+    expect(candidates).not.toContainEqual({ type: 'cell', x: 6, y: 1 })
   })
 
   it('selects 1-3 friendly core pieces and a gathering cell in two authoritative stages', () => {

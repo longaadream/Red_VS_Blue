@@ -14,6 +14,7 @@
   <script src="js/colyseus-client.js"></script>
   <script src="js/crypto-lib.js"></script>
   <script src="js/identity.js"></script>
+  <script src="js/compatibility-presentation.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -244,10 +245,11 @@
     <main class="game-main">
       <div class="view-heading"><div><p class="kicker">CUSTOM GAMES</p><h2>房间大厅 <small id="networkContext"></small></h2></div><div class="toolbar"><button class="button" id="inviteEntry" onclick="document.getElementById('inviteDialog').showModal()">邀请码加入</button><button class="button primary" id="openCreateRoom" onclick="openCreateSheet()">创建房间</button></div></div>
       <div class="browser-layout"><section class="room-browser">
-        <div class="browser-filters"><input id="roomSearch" type="search" aria-label="搜索房间" placeholder="搜索房间或地图" oninput="filterLobbyRooms()"><select id="modeFilter" aria-label="模式筛选" onchange="filterLobbyRooms()"><option value="all">全部模式</option><option value="1v1">1v1</option><option value="2v2">2v2</option></select><select id="stateFilter" aria-label="状态筛选" onchange="filterLobbyRooms()"><option value="all">全部状态</option><option value="waiting">可加入</option><option value="watch">可观战</option></select><button class="button" onclick="loadRooms()" id="refreshBtn">刷新</button></div>
+        <div class="browser-filters"><input id="roomSearch" type="search" aria-label="搜索房间" placeholder="搜索房间或地图" oninput="filterLobbyRooms()"><select id="modeFilter" aria-label="模式筛选" onchange="filterLobbyRooms()"><option value="all">全部模式</option><option value="1v1">1v1</option><option value="2v2">2v2</option></select><select id="stateFilter" aria-label="状态筛选" onchange="filterLobbyRooms()"><option value="all">全部状态</option><option value="waiting">可加入</option><option value="watch">可观战</option></select><button class="button" onclick="loadRooms(true)" id="refreshBtn">刷新</button></div>
         <div class="room-columns"><span>房间 / 地图</span><span>模式</span><span>人数</span><span>状态</span><span></span></div>
         <div id="roomList" class="room-scroll"><div class="browser-empty">正在连接并读取房间…</div></div>
         <div class="browser-caption"><span id="roomCount">当前服务器</span><span id="statusBar" role="status"></span></div>
+        <div id="compatibilityRecovery" class="compatibility-recovery" role="alert" hidden></div>
       </section><aside class="room-preview"><div class="preview-label">房间详情</div><img class="preview-emblem" src="images/tabletop/desk-emblem.svg" alt=""><h3 id="selectedRoomName">选择一个房间</h3><p id="selectedRoomInfo">在列表中选择房间，查看模式、地图和席位。</p><div id="selectedRoomActions"></div><div class="preview-note">想和朋友单独开一局？<br>创建私密房间后分享邀请码。</div></aside></div>
       <div id="rejoinBar" class="rejoin-strip" style="display:none"><span>你有一场进行中的对局</span><button class="button primary" id="rejoinBtn" onclick="rejoinBattle()">重新加入</button><button class="button" onclick="dismissRejoin()">忽略</button></div><div id="rejoinFeedback" role="status" style="display:none"></div>
     </main>
@@ -262,7 +264,7 @@
       <div class="field-label">地图</div>
       <select id="mapSelect" disabled><option value="">正在加载地图…</option></select>
       <label class="field-label" for="matchMode">对局模式</label>
-      <select id="matchMode" onchange="mapsLoaded=false;loadMaps()"><option value="1v1">1v1 · 双人对战</option><option value="2v2">2v2 · 四人组队</option></select>
+      <select id="matchMode" onchange="mapsLoaded=false;loadMaps(true)"><option value="1v1">1v1 · 双人对战</option><option value="2v2">2v2 · 四人组队</option></select>
       <div class="field-label">可见性</div>
       <div class="toggle-row">
         <span>公开房间（所有人可见）</span>
@@ -273,8 +275,9 @@
         <input type="checkbox" id="turnTimerEnabledToggle" checked>
       </div>
       <div id="createErr" class="err-msg"></div>
-      <button class="btn-primary" id="createRoomBtn" onclick="doCreateRoom()" disabled>创建并加入</button>
-      <button class="btn-cancel" onclick="closeCreateSheet()">取消</button>
+      <div id="createCompatibilityRecovery" class="compatibility-recovery" role="alert" hidden style="grid-column:1/-1;grid-row:6;margin:0"></div>
+      <button class="btn-primary" id="createRoomBtn" onclick="doCreateRoom()" disabled style="grid-column:2;grid-row:7">创建并加入</button>
+      <button class="btn-cancel" onclick="closeCreateSheet()" style="grid-column:1;grid-row:7">取消</button>
     </div>
   </div>
 
@@ -499,6 +502,19 @@
       ].join('\n')
     }
 
+    function renderCompatibilityRecovery(error, message, field, target) {
+      const host = target || document.getElementById('compatibilityRecovery')
+      const presentation = window.RvBCompatibilityPresentation
+      if (!host || !presentation || typeof presentation.render !== 'function') return null
+      return presentation.render(host, error, { message, field, buttonClass: 'button primary' })
+    }
+
+    function clearCompatibilityRecovery(target) {
+      const hosts = target ? [target] : [document.getElementById('compatibilityRecovery'), document.getElementById('createCompatibilityRecovery')]
+      const presentation = window.RvBCompatibilityPresentation
+      if (presentation && typeof presentation.clear === 'function') hosts.forEach(host => { if (host) presentation.clear(host) })
+    }
+
     function updateFloatBar() {
       const saved = RvBUtils.getServerUrl()
       const status = document.getElementById('floatStatus')
@@ -514,7 +530,8 @@
       }
     }
 
-    async function loadRooms() {
+    async function loadRooms(userInitiated = false) {
+      if (userInitiated) clearCompatibilityRecovery()
       if (!RvBUtils.getServerUrl()) {
         document.getElementById('roomList').innerHTML =
           '<div class="empty-state"><div class="empty-icon">⚠️</div>未连接服务器</div>'
@@ -532,6 +549,7 @@
         document.getElementById('roomList').innerHTML =
           '<div class="browser-empty">暂时无法读取房间：' + escHtml(e.message) + '<br><a href="multiplayer.html">打开服务器连接设置</a></div>'
         statusBar.textContent = ''
+        renderCompatibilityRecovery(e, '暂时无法读取房间：' + formatProfileError(e))
       } finally {
         btn.disabled = false
       }
@@ -634,6 +652,7 @@
     }
 
     async function joinRoom(roomId, faction, action) {
+      clearCompatibilityRecovery()
       try {
         const identity = RvBIdentity.getIdentity()
         if (!identity) { alert('请先设置账号'); return }
@@ -648,6 +667,7 @@
         const body = { action: requestedAction, roomId, playerId, playerName, publicKey, payload, signature, profileIdentity }
         if (faction) body.alignment = faction
         await lobbyRequest('rooms.action', body)
+        clearCompatibilityRecovery()
         window.location.href = 'room.html?roomId=' + encodeURIComponent(roomId)
           + '&server=' + encodeURIComponent(getLobbyServerMode())
           + '&serverUrl=' + encodeURIComponent(RvBUtils.getServerUrl())
@@ -655,10 +675,15 @@
           + '&playerId=' + encodeURIComponent(playerId)
           + '&playerName=' + encodeURIComponent(playerName)
           + (faction ? '&alignment=' + encodeURIComponent(faction) : '')
-      } catch (e) { alert('加入房间失败：' + formatProfileError(e)) }
+      } catch (e) {
+        const detail = '加入房间失败：' + formatProfileError(e)
+        renderCompatibilityRecovery(e, detail)
+        alert(detail)
+      }
     }
 
     async function spectateRoom(roomId) {
+      clearCompatibilityRecovery()
       const { id: spectatorId, displayName: spectatorName } = RvBIdentity.getIdentity()
       try {
         const connection = RvBUtils.getConnectionConfig()
@@ -666,18 +691,29 @@
         await RvBColyseus.requestAt(connection.url, 'rooms.spectate', { roomId, spectatorId, spectatorName, profileIdentity }, 6000)
         const target = new URLSearchParams({ roomId, playerId: spectatorId, playerName: spectatorName, mode: 'spectate', serverUrl: connection.url })
         if (connection.mode) target.set('server', connection.mode)
+        clearCompatibilityRecovery()
         window.location.href = 'battle.html?' + target.toString()
-      } catch (e) { alert('观战失败：' + formatProfileError(e)) }
+      } catch (e) {
+        const detail = '观战失败：' + formatProfileError(e)
+        renderCompatibilityRecovery(e, detail)
+        alert(detail)
+      }
     }
 
     async function deleteRoom(roomId, event) {
       event.stopPropagation()
       if (!confirm('确定要删除这个房间吗？')) return
       const { id: playerId } = RvBIdentity.getIdentity()
+      clearCompatibilityRecovery()
       try {
         await lobbyRequest('rooms.delete', { roomId, playerId })
+        clearCompatibilityRecovery()
         loadRooms()
-      } catch (e) { alert('删除房间失败：' + e.message) }
+      } catch (e) {
+        const detail = '删除房间失败：' + e.message
+        renderCompatibilityRecovery(e, detail)
+        alert(detail)
+      }
     }
 
     const isPublishedGuest = /^\/hosts\//.test(new URL(RvBUtils.getServerUrl() || location.origin).pathname)
@@ -691,7 +727,8 @@
       if (!RvBUtils.getServerUrl()) { alert('请先连接服务器'); return }
       document.getElementById('createSheet').style.display = 'flex'
       document.getElementById('createErr').style.display = 'none'
-      await loadMaps()
+      clearCompatibilityRecovery(document.getElementById('createCompatibilityRecovery'))
+      await loadMaps(true)
     }
 
     function closeCreateSheet() {
@@ -717,7 +754,8 @@
       return MAP_NAMES[mapId] || mapId
     }
 
-    async function loadMaps() {
+    async function loadMaps(userInitiated = false) {
+      if (userInitiated) clearCompatibilityRecovery()
       const sel = document.getElementById('mapSelect')
       const createBtn = document.getElementById('createRoomBtn')
       if (mapsLoaded) return true
@@ -759,6 +797,7 @@
           const errEl = document.getElementById('createErr')
           errEl.textContent = '地图加载失败：' + (error && error.message ? error.message : String(error))
           errEl.style.display = 'block'
+          renderCompatibilityRecovery(error, '地图加载失败：' + formatProfileError(error), undefined, document.getElementById('createCompatibilityRecovery'))
           return false
         } finally {
           mapsLoadPromise = null
@@ -771,6 +810,7 @@
     let createRoomPromise = null
     async function doCreateRoom() {
       if (createRoomPromise) return createRoomPromise
+      clearCompatibilityRecovery()
       const identity = RvBIdentity.getIdentity()
       const { id: hostId, displayName: playerName } = identity
       const publicKey = typeof RvBIdentity.getPublicKey === 'function'
@@ -791,12 +831,14 @@
           const mode = document.getElementById('matchMode').value
           const turnTimerEnabled = document.getElementById('turnTimerEnabledToggle').checked
           const room = await lobbyRequest('rooms.create', { name: playerName + ' 的 ' + mode + ' 房间', mode, hostId, hostName: playerName, publicKey, mapId, visibility, turnTimerEnabled, profileIdentity })
-          if (room.id) { closeCreateSheet(); showFactionPicker(room.id, 'join') }
+          if (room.id) { clearCompatibilityRecovery(); closeCreateSheet(); showFactionPicker(room.id, 'join') }
           else throw new Error('未返回房间 ID')
         } catch (e) {
           const serverUrl = (window.RvBUtils && RvBUtils.getServerUrl && RvBUtils.getServerUrl()) || '未设置'
-          errEl.textContent = '创建失败：' + formatProfileError(e) + '（服务器：' + serverUrl + '）'
+          const detail = '创建失败：' + formatProfileError(e) + '（服务器：' + serverUrl + '）'
+          errEl.textContent = detail
           errEl.style.display = 'block'
+          renderCompatibilityRecovery(e, detail, undefined, document.getElementById('createCompatibilityRecovery'))
         } finally {
           createBtn.textContent = '创建并加入'
           createBtn.disabled = !mapsLoaded
@@ -809,13 +851,18 @@
     async function joinByCode(spectating) {
       const raw = document.getElementById('inviteInput').value.trim()
       if (!raw) return
+      clearCompatibilityRecovery()
       const code = raw.toUpperCase()
       try {
         const match = await lobbyRequest('rooms.resolveInvite', { inviteCode: code })
         if (spectating) await spectateRoom(match.id)
         else if (match.status === 'waiting' || match.status === 'ready') { document.getElementById('inviteDialog').close(); showFactionPicker(match.id) }
         else alert('对局已开始，可以选择观战')
-      } catch (e) { alert('查找房间失败：' + e.message) }
+      } catch (e) {
+        const detail = '查找房间失败：' + e.message
+        renderCompatibilityRecovery(e, detail)
+        alert(detail)
+      }
     }
 
     function hideRejoin() {
