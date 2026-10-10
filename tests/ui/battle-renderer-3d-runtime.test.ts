@@ -666,6 +666,34 @@ describe('RED-68 BattleRenderer3D runtime', () => {
     } finally { h.renderer.dispose() }
   })
 
+  it('re-hits the stationary mouse pointer after a viewport change', () => {
+    const h = createHarness(1280, 720, false)
+    const model = runtimeModel()
+    const intents: Array<Record<string, unknown>> = []
+    h.renderer.init({ container: h.container, onIntent: (intent: Record<string, unknown>) => intents.push(intent) })
+    try {
+      h.renderer.update(model)
+      h.frame(16)
+      const point = h.renderer.projectCell(2, 2)
+      const canvas = h.renderers[0].domElement
+      canvas.dispatch('pointermove', { pointerType: 'mouse', clientX: point.clientX, clientY: point.clientY })
+      intents.length = 0
+
+      h.renderer.zoomBy(1.25)
+
+      const viewportIntent = intents.find(intent => intent.type === 'viewport-change')
+      expect(viewportIntent).toMatchObject({ type: 'viewport-change', hoveredCell: expect.anything() })
+      expect(viewportIntent?.hoveredCell).toEqual(h.renderer.screenToCell(point.clientX, point.clientY))
+      expect(intents.filter(intent => intent.type === 'hover-cell')).toEqual([
+        expect.objectContaining({
+          type: 'hover-cell',
+          x: (viewportIntent?.hoveredCell as { x: number; y: number } | null)?.x ?? null,
+          y: (viewportIntent?.hoveredCell as { x: number; y: number } | null)?.y ?? null,
+        }),
+      ])
+    } finally { h.renderer.dispose() }
+  })
+
   it('renders static state on demand and batches terrain by material', () => {
     const harness = createHarness(1280, 720, false)
     const model = runtimeModel()

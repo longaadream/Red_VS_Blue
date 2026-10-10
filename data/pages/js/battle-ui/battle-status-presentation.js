@@ -14,9 +14,20 @@
 
   function resolve(status) {
     const registry = root.BattleEffectIcons
-    return registry && typeof registry.resolveStatus === 'function'
+    const meta = registry && typeof registry.resolveStatus === 'function'
       ? registry.resolveStatus(status)
       : DEFAULT_DETAIL
+    if (registry && typeof registry.labelForStatus === 'function') {
+      return Object.assign({}, meta, { label: registry.labelForStatus(status) })
+    }
+    return meta
+  }
+
+  function labelForStatus(status) {
+    const registry = root.BattleEffectIcons
+    if (registry && typeof registry.labelForStatus === 'function') return registry.labelForStatus(status)
+    const meta = resolve(status)
+    return String(status && (status.name || status.label) || meta.label || '未知状态')
   }
 
   function boardEntries(statuses) {
@@ -70,6 +81,7 @@
   root.BattleStatusPresentation = {
     MAX_BOARD_STATUSES: MAX_BOARD_STATUSES,
     resolve: resolve,
+    labelForStatus: labelForStatus,
     boardEntries: boardEntries,
     boardOverview: boardOverview,
     boardSummary: boardSummary,
