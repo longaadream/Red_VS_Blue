@@ -35,7 +35,7 @@
     ]
   },
   "code": "function executeSkill(context) { var __rvb_import_effect_0, caster, direction, distance, dx, dy, event, events, hit, i, landing, occupied, targetPos, tile; var _pc = \"n43\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n43\": caster = (context)[\"piece\"]; _pc = \"n42\"; break; case \"n42\": targetPos = selectTarget({type: \"grid\", range: 99, filter: \"all\"}); _pc = \"n41\"; break; case \"n41\": _pc = (! (! ((! targetPos) || (targetPos)[\"needsTargetSelection\"]))) ? \"n40\" : \"n39\"; break; case \"n39\": _pc = (! (! (((caster)[\"x\"] == null) || ((caster)[\"y\"] == null)))) ? \"n38\" : \"n37\"; break; case \"n37\": dx = ((targetPos)[\"x\"] - (caster)[\"x\"]); _pc = \"n36\"; break; case \"n36\": dy = ((targetPos)[\"y\"] - (caster)[\"y\"]); _pc = \"n35\"; break; case \"n35\": _pc = (! (! (((dx !== 0) && (dy !== 0)) || ((dx === 0) && (dy === 0))))) ? \"n34\" : \"n33\"; break; case \"n33\": direction = {x: ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))), y: ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1)))}; _pc = \"n32\"; break; case \"n32\": events = traceProjectile({x: (caster)[\"x\"], y: (caster)[\"y\"]}, direction, {excludePieceId: (caster)[\"instanceId\"]}); _pc = \"n31\"; break; case \"n31\": hit = null; _pc = \"n30\"; break; case \"n30\": distance = 0; _pc = \"n29\"; break; case \"n29\": i = 0; _pc = \"n28\"; break; case \"n28\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (events)[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n25\"; while (__rvb_content_graph_region_pc_2 !== \"n16\") { switch (__rvb_content_graph_region_pc_2) { case \"n25\": event = (events)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_2 = (! (! ((event)[\"type\"] === \"piece\"))) ? \"n23\" : \"n18\"; break; case \"n18\": __rvb_content_graph_region_pc_2 = (! (! (((event)[\"type\"] === \"terrain\") && (event)[\"blocksProjectile\"]))) ? \"n17\" : \"n16\"; break; case \"n16\": __rvb_content_graph_region_pc_2 = \"n16\"; break; case \"n17\": return {success: true, message: \"共生拖行被地形阻挡\"}; case \"n23\": __rvb_content_graph_region_pc_2 = (! (! arePlayersAllied(battle, ((event)[\"piece\"])[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"]))) ? \"n22\" : \"n21\"; break; case \"n21\": hit = (event)[\"piece\"]; __rvb_content_graph_region_pc_2 = \"n20\"; break; case \"n20\": distance = (event)[\"distance\"]; __rvb_content_graph_region_pc_2 = \"n19\"; break; case \"n19\": __rvb_content_graph_loop_break_0 = true; __rvb_content_graph_region_pc_2 = \"n16\"; break; case \"n22\": return {success: true, message: \"共生拖行被路径上的友方角色阻挡\"}; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n27\"; while (__rvb_content_graph_region_pc_3 !== \"n26\") { switch (__rvb_content_graph_region_pc_3) { case \"n27\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_3 = \"n26\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n15\"; break; case \"n15\": _pc = (! (! (! hit))) ? \"n14\" : \"n13\"; break; case \"n13\": _pc = (! (! (distance > 1))) ? \"n12\" : \"n2\"; break; case \"n12\": landing = {x: ((caster)[\"x\"] + (direction)[\"x\"]), y: ((caster)[\"y\"] + (direction)[\"y\"])}; _pc = \"n11\"; break; case \"n11\": tile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (item) { return (((item)[\"x\"] === (landing)[\"x\"]) && ((item)[\"y\"] === (landing)[\"y\"])); }); _pc = \"n10\"; break; case \"n10\": _pc = (! (! (((! tile) || (! (tile)[\"props\"])) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n9\" : \"n8\"; break; case \"n8\": occupied = ((battle)[\"pieces\"])[\"some\"](function (piece) { return ((((((piece)[\"currentHp\"] > 0) && ((piece)[\"instanceId\"] !== (caster)[\"instanceId\"])) && ((piece)[\"instanceId\"] !== (hit)[\"instanceId\"])) && ((piece)[\"x\"] === (landing)[\"x\"])) && ((piece)[\"y\"] === (landing)[\"y\"])); }); _pc = \"n7\"; break; case \"n7\": _pc = (! (! occupied)) ? \"n6\" : \"n5\"; break; case \"n5\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (hit)[\"instanceId\"], x: (landing)[\"x\"], y: (landing)[\"y\"]}], \"pull\", {terrain: \"projectile\"}); _pc = \"n4\"; break; case \"n4\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n3\" : \"n2\"; break; case \"n2\": addStatusEffectById((hit)[\"instanceId\"], {id: (((\"root-\" + (caster)[\"instanceId\"]) + \"-\") + (hit)[\"instanceId\"]), name: \"定身\", type: \"root\", currentDuration: 1, currentUses: (- 1), intensity: 1, stacks: 1, sourceId: (caster)[\"instanceId\"]}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"发动共生拖行，将\") + (hit)[\"name\"]) + ((distance > 1) ? \"拉到身前并使其定身1回合\" : \"定身1回合\"))}; case \"n3\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n6\": return {success: true, message: \"毒液正前方已被占用\"}; case \"n9\": return {success: true, message: \"毒液正前方不是合法落点\"}; case \"n14\": return {success: true, message: \"路径上没有可拖行的敌人\"}; case \"n34\": return {success: false, message: \"必须选择与毒液在同一行或同一列的方向\"}; case \"n38\": return {success: false, message: \"毒液当前不在战场上\"}; case \"n40\": return targetPos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。\" === __gameplayInvalid) || (\"弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。\" === undefined) || (\"弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
     "surface": "skill",
@@ -1618,39 +1618,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "弹射物。选择正方向，将路径上首个敌人拉至自身前方相邻地格，并施加定身[1]。相邻敌人不移动，仍施加定身。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:venom-symbiote-drag",
+    "links": []
   }
 }

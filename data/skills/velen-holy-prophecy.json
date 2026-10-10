@@ -18,7 +18,7 @@
     "steps": []
   },
   "code": "function executeSkill(context) { var __rvb_import_bound_method_16, card, cardNames, caster, choice, eligible, isOrdinaryHoly, options, player; var _pc = \"n53\"; for (var _step = 0; _step <= 21; _step++) { switch (_pc) { case \"n53\": caster = (context)[\"piece\"]; _pc = \"n52\"; break; case \"n52\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (caster)[\"ownerPlayerId\"]); }); _pc = \"n51\"; break; case \"n51\": _pc = (! (! (! player))) ? \"n50\" : \"n47\"; break; case \"n47\": isOrdinaryHoly = function (card) { { var __rvb_content_graph_region_pc_0 = \"n49\"; while (__rvb_content_graph_region_pc_0 !== \"n48\") { switch (__rvb_content_graph_region_pc_0) { case \"n49\": return (card && (([\"holy-smite\", \"holy-heal\", \"holy-charge\"])[\"indexOf\"]((card)[\"cardId\"]) !== (- 1))); default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n46\"; break; case \"n46\": __rvb_import_bound_method_16 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((player)[\"hand\"]); _pc = \"n30\"; break; case \"n30\": eligible = (__rvb_import_bound_method_16)(function (card) { var __rvb_import_effect_13, __rvb_import_operand_11, __rvb_import_operand_14, __rvb_import_operand_15, __rvb_import_value_10, __rvb_import_value_8, state; { var __rvb_content_graph_region_pc_1 = \"n45\"; while (__rvb_content_graph_region_pc_1 !== \"n31\") { switch (__rvb_content_graph_region_pc_1) { case \"n45\": state = ((card)[\"contentState\"] || {}); __rvb_content_graph_region_pc_1 = \"n44\"; break; case \"n44\": __rvb_import_value_8 = (void 0); __rvb_content_graph_region_pc_1 = \"n43\"; break; case \"n43\": __rvb_import_value_10 = (void 0); __rvb_content_graph_region_pc_1 = \"n42\"; break; case \"n42\": __rvb_import_operand_15 = isOrdinaryHoly; __rvb_content_graph_region_pc_1 = \"n41\"; break; case \"n41\": __rvb_import_effect_13 = (__rvb_import_operand_15)(card); __rvb_content_graph_region_pc_1 = \"n40\"; break; case \"n40\": __rvb_import_operand_14 = __rvb_import_effect_13; __rvb_content_graph_region_pc_1 = \"n38\"; break; case \"n38\": __rvb_content_graph_region_pc_1 = (! (! __rvb_import_operand_14)) ? \"n37\" : \"n39\"; break; case \"n39\": __rvb_import_value_10 = __rvb_import_operand_14; __rvb_content_graph_region_pc_1 = \"n36\"; break; case \"n37\": __rvb_import_value_10 = (! (state)[\"velenHolyProphecy\"]); __rvb_content_graph_region_pc_1 = \"n36\"; break; case \"n36\": __rvb_import_operand_11 = __rvb_import_value_10; __rvb_content_graph_region_pc_1 = \"n34\"; break; case \"n34\": __rvb_content_graph_region_pc_1 = (! (! __rvb_import_operand_11)) ? \"n33\" : \"n35\"; break; case \"n35\": __rvb_import_value_8 = __rvb_import_operand_11; __rvb_content_graph_region_pc_1 = \"n32\"; break; case \"n33\": __rvb_import_value_8 = (! (state)[\"velenHolyProphecyEnhanced\"]); __rvb_content_graph_region_pc_1 = \"n32\"; break; case \"n32\": return __rvb_import_value_8; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n14\"; break; case \"n14\": _pc = (! (! ((eligible)[\"length\"] === 0))) ? \"n13\" : \"n12\"; break; case \"n12\": cardNames = {\"holy-smite\": \"圣光惩击\", \"holy-heal\": \"圣光治疗\", \"holy-charge\": \"圣光充能\"}; _pc = \"n11\"; break; case \"n11\": options = (eligible)[\"map\"](function (card) { return {label: ((card)[\"name\"] || (cardNames)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((card)[\"cardId\"])]), value: (card)[\"instanceId\"]}; }); _pc = \"n10\"; break; case \"n10\": choice = selectOption({title: \"圣光预言：选择一张圣光手牌\", options: options, selectionMode: \"single\", presentation: \"hand\", minSelections: 1, maxSelections: 1}); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (((choice === (void 0)) || (choice === null)) || (choice)[\"needsOptionSelection\"]))) ? \"n8\" : \"n7\"; break; case \"n7\": card = (eligible)[\"find\"](function (item) { return ((item)[\"instanceId\"] === choice); }); _pc = \"n6\"; break; case \"n6\": _pc = (! (! (! card))) ? \"n5\" : \"n4\"; break; case \"n4\": _pc = (! (! (! (card)[\"contentState\"]))) ? \"n3\" : \"n2\"; break; case \"n3\": (card)[\"contentState\"] = {}; _pc = \"n2\"; break; case \"n2\": ((card)[\"contentState\"])[\"velenHolyProphecy\"] = {sourcePieceId: (caster)[\"instanceId\"], createdTurnNumber: ((battle)[\"turn\"])[\"turnNumber\"]}; _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((caster)[\"name\"] + \"留下了圣光预言\")}; case \"n5\": return {success: false, message: \"选择的手牌已无法被预言\"}; case \"n8\": return choice; case \"n13\": return {success: false, message: \"没有可预言的圣光手牌\"}; case \"n50\": return {success: false, message: \"未找到玩家\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === __gameplayInvalid) || (\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === undefined) || (\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "range": "self",
   "concealTargetInBattleLog": true,
   "contentGraph": {
@@ -947,39 +947,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:velen-holy-prophecy",
+    "links": []
   }
 }

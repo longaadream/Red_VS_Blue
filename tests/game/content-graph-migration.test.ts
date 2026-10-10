@@ -397,7 +397,8 @@ function gridAction(
   }
 }
 
-const generatedDefinitionFields = new Set(['code', 'skillCode', 'previewCode', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries', 'gameplayModules'])
+// Cluster links are editor metadata; gameplay fields still compare to the frozen baseline.
+const generatedDefinitionFields = new Set(['code', 'skillCode', 'previewCode', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries', 'gameplayModules', 'cluster'])
 
 function canonicalDefinition(value: unknown): unknown {
   if (!record(value)) return value

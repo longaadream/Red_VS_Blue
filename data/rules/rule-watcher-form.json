@@ -5,548 +5,653 @@
   "trigger": {
     "type": "beginTurn"
   },
-  "skillCode": "var cardId, chosen, currentPlayerId, piece; var _pc = \"n14\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n14\": piece = (context)[\"rulePiece\"]; _pc = \"n13\"; break; case \"n13\": _pc = (! (! ((! piece) || ((piece)[\"currentHp\"] <= 0)))) ? \"n12\" : \"n11\"; break; case \"n11\": currentPlayerId = ((battle && (battle)[\"turn\"]) && ((battle)[\"turn\"])[\"currentPlayerId\"]); _pc = \"n10\"; break; case \"n10\": _pc = (! (! ((! currentPlayerId) || ((String(currentPlayerId))[\"toLowerCase\"]() !== (String((piece)[\"ownerPlayerId\"]))[\"toLowerCase\"]())))) ? \"n9\" : \"n8\"; break; case \"n8\": chosen = selectOption({title: ((piece)[\"name\"] + \" 红蓝形态：选择加入手牌的卡\"), playerId: (piece)[\"ownerPlayerId\"], canCancel: false, options: [{id: \"calm\", label: \"平静（护盾2点，进入平静姿态）\"}, {id: \"rage\", label: \"暴怒（造成1倍伤害，进入暴怒姿态）\"}]}); _pc = \"n7\"; break; case \"n7\": _pc = (! (! ((! chosen) || (chosen)[\"needsOptionSelection\"]))) ? \"n6\" : \"n3\"; break; case \"n3\": cardId = ((((chosen === \"calm\") || ((chosen)[\"id\"] === \"calm\")) || ((chosen)[\"value\"] === \"calm\")) ? \"watcher-calm\" : \"watcher-rage\"); _pc = \"n2\"; break; case \"n2\": addCardToHand(cardId, (piece)[\"ownerPlayerId\"]); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((piece)[\"name\"] + \"的红蓝形态发动：\") + ((cardId === \"watcher-calm\") ? \"获得平静\" : \"获得暴怒\"))}; case \"n6\": _pc = (! (! chosen)) ? \"n5\" : \"n4\"; break; case \"n5\": (chosen)[\"playerId\"] = (piece)[\"ownerPlayerId\"]; _pc = \"n4\"; break; case \"n4\": return chosen; case \"n9\": return {success: false, message: \"\"}; case \"n12\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "rule",
-    "entry": "n14",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "skillCode": "var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === null)) { _module2 = __gameplayInvalid; } else { var _module2 = (!(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1))); } var _condition4 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2); if (_condition4 !== __gameplayInvalid && _condition4) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module3 = __gameplayInvalid; } else { var _module3 = (({success: false, message: \"\"})); } if (!((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"result\")) ? _module3[\"result\"] : _module3) === __gameplayInvalid))) { return ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"result\")) ? _module3[\"result\"] : _module3); } } if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module5 = __gameplayInvalid; } else { var _module5 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module6 = __gameplayInvalid; } else { var _module6 = (flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))[\"currentHp\"]); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) > 0)); } if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === null)) { _module8 = __gameplayInvalid; } else { var _module8 = (!(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7))); } var _condition10 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); if (_condition10 !== __gameplayInvalid && _condition10) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module9 = __gameplayInvalid; } else { var _module9 = (({success: false, message: \"\"})); } if (!((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"result\")) ? _module9[\"result\"] : _module9) === __gameplayInvalid))) { return ((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"result\")) ? _module9[\"result\"] : _module9); } } var _module11 = (battle.turn.currentPlayerId); if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module12 = __gameplayInvalid; } else { var _module12 = (flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)).ownerPlayerId); } if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11))) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12)))) { _module13 = __gameplayInvalid; } else { var _module13 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12))); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null)) { _module14 = __gameplayInvalid; } else { var _module14 = (!(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13))); } var _condition16 = ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14); if (_condition16 !== __gameplayInvalid && _condition16) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module15 = __gameplayInvalid; } else { var _module15 = (({success: false, message: \"\"})); } if (!((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"result\")) ? _module15[\"result\"] : _module15) === __gameplayInvalid))) { return ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"result\")) ? _module15[\"result\"] : _module15); } } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module17 = __gameplayInvalid; } else { var _module17 = (String(flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))[\"name\"])); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((\"\" + ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17))); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === null) || (\" 红蓝形态：选择加入手牌的卡\" === __gameplayInvalid) || (\" 红蓝形态：选择加入手牌的卡\" === undefined) || (\" 红蓝形态：选择加入手牌的卡\" === null)) { _module19 = __gameplayInvalid; } else { var _module19 = ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) + \" 红蓝形态：选择加入手牌的卡\")); } if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12))) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19) === undefined) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19) === null)) { _module20 = __gameplayInvalid; } else { var _module20 = (flow.choice.option({title: ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19), options: [{id: \"calm\", label: \"平静（护盾2点，进入平静姿态）\"}, {id: \"rage\", label: \"暴怒（造成1倍伤害，进入暴怒姿态）\"}], playerId: ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12), canCancel: false})); } if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20) === __gameplayInvalid)) { _module21 = __gameplayInvalid; } else { var _module21 = ((!((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20) || Boolean(((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20).needsTargetSelection) || Boolean(((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20).needsOptionSelection))); } var _condition23 = ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21); if (_condition23 !== __gameplayInvalid && _condition23) { if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20) === __gameplayInvalid)) { _module22 = __gameplayInvalid; } else { var _module22 = (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20)); } if (!((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"result\")) ? _module22[\"result\"] : _module22) === __gameplayInvalid))) { return ((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"result\")) ? _module22[\"result\"] : _module22); } } if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20) === __gameplayInvalid)) { _module24 = __gameplayInvalid; } else { var _module24 = ((function(value) { if (typeof value === \"string\") return value; if (value && typeof value.id === \"string\") return value.id; if (value && typeof value.value === \"string\") return value.value; return \"\"; })(((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"choice\")) ? _module20[\"choice\"] : _module20))); } if ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === null) || (\"calm\" === __gameplayInvalid) || (\"calm\" === undefined) || (\"calm\" === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === \"calm\")); } var _condition36 = ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25); if (_condition36 !== __gameplayInvalid && _condition36) { if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === null) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12)))) { _module26 = __gameplayInvalid; } else { var _module26 = (flow.cards.add(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12), \"watcher-calm\")); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module27 = __gameplayInvalid; } else { var _module27 = ((\"\" + \"\")); } if ((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === undefined) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null)) { _module28 = __gameplayInvalid; } else { var _module28 = ((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) + ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17))); } if ((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === null) || (\"的红蓝形态发动：获得平静\" === __gameplayInvalid) || (\"的红蓝形态发动：获得平静\" === undefined) || (\"的红蓝形态发动：获得平静\" === null)) { _module29 = __gameplayInvalid; } else { var _module29 = ((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) + \"的红蓝形态发动：获得平静\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"text\")) ? _module29[\"text\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"text\")) ? _module29[\"text\"] : _module29) === null)) { _module30 = __gameplayInvalid; } else { var _module30 = (({success: true, message: ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"text\")) ? _module29[\"text\"] : _module29)})); } if (!((((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"result\")) ? _module30[\"result\"] : _module30) === __gameplayInvalid))) { return ((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"result\")) ? _module30[\"result\"] : _module30); } } else if (_condition36 !== __gameplayInvalid) { if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === null) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12)))) { _module31 = __gameplayInvalid; } else { var _module31 = (flow.cards.add(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12), \"watcher-rage\")); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((\"\" + \"\")); } if ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === __gameplayInvalid) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === undefined) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null)) { _module33 = __gameplayInvalid; } else { var _module33 = ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) + ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17))); } if ((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === __gameplayInvalid) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === undefined) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === null) || (\"的红蓝形态发动：获得暴怒\" === __gameplayInvalid) || (\"的红蓝形态发动：获得暴怒\" === undefined) || (\"的红蓝形态发动：获得暴怒\" === null)) { _module34 = __gameplayInvalid; } else { var _module34 = ((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) + \"的红蓝形态发动：获得暴怒\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = (({success: true, message: ((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34)})); } if (!((((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"result\")) ? _module35[\"result\"] : _module35) === __gameplayInvalid))) { return ((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"result\")) ? _module35[\"result\"] : _module35); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "piece-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "piece"
-                    },
-                    "key": "name"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": "的红蓝形态发动："
-                  }
-                },
-                "right": {
-                  "kind": "conditional",
-                  "test": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "ref",
-                      "name": "cardId"
-                    },
-                    "right": {
+              "kind": "call",
+              "id": "piece-exists",
+              "module": "query.has-piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "piece-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "piece-missing",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "piece-exists",
+                  "port": "exists"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "piece-required",
+              "condition": {
+                "kind": "output",
+                "node": "piece-missing",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "piece-missing-result-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
                       "kind": "literal",
-                      "value": "watcher-calm"
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
                     }
                   },
-                  "consequent": {
-                    "kind": "literal",
-                    "value": "获得平静"
-                  },
-                  "alternate": {
-                    "kind": "literal",
-                    "value": "获得暴怒"
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "piece-missing-result-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "piece-missing-result-result",
+                    "port": "result"
                   }
                 }
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "call",
-        "capability": "addCardToHand",
-        "args": [
-          {
-            "kind": "ref",
-            "name": "cardId"
-          },
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "piece"
+              ]
             },
-            "key": "ownerPlayerId"
-          }
-        ],
-        "next": "n1"
-      },
-      {
-        "id": "n3",
-        "kind": "bind",
-        "name": "cardId",
-        "expr": {
-          "kind": "conditional",
-          "test": {
-            "kind": "binary",
-            "op": "||",
-            "left": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "ref",
-                  "name": "chosen"
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": "calm"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "chosen"
-                  },
-                  "key": "id"
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": "calm"
-                }
-              }
-            },
-            "right": {
-              "kind": "binary",
-              "op": "===",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "chosen"
-                },
-                "key": "value"
-              },
-              "right": {
-                "kind": "literal",
-                "value": "calm"
-              }
-            }
-          },
-          "consequent": {
-            "kind": "literal",
-            "value": "watcher-calm"
-          },
-          "alternate": {
-            "kind": "literal",
-            "value": "watcher-rage"
-          }
-        },
-        "next": "n2"
-      },
-      {
-        "id": "n4",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "chosen"
-        }
-      },
-      {
-        "id": "n5",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "chosen"
-          },
-          "key": "playerId"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "piece"
-          },
-          "key": "ownerPlayerId"
-        },
-        "next": "n4"
-      },
-      {
-        "id": "n6",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "ref",
-              "name": "chosen"
-            }
-          }
-        },
-        "yes": "n5",
-        "no": "n4"
-      },
-      {
-        "id": "n7",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "chosen"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "chosen"
-                },
-                "key": "needsOptionSelection"
-              }
-            }
-          }
-        },
-        "yes": "n6",
-        "no": "n3"
-      },
-      {
-        "id": "n8",
-        "kind": "call",
-        "capability": "selectOption",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "title",
-                "value": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "piece"
-                    },
-                    "key": "name"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": " 红蓝形态：选择加入手牌的卡"
-                  }
-                }
-              },
-              {
-                "key": "playerId",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "piece"
-                  },
-                  "key": "ownerPlayerId"
-                }
-              },
-              {
-                "key": "canCancel",
-                "value": {
-                  "kind": "literal",
-                  "value": false
-                }
-              },
-              {
-                "key": "options",
-                "value": {
-                  "kind": "array",
-                  "items": [
-                    {
-                      "kind": "object",
-                      "entries": [
-                        {
-                          "key": "id",
-                          "value": {
-                            "kind": "literal",
-                            "value": "calm"
-                          }
-                        },
-                        {
-                          "key": "label",
-                          "value": {
-                            "kind": "literal",
-                            "value": "平静（护盾2点，进入平静姿态）"
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "kind": "object",
-                      "entries": [
-                        {
-                          "key": "id",
-                          "value": {
-                            "kind": "literal",
-                            "value": "rage"
-                          }
-                        },
-                        {
-                          "key": "label",
-                          "value": {
-                            "kind": "literal",
-                            "value": "暴怒（造成1倍伤害，进入暴怒姿态）"
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ],
-        "result": "chosen",
-        "next": "n7"
-      },
-      {
-        "id": "n9",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
+              "kind": "call",
+              "id": "piece",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "piece-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "hp",
+              "module": "attribute.read",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "piece",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "currentHp"
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n10",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "currentPlayerId"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "!==",
+              "kind": "call",
+              "id": "alive",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "call",
-                    "callee": "String",
-                    "args": [
-                      {
-                        "kind": "ref",
-                        "name": "currentPlayerId"
-                      }
-                    ]
-                  },
-                  "method": "toLowerCase",
-                  "args": []
-                },
-                "right": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "call",
-                    "callee": "String",
-                    "args": [
-                      {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "piece"
-                        },
-                        "key": "ownerPlayerId"
-                      }
-                    ]
-                  },
-                  "method": "toLowerCase",
-                  "args": []
-                }
-              }
-            }
-          }
-        },
-        "yes": "n9",
-        "no": "n8"
-      },
-      {
-        "id": "n11",
-        "kind": "bind",
-        "name": "currentPlayerId",
-        "expr": {
-          "kind": "binary",
-          "op": "&&",
-          "left": {
-            "kind": "binary",
-            "op": "&&",
-            "left": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "right": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "turn"
-            }
-          },
-          "right": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "turn"
-            },
-            "key": "currentPlayerId"
-          }
-        },
-        "next": "n10"
-      },
-      {
-        "id": "n12",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n13",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "piece"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "<=",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "piece"
-                  },
-                  "key": "currentHp"
+                  "kind": "output",
+                  "node": "hp",
+                  "port": "value"
                 },
                 "right": {
                   "kind": "literal",
                   "value": 0
                 }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "dead",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "alive",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "alive-required",
+              "condition": {
+                "kind": "output",
+                "node": "dead",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "dead-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "dead-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "dead-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "event-player",
+              "module": "turn.current-player",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "piece.owner",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "piece",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "same-player",
+              "module": "compare.player-reference",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "event-player",
+                  "port": "player"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "wrong-player",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "same-player",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "owner-turn-required",
+              "condition": {
+                "kind": "output",
+                "node": "wrong-player",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "wrong-player-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "wrong-player-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "wrong-player-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "name",
+              "module": "attribute.text",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "piece",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "name"
               }
+            },
+            {
+              "kind": "call",
+              "id": "choice-title-0",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": ""
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "name",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "choice-title-1",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "choice-title-0",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": " 红蓝形态：选择加入手牌的卡"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "choice",
+              "module": "choice.required-option-pair",
+              "version": "1",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                },
+                "title": {
+                  "kind": "output",
+                  "node": "choice-title-1",
+                  "port": "text"
+                }
+              },
+              "parameters": {
+                "firstLabel": "平静（护盾2点，进入平静姿态）",
+                "firstValue": "calm",
+                "secondLabel": "暴怒（造成1倍伤害，进入暴怒姿态）",
+                "secondValue": "rage"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "unresolved",
+              "module": "choice.is-unresolved",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "waiting",
+              "condition": {
+                "kind": "output",
+                "node": "unresolved",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "choice-result",
+                  "module": "choice.as-result",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "waiting-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "choice-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "selected",
+              "module": "choice.option-id-value",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "is-calm",
+              "module": "compare.equal-string",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "selected",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "calm"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "calm-branch",
+              "condition": {
+                "kind": "output",
+                "node": "is-calm",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "calm-card",
+                  "module": "card.hand-add",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "output",
+                      "node": "owner",
+                      "port": "player"
+                    }
+                  },
+                  "parameters": {
+                    "cardId": "watcher-calm"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "calm-message-0",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "literal",
+                      "value": ""
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "calm-message-1",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "calm-message-0",
+                      "port": "text"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "name",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "calm-message-2",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "calm-message-1",
+                      "port": "text"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "的红蓝形态发动：获得平静"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "calm-success-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": true
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "calm-message-2",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "calm-success-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "calm-success-result",
+                    "port": "result"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "rage-card",
+                  "module": "card.hand-add",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "output",
+                      "node": "owner",
+                      "port": "player"
+                    }
+                  },
+                  "parameters": {
+                    "cardId": "watcher-rage"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "rage-message-0",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "literal",
+                      "value": ""
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "rage-message-1",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "rage-message-0",
+                      "port": "text"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "name",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "rage-message-2",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "rage-message-1",
+                      "port": "text"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "的红蓝形态发动：获得暴怒"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "rage-success-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": true
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "rage-message-2",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "rage-success-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "rage-success-result",
+                    "port": "result"
+                  }
+                }
+              ]
             }
-          }
+          ]
         },
-        "yes": "n12",
-        "no": "n11"
-      },
-      {
-        "id": "n14",
-        "kind": "bind",
-        "name": "piece",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "rulePiece"
-        },
-        "next": "n13"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "skillCode",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

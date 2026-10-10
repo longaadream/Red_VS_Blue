@@ -14,286 +14,471 @@
     "type": "afterDamageTaken"
   },
   "icon": "Zap",
-  "code": "function executeCard(context) { var __rvb_lexical_0_attacker, __rvb_lexical_1_defender, __rvb_lexical_2_result; var _pc = \"n10\"; for (var _step = 0; _step <= 10; _step++) { switch (_pc) { case \"n10\": _pc = (! (! (! (context)[\"sourcePiece\"]))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! ((context)[\"targetPiece\"] && (((context)[\"targetPiece\"])[\"ownerPlayerId\"] !== playerId)))) ? \"n7\" : \"n6\"; break; case \"n6\": __rvb_lexical_0_attacker = (context)[\"sourcePiece\"]; _pc = \"n5\"; break; case \"n5\": __rvb_lexical_1_defender = (context)[\"targetPiece\"]; _pc = \"n4\"; break; case \"n4\": _pc = (! (! ((! __rvb_lexical_1_defender) || ((__rvb_lexical_1_defender)[\"ownerPlayerId\"] !== playerId)))) ? \"n3\" : \"n2\"; break; case \"n2\": __rvb_lexical_2_result = dealDamage(__rvb_lexical_1_defender, __rvb_lexical_0_attacker, 5, \"true\", battle, \"sample-reactive-card\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: `反击意志：对${((__rvb_lexical_0_attacker)[\"name\"] || (__rvb_lexical_0_attacker)[\"templateId\"])}造成5点真实伤害`}; case \"n3\": return {success: false}; case \"n7\": return {success: false}; case \"n9\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "card",
-    "entry": "n10",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "code": "function executeCard(context) { var __gameplayInvalid = {}; var _module0 = (flow.effects.captureEventPiece(\"sourcePiece\")); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0) != null)); } var _condition19 = ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1); if (_condition19 !== __gameplayInvalid && _condition19) { var _module2 = (flow.effects.captureEventPiece(\"targetPiece\")); if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2) === undefined)) { _module3 = __gameplayInvalid; } else { var _module3 = ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2) != null)); } var _condition17 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3); if (_condition17 !== __gameplayInvalid && _condition17) { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0) === undefined)) { _module4 = __gameplayInvalid; } else { var _module4 = ((function(source) { flow.effects.capturedOwner(source); return source; })(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"source\")) ? _module0[\"source\"] : _module0))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2) === undefined)) { _module5 = __gameplayInvalid; } else { var _module5 = ((function(source) { flow.effects.capturedOwner(source); return source; })(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"source\")) ? _module2[\"source\"] : _module2))); } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = (flow.effects.capturedOwner(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5))); } var _module7 = (flow.refs.player()); if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"player\")) ? _module6[\"player\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"player\")) ? _module6[\"player\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"player\")) ? _module6[\"player\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"player\")) ? _module6[\"player\"] : _module6))) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"player\")) ? _module7[\"player\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"player\")) ? _module7[\"player\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"player\")) ? _module7[\"player\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"player\")) ? _module7[\"player\"] : _module7)))) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"player\")) ? _module6[\"player\"] : _module6) === ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"player\")) ? _module7[\"player\"] : _module7))); } var _condition15 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); if (_condition15 !== __gameplayInvalid && _condition15) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === null) || (5 === __gameplayInvalid) || (5 === undefined) || (5 === null)) { _module9 = __gameplayInvalid; } else { var _module9 = (flow.effects.damageCaptured(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"source\")) ? _module5[\"source\"] : _module5), ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4), 5, \"true\", \"sample-reactive-card\")); } if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4) === null)) { _module10 = __gameplayInvalid; } else { var _module10 = (flow.effects.capturedName(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"source\")) ? _module4[\"source\"] : _module4), \"templateId\")); } if ((\"反击意志：对\" === __gameplayInvalid) || (\"反击意志：对\" === undefined) || (\"反击意志：对\" === null) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = ((\"反击意志：对\" + ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10))); } if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (\"造成5点真实伤害\" === __gameplayInvalid) || (\"造成5点真实伤害\" === undefined) || (\"造成5点真实伤害\" === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) + \"造成5点真实伤害\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === null)) { _module13 = __gameplayInvalid; } else { var _module13 = (({success: true, message: ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12)})); } if (!((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"result\")) ? _module13[\"result\"] : _module13) === __gameplayInvalid))) { return ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"result\")) ? _module13[\"result\"] : _module13); } } else if (_condition15 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null)) { _module14 = __gameplayInvalid; } else { var _module14 = (({success: false})); } if (!((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"result\")) ? _module14[\"result\"] : _module14) === __gameplayInvalid))) { return ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"result\")) ? _module14[\"result\"] : _module14); } } } else if (_condition17 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null)) { _module16 = __gameplayInvalid; } else { var _module16 = (({success: false})); } if (!((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"result\")) ? _module16[\"result\"] : _module16) === __gameplayInvalid))) { return ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"result\")) ? _module16[\"result\"] : _module16); } } } else if (_condition19 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null)) { _module18 = __gameplayInvalid; } else { var _module18 = (({success: false})); } if (!((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"result\")) ? _module18[\"result\"] : _module18) === __gameplayInvalid))) { return ((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"result\")) ? _module18[\"result\"] : _module18); } } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "card",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "source.capture-event-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "field": "sourcePiece"
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "template",
-                "head": "反击意志：对",
-                "spans": [
-                  {
-                    "kind": "binary",
-                    "op": "||",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "__rvb_lexical_0_attacker"
-                      },
-                      "key": "name"
-                    },
-                    "right": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "__rvb_lexical_0_attacker"
-                      },
-                      "key": "templateId"
-                    }
+              "kind": "call",
+              "id": "has-source",
+              "module": "source.is-present",
+              "version": "1",
+              "inputs": {
+                "source": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "source"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "source-guard",
+              "condition": {
+                "kind": "output",
+                "node": "has-source",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "target",
+                  "module": "source.capture-event-piece",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {
+                    "field": "targetPiece"
                   }
-                ],
-                "tails": [
-                  "",
-                  "造成5点真实伤害"
-                ]
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "call",
-        "capability": "dealDamage",
-        "args": [
-          {
-            "kind": "ref",
-            "name": "__rvb_lexical_1_defender"
-          },
-          {
-            "kind": "ref",
-            "name": "__rvb_lexical_0_attacker"
-          },
-          {
-            "kind": "literal",
-            "value": 5
-          },
-          {
-            "kind": "literal",
-            "value": "true"
-          },
-          {
-            "kind": "ref",
-            "name": "battle"
-          },
-          {
-            "kind": "literal",
-            "value": "sample-reactive-card"
-          }
-        ],
-        "result": "__rvb_lexical_2_result",
-        "next": "n1"
-      },
-      {
-        "id": "n3",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n4",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_1_defender"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "!==",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "__rvb_lexical_1_defender"
+                },
+                {
+                  "kind": "call",
+                  "id": "has-target",
+                  "module": "source.is-present",
+                  "version": "1",
+                  "inputs": {
+                    "source": {
+                      "kind": "output",
+                      "node": "target",
+                      "port": "source"
+                    }
                   },
-                  "key": "ownerPlayerId"
+                  "parameters": {}
                 },
-                "right": {
-                  "kind": "ref",
-                  "name": "playerId"
-                }
-              }
-            }
-          }
-        },
-        "yes": "n3",
-        "no": "n2"
-      },
-      {
-        "id": "n5",
-        "kind": "bind",
-        "name": "__rvb_lexical_1_defender",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "targetPiece"
-        },
-        "next": "n4"
-      },
-      {
-        "id": "n6",
-        "kind": "bind",
-        "name": "__rvb_lexical_0_attacker",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "sourcePiece"
-        },
-        "next": "n5"
-      },
-      {
-        "id": "n7",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n8",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "&&",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "targetPiece"
-              },
-              "right": {
-                "kind": "binary",
-                "op": "!==",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "context"
+                {
+                  "kind": "if",
+                  "id": "target-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "has-target",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "source-valid",
+                      "module": "source.require-present",
+                      "version": "1",
+                      "inputs": {
+                        "source": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "source"
+                        }
+                      },
+                      "parameters": {}
                     },
-                    "key": "targetPiece"
-                  },
-                  "key": "ownerPlayerId"
-                },
-                "right": {
-                  "kind": "ref",
-                  "name": "playerId"
+                    {
+                      "kind": "call",
+                      "id": "target-valid",
+                      "module": "source.require-present",
+                      "version": "1",
+                      "inputs": {
+                        "source": {
+                          "kind": "output",
+                          "node": "target",
+                          "port": "source"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "target-owner",
+                      "module": "source.captured-owner",
+                      "version": "1",
+                      "inputs": {
+                        "source": {
+                          "kind": "output",
+                          "node": "target-valid",
+                          "port": "source"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "owner",
+                      "module": "ref.player",
+                      "version": "1",
+                      "inputs": {},
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "same-owner",
+                      "module": "compare.player-reference",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "target-owner",
+                          "port": "player"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "owner",
+                          "port": "player"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "friendly-target-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "same-owner",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "damage",
+                          "module": "effect.damage-captured",
+                          "version": "1",
+                          "inputs": {
+                            "source": {
+                              "kind": "output",
+                              "node": "target-valid",
+                              "port": "source"
+                            },
+                            "target": {
+                              "kind": "output",
+                              "node": "source-valid",
+                              "port": "source"
+                            },
+                            "amount": {
+                              "kind": "literal",
+                              "value": 5
+                            }
+                          },
+                          "parameters": {
+                            "damageType": "true",
+                            "skillId": "sample-reactive-card"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "attacker-name",
+                          "module": "piece.captured-name",
+                          "version": "1",
+                          "inputs": {
+                            "source": {
+                              "kind": "output",
+                              "node": "source-valid",
+                              "port": "source"
+                            }
+                          },
+                          "parameters": {
+                            "fallback": "templateId"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "message",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "literal",
+                              "value": "反击意志：对"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "attacker-name",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "message-2",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "message",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "造成5点真实伤害"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": true
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "message-2",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "return-success",
+                          "value": {
+                            "kind": "output",
+                            "node": "result",
+                            "port": "result"
+                          }
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "friendly-target-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "friendly-target-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "friendly-target-result",
+                            "port": "result"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "missing-target-result",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "missing-target-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "missing-target-result",
+                        "port": "result"
+                      }
+                    }
+                  ]
                 }
-              }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "missing-source-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "missing-source-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "missing-source-result",
+                    "port": "result"
+                  }
+                }
+              ]
             }
-          }
-        },
-        "yes": "n7",
-        "no": "n6"
-      },
-      {
-        "id": "n9",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+          ],
+          "schemas": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
+              "id": "damage-buff-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "calm-shield-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "stance-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                }
+              ]
             }
           ]
-        }
-      },
-      {
-        "id": "n10",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "sourcePiece"
-              }
-            }
-          }
         },
-        "yes": "n9",
-        "no": "n8"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

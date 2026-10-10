@@ -1,5 +1,6 @@
 import { assertContentAvailable, battleContentMode, type ModeScopedContent } from './content-availability'
 import { writePiecePosition, withPositionWriteGuard } from './position-write-guard'
+import { normalizePendingResult } from './pending-result'
 import { areMatchAllies } from './match-teams'
 import { applySkillChoiceSequence, type SkillChoiceInput } from './skill-choice-sequence'
 import { adventureBoundary, adventureDeploymentCells, refreshAdventureActionPoints, isAdventureProgramMove } from './adventure-boundary'
@@ -1558,6 +1559,7 @@ function applyBattleActionInternal(
     currentContext: any,
     seed: PendingSeed = {},
   ): boolean => {
+    result = normalizePendingResult(result)!
     if (!result.needsOptionSelection && !result.needsTargetSelection) return false
     if (result.needsTargetSelection && Array.isArray(result.targetCandidates)) {
       const minimum = Number.isSafeInteger(result.minSelections)
@@ -1612,7 +1614,7 @@ function applyBattleActionInternal(
       source: {
         type: currentRuleId ? 'rule' : 'pending',
         id: currentRuleId || 'pending-target',
-        pieceId: currentRuleSourceId,
+        pieceId: currentRuleSourceId ?? seed.source?.pieceId,
       },
       triggerContext,
       continuationContext,
@@ -3671,6 +3673,7 @@ function applyBattleActionInternal(
       }
       appendTriggerMessages(next, result, action.playerId)
       if (setPendingInteraction(next, result, pending.triggerContext || {}, {
+        source: pending.source,
         continuationContext: pending.continuationContext,
         pendingQueue: pending.pendingQueue,
           pendingReactiveCards: pending.pendingReactiveCards,

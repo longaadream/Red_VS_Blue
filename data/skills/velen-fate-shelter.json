@@ -29,7 +29,7 @@
     ]
   },
   "code": "function executeSkill(context) { var caster, existing, target; var _pc = \"n12\"; for (var _step = 0; _step <= 12; _step++) { switch (_pc) { case \"n12\": caster = (context)[\"piece\"]; _pc = \"n11\"; break; case \"n11\": target = selectTarget({type: \"piece\", range: 99, filter: \"ally\"}); _pc = \"n10\"; break; case \"n10\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n9\" : \"n8\"; break; case \"n8\": _pc = (! (! (((target)[\"currentHp\"] <= 0) || (! arePlayersAllied(battle, (target)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"]))))) ? \"n7\" : \"n6\"; break; case \"n6\": existing = ((target)[\"statusTags\"] && ((target)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"velen-fate-shelter\"); })); _pc = \"n5\"; break; case \"n5\": _pc = (! (! existing)) ? \"n4\" : \"n3\"; break; case \"n3\": addStatusEffectById((target)[\"instanceId\"], {id: (((\"velen-fate-shelter-\" + (caster)[\"instanceId\"]) + \"-\") + (target)[\"instanceId\"]), name: \"命运庇护\", type: \"velen-fate-shelter\", currentDuration: (- 1), currentUses: (- 1), intensity: 8, stacks: 1, sourceId: (caster)[\"instanceId\"], createdTurnNumber: ((battle)[\"turn\"])[\"turnNumber\"], relatedRules: [\"rule-velen-fate-target\"]}); _pc = \"n2\"; break; case \"n2\": addRuleById((target)[\"instanceId\"], \"rule-velen-fate-target\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"为\") + (target)[\"name\"]) + \"预见了命运庇护\")}; case \"n4\": return {success: false, message: \"目标已经获得命运庇护\"}; case \"n7\": return {success: false, message: \"命运庇护只能选择存活友方\"}; case \"n9\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\", expectedValues: {heal: 8}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\" === __gameplayInvalid) || (\"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\" === undefined) || (\"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\" === null) || (8 === __gameplayInvalid) || (8 === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。\", expectedValues: {heal: 8}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "range": "single",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
@@ -536,47 +536,55 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": [
-                      {
-                        "key": "heal",
-                        "value": {
-                          "kind": "literal",
-                          "value": 8
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择全图友军。你的下回合开始时若双方存活，回复目标8点，并赋予圣盾。"
+                },
+                "heal": {
+                  "kind": "literal",
+                  "value": 8
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:velen-fate-shelter",
+    "links": []
   }
 }

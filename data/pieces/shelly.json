@@ -13,11 +13,30 @@
     "speed": 4
   },
   "skills": [
-    { "skillId": "shelly-bandage", "level": 1 },
-    { "skillId": "shelly-shotgun", "level": 1 },
-    { "skillId": "shelly-super-shell", "level": 1 },
-    { "skillId": "shelly-dash", "level": 1 }
+    {
+      "skillId": "shelly-bandage",
+      "level": 1
+    },
+    {
+      "skillId": "shelly-shotgun",
+      "level": 1
+    },
+    {
+      "skillId": "shelly-super-shell",
+      "level": 1
+    },
+    {
+      "skillId": "shelly-dash",
+      "level": 1
+    }
   ],
-  "rules": ["rule-shelly-bandage"],
-  "isDefault": false
+  "rules": [
+    "rule-shelly-bandage"
+  ],
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:shelly",
+    "links": []
+  }
 }

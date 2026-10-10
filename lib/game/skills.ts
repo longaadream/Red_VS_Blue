@@ -1296,6 +1296,7 @@ export function createSkillCodeFlow(battle: BattleState, context: Parameters<typ
   }
   return createFlowRuntime(battle, context, surface, {
     dealDamage, healDamage,
+    loadCardDefinition: cardId => loadCardForBattle(battle, cardId),
     addStatusEffectById: (id, status) => addStatusWithEvents(battle, id, status),
     removeStatusEffectById: (id, status) => removeStatusWithEvents(battle, id, status),
     addPlayerStatusEffectById: (id, status) => addPlayerStatusWithEvents(battle, id, status),

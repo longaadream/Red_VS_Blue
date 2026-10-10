@@ -15,37 +15,78 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "self",
-  "code": "function executeSkill(context) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "triggerSkill",
-    "entry": "n1",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module0 = ({success: false, message: \"\"}); } if (!(((_module0[\"success\"]) === __gameplayInvalid) || ((_module0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module0[\"success\"]), \"message\": (_module0[\"message\"]) }; } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "result",
+              "module": "result.message",
+              "version": "1",
+              "inputs": {
+                "message": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {
+                "success": false
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
+              "kind": "return",
+              "id": "return",
+              "values": {
+                "success": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "success"
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "message"
+                }
               }
             }
           ]
-        }
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:ulquiorra-high-speed-regeneration",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-ulquiorra-damage-dealt",
+        "relation": "shared",
+        "source": "pieces/dark-ulquiorra.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-ulquiorra-damage-taken",
+        "relation": "shared",
+        "source": "pieces/dark-ulquiorra.rules"
       }
     ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  }
 }

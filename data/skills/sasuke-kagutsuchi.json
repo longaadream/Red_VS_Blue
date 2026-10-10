@@ -18,7 +18,7 @@
   "powerMultiplier": 1,
   "actionPointCost": 1,
   "code": "function executeSkill(context) { var caster, cells, existing, layers, removed, target; var _pc = \"n33\"; for (var _step = 0; _step <= 15; _step++) { switch (_pc) { case \"n33\": caster = (context)[\"piece\"]; _pc = \"n32\"; break; case \"n32\": target = selectTarget({type: \"piece\", range: 99, filter: \"all\"}); _pc = \"n31\"; break; case \"n31\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n30\" : \"n29\"; break; case \"n29\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n28\" : \"n27\"; break; case \"n28\": (battle)[\"extensions\"] = {}; _pc = \"n27\"; break; case \"n27\": cells = (((battle)[\"extensions\"])[\"amaterasuCells\"] || []); _pc = \"n26\"; break; case \"n26\": removed = (cells)[\"filter\"](function (cell) { return ((Math.abs(((cell)[\"x\"] - (target)[\"x\"])) + Math.abs(((cell)[\"y\"] - (target)[\"y\"]))) <= 4); }); _pc = \"n7\"; break; case \"n7\": ((context)[\"presentationQueue\"]).push(\"tileEffectRemoved\", function () { var __rvb_import_bound_method_1, __rvb_import_effect_0; { var __rvb_content_graph_region_pc_0 = \"n25\"; while (__rvb_content_graph_region_pc_0 !== \"n8\") { switch (__rvb_content_graph_region_pc_0) { case \"n25\": ((battle)[\"extensions\"])[\"amaterasuCells\"] = (cells)[\"filter\"](function (cell) { return ((removed)[\"indexOf\"](cell) === (- 1)); }); __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_0 = (! (! ((battle)[\"extensions\"])[\"tileEffects\"])) ? \"n23\" : \"n8\"; break; case \"n23\": __rvb_import_bound_method_1 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((battle)[\"extensions\"])[\"tileEffects\"]); __rvb_content_graph_region_pc_0 = \"n18\"; break; case \"n18\": __rvb_import_effect_0 = (__rvb_import_bound_method_1)(function (effect) { { var __rvb_content_graph_region_pc_1 = \"n22\"; while (__rvb_content_graph_region_pc_1 !== \"n19\") { switch (__rvb_content_graph_region_pc_1) { case \"n22\": __rvb_content_graph_region_pc_1 = (! (! ((effect)[\"tileType\"] !== \"amaterasu\"))) ? \"n21\" : \"n20\"; break; case \"n20\": return (! (removed)[\"some\"](function (cell) { return (((cell)[\"x\"] === (effect)[\"x\"]) && ((cell)[\"y\"] === (effect)[\"y\"])); })); case \"n21\": return true; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n17\"; break; case \"n17\": ((battle)[\"extensions\"])[\"tileEffects\"] = __rvb_import_effect_0; __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n6\"; break; case \"n6\": layers = (2 + Math.min(2, (removed)[\"length\"])); _pc = \"n5\"; break; case \"n5\": existing = ((target)[\"statusTags\"] && ((target)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"amaterasu-burn\"); })); _pc = \"n4\"; break; case \"n4\": _pc = (! (! existing)) ? \"n2\" : \"n3\"; break; case \"n3\": addStatusEffectById((target)[\"instanceId\"], {id: (\"amaterasu-burn-\" + (target)[\"instanceId\"]), name: \"天照灼烧\", type: \"amaterasu-burn\", currentDuration: (- 1), currentUses: (- 1), intensity: 2, stacks: layers}); _pc = \"n1\"; break; case \"n2\": (existing)[\"stacks\"] = Math.min(4, (((existing)[\"stacks\"] || 0) + layers)); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"使用加具土命，移除目标周围\") + (removed)[\"length\"]) + \"个天照地格，为\") + (target)[\"name\"]) + \"附加\") + layers) + \"层天照\")}; case \"n30\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。\", expectedValues: {baseStacks: 2, maxStacks: 4}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; var _record0 = ({\"baseStacks\": 2, \"maxStacks\": 4}); var _record1 = ({\"description\": \"选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。\", \"expectedValues\": _record0}); if (!((_record1 === __gameplayInvalid))) { return _record1; } }",
   "targeting": {
     "steps": [
       {
@@ -919,54 +919,105 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": {
+                "kind": "record",
+                "schema": "constant-preview-result@1"
+              }
+            }
+          ],
+          "schemas": [
+            {
+              "id": "constant-record-1",
+              "version": "1",
+              "fields": [
                 {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。"
-                  }
+                  "name": "baseStacks",
+                  "type": "number"
                 },
                 {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": [
-                      {
-                        "key": "baseStacks",
-                        "value": {
-                          "kind": "literal",
-                          "value": 2
-                        }
-                      },
-                      {
-                        "key": "maxStacks",
-                        "value": {
-                          "kind": "literal",
-                          "value": 4
-                        }
-                      }
-                    ]
+                  "name": "maxStacks",
+                  "type": "number"
+                }
+              ]
+            },
+            {
+              "id": "constant-preview-result",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "description",
+                  "type": "string"
+                },
+                {
+                  "name": "expectedValues",
+                  "type": {
+                    "kind": "record",
+                    "schema": "constant-record-1@1"
                   }
                 }
               ]
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "record.create",
+              "id": "record-0",
+              "schema": "constant-record-1@1",
+              "fields": {
+                "baseStacks": {
+                  "kind": "literal",
+                  "value": 2
+                },
+                "maxStacks": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "record-1",
+              "schema": "constant-preview-result@1",
+              "fields": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择全图棋子，赋予天照 x 2。消耗目标4格内的全部天照地格，每格额外+1层，本次最多4层。"
+                },
+                "expectedValues": {
+                  "kind": "output",
+                  "node": "record-0",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "record-1",
+                "port": "value"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:sasuke-kagutsuchi",
+    "links": []
   }
 }

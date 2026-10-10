@@ -17,7 +17,7 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var added, battle, caster, cx, cy, dirX, dirY, dx, dy, pos; var _pc = \"n44\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n44\": caster = (context)[\"piece\"]; _pc = \"n43\"; break; case \"n43\": battle = (context)[\"battle\"]; _pc = \"n42\"; break; case \"n42\": pos = selectTarget({type: \"grid\", range: 99, filter: \"all\"}); _pc = \"n41\"; break; case \"n41\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n40\" : \"n39\"; break; case \"n39\": dx = ((pos)[\"x\"] - (caster)[\"x\"]); _pc = \"n38\"; break; case \"n38\": dy = ((pos)[\"y\"] - (caster)[\"y\"]); _pc = \"n37\"; break; case \"n37\": _pc = (! (! ((dx !== 0) && (dy !== 0)))) ? \"n36\" : \"n35\"; break; case \"n35\": _pc = (! (! ((dx === 0) && (dy === 0)))) ? \"n34\" : \"n33\"; break; case \"n33\": dirX = ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))); _pc = \"n32\"; break; case \"n32\": dirY = ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1))); _pc = \"n31\"; break; case \"n31\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n30\" : \"n29\"; break; case \"n30\": (battle)[\"extensions\"] = {}; _pc = \"n29\"; break; case \"n29\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n28\" : \"n27\"; break; case \"n28\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n27\"; break; case \"n27\": _pc = (! (! (! ((battle)[\"extensions\"])[\"amaterasuCells\"]))) ? \"n26\" : \"n25\"; break; case \"n26\": ((battle)[\"extensions\"])[\"amaterasuCells\"] = []; _pc = \"n25\"; break; case \"n25\": cx = ((caster)[\"x\"] + dirX); _pc = \"n24\"; break; case \"n24\": cy = ((caster)[\"y\"] + dirY); _pc = \"n23\"; break; case \"n23\": added = 0; _pc = \"n9\"; break; case \"n9\": ((context)[\"presentationQueue\"]).push(\"tileEffectAdded\", function () { var tile; { var __rvb_content_graph_region_pc_0 = \"n22\"; while (__rvb_content_graph_region_pc_0 !== \"n10\") { switch (__rvb_content_graph_region_pc_0) { case \"n22\": var __rvb_content_graph_loop_break_1 = false, __rvb_content_graph_loop_continue_2 = false; while ((! (! true))) { __rvb_content_graph_loop_continue_2 = false; { var __rvb_content_graph_region_pc_3 = \"n21\"; while (__rvb_content_graph_region_pc_3 !== \"n11\") { switch (__rvb_content_graph_region_pc_3) { case \"n21\": tile = (((battle)[\"map\"] && ((battle)[\"map\"])[\"tiles\"]) && (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === cx) && ((t)[\"y\"] === cy)); })); __rvb_content_graph_region_pc_3 = \"n20\"; break; case \"n20\": __rvb_content_graph_region_pc_3 = (! (! (! tile))) ? \"n19\" : \"n18\"; break; case \"n18\": __rvb_content_graph_region_pc_3 = (! (! (! (((battle)[\"extensions\"])[\"tileEffects\"])[\"some\"](function (t) { return ((((t)[\"tileType\"] === \"amaterasu\") && ((t)[\"x\"] === cx)) && ((t)[\"y\"] === cy)); })))) ? \"n17\" : \"n15\"; break; case \"n17\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: cx, y: cy, sourceId: \"amaterasu\", tileType: \"amaterasu\", icon: \"🌑\", iconPosition: \"bottom-right\"}); __rvb_content_graph_region_pc_3 = \"n16\"; break; case \"n16\": added = ((+ added) + 1); __rvb_content_graph_region_pc_3 = \"n15\"; break; case \"n15\": __rvb_content_graph_region_pc_3 = (! (! (! (((battle)[\"extensions\"])[\"amaterasuCells\"])[\"some\"](function (c) { return (((c)[\"x\"] === cx) && ((c)[\"y\"] === cy)); })))) ? \"n14\" : \"n13\"; break; case \"n14\": (((battle)[\"extensions\"])[\"amaterasuCells\"]).push({x: cx, y: cy, sourcePieceId: (caster)[\"instanceId\"], ownerPlayerId: (caster)[\"ownerPlayerId\"]}); __rvb_content_graph_region_pc_3 = \"n13\"; break; case \"n13\": cx += dirX; __rvb_content_graph_region_pc_3 = \"n12\"; break; case \"n12\": cy += dirY; __rvb_content_graph_region_pc_3 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_3 = \"n11\"; break; case \"n19\": __rvb_content_graph_loop_break_1 = true; __rvb_content_graph_region_pc_3 = \"n11\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; if (__rvb_content_graph_loop_break_1) break; if (__rvb_content_graph_loop_continue_2) { __rvb_content_graph_loop_continue_2 = false; continue; } } __rvb_content_graph_region_pc_0 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_0 = \"n10\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n8\"; break; case \"n8\": _pc = (! (! (added === 0))) ? \"n7\" : \"n6\"; break; case \"n6\": _pc = (! (! (! ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"]))) ? \"n5\" : \"n4\"; break; case \"n5\": ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"] = (caster)[\"ownerPlayerId\"]; _pc = \"n4\"; break; case \"n4\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-move\"); _pc = \"n3\"; break; case \"n3\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-stack\"); _pc = \"n2\"; break; case \"n2\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-damage\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((caster)[\"name\"] + \"射出因陀罗之矢，新增\") + added) + \"个地格为永久天照范围\")}; case \"n7\": return {success: true, message: ((caster)[\"name\"] + \"射出因陀罗之矢，该方向的天照范围已完整覆盖\")}; case \"n34\": return {success: false, message: \"不能选择自身所在格子\"}; case \"n36\": return {success: false, message: \"因陀罗之矢只能瞄准同一行或同一列的格子\"}; case \"n40\": return pos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择正方向，至地图边缘的所有地格永久化为天照地格。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"选择正方向，至地图边缘的所有地格永久化为天照地格。\" === __gameplayInvalid) || (\"选择正方向，至地图边缘的所有地格永久化为天照地格。\" === undefined) || (\"选择正方向，至地图边缘的所有地格永久化为天照地格。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"选择正方向，至地图边缘的所有地格永久化为天照地格。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "targeting": {
     "steps": [
       {
@@ -1400,39 +1400,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择正方向，至地图边缘的所有地格永久化为天照地格。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择正方向，至地图边缘的所有地格永久化为天照地格。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:sasuke-indra-arrow",
+    "links": []
   }
 }

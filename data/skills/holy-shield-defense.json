@@ -14,5 +14,10 @@
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1,
-  "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'holy-shield'); } return { message: piece.name + '的圣盾抵挡了' + damage + '点伤害', success: true }; }"
+  "code": "function executeSkill(context) { const piece = context.piece; const damage = context.damage; if (typeof removeStatusEffectById === 'function') { removeStatusEffectById(piece.instanceId, 'holy-shield'); } return { message: piece.name + '的圣盾抵挡了' + damage + '点伤害', success: true }; }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:holy-shield-defense",
+    "links": []
+  }
 }

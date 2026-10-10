@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "checks": [
+    "active Cluster overview and exact description",
+    "valid and invalid raw JSON draft roundtrip",
+    "invalid foreign owner blocks inline edit",
+    "explicit linked rule navigation",
+    "unsaved inline status draft roundtrip",
+    "passive piece Cluster root",
+    "same-collection session retirement for duplicate status owners",
+    "foreign status draft sync to owning skill",
+    "structured status edit preserves extensions",
+    "save and reload",
+    "new passive skill kind control and module starter",
+    "Cluster screenshot"
+  ],
+  "screenshots": [
+    "skill-cluster-editor.png"
+  ]
+}

@@ -18,1315 +18,966 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, __rvb_import_effect_1, __rvb_import_effect_3, __rvb_import_effect_4, __rvb_import_effect_6, __rvb_import_operand_2, __rvb_import_operand_5, __rvb_import_operand_7, __rvb_lexical_0_sourcePiece, __rvb_lexical_1_shadowStepStatus, __rvb_lexical_2_targetX, __rvb_lexical_3_targetY, __rvb_lexical_4_shadowStepSourceId, __rvb_lexical_5_cleanupAndCancel, __rvb_lexical_7_targetTile, __rvb_lexical_8_pieceAtPos, __rvb_lexical_9_index; var _pc = \"n44\"; for (var _step = 0; _step <= 36; _step++) { switch (_pc) { case \"n44\": __rvb_lexical_0_sourcePiece = (context)[\"piece\"]; _pc = \"n43\"; break; case \"n43\": _pc = (! (! (! (__rvb_lexical_0_sourcePiece)[\"statusTags\"]))) ? \"n42\" : \"n41\"; break; case \"n41\": __rvb_lexical_1_shadowStepStatus = ((__rvb_lexical_0_sourcePiece)[\"statusTags\"])[\"find\"](function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); _pc = \"n40\"; break; case \"n40\": _pc = (! (! (! __rvb_lexical_1_shadowStepStatus))) ? \"n39\" : \"n38\"; break; case \"n38\": _pc = (! (! ((__rvb_lexical_1_shadowStepStatus)[\"remainingDuration\"] <= 0))) ? \"n37\" : \"n36\"; break; case \"n36\": _pc = (! (! ((context)[\"playerId\"] !== (__rvb_lexical_0_sourcePiece)[\"ownerPlayerId\"]))) ? \"n35\" : \"n34\"; break; case \"n34\": __rvb_lexical_2_targetX = (__rvb_lexical_1_shadowStepStatus)[\"value\"]; _pc = \"n33\"; break; case \"n33\": __rvb_lexical_3_targetY = (__rvb_lexical_1_shadowStepStatus)[\"intensity\"]; _pc = \"n32\"; break; case \"n32\": __rvb_lexical_4_shadowStepSourceId = (\"shadow-step-\" + (__rvb_lexical_0_sourcePiece)[\"instanceId\"]); _pc = \"n31\"; break; case \"n31\": __rvb_lexical_5_cleanupAndCancel = function (reason) { var __rvb_import_bound_method_8, __rvb_lexical_6_index; { var __rvb_content_graph_region_pc_0 = \"n30\"; while (__rvb_content_graph_region_pc_0 !== \"n23\") { switch (__rvb_content_graph_region_pc_0) { case \"n30\": __rvb_content_graph_region_pc_0 = (! (! ((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n29\" : \"n28\"; break; case \"n29\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((te)[\"tileType\"] === \"shadow-step\") && ((te)[\"sourceId\"] === __rvb_lexical_4_shadowStepSourceId))); }); __rvb_content_graph_region_pc_0 = \"n28\"; break; case \"n28\": __rvb_import_bound_method_8 = (function (receiver) { var capturedMethod = receiver[\"findIndex\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((__rvb_lexical_0_sourcePiece)[\"statusTags\"]); __rvb_content_graph_region_pc_0 = \"n27\"; break; case \"n27\": __rvb_lexical_6_index = (__rvb_import_bound_method_8)(function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); __rvb_content_graph_region_pc_0 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_0 = (! (! (__rvb_lexical_6_index !== (- 1)))) ? \"n25\" : \"n24\"; break; case \"n25\": ((__rvb_lexical_0_sourcePiece)[\"statusTags\"]).splice(__rvb_lexical_6_index, 1); __rvb_content_graph_region_pc_0 = \"n24\"; break; case \"n24\": return {message: ((((__rvb_lexical_0_sourcePiece)[\"name\"] + \"的暗影步\") + reason) + \"，传送取消\"), success: true}; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n22\"; break; case \"n22\": __rvb_lexical_7_targetTile = (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === __rvb_lexical_2_targetX) && ((t)[\"y\"] === __rvb_lexical_3_targetY)); }); _pc = \"n21\"; break; case \"n21\": _pc = (! (! ((! __rvb_lexical_7_targetTile) || (! ((__rvb_lexical_7_targetTile)[\"props\"])[\"walkable\"])))) ? \"n20\" : \"n17\"; break; case \"n17\": __rvb_lexical_8_pieceAtPos = ((battle)[\"pieces\"])[\"find\"](function (p) { return ((((p)[\"x\"] === __rvb_lexical_2_targetX) && ((p)[\"y\"] === __rvb_lexical_3_targetY)) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n16\"; break; case \"n16\": _pc = (! (! __rvb_lexical_8_pieceAtPos)) ? \"n15\" : \"n12\"; break; case \"n12\": _pc = (! (! ((battle)[\"extensions\"] && ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n11\" : \"n10\"; break; case \"n11\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (te) { return (! (((te)[\"tileType\"] === \"shadow-step\") && ((te)[\"sourceId\"] === __rvb_lexical_4_shadowStepSourceId))); }); _pc = \"n10\"; break; case \"n10\": __rvb_import_effect_3 = flow.effects.displace([{pieceId: (__rvb_lexical_0_sourcePiece)[\"instanceId\"], x: __rvb_lexical_2_targetX, y: __rvb_lexical_3_targetY}], \"teleport\"); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (! (__rvb_import_effect_3)[\"success\"]))) ? \"n8\" : \"n5\"; break; case \"n5\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"findIndex\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })((__rvb_lexical_0_sourcePiece)[\"statusTags\"]); _pc = \"n4\"; break; case \"n4\": __rvb_lexical_9_index = (__rvb_import_bound_method_0)(function (tag) { return ((tag)[\"type\"] === \"shadow-step\"); }); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (__rvb_lexical_9_index !== (- 1)))) ? \"n2\" : \"n1\"; break; case \"n2\": ((__rvb_lexical_0_sourcePiece)[\"statusTags\"]).splice(__rvb_lexical_9_index, 1); _pc = \"n1\"; break; case \"n1\": return {message: ((((((__rvb_lexical_0_sourcePiece)[\"name\"] + \"通过暗影步传送到了(\") + __rvb_lexical_2_targetX) + \",\") + __rvb_lexical_3_targetY) + \")\"), success: true}; case \"n8\": __rvb_import_operand_2 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n7\"; break; case \"n7\": __rvb_import_effect_1 = (__rvb_import_operand_2)(\"被阻挡\"); _pc = \"n6\"; break; case \"n6\": return __rvb_import_effect_1; case \"n15\": __rvb_import_operand_5 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n14\"; break; case \"n14\": __rvb_import_effect_4 = (__rvb_import_operand_5)(\"目标位置已被占用\"); _pc = \"n13\"; break; case \"n13\": return __rvb_import_effect_4; case \"n20\": __rvb_import_operand_7 = __rvb_lexical_5_cleanupAndCancel; _pc = \"n19\"; break; case \"n19\": __rvb_import_effect_6 = (__rvb_import_operand_7)(\"目标位置不可行走\"); _pc = \"n18\"; break; case \"n18\": return __rvb_import_effect_6; case \"n35\": return {message: \"\", success: false}; case \"n37\": return {message: \"\", success: false}; case \"n39\": return {message: \"\", success: false}; case \"n42\": return {message: \"\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "triggerSkill",
-    "entry": "n44",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "binary",
-                    "op": "+",
-                    "left": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "binary",
-                        "op": "+",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "__rvb_lexical_0_sourcePiece"
-                          },
-                          "key": "name"
-                        },
-                        "right": {
-                          "kind": "literal",
-                          "value": "通过暗影步传送到了("
-                        }
-                      },
-                      "right": {
-                        "kind": "ref",
-                        "name": "__rvb_lexical_2_targetX"
-                      }
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": ","
-                    }
-                  },
-                  "right": {
-                    "kind": "ref",
-                    "name": "__rvb_lexical_3_targetY"
-                  }
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": ")"
-                }
-              }
-            },
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "call",
-        "capability": "array.splice",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "__rvb_lexical_0_sourcePiece"
-            },
-            "key": "statusTags"
-          },
-          {
-            "kind": "ref",
-            "name": "__rvb_lexical_9_index"
-          },
-          {
-            "kind": "literal",
-            "value": 1
-          }
-        ],
-        "next": "n1"
-      },
-      {
-        "id": "n3",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "!==",
-              "left": {
-                "kind": "ref",
-                "name": "__rvb_lexical_9_index"
-              },
-              "right": {
-                "kind": "unary",
-                "op": "-",
-                "argument": {
-                  "kind": "literal",
-                  "value": 1
-                }
-              }
-            }
-          }
-        },
-        "yes": "n2",
-        "no": "n1"
-      },
-      {
-        "id": "n4",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_bound_method_0"
-          }
-        },
-        "args": [
-          {
-            "kind": "lambda",
-            "parameters": [
-              "tag"
-            ],
-            "body": {
-              "kind": "binary",
-              "op": "===",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "tag"
-                },
-                "key": "type"
-              },
-              "right": {
-                "kind": "literal",
-                "value": "shadow-step"
-              }
-            }
-          }
-        ],
-        "result": "__rvb_lexical_9_index",
-        "next": "n3"
-      },
-      {
-        "id": "n5",
-        "kind": "bind",
-        "name": "__rvb_import_bound_method_0",
-        "expr": {
-          "kind": "boundMethod",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "__rvb_lexical_0_sourcePiece"
-            },
-            "key": "statusTags"
-          },
-          "method": "findIndex"
-        },
-        "next": "n4"
-      },
-      {
-        "id": "n6",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_1"
-        }
-      },
-      {
-        "id": "n7",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_operand_2"
-          }
-        },
-        "args": [
-          {
-            "kind": "literal",
-            "value": "被阻挡"
-          }
-        ],
-        "result": "__rvb_import_effect_1",
-        "next": "n6"
-      },
-      {
-        "id": "n8",
-        "kind": "bind",
-        "name": "__rvb_import_operand_2",
-        "expr": {
-          "kind": "ref",
-          "name": "__rvb_lexical_5_cleanupAndCancel"
-        },
-        "next": "n7"
-      },
-      {
-        "id": "n9",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_import_effect_3"
-                },
-                "key": "success"
-              }
-            }
-          }
-        },
-        "yes": "n8",
-        "no": "n5"
-      },
-      {
-        "id": "n10",
-        "kind": "call",
-        "capability": "flow.effects.displace",
-        "args": [
-          {
-            "kind": "array",
-            "items": [
-              {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "pieceId",
-                    "value": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "__rvb_lexical_0_sourcePiece"
-                      },
-                      "key": "instanceId"
-                    }
-                  },
-                  {
-                    "key": "x",
-                    "value": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_2_targetX"
-                    }
-                  },
-                  {
-                    "key": "y",
-                    "value": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_3_targetY"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "kind": "literal",
-            "value": "teleport"
-          }
-        ],
-        "result": "__rvb_import_effect_3",
-        "next": "n9"
-      },
-      {
-        "id": "n11",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "extensions"
-          },
-          "key": "tileEffects"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "extensions"
-            },
-            "key": "tileEffects"
-          },
-          "method": "filter",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "te"
-              ],
-              "body": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "binary",
-                  "op": "&&",
-                  "left": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "te"
-                      },
-                      "key": "tileType"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": "shadow-step"
-                    }
-                  },
-                  "right": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "te"
-                      },
-                      "key": "sourceId"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_4_shadowStepSourceId"
-                    }
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n10"
-      },
-      {
-        "id": "n12",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "&&",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "battle"
-                },
-                "key": "extensions"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "battle"
-                  },
-                  "key": "extensions"
-                },
-                "key": "tileEffects"
-              }
-            }
-          }
-        },
-        "yes": "n11",
-        "no": "n10"
-      },
-      {
-        "id": "n13",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_4"
-        }
-      },
-      {
-        "id": "n14",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_operand_5"
-          }
-        },
-        "args": [
-          {
-            "kind": "literal",
-            "value": "目标位置已被占用"
-          }
-        ],
-        "result": "__rvb_import_effect_4",
-        "next": "n13"
-      },
-      {
-        "id": "n15",
-        "kind": "bind",
-        "name": "__rvb_import_operand_5",
-        "expr": {
-          "kind": "ref",
-          "name": "__rvb_lexical_5_cleanupAndCancel"
-        },
-        "next": "n14"
-      },
-      {
-        "id": "n16",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "ref",
-              "name": "__rvb_lexical_8_pieceAtPos"
-            }
-          }
-        },
-        "yes": "n15",
-        "no": "n12"
-      },
-      {
-        "id": "n17",
-        "kind": "bind",
-        "name": "__rvb_lexical_8_pieceAtPos",
-        "expr": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "pieces"
-          },
-          "method": "find",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "p"
-              ],
-              "body": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "&&",
-                  "left": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "x"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_2_targetX"
-                    }
-                  },
-                  "right": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "y"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_3_targetY"
-                    }
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": ">",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "p"
-                    },
-                    "key": "currentHp"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n16"
-      },
-      {
-        "id": "n18",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_6"
-        }
-      },
-      {
-        "id": "n19",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_operand_7"
-          }
-        },
-        "args": [
-          {
-            "kind": "literal",
-            "value": "目标位置不可行走"
-          }
-        ],
-        "result": "__rvb_import_effect_6",
-        "next": "n18"
-      },
-      {
-        "id": "n20",
-        "kind": "bind",
-        "name": "__rvb_import_operand_7",
-        "expr": {
-          "kind": "ref",
-          "name": "__rvb_lexical_5_cleanupAndCancel"
-        },
-        "next": "n19"
-      },
-      {
-        "id": "n21",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_7_targetTile"
-                }
-              },
-              "right": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_7_targetTile"
-                    },
-                    "key": "props"
-                  },
-                  "key": "walkable"
-                }
-              }
-            }
-          }
-        },
-        "yes": "n20",
-        "no": "n17"
-      },
-      {
-        "id": "n22",
-        "kind": "bind",
-        "name": "__rvb_lexical_7_targetTile",
-        "expr": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "map"
-            },
-            "key": "tiles"
-          },
-          "method": "find",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "t"
-              ],
-              "body": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "t"
-                    },
-                    "key": "x"
-                  },
-                  "right": {
-                    "kind": "ref",
-                    "name": "__rvb_lexical_2_targetX"
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "t"
-                    },
-                    "key": "y"
-                  },
-                  "right": {
-                    "kind": "ref",
-                    "name": "__rvb_lexical_3_targetY"
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n21"
-      },
-      {
-        "id": "n31",
-        "kind": "bind",
-        "name": "__rvb_lexical_5_cleanupAndCancel",
-        "expr": {
-          "kind": "function",
-          "parameters": [
-            "reason"
-          ],
-          "body": {
-            "entry": "n30",
-            "end": "n23",
-            "nodes": [
-              {
-                "id": "n24",
-                "kind": "return",
-                "value": {
-                  "kind": "object",
-                  "entries": [
-                    {
-                      "key": "message",
-                      "value": {
-                        "kind": "binary",
-                        "op": "+",
-                        "left": {
-                          "kind": "binary",
-                          "op": "+",
-                          "left": {
-                            "kind": "binary",
-                            "op": "+",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "__rvb_lexical_0_sourcePiece"
-                              },
-                              "key": "name"
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": "的暗影步"
-                            }
-                          },
-                          "right": {
-                            "kind": "ref",
-                            "name": "reason"
-                          }
-                        },
-                        "right": {
-                          "kind": "literal",
-                          "value": "，传送取消"
-                        }
-                      }
-                    },
-                    {
-                      "key": "success",
-                      "value": {
-                        "kind": "literal",
-                        "value": true
-                      }
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "n25",
-                "kind": "call",
-                "capability": "array.splice",
-                "args": [
-                  {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_0_sourcePiece"
-                    },
-                    "key": "statusTags"
-                  },
-                  {
-                    "kind": "ref",
-                    "name": "__rvb_lexical_6_index"
-                  },
-                  {
-                    "kind": "literal",
-                    "value": 1
-                  }
-                ],
-                "next": "n24"
-              },
-              {
-                "id": "n26",
-                "kind": "branch",
-                "condition": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "binary",
-                      "op": "!==",
-                      "left": {
-                        "kind": "ref",
-                        "name": "__rvb_lexical_6_index"
-                      },
-                      "right": {
-                        "kind": "unary",
-                        "op": "-",
-                        "argument": {
-                          "kind": "literal",
-                          "value": 1
-                        }
-                      }
-                    }
-                  }
-                },
-                "yes": "n25",
-                "no": "n24"
-              },
-              {
-                "id": "n27",
-                "kind": "invoke",
-                "target": {
-                  "kind": "function",
-                  "value": {
-                    "kind": "ref",
-                    "name": "__rvb_import_bound_method_8"
-                  }
-                },
-                "args": [
-                  {
-                    "kind": "lambda",
-                    "parameters": [
-                      "tag"
-                    ],
-                    "body": {
-                      "kind": "binary",
-                      "op": "===",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "tag"
-                        },
-                        "key": "type"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "shadow-step"
-                      }
-                    }
-                  }
-                ],
-                "result": "__rvb_lexical_6_index",
-                "next": "n26"
-              },
-              {
-                "id": "n28",
-                "kind": "bind",
-                "name": "__rvb_import_bound_method_8",
-                "expr": {
-                  "kind": "boundMethod",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "__rvb_lexical_0_sourcePiece"
-                    },
-                    "key": "statusTags"
-                  },
-                  "method": "findIndex"
-                },
-                "next": "n27"
-              },
-              {
-                "id": "n29",
-                "kind": "set",
-                "target": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "battle"
-                    },
-                    "key": "extensions"
-                  },
-                  "key": "tileEffects"
-                },
-                "operator": "=",
-                "value": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "battle"
-                      },
-                      "key": "extensions"
-                    },
-                    "key": "tileEffects"
-                  },
-                  "method": "filter",
-                  "args": [
-                    {
-                      "kind": "lambda",
-                      "parameters": [
-                        "te"
-                      ],
-                      "body": {
-                        "kind": "unary",
-                        "op": "!",
-                        "argument": {
-                          "kind": "binary",
-                          "op": "&&",
-                          "left": {
-                            "kind": "binary",
-                            "op": "===",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "te"
-                              },
-                              "key": "tileType"
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": "shadow-step"
-                            }
-                          },
-                          "right": {
-                            "kind": "binary",
-                            "op": "===",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "te"
-                              },
-                              "key": "sourceId"
-                            },
-                            "right": {
-                              "kind": "ref",
-                              "name": "__rvb_lexical_4_shadowStepSourceId"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                },
-                "next": "n28"
-              },
-              {
-                "id": "n30",
-                "kind": "branch",
-                "condition": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "binary",
-                      "op": "&&",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "battle"
-                        },
-                        "key": "extensions"
-                      },
-                      "right": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "battle"
-                          },
-                          "key": "extensions"
-                        },
-                        "key": "tileEffects"
-                      }
-                    }
-                  }
-                },
-                "yes": "n29",
-                "no": "n28"
-              },
-              {
-                "id": "n23",
-                "kind": "regionEnd"
-              }
-            ]
-          }
-        },
-        "next": "n22"
-      },
-      {
-        "id": "n32",
-        "kind": "bind",
-        "name": "__rvb_lexical_4_shadowStepSourceId",
-        "expr": {
-          "kind": "binary",
-          "op": "+",
-          "left": {
-            "kind": "literal",
-            "value": "shadow-step-"
-          },
-          "right": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "__rvb_lexical_0_sourcePiece"
-            },
-            "key": "instanceId"
-          }
-        },
-        "next": "n31"
-      },
-      {
-        "id": "n33",
-        "kind": "bind",
-        "name": "__rvb_lexical_3_targetY",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "__rvb_lexical_1_shadowStepStatus"
-          },
-          "key": "intensity"
-        },
-        "next": "n32"
-      },
-      {
-        "id": "n34",
-        "kind": "bind",
-        "name": "__rvb_lexical_2_targetX",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "__rvb_lexical_1_shadowStepStatus"
-          },
-          "key": "value"
-        },
-        "next": "n33"
-      },
-      {
-        "id": "n35",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            },
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n36",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "!==",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "playerId"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_0_sourcePiece"
-                },
-                "key": "ownerPlayerId"
-              }
-            }
-          }
-        },
-        "yes": "n35",
-        "no": "n34"
-      },
-      {
-        "id": "n37",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            },
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n38",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "<=",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_1_shadowStepStatus"
-                },
-                "key": "remainingDuration"
-              },
-              "right": {
-                "kind": "literal",
-                "value": 0
-              }
-            }
-          }
-        },
-        "yes": "n37",
-        "no": "n36"
-      },
-      {
-        "id": "n39",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            },
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n40",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "ref",
-                "name": "__rvb_lexical_1_shadowStepStatus"
-              }
-            }
-          }
-        },
-        "yes": "n39",
-        "no": "n38"
-      },
-      {
-        "id": "n41",
-        "kind": "bind",
-        "name": "__rvb_lexical_1_shadowStepStatus",
-        "expr": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "__rvb_lexical_0_sourcePiece"
-            },
-            "key": "statusTags"
-          },
-          "method": "find",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "tag"
-              ],
-              "body": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "tag"
-                  },
-                  "key": "type"
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": "shadow-step"
-                }
-              }
-            }
-          ]
-        },
-        "next": "n40"
-      },
-      {
-        "id": "n42",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            },
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n43",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_0_sourcePiece"
-                },
-                "key": "statusTags"
-              }
-            }
-          }
-        },
-        "yes": "n42",
-        "no": "n41"
-      },
-      {
-        "id": "n44",
-        "kind": "bind",
-        "name": "__rvb_lexical_0_sourcePiece",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "piece"
-        },
-        "next": "n43"
-      }
-    ]
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } var _condition51 = ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1); if (_condition51 !== __gameplayInvalid && _condition51) { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module3 = __gameplayInvalid; } else { var _module3 = (String(flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))[\"name\"])); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module4 = __gameplayInvalid; } else { var _module4 = ((flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).instanceId)); } if ((\"shadow-step-\" === __gameplayInvalid) || (\"shadow-step-\" === undefined) || (\"shadow-step-\" === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"id\")) ? _module4[\"id\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"id\")) ? _module4[\"id\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"id\")) ? _module4[\"id\"] : _module4) === null)) { _module5 = __gameplayInvalid; } else { var _module5 = ((\"shadow-step-\" + ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"id\")) ? _module4[\"id\"] : _module4))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module6 = __gameplayInvalid; } else { var _module6 = ((function() { var tag = (flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).statusTags || []).find(function(tag) { return tag.type === \"shadow-step\"; }); return tag ? tag.id : null; })()); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === undefined)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) !== null && ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) !== undefined)); } var _condition49 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"present\")) ? _module7[\"present\"] : _module7); if (_condition49 !== __gameplayInvalid && _condition49) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === undefined) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module8 = __gameplayInvalid; } else { var _module8 = ((function(pieceId, statusId, fallback) { var tag = (flow.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && (tag.remainingDuration === undefined ? tag.currentDuration : tag.remainingDuration); return raw === undefined ? Number(fallback) : Number(raw); })(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6), 0)); } if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module9 = __gameplayInvalid; } else { var _module9 = ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) > 0)); } var _condition47 = ((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9); if (_condition47 !== __gameplayInvalid && _condition47) { var _module10 = (battle.turn.currentPlayerId); if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module11 = __gameplayInvalid; } else { var _module11 = (flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).ownerPlayerId); } if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === null) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11))) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10) === null) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10)))) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"player\")) ? _module11[\"player\"] : _module11) === ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"player\")) ? _module10[\"player\"] : _module10))); } var _condition45 = ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12); if (_condition45 !== __gameplayInvalid && _condition45) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === undefined) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((function() { var tag = (flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).statusTags || []).find(function(tag) { return tag.id === ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6); }); var value = tag && tag[\"value\"]; return value == null ? 0 : Number(value); })()); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6) === undefined) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((function() { var tag = (flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).statusTags || []).find(function(tag) { return tag.id === ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"id\")) ? _module6[\"id\"] : _module6); }); var value = tag && tag[\"intensity\"]; return value == null ? 0 : Number(value); })()); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === null)) { _module15 = __gameplayInvalid; } else { var _module15 = (({x: ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13), y: ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14)})); } if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((function(cell) { var tiles = battle.map && Array.isArray(battle.map.tiles) ? battle.map.tiles : []; var tile = tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); return Boolean(tile && tile.props && tile.props.walkable); })(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15))); } var _condition43 = ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"walkable\")) ? _module16[\"walkable\"] : _module16); if (_condition43 !== __gameplayInvalid && _condition43) { if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === undefined)) { _module17 = __gameplayInvalid; } else { var _module17 = ((function(cell, ignore) { if (!cell) return false; return !(battle.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || \"\"); }); })(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15), null)); } var _condition38 = ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17); if (_condition38 !== __gameplayInvalid && _condition38) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = (flow.effects.clearTileMarkers(\"shadow-step\", ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15) === null)) { _module19 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module19 = ((function(value){return {result: value, success: value.success}})(flow.effects.move([{pieceId: ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), x: (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15)).x, y: (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"cell\")) ? _module15[\"cell\"] : _module15)).y}], \"teleport\"))); } var _condition33 = (_module19[\"success\"]); if (_condition33 !== __gameplayInvalid && _condition33) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (\"shadow-step\" === __gameplayInvalid) || (\"shadow-step\" === undefined)) { _module20 = __gameplayInvalid; } else { var _module20 = ((\"shadow-step\" == null ? false : flow.status.removeRaw(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), \"type\", \"shadow-step\"))); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null)) { _module21 = __gameplayInvalid; } else { var _module21 = (String(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13))); } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === null)) { _module22 = __gameplayInvalid; } else { var _module22 = (String(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14))); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === null) || (\"通过暗影步传送到了(\" === __gameplayInvalid) || (\"通过暗影步传送到了(\" === undefined) || (\"通过暗影步传送到了(\" === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) + \"通过暗影步传送到了(\")); } if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === null) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"text\")) ? _module21[\"text\"] : _module21) === __gameplayInvalid) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"text\")) ? _module21[\"text\"] : _module21) === undefined) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"text\")) ? _module21[\"text\"] : _module21) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) + ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"text\")) ? _module21[\"text\"] : _module21))); } if ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === null) || (\",\" === __gameplayInvalid) || (\",\" === undefined) || (\",\" === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) + \",\")); } if ((((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) === __gameplayInvalid) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) === undefined) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) === null) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"text\")) ? _module22[\"text\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"text\")) ? _module22[\"text\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"text\")) ? _module22[\"text\"] : _module22) === null)) { _module26 = __gameplayInvalid; } else { var _module26 = ((((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) + ((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"text\")) ? _module22[\"text\"] : _module22))); } if ((((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"text\")) ? _module26[\"text\"] : _module26) === __gameplayInvalid) || (((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"text\")) ? _module26[\"text\"] : _module26) === undefined) || (((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"text\")) ? _module26[\"text\"] : _module26) === null) || (\")\" === __gameplayInvalid) || (\")\" === undefined) || (\")\" === null)) { _module27 = __gameplayInvalid; } else { var _module27 = ((((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"text\")) ? _module26[\"text\"] : _module26) + \")\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === null)) { _module28 = __gameplayInvalid; } else { var _module28 = (({success: true, message: ((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27)})); } if (!((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"result\")) ? _module28[\"result\"] : _module28) === __gameplayInvalid))) { return ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"result\")) ? _module28[\"result\"] : _module28); } } else if (_condition33 !== __gameplayInvalid) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null)) { _module29 = __gameplayInvalid; } else { var _module29 = (flow.effects.clearTileMarkers(\"shadow-step\", ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (\"shadow-step\" === __gameplayInvalid) || (\"shadow-step\" === undefined)) { _module30 = __gameplayInvalid; } else { var _module30 = ((\"shadow-step\" == null ? false : flow.status.removeRaw(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), \"type\", \"shadow-step\"))); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === null) || (\"的暗影步被阻挡，传送取消\" === __gameplayInvalid) || (\"的暗影步被阻挡，传送取消\" === undefined) || (\"的暗影步被阻挡，传送取消\" === null)) { _module31 = __gameplayInvalid; } else { var _module31 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) + \"的暗影步被阻挡，传送取消\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31) === __gameplayInvalid) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31) === null)) { _module32 = __gameplayInvalid; } else { var _module32 = (({success: true, message: ((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31)})); } if (!((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"result\")) ? _module32[\"result\"] : _module32) === __gameplayInvalid))) { return ((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"result\")) ? _module32[\"result\"] : _module32); } } } else if (_condition38 !== __gameplayInvalid) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null)) { _module34 = __gameplayInvalid; } else { var _module34 = (flow.effects.clearTileMarkers(\"shadow-step\", ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (\"shadow-step\" === __gameplayInvalid) || (\"shadow-step\" === undefined)) { _module35 = __gameplayInvalid; } else { var _module35 = ((\"shadow-step\" == null ? false : flow.status.removeRaw(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), \"type\", \"shadow-step\"))); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === null) || (\"的暗影步目标位置已被占用，传送取消\" === __gameplayInvalid) || (\"的暗影步目标位置已被占用，传送取消\" === undefined) || (\"的暗影步目标位置已被占用，传送取消\" === null)) { _module36 = __gameplayInvalid; } else { var _module36 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) + \"的暗影步目标位置已被占用，传送取消\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === null)) { _module37 = __gameplayInvalid; } else { var _module37 = (({success: true, message: ((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36)})); } if (!((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"result\")) ? _module37[\"result\"] : _module37) === __gameplayInvalid))) { return ((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"result\")) ? _module37[\"result\"] : _module37); } } } else if (_condition43 !== __gameplayInvalid) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null)) { _module39 = __gameplayInvalid; } else { var _module39 = (flow.effects.clearTileMarkers(\"shadow-step\", ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5))); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || (\"shadow-step\" === __gameplayInvalid) || (\"shadow-step\" === undefined)) { _module40 = __gameplayInvalid; } else { var _module40 = ((\"shadow-step\" == null ? false : flow.status.removeRaw(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2), \"type\", \"shadow-step\"))); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === null) || (\"的暗影步目标位置不可行走，传送取消\" === __gameplayInvalid) || (\"的暗影步目标位置不可行走，传送取消\" === undefined) || (\"的暗影步目标位置不可行走，传送取消\" === null)) { _module41 = __gameplayInvalid; } else { var _module41 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) + \"的暗影步目标位置不可行走，传送取消\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === __gameplayInvalid) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === null)) { _module42 = __gameplayInvalid; } else { var _module42 = (({success: true, message: ((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41)})); } if (!((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"result\")) ? _module42[\"result\"] : _module42) === __gameplayInvalid))) { return ((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"result\")) ? _module42[\"result\"] : _module42); } } } else if (_condition45 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module44 = __gameplayInvalid; } else { var _module44 = (({success: false, message: \"\"})); } if (!((((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"result\")) ? _module44[\"result\"] : _module44) === __gameplayInvalid))) { return ((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"result\")) ? _module44[\"result\"] : _module44); } } } else if (_condition47 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module46 = __gameplayInvalid; } else { var _module46 = (({success: false, message: \"\"})); } if (!((((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"result\")) ? _module46[\"result\"] : _module46) === __gameplayInvalid))) { return ((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"result\")) ? _module46[\"result\"] : _module46); } } } else if (_condition49 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module48 = __gameplayInvalid; } else { var _module48 = (({success: false, message: \"\"})); } if (!((((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"result\")) ? _module48[\"result\"] : _module48) === __gameplayInvalid))) { return ((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"result\")) ? _module48[\"result\"] : _module48); } } } else if (_condition51 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module50 = __gameplayInvalid; } else { var _module50 = (({success: false, message: \"\"})); } if (!((((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"result\")) ? _module50[\"result\"] : _module50) === __gameplayInvalid))) { return ((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"result\")) ? _module50[\"result\"] : _module50); } } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:shadow-step-teleport",
+    "links": []
   },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "source-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source-present",
+              "module": "query.has-piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "source-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "source-guard",
+              "condition": {
+                "kind": "output",
+                "node": "source-present",
+                "port": "exists"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "source",
+                  "module": "query.piece",
+                  "version": "1",
+                  "inputs": {
+                    "pieceId": {
+                      "kind": "output",
+                      "node": "source-ref",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "source-name",
+                  "module": "attribute.text",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "source",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "attribute": "name"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "source-id",
+                  "module": "piece.identifier",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "source",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "source-id-text",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "literal",
+                      "value": "shadow-step-"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "source-id",
+                      "port": "id"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "status-id",
+                  "module": "status.find-id",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "source",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "statusType": "shadow-step"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "status-present",
+                  "module": "value.present-string",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "status-id",
+                      "port": "id"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "status-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "status-present",
+                    "port": "present"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "duration",
+                      "module": "status.read-duration",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "piece"
+                        },
+                        "statusId": {
+                          "kind": "output",
+                          "node": "status-id",
+                          "port": "id"
+                        },
+                        "fallback": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "duration-live",
+                      "module": "compare.greater-than",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "duration",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "duration-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "duration-live",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "current-player",
+                          "module": "turn.current-player",
+                          "version": "1",
+                          "inputs": {},
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "owner",
+                          "module": "piece.owner",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "source",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "owner-turn",
+                          "module": "compare.equal-player",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "owner",
+                              "port": "player"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "current-player",
+                              "port": "player"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "if",
+                          "id": "owner-guard",
+                          "condition": {
+                            "kind": "output",
+                            "node": "owner-turn",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "call",
+                              "id": "target-x",
+                              "module": "status.read-number",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
+                                },
+                                "statusId": {
+                                  "kind": "output",
+                                  "node": "status-id",
+                                  "port": "id"
+                                },
+                                "fallback": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              },
+                              "parameters": {
+                                "field": "value"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "target-y",
+                              "module": "status.read-number",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
+                                },
+                                "statusId": {
+                                  "kind": "output",
+                                  "node": "status-id",
+                                  "port": "id"
+                                },
+                                "fallback": {
+                                  "kind": "literal",
+                                  "value": 0
+                                }
+                              },
+                              "parameters": {
+                                "field": "intensity"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "target-cell",
+                              "module": "spatial.cell",
+                              "version": "1",
+                              "inputs": {
+                                "x": {
+                                  "kind": "output",
+                                  "node": "target-x",
+                                  "port": "value"
+                                },
+                                "y": {
+                                  "kind": "output",
+                                  "node": "target-y",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "walkable",
+                              "module": "spatial.cell-walkable",
+                              "version": "1",
+                              "inputs": {
+                                "cell": {
+                                  "kind": "output",
+                                  "node": "target-cell",
+                                  "port": "cell"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "if",
+                              "id": "walkable-guard",
+                              "condition": {
+                                "kind": "output",
+                                "node": "walkable",
+                                "port": "walkable"
+                              },
+                              "then": [
+                                {
+                                  "kind": "call",
+                                  "id": "vacant",
+                                  "module": "spatial.cell-unoccupied",
+                                  "version": "1",
+                                  "inputs": {
+                                    "cell": {
+                                      "kind": "output",
+                                      "node": "target-cell",
+                                      "port": "cell"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "if",
+                                  "id": "vacant-guard",
+                                  "condition": {
+                                    "kind": "output",
+                                    "node": "vacant",
+                                    "port": "value"
+                                  },
+                                  "then": [
+                                    {
+                                      "kind": "call",
+                                      "id": "clear-before-move",
+                                      "module": "tile.clear-marker",
+                                      "version": "1",
+                                      "inputs": {
+                                        "sourceId": {
+                                          "kind": "output",
+                                          "node": "source-id-text",
+                                          "port": "text"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "effectType": "shadow-step"
+                                      }
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "move",
+                                      "module": "effect.teleport",
+                                      "version": "1",
+                                      "inputs": {
+                                        "piece": {
+                                          "kind": "output",
+                                          "node": "source",
+                                          "port": "piece"
+                                        },
+                                        "destination": {
+                                          "kind": "output",
+                                          "node": "target-cell",
+                                          "port": "cell"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "kind": "teleport"
+                                      }
+                                    },
+                                    {
+                                      "kind": "if",
+                                      "id": "move-guard",
+                                      "condition": {
+                                        "kind": "output",
+                                        "node": "move",
+                                        "port": "success"
+                                      },
+                                      "then": [
+                                        {
+                                          "kind": "call",
+                                          "id": "remove-status",
+                                          "module": "status.remove-record",
+                                          "version": "1",
+                                          "inputs": {
+                                            "piece": {
+                                              "kind": "output",
+                                              "node": "source",
+                                              "port": "piece"
+                                            },
+                                            "value": {
+                                              "kind": "literal",
+                                              "value": "shadow-step"
+                                            }
+                                          },
+                                          "parameters": {
+                                            "selector": "type"
+                                          }
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "x-text",
+                                          "module": "text.from-number",
+                                          "version": "1",
+                                          "inputs": {
+                                            "value": {
+                                              "kind": "output",
+                                              "node": "target-x",
+                                              "port": "value"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "y-text",
+                                          "module": "text.from-number",
+                                          "version": "1",
+                                          "inputs": {
+                                            "value": {
+                                              "kind": "output",
+                                              "node": "target-y",
+                                              "port": "value"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "message-prefix",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "source-name",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": "通过暗影步传送到了("
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "message-x",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "message-prefix",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "output",
+                                              "node": "x-text",
+                                              "port": "text"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "message-separator",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "message-x",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": ","
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "message-y",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "message-separator",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "output",
+                                              "node": "y-text",
+                                              "port": "text"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "message",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "message-y",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": ")"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "success-result",
+                                          "module": "result.action",
+                                          "version": "1",
+                                          "inputs": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": true
+                                            },
+                                            "message": {
+                                              "kind": "output",
+                                              "node": "message",
+                                              "port": "text"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "return",
+                                          "id": "success-return",
+                                          "value": {
+                                            "kind": "output",
+                                            "node": "success-result",
+                                            "port": "result"
+                                          }
+                                        }
+                                      ],
+                                      "else": [
+                                        {
+                                          "kind": "call",
+                                          "id": "blocked-clear-tile",
+                                          "module": "tile.clear-marker",
+                                          "version": "1",
+                                          "inputs": {
+                                            "sourceId": {
+                                              "kind": "output",
+                                              "node": "source-id-text",
+                                              "port": "text"
+                                            }
+                                          },
+                                          "parameters": {
+                                            "effectType": "shadow-step"
+                                          }
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "blocked-remove-status",
+                                          "module": "status.remove-record",
+                                          "version": "1",
+                                          "inputs": {
+                                            "piece": {
+                                              "kind": "output",
+                                              "node": "source",
+                                              "port": "piece"
+                                            },
+                                            "value": {
+                                              "kind": "literal",
+                                              "value": "shadow-step"
+                                            }
+                                          },
+                                          "parameters": {
+                                            "selector": "type"
+                                          }
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "blocked-message",
+                                          "module": "text.concat",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "source-name",
+                                              "port": "text"
+                                            },
+                                            "right": {
+                                              "kind": "literal",
+                                              "value": "的暗影步被阻挡，传送取消"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "blocked-result",
+                                          "module": "result.action",
+                                          "version": "1",
+                                          "inputs": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": true
+                                            },
+                                            "message": {
+                                              "kind": "output",
+                                              "node": "blocked-message",
+                                              "port": "text"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "return",
+                                          "id": "blocked-return",
+                                          "value": {
+                                            "kind": "output",
+                                            "node": "blocked-result",
+                                            "port": "result"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "kind": "call",
+                                      "id": "occupied-clear-tile",
+                                      "module": "tile.clear-marker",
+                                      "version": "1",
+                                      "inputs": {
+                                        "sourceId": {
+                                          "kind": "output",
+                                          "node": "source-id-text",
+                                          "port": "text"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "effectType": "shadow-step"
+                                      }
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "occupied-remove-status",
+                                      "module": "status.remove-record",
+                                      "version": "1",
+                                      "inputs": {
+                                        "piece": {
+                                          "kind": "output",
+                                          "node": "source",
+                                          "port": "piece"
+                                        },
+                                        "value": {
+                                          "kind": "literal",
+                                          "value": "shadow-step"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "selector": "type"
+                                      }
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "occupied-message",
+                                      "module": "text.concat",
+                                      "version": "1",
+                                      "inputs": {
+                                        "left": {
+                                          "kind": "output",
+                                          "node": "source-name",
+                                          "port": "text"
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": "的暗影步目标位置已被占用，传送取消"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "occupied-result",
+                                      "module": "result.action",
+                                      "version": "1",
+                                      "inputs": {
+                                        "success": {
+                                          "kind": "literal",
+                                          "value": true
+                                        },
+                                        "message": {
+                                          "kind": "output",
+                                          "node": "occupied-message",
+                                          "port": "text"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "return",
+                                      "id": "occupied-return",
+                                      "value": {
+                                        "kind": "output",
+                                        "node": "occupied-result",
+                                        "port": "result"
+                                      }
+                                    }
+                                  ]
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "kind": "call",
+                                  "id": "terrain-clear-tile",
+                                  "module": "tile.clear-marker",
+                                  "version": "1",
+                                  "inputs": {
+                                    "sourceId": {
+                                      "kind": "output",
+                                      "node": "source-id-text",
+                                      "port": "text"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "effectType": "shadow-step"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "terrain-remove-status",
+                                  "module": "status.remove-record",
+                                  "version": "1",
+                                  "inputs": {
+                                    "piece": {
+                                      "kind": "output",
+                                      "node": "source",
+                                      "port": "piece"
+                                    },
+                                    "value": {
+                                      "kind": "literal",
+                                      "value": "shadow-step"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "selector": "type"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "terrain-message",
+                                  "module": "text.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "source-name",
+                                      "port": "text"
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": "的暗影步目标位置不可行走，传送取消"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "terrain-result",
+                                  "module": "result.action",
+                                  "version": "1",
+                                  "inputs": {
+                                    "success": {
+                                      "kind": "literal",
+                                      "value": true
+                                    },
+                                    "message": {
+                                      "kind": "output",
+                                      "node": "terrain-message",
+                                      "port": "text"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "return",
+                                  "id": "terrain-return",
+                                  "value": {
+                                    "kind": "output",
+                                    "node": "terrain-result",
+                                    "port": "result"
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "else": [
+                            {
+                              "kind": "call",
+                              "id": "wrong-player-result",
+                              "module": "result.action",
+                              "version": "1",
+                              "inputs": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": false
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": ""
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "return",
+                              "id": "wrong-player-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "wrong-player-result",
+                                "port": "result"
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "expired-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            },
+                            "message": {
+                              "kind": "literal",
+                              "value": ""
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "expired-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "expired-result",
+                            "port": "result"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "missing-status-result",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        },
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "missing-status-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "missing-status-result",
+                        "port": "result"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "missing-source-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "missing-source-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "missing-source-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
+    }
+  }
 }

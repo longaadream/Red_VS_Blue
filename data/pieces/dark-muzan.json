@@ -12,14 +12,31 @@
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "muzan-flesh-regeneration", "level": 1 },
-    { "skillId": "muzan-blood-whip", "level": 1 },
-    { "skillId": "muzan-demon-body", "level": 1 },
-    { "skillId": "muzan-parasitism", "level": 1 }
+    {
+      "skillId": "muzan-flesh-regeneration",
+      "level": 1
+    },
+    {
+      "skillId": "muzan-blood-whip",
+      "level": 1
+    },
+    {
+      "skillId": "muzan-demon-body",
+      "level": 1
+    },
+    {
+      "skillId": "muzan-parasitism",
+      "level": 1
+    }
   ],
   "rules": [
     "rule-muzan-regeneration-damage",
     "rule-muzan-regeneration-end"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:dark-muzan",
+    "links": []
+  }
 }

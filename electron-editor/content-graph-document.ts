@@ -14,7 +14,7 @@ import {
   compileContentGraph,
   type ContentGraph,
 } from './content-graph'
-import { assertGameplayModuleDocument } from './gameplay-module-core.cjs'
+import { assertGameplayModuleDocument, assertSkillClusterMetadata } from './gameplay-module-core.cjs'
 export * from './gameplay-module-core.cjs'
 
 // Keep this module a drop-in document-level entry point for callers that
@@ -106,6 +106,8 @@ function assertExtraEntry(content: ContentGraphDocument, field: string, entry: u
  */
 export function assertContentGraphDocument(content: unknown): void {
   assertDocumentObject(content)
+  // Cluster identities constrain authored documents, not runtime skill copies.
+  assertSkillClusterMetadata(content)
   assertGameplayModuleDocument(content)
   assertNoLegacySkillGraph(content)
   const entries = assertEntriesObject(content)

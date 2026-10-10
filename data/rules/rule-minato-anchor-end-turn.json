@@ -5,1968 +5,781 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "var __rvb_import_bound_method_11, __rvb_import_bound_method_9, __rvb_import_effect_0, __rvb_import_effect_1, __rvb_import_effect_10, __rvb_import_effect_12, __rvb_import_effect_3, __rvb_import_operand_13, __rvb_import_operand_14, __rvb_import_operand_2, __rvb_import_operand_4, __rvb_import_operand_5, __rvb_import_operand_6, __rvb_import_operand_7, __rvb_import_operand_8, anchors, candidates, existing, legalCells, minato, oldest, valid, x, y; var _pc = \"n85\"; for (var _step = 0; _step <= 43; _step++) { switch (_pc) { case \"n85\": minato = (context)[\"rulePiece\"]; _pc = \"n84\"; break; case \"n84\": _pc = (! (! (((! minato) || ((minato)[\"currentHp\"] <= 0)) || (((battle)[\"turn\"])[\"currentPlayerId\"] !== (minato)[\"ownerPlayerId\"])))) ? \"n83\" : \"n46\"; break; case \"n46\": legalCells = function () { var __rvb_import_bound_method_16, __rvb_import_bound_method_18, __rvb_import_effect_15, __rvb_import_effect_17; { var __rvb_content_graph_region_pc_0 = \"n82\"; while (__rvb_content_graph_region_pc_0 !== \"n47\") { switch (__rvb_content_graph_region_pc_0) { case \"n82\": __rvb_import_bound_method_18 = (function (receiver) { var capturedMethod = receiver[\"filter\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((battle)[\"map\"])[\"tiles\"]); __rvb_content_graph_region_pc_0 = \"n75\"; break; case \"n75\": __rvb_import_effect_17 = (__rvb_import_bound_method_18)(function (tile) { { var __rvb_content_graph_region_pc_1 = \"n81\"; while (__rvb_content_graph_region_pc_1 !== \"n76\") { switch (__rvb_content_graph_region_pc_1) { case \"n81\": __rvb_content_graph_region_pc_1 = (! (! ((! (tile)[\"props\"]) || (! ((tile)[\"props\"])[\"walkable\"])))) ? \"n80\" : \"n79\"; break; case \"n79\": __rvb_content_graph_region_pc_1 = (! (! ((Math.abs(((tile)[\"x\"] - (minato)[\"x\"])) + Math.abs(((tile)[\"y\"] - (minato)[\"y\"]))) > 7))) ? \"n78\" : \"n77\"; break; case \"n77\": return (! ((battle)[\"pieces\"])[\"some\"](function (piece) { return ((((piece)[\"currentHp\"] > 0) && ((piece)[\"x\"] === (tile)[\"x\"])) && ((piece)[\"y\"] === (tile)[\"y\"])); })); case \"n78\": return false; case \"n80\": return false; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n74\"; break; case \"n74\": __rvb_import_bound_method_16 = (function (receiver) { var capturedMethod = receiver[\"map\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_17); __rvb_content_graph_region_pc_0 = \"n61\"; break; case \"n61\": __rvb_import_effect_15 = (__rvb_import_bound_method_16)(function (tile) { return {type: \"cell\", x: (tile)[\"x\"], y: (tile)[\"y\"]}; }); __rvb_content_graph_region_pc_0 = \"n60\"; break; case \"n60\": return __rvb_import_effect_15; default: throw new Error(\"invalid content graph region node\"); } } } }; _pc = \"n45\"; break; case \"n45\": _pc = (! (! (((context)[\"targetX\"] === (void 0)) || ((context)[\"targetY\"] === (void 0))))) ? \"n44\" : \"n39\"; break; case \"n39\": x = (context)[\"targetX\"]; _pc = \"n38\"; break; case \"n38\": y = (context)[\"targetY\"]; _pc = \"n37\"; break; case \"n37\": __rvb_import_operand_13 = legalCells; _pc = \"n36\"; break; case \"n36\": __rvb_import_effect_12 = (__rvb_import_operand_13)(); _pc = \"n35\"; break; case \"n35\": __rvb_import_bound_method_11 = (function (receiver) { var capturedMethod = receiver[\"some\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(__rvb_import_effect_12); _pc = \"n34\"; break; case \"n34\": __rvb_import_effect_10 = (__rvb_import_bound_method_11)(function (cell) { return (((cell)[\"x\"] === x) && ((cell)[\"y\"] === y)); }); _pc = \"n33\"; break; case \"n33\": valid = __rvb_import_effect_10; _pc = \"n32\"; break; case \"n32\": _pc = (! (! (! valid))) ? \"n31\" : \"n30\"; break; case \"n30\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n29\" : \"n28\"; break; case \"n29\": (battle)[\"extensions\"] = {}; _pc = \"n28\"; break; case \"n28\": _pc = (! (! (! ((battle)[\"extensions\"])[\"minatoAnchors\"]))) ? \"n27\" : \"n26\"; break; case \"n27\": ((battle)[\"extensions\"])[\"minatoAnchors\"] = []; _pc = \"n26\"; break; case \"n26\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n25\" : \"n24\"; break; case \"n25\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n24\"; break; case \"n24\": anchors = ((battle)[\"extensions\"])[\"minatoAnchors\"]; _pc = \"n23\"; break; case \"n23\": existing = (anchors)[\"find\"](function (anchor) { return ((((anchor)[\"sourceId\"] === (minato)[\"instanceId\"]) && ((anchor)[\"x\"] === x)) && ((anchor)[\"y\"] === y)); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! existing)) ? \"n12\" : \"n21\"; break; case \"n21\": __rvb_import_bound_method_9 = (function (receiver) { var capturedMethod = receiver[\"push\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(anchors); _pc = \"n20\"; break; case \"n20\": __rvb_import_operand_8 = x; _pc = \"n19\"; break; case \"n19\": __rvb_import_operand_7 = y; _pc = \"n18\"; break; case \"n18\": __rvb_import_operand_6 = (minato)[\"instanceId\"]; _pc = \"n17\"; break; case \"n17\": __rvb_import_operand_5 = (minato)[\"ownerPlayerId\"]; _pc = \"n16\"; break; case \"n16\": __rvb_import_effect_3 = Date.now(); _pc = \"n15\"; break; case \"n15\": __rvb_import_operand_4 = __rvb_import_effect_3; _pc = \"n14\"; break; case \"n14\": __rvb_import_operand_2 = {x: __rvb_import_operand_8, y: __rvb_import_operand_7, sourceId: __rvb_import_operand_6, ownerPlayerId: __rvb_import_operand_5, createdAt: __rvb_import_operand_4}; _pc = \"n13\"; break; case \"n13\": (__rvb_import_bound_method_9)(__rvb_import_operand_2); _pc = \"n10\"; break; case \"n12\": __rvb_import_effect_1 = Date.now(); _pc = \"n11\"; break; case \"n11\": (existing)[\"createdAt\"] = __rvb_import_effect_1; _pc = \"n10\"; break; case \"n10\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (effect) { return (! (((((effect)[\"tileType\"] === \"flying-raijin-anchor\") && ((effect)[\"sourceId\"] === (minato)[\"instanceId\"])) && ((effect)[\"x\"] === x)) && ((effect)[\"y\"] === y))); }); _pc = \"n9\"; break; case \"n9\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: x, y: y, sourceId: (minato)[\"instanceId\"], tileType: \"flying-raijin-anchor\", icon: \"⚡\", bgColor: \"rgba(250, 204, 21, 0.14)\", boxShadow: \"inset 0 0 0 2px rgba(250, 204, 21, 0.75)\", iconPosition: \"top-left\"}); _pc = \"n8\"; break; case \"n8\": var __rvb_content_graph_loop_break_2 = false, __rvb_content_graph_loop_continue_3 = false; while ((! (! (((anchors)[\"filter\"](function (anchor) { return ((anchor)[\"sourceId\"] === (minato)[\"instanceId\"]); }))[\"length\"] > 3)))) { __rvb_content_graph_loop_continue_3 = false; { var __rvb_content_graph_region_pc_4 = \"n7\"; while (__rvb_content_graph_region_pc_4 !== \"n2\") { switch (__rvb_content_graph_region_pc_4) { case \"n7\": __rvb_import_effect_0 = ((anchors)[\"filter\"](function (anchor) { return ((anchor)[\"sourceId\"] === (minato)[\"instanceId\"]); })).sort(function (a, b) { return (((a)[\"createdAt\"] || 0) - ((b)[\"createdAt\"] || 0)); }); __rvb_content_graph_region_pc_4 = \"n6\"; break; case \"n6\": oldest = (__rvb_import_effect_0)[0]; __rvb_content_graph_region_pc_4 = \"n5\"; break; case \"n5\": anchors = (anchors)[\"filter\"](function (anchor) { return (anchor !== oldest); }); __rvb_content_graph_region_pc_4 = \"n4\"; break; case \"n4\": ((battle)[\"extensions\"])[\"minatoAnchors\"] = anchors; __rvb_content_graph_region_pc_4 = \"n3\"; break; case \"n3\": ((battle)[\"extensions\"])[\"tileEffects\"] = (((battle)[\"extensions\"])[\"tileEffects\"])[\"filter\"](function (effect) { return (! (((((effect)[\"tileType\"] === \"flying-raijin-anchor\") && ((effect)[\"sourceId\"] === (minato)[\"instanceId\"])) && ((effect)[\"x\"] === (oldest)[\"x\"])) && ((effect)[\"y\"] === (oldest)[\"y\"]))); }); __rvb_content_graph_region_pc_4 = \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_4 = \"n2\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_2) break; if (__rvb_content_graph_loop_break_2) break; if (__rvb_content_graph_loop_continue_3) { __rvb_content_graph_loop_continue_3 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((minato)[\"name\"] + \"标记飞雷神锚点(\") + x) + \",\") + y) + \")\")}; case \"n31\": return {success: false, message: \"飞雷神锚点位置不合法\"}; case \"n44\": __rvb_import_operand_14 = legalCells; _pc = \"n43\"; break; case \"n43\": candidates = (__rvb_import_operand_14)(); _pc = \"n42\"; break; case \"n42\": _pc = (! (! (! (candidates)[\"length\"]))) ? \"n41\" : \"n40\"; break; case \"n40\": return {needsTargetSelection: true, targetType: \"cell\", range: 7, filter: \"all\", playerId: (minato)[\"ownerPlayerId\"], title: ((minato)[\"name\"] + \"选择飞雷神锚点\"), canCancel: true, targetCandidates: candidates}; case \"n41\": return {success: false, message: \"\"}; case \"n83\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\");",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "rule",
-    "entry": "n85",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "skillCode": "var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"currentHp\"]); } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module3 = __gameplayInvalid; } else { var _module3 = ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) > 0)); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).ownerPlayerId); } var _module5 = (battle.turn.currentPlayerId); if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4))) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5)))) { _module6 = __gameplayInvalid; } else { var _module6 = ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"player\")) ? _module4[\"player\"] : _module4) === ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"player\")) ? _module5[\"player\"] : _module5))); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) && ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6))); } var _condition40 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7); if (_condition40 !== __gameplayInvalid && _condition40) { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module8 = __gameplayInvalid; } else { var _module8 = ((function(sourceId, radius) { var source = (battle.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; return ((battle.map && battle.map.tiles) || []).filter(function(tile) { if (!tile || !tile.props || !tile.props.walkable || Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) > radius) return false; return !(battle.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === tile.x && piece.y === tile.y; }); }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), 7)); } if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === null)) { _module9 = __gameplayInvalid; } else { var _module9 = (Array.isArray(((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8)) ? ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8).length : 0); } if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module10 = __gameplayInvalid; } else { var _module10 = ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) > 0)); } var _condition38 = ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10); if (_condition38 !== __gameplayInvalid && _condition38) { if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = (((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"cells\")) ? _module8[\"cells\"] : _module8) || []).map(function(cell) { return {type: \"cell\", x: cell.x, y: cell.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }))); } var _module12 = (flow.refs.player()); if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12)))) { _module13 = __gameplayInvalid; } else { var _module13 = ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"player\")) ? _module12[\"player\"] : _module12) || context.playerId)); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module14 = __gameplayInvalid; } else { var _module14 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === null) || (\"选择飞雷神锚点\" === __gameplayInvalid) || (\"选择飞雷神锚点\" === undefined) || (\"选择飞雷神锚点\" === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) + \"选择飞雷神锚点\")); } var _record16 = ({}); if ((_record16 !== __gameplayInvalid) && ((_record16 !== null) !== __gameplayInvalid) && ((typeof _record16 === \"object\") !== __gameplayInvalid) && ((!Array.isArray(_record16)) !== __gameplayInvalid) && (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"player\")) ? _module13[\"player\"] : _module13) !== __gameplayInvalid) && (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) !== __gameplayInvalid) && (\"cell\" !== __gameplayInvalid) && (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"choices\")) ? _module11[\"choices\"] : _module11) !== __gameplayInvalid) && (\"single\" !== __gameplayInvalid) && (1 !== __gameplayInvalid) && (1 !== __gameplayInvalid) && (true !== __gameplayInvalid)) { return { success: true, pendingTargetSelection: { playerId: ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"player\")) ? _module13[\"player\"] : _module13), title: ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15), targetType: \"cell\", candidates: ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"choices\")) ? _module11[\"choices\"] : _module11), selectionMode: \"single\", min: 1, max: 1, minSelections: 1, maxSelections: 1, canCancel: true, payload: _record16, effectCode: \"function(ctx) { var __gameplayInvalid = {}; var _module17 = (ctx.flow.refs.holder()); if ((((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17) != null && typeof ctx.flow !== \\\"undefined\\\" && ctx.flow !== null && ctx.flow.query && typeof ctx.flow.query.hasPiece === \\\"function\\\" && !ctx.flow.query.hasPiece(((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17)))) { _module18 = __gameplayInvalid; } else { var _module18 = (ctx.flow.query.hasPiece(((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17)) ? ctx.flow.query.piece(((_module17 !== null && typeof _module17 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module17, \\\"piece\\\")) ? _module17[\\\"piece\\\"] : _module17)).instanceId : null); } if ((((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === __gameplayInvalid) || (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === undefined)) { _module19 = __gameplayInvalid; } else { var _module19 = ((function(cell) { if (!cell) return false; var tile = ctx.battle.map && Array.isArray(ctx.battle.map.tiles) ? ctx.battle.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; return Boolean(tile && tile.props && tile.props.walkable); })(((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null))); } if ((((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === __gameplayInvalid) || (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === undefined)) { _module20 = __gameplayInvalid; } else { var _module20 = ((function(cell, ignore) { if (!cell) return false; return !(ctx.battle.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || \\\"\\\"); }); })(((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null), null)); } var _condition35 = ((_module19 !== null && typeof _module19 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module19, \\\"value\\\")) ? _module19[\\\"value\\\"] : _module19); if (_condition35 !== __gameplayInvalid && _condition35) { var _condition33 = ((_module20 !== null && typeof _module20 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module20, \\\"value\\\")) ? _module20[\\\"value\\\"] : _module20); if (_condition33 !== __gameplayInvalid && _condition33) { if ((((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) != null && typeof ctx.flow !== \\\"undefined\\\" && ctx.flow !== null && ctx.flow.query && typeof ctx.flow.query.hasPiece === \\\"function\\\" && !ctx.flow.query.hasPiece(((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18))) || (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === __gameplayInvalid) || (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === undefined)) { _module21 = __gameplayInvalid; } else { var _module21 = ((function(sourceId, cell, storageKey, tileType, maxAnchors) { var source = (ctx.battle.pieces || []).concat(ctx.battle.graveyard || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source || !cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return false; ctx.battle.extensions = ctx.battle.extensions || {}; var anchors = Array.isArray(ctx.battle.extensions[storageKey]) ? ctx.battle.extensions[storageKey] : []; var tileEffects = Array.isArray(ctx.battle.extensions.tileEffects) ? ctx.battle.extensions.tileEffects : []; var now = Date.now(); var existing = anchors.find(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); if (existing) existing.createdAt = now; else anchors.push({x:cell.x, y:cell.y, sourceId:sourceId, ownerPlayerId:source.ownerPlayerId, createdAt:now}); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); tileEffects.push({x:cell.x, y:cell.y, sourceId:sourceId, tileType:tileType, icon:\\\"⚡\\\", bgColor:\\\"rgba(250, 204, 21, 0.14)\\\", boxShadow:\\\"inset 0 0 0 2px rgba(250, 204, 21, 0.75)\\\", iconPosition:\\\"top-left\\\"}); while (anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).length > maxAnchors) { var own = anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); }); var oldest = own[0]; anchors = anchors.filter(function(anchor) { return anchor !== oldest; }); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === oldest.x && effect.y === oldest.y); }); } ctx.battle.extensions[storageKey] = anchors; ctx.battle.extensions.tileEffects = tileEffects; return true; })(((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18), ((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null), \\\"minatoAnchors\\\", \\\"flying-raijin-anchor\\\", 3)); } if ((((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) === null) || (((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18) != null && typeof ctx.flow !== \\\"undefined\\\" && ctx.flow !== null && ctx.flow.query && typeof ctx.flow.query.hasPiece === \\\"function\\\" && !ctx.flow.query.hasPiece(((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18)))) { _module22 = __gameplayInvalid; } else { var _module22 = (String(ctx.flow.query.piece(((_module18 !== null && typeof _module18 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module18, \\\"piece\\\")) ? _module18[\\\"piece\\\"] : _module18))[\\\"name\\\"])); } if ((((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === __gameplayInvalid) || (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null) === undefined)) { _module23 = { \\\"x\\\": __gameplayInvalid, \\\"y\\\": __gameplayInvalid }; } else { var _module23 = (({x: (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null)) ? (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null)).x : 0, y: (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null)) ? (((ctx[\\\"targetX\\\"] !== undefined && ctx[\\\"targetY\\\"] !== undefined) ? { x: ctx[\\\"targetX\\\"], y: ctx[\\\"targetY\\\"] } : null)).y : 0})); } if (((_module23[\\\"x\\\"]) === __gameplayInvalid) || ((_module23[\\\"x\\\"]) === undefined) || ((_module23[\\\"x\\\"]) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = (String((_module23[\\\"x\\\"]))); } if (((_module23[\\\"y\\\"]) === __gameplayInvalid) || ((_module23[\\\"y\\\"]) === undefined) || ((_module23[\\\"y\\\"]) === null)) { _module25 = __gameplayInvalid; } else { var _module25 = (String((_module23[\\\"y\\\"]))); } if ((((_module22 !== null && typeof _module22 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module22, \\\"text\\\")) ? _module22[\\\"text\\\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module22, \\\"text\\\")) ? _module22[\\\"text\\\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module22, \\\"text\\\")) ? _module22[\\\"text\\\"] : _module22) === null) || (\\\"标记飞雷神锚点(\\\" === __gameplayInvalid) || (\\\"标记飞雷神锚点(\\\" === undefined) || (\\\"标记飞雷神锚点(\\\" === null)) { _module26 = __gameplayInvalid; } else { var _module26 = ((((_module22 !== null && typeof _module22 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module22, \\\"text\\\")) ? _module22[\\\"text\\\"] : _module22) + \\\"标记飞雷神锚点(\\\")); } if ((((_module26 !== null && typeof _module26 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module26, \\\"text\\\")) ? _module26[\\\"text\\\"] : _module26) === __gameplayInvalid) || (((_module26 !== null && typeof _module26 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module26, \\\"text\\\")) ? _module26[\\\"text\\\"] : _module26) === undefined) || (((_module26 !== null && typeof _module26 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module26, \\\"text\\\")) ? _module26[\\\"text\\\"] : _module26) === null) || (((_module24 !== null && typeof _module24 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module24, \\\"text\\\")) ? _module24[\\\"text\\\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module24, \\\"text\\\")) ? _module24[\\\"text\\\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module24, \\\"text\\\")) ? _module24[\\\"text\\\"] : _module24) === null)) { _module27 = __gameplayInvalid; } else { var _module27 = ((((_module26 !== null && typeof _module26 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module26, \\\"text\\\")) ? _module26[\\\"text\\\"] : _module26) + ((_module24 !== null && typeof _module24 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module24, \\\"text\\\")) ? _module24[\\\"text\\\"] : _module24))); } if ((((_module27 !== null && typeof _module27 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module27, \\\"text\\\")) ? _module27[\\\"text\\\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module27, \\\"text\\\")) ? _module27[\\\"text\\\"] : _module27) === undefined) || (((_module27 !== null && typeof _module27 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module27, \\\"text\\\")) ? _module27[\\\"text\\\"] : _module27) === null) || (\\\",\\\" === __gameplayInvalid) || (\\\",\\\" === undefined) || (\\\",\\\" === null)) { _module28 = __gameplayInvalid; } else { var _module28 = ((((_module27 !== null && typeof _module27 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module27, \\\"text\\\")) ? _module27[\\\"text\\\"] : _module27) + \\\",\\\")); } if ((((_module28 !== null && typeof _module28 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module28, \\\"text\\\")) ? _module28[\\\"text\\\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module28, \\\"text\\\")) ? _module28[\\\"text\\\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module28, \\\"text\\\")) ? _module28[\\\"text\\\"] : _module28) === null) || (((_module25 !== null && typeof _module25 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module25, \\\"text\\\")) ? _module25[\\\"text\\\"] : _module25) === __gameplayInvalid) || (((_module25 !== null && typeof _module25 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module25, \\\"text\\\")) ? _module25[\\\"text\\\"] : _module25) === undefined) || (((_module25 !== null && typeof _module25 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module25, \\\"text\\\")) ? _module25[\\\"text\\\"] : _module25) === null)) { _module29 = __gameplayInvalid; } else { var _module29 = ((((_module28 !== null && typeof _module28 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module28, \\\"text\\\")) ? _module28[\\\"text\\\"] : _module28) + ((_module25 !== null && typeof _module25 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module25, \\\"text\\\")) ? _module25[\\\"text\\\"] : _module25))); } if ((((_module29 !== null && typeof _module29 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module29, \\\"text\\\")) ? _module29[\\\"text\\\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module29, \\\"text\\\")) ? _module29[\\\"text\\\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module29, \\\"text\\\")) ? _module29[\\\"text\\\"] : _module29) === null) || (\\\")\\\" === __gameplayInvalid) || (\\\")\\\" === undefined) || (\\\")\\\" === null)) { _module30 = __gameplayInvalid; } else { var _module30 = ((((_module29 !== null && typeof _module29 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module29, \\\"text\\\")) ? _module29[\\\"text\\\"] : _module29) + \\\")\\\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module30 !== null && typeof _module30 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module30, \\\"text\\\")) ? _module30[\\\"text\\\"] : _module30) === __gameplayInvalid) || (((_module30 !== null && typeof _module30 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module30, \\\"text\\\")) ? _module30[\\\"text\\\"] : _module30) === null)) { _module31 = __gameplayInvalid; } else { var _module31 = (({success: true, message: ((_module30 !== null && typeof _module30 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module30, \\\"text\\\")) ? _module30[\\\"text\\\"] : _module30)})); } if (!((((_module31 !== null && typeof _module31 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module31, \\\"result\\\")) ? _module31[\\\"result\\\"] : _module31) === __gameplayInvalid))) { return ((_module31 !== null && typeof _module31 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module31, \\\"result\\\")) ? _module31[\\\"result\\\"] : _module31); } } else if (_condition33 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\\\"飞雷神锚点位置不合法\\\" === __gameplayInvalid) || (\\\"飞雷神锚点位置不合法\\\" === null)) { _module32 = __gameplayInvalid; } else { var _module32 = (({success: false, message: \\\"飞雷神锚点位置不合法\\\"})); } if (!((((_module32 !== null && typeof _module32 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module32, \\\"result\\\")) ? _module32[\\\"result\\\"] : _module32) === __gameplayInvalid))) { return ((_module32 !== null && typeof _module32 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module32, \\\"result\\\")) ? _module32[\\\"result\\\"] : _module32); } } } else if (_condition35 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\\\"飞雷神锚点位置不合法\\\" === __gameplayInvalid) || (\\\"飞雷神锚点位置不合法\\\" === null)) { _module34 = __gameplayInvalid; } else { var _module34 = (({success: false, message: \\\"飞雷神锚点位置不合法\\\"})); } if (!((((_module34 !== null && typeof _module34 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module34, \\\"result\\\")) ? _module34[\\\"result\\\"] : _module34) === __gameplayInvalid))) { return ((_module34 !== null && typeof _module34 === \\\"object\\\" && Object.prototype.hasOwnProperty.call(_module34, \\\"result\\\")) ? _module34[\\\"result\\\"] : _module34); } } }\" } }; } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module36 = __gameplayInvalid; } else { var _module36 = (({success: true, message: \"\"})); } if (!((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"result\")) ? _module36[\"result\"] : _module36) === __gameplayInvalid))) { return ((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"result\")) ? _module36[\"result\"] : _module36); } } else if (_condition38 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module37 = __gameplayInvalid; } else { var _module37 = (({success: false, message: \"\"})); } if (!((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"result\")) ? _module37[\"result\"] : _module37) === __gameplayInvalid))) { return ((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"result\")) ? _module37[\"result\"] : _module37); } } } else if (_condition40 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module39 = __gameplayInvalid; } else { var _module39 = (({success: false, message: \"\"})); } if (!((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"result\")) ? _module39[\"result\"] : _module39) === __gameplayInvalid))) { return ((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"result\")) ? _module39[\"result\"] : _module39); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "hp",
+              "module": "attribute.read",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "currentHp"
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
+              "kind": "call",
+              "id": "alive",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "binary",
-                    "op": "+",
-                    "left": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "binary",
-                        "op": "+",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "minato"
-                          },
-                          "key": "name"
-                        },
-                        "right": {
-                          "kind": "literal",
-                          "value": "标记飞雷神锚点("
-                        }
-                      },
-                      "right": {
-                        "kind": "ref",
-                        "name": "x"
-                      }
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": ","
-                    }
-                  },
-                  "right": {
-                    "kind": "ref",
-                    "name": "y"
-                  }
+                  "kind": "output",
+                  "node": "hp",
+                  "port": "value"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": ")"
-                }
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n8",
-        "kind": "loop",
-        "loop": "while",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": ">",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "ref",
-                    "name": "anchors"
-                  },
-                  "method": "filter",
-                  "args": [
-                    {
-                      "kind": "lambda",
-                      "parameters": [
-                        "anchor"
-                      ],
-                      "body": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "anchor"
-                          },
-                          "key": "sourceId"
-                        },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "minato"
-                          },
-                          "key": "instanceId"
-                        }
-                      }
-                    }
-                  ]
-                },
-                "key": "length"
-              },
-              "right": {
-                "kind": "literal",
-                "value": 3
-              }
-            }
-          }
-        },
-        "body": {
-          "entry": "n7",
-          "end": "n2",
-          "nodes": [
-            {
-              "id": "n2",
-              "kind": "regionEnd"
-            },
-            {
-              "id": "n3",
-              "kind": "set",
-              "target": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "battle"
-                  },
-                  "key": "extensions"
-                },
-                "key": "tileEffects"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "collection",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "battle"
-                    },
-                    "key": "extensions"
-                  },
-                  "key": "tileEffects"
-                },
-                "method": "filter",
-                "args": [
-                  {
-                    "kind": "lambda",
-                    "parameters": [
-                      "effect"
-                    ],
-                    "body": {
-                      "kind": "unary",
-                      "op": "!",
-                      "argument": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": "&&",
-                          "left": {
-                            "kind": "binary",
-                            "op": "&&",
-                            "left": {
-                              "kind": "binary",
-                              "op": "===",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "effect"
-                                },
-                                "key": "tileType"
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": "flying-raijin-anchor"
-                              }
-                            },
-                            "right": {
-                              "kind": "binary",
-                              "op": "===",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "effect"
-                                },
-                                "key": "sourceId"
-                              },
-                              "right": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "minato"
-                                },
-                                "key": "instanceId"
-                              }
-                            }
-                          },
-                          "right": {
-                            "kind": "binary",
-                            "op": "===",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "effect"
-                              },
-                              "key": "x"
-                            },
-                            "right": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "oldest"
-                              },
-                              "key": "x"
-                            }
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "effect"
-                            },
-                            "key": "y"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "oldest"
-                            },
-                            "key": "y"
-                          }
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              "next": "n2"
-            },
-            {
-              "id": "n4",
-              "kind": "set",
-              "target": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "battle"
-                  },
-                  "key": "extensions"
-                },
-                "key": "minatoAnchors"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "ref",
-                "name": "anchors"
-              },
-              "next": "n3"
-            },
-            {
-              "id": "n5",
-              "kind": "set",
-              "target": {
-                "kind": "ref",
-                "name": "anchors"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "collection",
-                "object": {
-                  "kind": "ref",
-                  "name": "anchors"
-                },
-                "method": "filter",
-                "args": [
-                  {
-                    "kind": "lambda",
-                    "parameters": [
-                      "anchor"
-                    ],
-                    "body": {
-                      "kind": "binary",
-                      "op": "!==",
-                      "left": {
-                        "kind": "ref",
-                        "name": "anchor"
-                      },
-                      "right": {
-                        "kind": "ref",
-                        "name": "oldest"
-                      }
-                    }
-                  }
-                ]
-              },
-              "next": "n4"
-            },
-            {
-              "id": "n6",
-              "kind": "bind",
-              "name": "oldest",
-              "expr": {
-                "kind": "index",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_import_effect_0"
-                },
-                "index": {
                   "kind": "literal",
                   "value": 0
                 }
               },
-              "next": "n5"
+              "parameters": {}
             },
             {
-              "id": "n7",
               "kind": "call",
-              "capability": "array.sort",
-              "args": [
+              "id": "owner",
+              "module": "piece.owner",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "current-player",
+              "module": "turn.current-player",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "same-player",
+              "module": "compare.equal-player",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "current-player",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "active",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "alive",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "same-player",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "active-check",
+              "condition": {
+                "kind": "output",
+                "node": "active",
+                "port": "value"
+              },
+              "then": [
                 {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "ref",
-                    "name": "anchors"
-                  },
-                  "method": "filter",
-                  "args": [
-                    {
-                      "kind": "lambda",
-                      "parameters": [
-                        "anchor"
-                      ],
-                      "body": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "anchor"
-                          },
-                          "key": "sourceId"
-                        },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "minato"
-                          },
-                          "key": "instanceId"
-                        }
-                      }
+                  "kind": "call",
+                  "id": "cells",
+                  "module": "marker.anchor-candidates",
+                  "version": "1",
+                  "inputs": {
+                    "source": {
+                      "kind": "output",
+                      "node": "holder",
+                      "port": "piece"
                     }
-                  ]
+                  },
+                  "parameters": {
+                    "range": 7
+                  }
                 },
                 {
-                  "kind": "lambda",
-                  "parameters": [
-                    "a",
-                    "b"
-                  ],
-                  "body": {
-                    "kind": "binary",
-                    "op": "-",
+                  "kind": "call",
+                  "id": "count",
+                  "module": "list.count-cells",
+                  "version": "1",
+                  "inputs": {
+                    "items": {
+                      "kind": "output",
+                      "node": "cells",
+                      "port": "cells"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "has-cells",
+                  "module": "compare.greater-than",
+                  "version": "1",
+                  "inputs": {
                     "left": {
-                      "kind": "binary",
-                      "op": "||",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "a"
-                        },
-                        "key": "createdAt"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": 0
-                      }
+                      "kind": "output",
+                      "node": "count",
+                      "port": "value"
                     },
                     "right": {
-                      "kind": "binary",
-                      "op": "||",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "b"
-                        },
-                        "key": "createdAt"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": 0
-                      }
+                      "kind": "literal",
+                      "value": 0
                     }
-                  }
-                }
-              ],
-              "result": "__rvb_import_effect_0",
-              "next": "n6"
-            }
-          ]
-        },
-        "next": "n1"
-      },
-      {
-        "id": "n9",
-        "kind": "call",
-        "capability": "array.push",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "extensions"
-            },
-            "key": "tileEffects"
-          },
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "x",
-                "value": {
-                  "kind": "ref",
-                  "name": "x"
-                }
-              },
-              {
-                "key": "y",
-                "value": {
-                  "kind": "ref",
-                  "name": "y"
-                }
-              },
-              {
-                "key": "sourceId",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "minato"
                   },
-                  "key": "instanceId"
-                }
-              },
-              {
-                "key": "tileType",
-                "value": {
-                  "kind": "literal",
-                  "value": "flying-raijin-anchor"
-                }
-              },
-              {
-                "key": "icon",
-                "value": {
-                  "kind": "literal",
-                  "value": "⚡"
-                }
-              },
-              {
-                "key": "bgColor",
-                "value": {
-                  "kind": "literal",
-                  "value": "rgba(250, 204, 21, 0.14)"
-                }
-              },
-              {
-                "key": "boxShadow",
-                "value": {
-                  "kind": "literal",
-                  "value": "inset 0 0 0 2px rgba(250, 204, 21, 0.75)"
-                }
-              },
-              {
-                "key": "iconPosition",
-                "value": {
-                  "kind": "literal",
-                  "value": "top-left"
-                }
-              }
-            ]
-          }
-        ],
-        "next": "n8"
-      },
-      {
-        "id": "n10",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "extensions"
-          },
-          "key": "tileEffects"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "battle"
-              },
-              "key": "extensions"
-            },
-            "key": "tileEffects"
-          },
-          "method": "filter",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "effect"
-              ],
-              "body": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "binary",
-                  "op": "&&",
-                  "left": {
-                    "kind": "binary",
-                    "op": "&&",
-                    "left": {
-                      "kind": "binary",
-                      "op": "&&",
-                      "left": {
-                        "kind": "binary",
-                        "op": "===",
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "candidate-check",
+                  "condition": {
+                    "kind": "output",
+                    "node": "has-cells",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "candidates",
+                      "module": "choice.from-cells",
+                      "version": "1",
+                      "inputs": {
+                        "cells": {
+                          "kind": "output",
+                          "node": "cells",
+                          "port": "cells"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "player-ref",
+                      "module": "ref.player",
+                      "version": "1",
+                      "inputs": {},
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "player",
+                      "module": "player.require",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "player-ref",
+                          "port": "player"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "name",
+                      "module": "attribute.text",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "holder",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "attribute": "name"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "title",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
                         "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "effect"
-                          },
-                          "key": "tileType"
+                          "kind": "output",
+                          "node": "name",
+                          "port": "text"
                         },
                         "right": {
                           "kind": "literal",
-                          "value": "flying-raijin-anchor"
+                          "value": "选择飞雷神锚点"
                         }
                       },
-                      "right": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "effect"
-                          },
-                          "key": "sourceId"
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "record.create",
+                      "id": "payload",
+                      "schema": "pending-empty-payload@1",
+                      "fields": {}
+                    },
+                    {
+                      "kind": "defer-choice",
+                      "id": "anchor-choice",
+                      "graph": "minato-anchor-end-turn",
+                      "payload": {
+                        "kind": "output",
+                        "node": "payload",
+                        "port": "value"
+                      },
+                      "player": {
+                        "kind": "output",
+                        "node": "player",
+                        "port": "player"
+                      },
+                      "title": {
+                        "kind": "output",
+                        "node": "title",
+                        "port": "text"
+                      },
+                      "targetType": {
+                        "kind": "literal",
+                        "value": "cell"
+                      },
+                      "candidates": {
+                        "kind": "output",
+                        "node": "candidates",
+                        "port": "choices"
+                      },
+                      "selectionMode": {
+                        "kind": "literal",
+                        "value": "single"
+                      },
+                      "min": {
+                        "kind": "literal",
+                        "value": 1
+                      },
+                      "max": {
+                        "kind": "literal",
+                        "value": 1
+                      },
+                      "canCancel": {
+                        "kind": "literal",
+                        "value": true
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "pending",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": true
                         },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "minato"
-                          },
-                          "key": "instanceId"
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
                         }
-                      }
+                      },
+                      "parameters": {}
                     },
-                    "right": {
-                      "kind": "binary",
-                      "op": "===",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "effect"
+                    {
+                      "kind": "return",
+                      "id": "pending-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "pending",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "none",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
                         },
-                        "key": "x"
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
+                        }
                       },
-                      "right": {
-                        "kind": "ref",
-                        "name": "x"
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "none-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "none",
+                        "port": "result"
                       }
                     }
-                  },
-                  "right": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "effect"
-                      },
-                      "key": "y"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "y"
-                    }
-                  }
+                  ]
                 }
-              }
-            }
-          ]
-        },
-        "next": "n9"
-      },
-      {
-        "id": "n11",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "existing"
-          },
-          "key": "createdAt"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_1"
-        },
-        "next": "n10"
-      },
-      {
-        "id": "n12",
-        "kind": "call",
-        "capability": "Date.now",
-        "args": [],
-        "result": "__rvb_import_effect_1",
-        "next": "n11"
-      },
-      {
-        "id": "n13",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_bound_method_9"
-          }
-        },
-        "args": [
-          {
-            "kind": "ref",
-            "name": "__rvb_import_operand_2"
-          }
-        ],
-        "next": "n10"
-      },
-      {
-        "id": "n14",
-        "kind": "bind",
-        "name": "__rvb_import_operand_2",
-        "expr": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "x",
-              "value": {
-                "kind": "ref",
-                "name": "__rvb_import_operand_8"
-              }
-            },
-            {
-              "key": "y",
-              "value": {
-                "kind": "ref",
-                "name": "__rvb_import_operand_7"
-              }
-            },
-            {
-              "key": "sourceId",
-              "value": {
-                "kind": "ref",
-                "name": "__rvb_import_operand_6"
-              }
-            },
-            {
-              "key": "ownerPlayerId",
-              "value": {
-                "kind": "ref",
-                "name": "__rvb_import_operand_5"
-              }
-            },
-            {
-              "key": "createdAt",
-              "value": {
-                "kind": "ref",
-                "name": "__rvb_import_operand_4"
-              }
-            }
-          ]
-        },
-        "next": "n13"
-      },
-      {
-        "id": "n15",
-        "kind": "bind",
-        "name": "__rvb_import_operand_4",
-        "expr": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_3"
-        },
-        "next": "n14"
-      },
-      {
-        "id": "n16",
-        "kind": "call",
-        "capability": "Date.now",
-        "args": [],
-        "result": "__rvb_import_effect_3",
-        "next": "n15"
-      },
-      {
-        "id": "n17",
-        "kind": "bind",
-        "name": "__rvb_import_operand_5",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "minato"
-          },
-          "key": "ownerPlayerId"
-        },
-        "next": "n16"
-      },
-      {
-        "id": "n18",
-        "kind": "bind",
-        "name": "__rvb_import_operand_6",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "minato"
-          },
-          "key": "instanceId"
-        },
-        "next": "n17"
-      },
-      {
-        "id": "n19",
-        "kind": "bind",
-        "name": "__rvb_import_operand_7",
-        "expr": {
-          "kind": "ref",
-          "name": "y"
-        },
-        "next": "n18"
-      },
-      {
-        "id": "n20",
-        "kind": "bind",
-        "name": "__rvb_import_operand_8",
-        "expr": {
-          "kind": "ref",
-          "name": "x"
-        },
-        "next": "n19"
-      },
-      {
-        "id": "n21",
-        "kind": "bind",
-        "name": "__rvb_import_bound_method_9",
-        "expr": {
-          "kind": "boundMethod",
-          "object": {
-            "kind": "ref",
-            "name": "anchors"
-          },
-          "method": "push"
-        },
-        "next": "n20"
-      },
-      {
-        "id": "n22",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "ref",
-              "name": "existing"
-            }
-          }
-        },
-        "yes": "n12",
-        "no": "n21"
-      },
-      {
-        "id": "n23",
-        "kind": "bind",
-        "name": "existing",
-        "expr": {
-          "kind": "collection",
-          "object": {
-            "kind": "ref",
-            "name": "anchors"
-          },
-          "method": "find",
-          "args": [
-            {
-              "kind": "lambda",
-              "parameters": [
-                "anchor"
               ],
-              "body": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "&&",
-                  "left": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "anchor"
-                      },
-                      "key": "sourceId"
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "inactive",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
                     },
-                    "right": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "minato"
-                      },
-                      "key": "instanceId"
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
                     }
                   },
-                  "right": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "anchor"
-                      },
-                      "key": "x"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "x"
-                    }
-                  }
+                  "parameters": {}
                 },
-                "right": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "anchor"
-                    },
-                    "key": "y"
-                  },
-                  "right": {
-                    "kind": "ref",
-                    "name": "y"
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n22"
-      },
-      {
-        "id": "n24",
-        "kind": "bind",
-        "name": "anchors",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "extensions"
-          },
-          "key": "minatoAnchors"
-        },
-        "next": "n23"
-      },
-      {
-        "id": "n25",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "extensions"
-          },
-          "key": "tileEffects"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "array",
-          "items": []
-        },
-        "next": "n24"
-      },
-      {
-        "id": "n26",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "battle"
-                  },
-                  "key": "extensions"
-                },
-                "key": "tileEffects"
-              }
-            }
-          }
-        },
-        "yes": "n25",
-        "no": "n24"
-      },
-      {
-        "id": "n27",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "battle"
-            },
-            "key": "extensions"
-          },
-          "key": "minatoAnchors"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "array",
-          "items": []
-        },
-        "next": "n26"
-      },
-      {
-        "id": "n28",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "battle"
-                  },
-                  "key": "extensions"
-                },
-                "key": "minatoAnchors"
-              }
-            }
-          }
-        },
-        "yes": "n27",
-        "no": "n26"
-      },
-      {
-        "id": "n29",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "battle"
-          },
-          "key": "extensions"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "object",
-          "entries": []
-        },
-        "next": "n28"
-      },
-      {
-        "id": "n30",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "battle"
-                },
-                "key": "extensions"
-              }
-            }
-          }
-        },
-        "yes": "n29",
-        "no": "n28"
-      },
-      {
-        "id": "n31",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "飞雷神锚点位置不合法"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n32",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "ref",
-                "name": "valid"
-              }
-            }
-          }
-        },
-        "yes": "n31",
-        "no": "n30"
-      },
-      {
-        "id": "n33",
-        "kind": "bind",
-        "name": "valid",
-        "expr": {
-          "kind": "ref",
-          "name": "__rvb_import_effect_10"
-        },
-        "next": "n32"
-      },
-      {
-        "id": "n34",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_bound_method_11"
-          }
-        },
-        "args": [
-          {
-            "kind": "lambda",
-            "parameters": [
-              "cell"
-            ],
-            "body": {
-              "kind": "binary",
-              "op": "&&",
-              "left": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "cell"
-                  },
-                  "key": "x"
-                },
-                "right": {
-                  "kind": "ref",
-                  "name": "x"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "cell"
-                  },
-                  "key": "y"
-                },
-                "right": {
-                  "kind": "ref",
-                  "name": "y"
-                }
-              }
-            }
-          }
-        ],
-        "result": "__rvb_import_effect_10",
-        "next": "n33"
-      },
-      {
-        "id": "n35",
-        "kind": "bind",
-        "name": "__rvb_import_bound_method_11",
-        "expr": {
-          "kind": "boundMethod",
-          "object": {
-            "kind": "ref",
-            "name": "__rvb_import_effect_12"
-          },
-          "method": "some"
-        },
-        "next": "n34"
-      },
-      {
-        "id": "n36",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_operand_13"
-          }
-        },
-        "args": [],
-        "result": "__rvb_import_effect_12",
-        "next": "n35"
-      },
-      {
-        "id": "n37",
-        "kind": "bind",
-        "name": "__rvb_import_operand_13",
-        "expr": {
-          "kind": "ref",
-          "name": "legalCells"
-        },
-        "next": "n36"
-      },
-      {
-        "id": "n38",
-        "kind": "bind",
-        "name": "y",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "targetY"
-        },
-        "next": "n37"
-      },
-      {
-        "id": "n39",
-        "kind": "bind",
-        "name": "x",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "targetX"
-        },
-        "next": "n38"
-      },
-      {
-        "id": "n40",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "needsTargetSelection",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            },
-            {
-              "key": "targetType",
-              "value": {
-                "kind": "literal",
-                "value": "cell"
-              }
-            },
-            {
-              "key": "range",
-              "value": {
-                "kind": "literal",
-                "value": 7
-              }
-            },
-            {
-              "key": "filter",
-              "value": {
-                "kind": "literal",
-                "value": "all"
-              }
-            },
-            {
-              "key": "playerId",
-              "value": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "minato"
-                },
-                "key": "ownerPlayerId"
-              }
-            },
-            {
-              "key": "title",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "minato"
-                  },
-                  "key": "name"
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": "选择飞雷神锚点"
-                }
-              }
-            },
-            {
-              "key": "canCancel",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            },
-            {
-              "key": "targetCandidates",
-              "value": {
-                "kind": "ref",
-                "name": "candidates"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n41",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n42",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "candidates"
-                },
-                "key": "length"
-              }
-            }
-          }
-        },
-        "yes": "n41",
-        "no": "n40"
-      },
-      {
-        "id": "n43",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_operand_14"
-          }
-        },
-        "args": [],
-        "result": "candidates",
-        "next": "n42"
-      },
-      {
-        "id": "n44",
-        "kind": "bind",
-        "name": "__rvb_import_operand_14",
-        "expr": {
-          "kind": "ref",
-          "name": "legalCells"
-        },
-        "next": "n43"
-      },
-      {
-        "id": "n45",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "targetX"
-                },
-                "right": {
-                  "kind": "undefined"
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "context"
-                  },
-                  "key": "targetY"
-                },
-                "right": {
-                  "kind": "undefined"
-                }
-              }
-            }
-          }
-        },
-        "yes": "n44",
-        "no": "n39"
-      },
-      {
-        "id": "n46",
-        "kind": "bind",
-        "name": "legalCells",
-        "expr": {
-          "kind": "function",
-          "parameters": [],
-          "body": {
-            "entry": "n82",
-            "end": "n47",
-            "nodes": [
-              {
-                "id": "n60",
-                "kind": "return",
-                "value": {
-                  "kind": "ref",
-                  "name": "__rvb_import_effect_15"
-                }
-              },
-              {
-                "id": "n61",
-                "kind": "invoke",
-                "target": {
-                  "kind": "function",
+                {
+                  "kind": "return",
+                  "id": "inactive-return",
                   "value": {
-                    "kind": "ref",
-                    "name": "__rvb_import_bound_method_16"
+                    "kind": "output",
+                    "node": "inactive",
+                    "port": "result"
                   }
-                },
-                "args": [
+                }
+              ]
+            }
+          ],
+          "schemas": [
+            {
+              "id": "pending-empty-payload",
+              "version": "1",
+              "fields": []
+            }
+          ],
+          "continuations": [
+            {
+              "id": "minato-anchor-end-turn",
+              "version": "1",
+              "graph": {
+                "version": "rvb-gameplay-modules/v1",
+                "surface": "pending",
+                "outputs": [
                   {
-                    "kind": "lambda",
-                    "parameters": [
-                      "tile"
-                    ],
-                    "body": {
-                      "kind": "object",
-                      "entries": [
-                        {
-                          "key": "type",
-                          "value": {
-                            "kind": "literal",
-                            "value": "cell"
-                          }
-                        },
-                        {
-                          "key": "x",
-                          "value": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "tile"
-                            },
-                            "key": "x"
-                          }
-                        },
-                        {
-                          "key": "y",
-                          "value": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "tile"
-                            },
-                            "key": "y"
-                          }
-                        }
-                      ]
-                    }
+                    "name": "result",
+                    "type": "record",
+                    "nullable": true
                   }
                 ],
-                "result": "__rvb_import_effect_15",
-                "next": "n60"
-              },
-              {
-                "id": "n74",
-                "kind": "bind",
-                "name": "__rvb_import_bound_method_16",
-                "expr": {
-                  "kind": "boundMethod",
-                  "object": {
-                    "kind": "ref",
-                    "name": "__rvb_import_effect_17"
+                "hostBindings": {
+                  "payload": {
+                    "kind": "record",
+                    "schema": "pending-empty-payload@1"
                   },
-                  "method": "map"
-                },
-                "next": "n61"
-              },
-              {
-                "id": "n75",
-                "kind": "invoke",
-                "target": {
-                  "kind": "function",
-                  "value": {
-                    "kind": "ref",
-                    "name": "__rvb_import_bound_method_18"
+                  "targetCell": {
+                    "kind": "nullable",
+                    "value": "cell"
                   }
                 },
-                "args": [
+                "schemas": [
                   {
-                    "kind": "function",
-                    "parameters": [
-                      "tile"
-                    ],
-                    "body": {
-                      "entry": "n81",
-                      "end": "n76",
-                      "nodes": [
-                        {
-                          "id": "n77",
-                          "kind": "return",
-                          "value": {
-                            "kind": "unary",
-                            "op": "!",
-                            "argument": {
-                              "kind": "collection",
-                              "object": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "battle"
-                                },
-                                "key": "pieces"
+                    "id": "pending-empty-payload",
+                    "version": "1",
+                    "fields": []
+                  }
+                ],
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "holder-ref",
+                    "module": "ref.holder",
+                    "version": "1",
+                    "inputs": {},
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "holder",
+                    "module": "query.piece",
+                    "version": "1",
+                    "inputs": {
+                      "pieceId": {
+                        "kind": "output",
+                        "node": "holder-ref",
+                        "port": "piece"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "walkable",
+                    "module": "spatial.cell-walkable-safe",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "targetCell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "free",
+                    "module": "spatial.cell-unoccupied",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "targetCell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "if",
+                    "id": "valid",
+                    "condition": {
+                      "kind": "output",
+                      "node": "walkable",
+                      "port": "value"
+                    },
+                    "then": [
+                      {
+                        "kind": "if",
+                        "id": "free-check",
+                        "condition": {
+                          "kind": "output",
+                          "node": "free",
+                          "port": "value"
+                        },
+                        "then": [
+                          {
+                            "kind": "call",
+                            "id": "place",
+                            "module": "marker.anchor-place",
+                            "version": "1",
+                            "inputs": {
+                              "source": {
+                                "kind": "output",
+                                "node": "holder",
+                                "port": "piece"
                               },
-                              "method": "some",
-                              "args": [
-                                {
-                                  "kind": "lambda",
-                                  "parameters": [
-                                    "piece"
-                                  ],
-                                  "body": {
-                                    "kind": "binary",
-                                    "op": "&&",
-                                    "left": {
-                                      "kind": "binary",
-                                      "op": "&&",
-                                      "left": {
-                                        "kind": "binary",
-                                        "op": ">",
-                                        "left": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "piece"
-                                          },
-                                          "key": "currentHp"
-                                        },
-                                        "right": {
-                                          "kind": "literal",
-                                          "value": 0
-                                        }
-                                      },
-                                      "right": {
-                                        "kind": "binary",
-                                        "op": "===",
-                                        "left": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "piece"
-                                          },
-                                          "key": "x"
-                                        },
-                                        "right": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "tile"
-                                          },
-                                          "key": "x"
-                                        }
-                                      }
-                                    },
-                                    "right": {
-                                      "kind": "binary",
-                                      "op": "===",
-                                      "left": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "piece"
-                                        },
-                                        "key": "y"
-                                      },
-                                      "right": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "tile"
-                                        },
-                                        "key": "y"
-                                      }
-                                    }
-                                  }
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "id": "n78",
-                          "kind": "return",
-                          "value": {
-                            "kind": "literal",
-                            "value": false
-                          }
-                        },
-                        {
-                          "id": "n79",
-                          "kind": "branch",
-                          "condition": {
-                            "kind": "unary",
-                            "op": "!",
-                            "argument": {
-                              "kind": "unary",
-                              "op": "!",
-                              "argument": {
-                                "kind": "binary",
-                                "op": ">",
-                                "left": {
-                                  "kind": "binary",
-                                  "op": "+",
-                                  "left": {
-                                    "kind": "call",
-                                    "callee": "Math.abs",
-                                    "args": [
-                                      {
-                                        "kind": "binary",
-                                        "op": "-",
-                                        "left": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "tile"
-                                          },
-                                          "key": "x"
-                                        },
-                                        "right": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "minato"
-                                          },
-                                          "key": "x"
-                                        }
-                                      }
-                                    ]
-                                  },
-                                  "right": {
-                                    "kind": "call",
-                                    "callee": "Math.abs",
-                                    "args": [
-                                      {
-                                        "kind": "binary",
-                                        "op": "-",
-                                        "left": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "tile"
-                                          },
-                                          "key": "y"
-                                        },
-                                        "right": {
-                                          "kind": "get",
-                                          "object": {
-                                            "kind": "ref",
-                                            "name": "minato"
-                                          },
-                                          "key": "y"
-                                        }
-                                      }
-                                    ]
-                                  }
-                                },
-                                "right": {
-                                  "kind": "literal",
-                                  "value": 7
-                                }
+                              "cell": {
+                                "kind": "input",
+                                "name": "targetCell"
                               }
+                            },
+                            "parameters": {
+                              "storageKey": "minatoAnchors",
+                              "tileType": "flying-raijin-anchor"
                             }
                           },
-                          "yes": "n78",
-                          "no": "n77"
-                        },
-                        {
-                          "id": "n80",
-                          "kind": "return",
-                          "value": {
-                            "kind": "literal",
-                            "value": false
-                          }
-                        },
-                        {
-                          "id": "n81",
-                          "kind": "branch",
-                          "condition": {
-                            "kind": "unary",
-                            "op": "!",
-                            "argument": {
-                              "kind": "unary",
-                              "op": "!",
-                              "argument": {
-                                "kind": "binary",
-                                "op": "||",
-                                "left": {
-                                  "kind": "unary",
-                                  "op": "!",
-                                  "argument": {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "tile"
-                                    },
-                                    "key": "props"
-                                  }
-                                },
-                                "right": {
-                                  "kind": "unary",
-                                  "op": "!",
-                                  "argument": {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "get",
-                                      "object": {
-                                        "kind": "ref",
-                                        "name": "tile"
-                                      },
-                                      "key": "props"
-                                    },
-                                    "key": "walkable"
-                                  }
-                                }
+                          {
+                            "kind": "call",
+                            "id": "name",
+                            "module": "attribute.text",
+                            "version": "1",
+                            "inputs": {
+                              "piece": {
+                                "kind": "output",
+                                "node": "holder",
+                                "port": "piece"
                               }
+                            },
+                            "parameters": {
+                              "attribute": "name"
                             }
                           },
-                          "yes": "n80",
-                          "no": "n79"
+                          {
+                            "kind": "call",
+                            "id": "coords",
+                            "module": "spatial.cell-coordinates-safe",
+                            "version": "1",
+                            "inputs": {
+                              "cell": {
+                                "kind": "input",
+                                "name": "targetCell"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "x",
+                            "module": "text.from-number",
+                            "version": "1",
+                            "inputs": {
+                              "value": {
+                                "kind": "output",
+                                "node": "coords",
+                                "port": "x"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "y",
+                            "module": "text.from-number",
+                            "version": "1",
+                            "inputs": {
+                              "value": {
+                                "kind": "output",
+                                "node": "coords",
+                                "port": "y"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-text-0",
+                            "module": "text.concat",
+                            "version": "1",
+                            "inputs": {
+                              "left": {
+                                "kind": "output",
+                                "node": "name",
+                                "port": "text"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": "标记飞雷神锚点("
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-text-1",
+                            "module": "text.concat",
+                            "version": "1",
+                            "inputs": {
+                              "left": {
+                                "kind": "output",
+                                "node": "success-text-0",
+                                "port": "text"
+                              },
+                              "right": {
+                                "kind": "output",
+                                "node": "x",
+                                "port": "text"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-text-2",
+                            "module": "text.concat",
+                            "version": "1",
+                            "inputs": {
+                              "left": {
+                                "kind": "output",
+                                "node": "success-text-1",
+                                "port": "text"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": ","
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-text-3",
+                            "module": "text.concat",
+                            "version": "1",
+                            "inputs": {
+                              "left": {
+                                "kind": "output",
+                                "node": "success-text-2",
+                                "port": "text"
+                              },
+                              "right": {
+                                "kind": "output",
+                                "node": "y",
+                                "port": "text"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-text-4",
+                            "module": "text.concat",
+                            "version": "1",
+                            "inputs": {
+                              "left": {
+                                "kind": "output",
+                                "node": "success-text-3",
+                                "port": "text"
+                              },
+                              "right": {
+                                "kind": "literal",
+                                "value": ")"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "call",
+                            "id": "success-result",
+                            "module": "result.action",
+                            "version": "1",
+                            "inputs": {
+                              "success": {
+                                "kind": "literal",
+                                "value": true
+                              },
+                              "message": {
+                                "kind": "output",
+                                "node": "success-text-4",
+                                "port": "text"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "return",
+                            "id": "success-result-return",
+                            "value": {
+                              "kind": "output",
+                              "node": "success-result",
+                              "port": "result"
+                            }
+                          }
+                        ],
+                        "else": [
+                          {
+                            "kind": "call",
+                            "id": "occupied",
+                            "module": "result.action",
+                            "version": "1",
+                            "inputs": {
+                              "success": {
+                                "kind": "literal",
+                                "value": false
+                              },
+                              "message": {
+                                "kind": "literal",
+                                "value": "飞雷神锚点位置不合法"
+                              }
+                            },
+                            "parameters": {}
+                          },
+                          {
+                            "kind": "return",
+                            "id": "occupied-return",
+                            "value": {
+                              "kind": "output",
+                              "node": "occupied",
+                              "port": "result"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "else": [
+                      {
+                        "kind": "call",
+                        "id": "unwalkable",
+                        "module": "result.action",
+                        "version": "1",
+                        "inputs": {
+                          "success": {
+                            "kind": "literal",
+                            "value": false
+                          },
+                          "message": {
+                            "kind": "literal",
+                            "value": "飞雷神锚点位置不合法"
+                          }
                         },
-                        {
-                          "id": "n76",
-                          "kind": "regionEnd"
-                        }
-                      ]
-                    }
-                  }
-                ],
-                "result": "__rvb_import_effect_17",
-                "next": "n74"
-              },
-              {
-                "id": "n82",
-                "kind": "bind",
-                "name": "__rvb_import_bound_method_18",
-                "expr": {
-                  "kind": "boundMethod",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "battle"
+                        "parameters": {}
                       },
-                      "key": "map"
-                    },
-                    "key": "tiles"
-                  },
-                  "method": "filter"
-                },
-                "next": "n75"
-              },
-              {
-                "id": "n47",
-                "kind": "regionEnd"
-              }
-            ]
-          }
-        },
-        "next": "n45"
-      },
-      {
-        "id": "n83",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
+                      {
+                        "kind": "return",
+                        "id": "unwalkable-return",
+                        "value": {
+                          "kind": "output",
+                          "node": "unwalkable",
+                          "port": "result"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           ]
-        }
-      },
-      {
-        "id": "n84",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "ref",
-                    "name": "minato"
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "<=",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "minato"
-                    },
-                    "key": "currentHp"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "!==",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "battle"
-                    },
-                    "key": "turn"
-                  },
-                  "key": "currentPlayerId"
-                },
-                "right": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "minato"
-                  },
-                  "key": "ownerPlayerId"
-                }
-              }
-            }
-          }
         },
-        "yes": "n83",
-        "no": "n46"
-      },
-      {
-        "id": "n85",
-        "kind": "bind",
-        "name": "minato",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "rulePiece"
-        },
-        "next": "n84"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "skillCode",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

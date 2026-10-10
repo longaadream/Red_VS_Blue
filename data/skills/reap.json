@@ -132,5 +132,17 @@
         "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:reap",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-reap",
+        "relation": "owned",
+        "source": "pieces/reaper.rules"
+      }
+    ]
   }
 }

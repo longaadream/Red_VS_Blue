@@ -18,7 +18,7 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "code": "function executeSkill(context) { var allies, battle, divineShieldCount, intensity, sourcePiece; var _pc = \"n17\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"n17\": sourcePiece = (context)[\"piece\"]; _pc = \"n16\"; break; case \"n16\": battle = (context)[\"battle\"]; _pc = \"n15\"; break; case \"n15\": divineShieldCount = (((battle)[\"pieces\"])[\"filter\"](function (p) { return ((((p)[\"currentHp\"] > 0) && (p)[\"statusTags\"]) && ((p)[\"statusTags\"])[\"some\"](function (t) { return ((t)[\"type\"] === \"divine-shield\"); })); }))[\"length\"]; _pc = \"n14\"; break; case \"n14\": intensity = (2 + (divineShieldCount * 1)); _pc = \"n13\"; break; case \"n13\": allies = ((battle)[\"pieces\"])[\"filter\"](function (p) { return (arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (sourcePiece)[\"ownerPlayerId\"]) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n2\"; break; case \"n2\": ((context)[\"presentationQueue\"]).push(\"statusAdded\", function () { var __rvb_import_operand_0; { var __rvb_content_graph_region_pc_0 = \"n12\"; while (__rvb_content_graph_region_pc_0 !== \"n3\") { switch (__rvb_content_graph_region_pc_0) { case \"n12\": __rvb_import_operand_0 = allies; __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (ally) { var activeBuff; { var __rvb_content_graph_region_pc_1 = \"n11\"; while (__rvb_content_graph_region_pc_1 !== \"n5\") { switch (__rvb_content_graph_region_pc_1) { case \"n11\": addStatusEffectById((ally)[\"instanceId\"], {id: \"damage-buff\", type: \"damage-buff\", name: \"强化\", currentDuration: (- 1), currentUses: 1, intensity: intensity, stacks: 1, relatedRules: [\"rule-damage-buff\"]}); __rvb_content_graph_region_pc_1 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_1 = (! (! ((typeof addRuleById === \"function\") && ((! (ally)[\"rules\"]) || (! ((ally)[\"rules\"])[\"some\"](function (rule) { return ((rule)[\"id\"] === \"rule-damage-buff\"); })))))) ? \"n9\" : \"n8\"; break; case \"n9\": addRuleById((ally)[\"instanceId\"], \"rule-damage-buff\"); __rvb_content_graph_region_pc_1 = \"n8\"; break; case \"n8\": activeBuff = ((ally)[\"statusTags\"] && ((ally)[\"statusTags\"])[\"find\"](function (tag) { return (((tag)[\"id\"] === \"damage-buff\") && ((tag)[\"type\"] === \"damage-buff\")); })); __rvb_content_graph_region_pc_1 = \"n7\"; break; case \"n7\": __rvb_content_graph_region_pc_1 = (! (! activeBuff)) ? \"n6\" : \"n5\"; break; case \"n6\": (activeBuff)[\"relatedRules\"] = [\"rule-damage-buff\"]; __rvb_content_graph_region_pc_1 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_1 = \"n5\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_0 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {message: (((((sourcePiece)[\"name\"] + \"为所有友方棋子赐福，下一次伤害增加\") + intensity) + \"点\") + ((divineShieldCount > 0) ? ((\"（圣盾×\" + divineShieldCount) + \"）\") : \"\")), success: true}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"所有友军下次造成的伤害+2。每有1个持有圣盾的棋子，该次伤害额外+1。\", expectedValues: {damageBonus: 4}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; var _record0 = ({\"damageBonus\": 4}); var _record1 = ({\"description\": \"所有友军下次造成的伤害+2。每有1个持有圣盾的棋子，该次伤害额外+1。\", \"expectedValues\": _record0}); if (!((_record1 === __gameplayInvalid))) { return _record1; } }",
   "range": "all-allies",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
@@ -729,47 +729,97 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": {
+                "kind": "record",
+                "schema": "constant-preview-result@1"
+              }
+            }
+          ],
+          "schemas": [
+            {
+              "id": "constant-record-1",
+              "version": "1",
+              "fields": [
                 {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "所有友军下次造成的伤害+2。每有1个持有圣盾的棋子，该次伤害额外+1。"
-                  }
+                  "name": "damageBonus",
+                  "type": "number"
+                }
+              ]
+            },
+            {
+              "id": "constant-preview-result",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "description",
+                  "type": "string"
                 },
                 {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": [
-                      {
-                        "key": "damageBonus",
-                        "value": {
-                          "kind": "literal",
-                          "value": 4
-                        }
-                      }
-                    ]
+                  "name": "expectedValues",
+                  "type": {
+                    "kind": "record",
+                    "schema": "constant-record-1@1"
                   }
                 }
               ]
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "record.create",
+              "id": "record-0",
+              "schema": "constant-record-1@1",
+              "fields": {
+                "damageBonus": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "record-1",
+              "schema": "constant-preview-result@1",
+              "fields": {
+                "description": {
+                  "kind": "literal",
+                  "value": "所有友军下次造成的伤害+2。每有1个持有圣盾的棋子，该次伤害额外+1。"
+                },
+                "expectedValues": {
+                  "kind": "output",
+                  "node": "record-0",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "record-1",
+                "port": "value"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:divine-blessing",
+    "links": []
   }
 }

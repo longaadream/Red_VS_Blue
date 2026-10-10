@@ -28,5 +28,10 @@
     "rule-recall-skill",
     "rule-recall-move",
     "rule-recall-endturn"
-  ]
+  ],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:tracer",
+    "links": []
+  }
 }

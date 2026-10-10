@@ -1,4 +1,6 @@
 import type { BattleState } from "./turn"
+import { normalizePendingResult } from './pending-result'
+import { executeRuleContinuation } from './pending-continuation'
 import { adventureRuleSourceAllowed } from './adventure-boundary'
 import { checkpointBattlePresentation, withBattlePresentationSource } from './battle-presentation-recording'
 import type { PieceInstance, PieceStatusTag } from "./piece"
@@ -725,6 +727,7 @@ export class TriggerSystem {
     let pendingMaxSelections: number | undefined
     let needsTargetSelection = false
     let pendingTargetType: string | undefined
+    let pendingTargetDetails: Partial<TriggerResult> = {}
     const candidateStateSnapshot = () => (
       JSON.parse(JSON.stringify(battle)) as BattleState
     )
@@ -940,6 +943,9 @@ export class TriggerSystem {
         let result: any
         let damageBeforeEffect = 0
         let ruleOwnerPlayerId: string | undefined
+        let continuation: { prompt: TriggerResult; answer: SuspendableInteractionInput } | undefined
+        let continuationAnswerIndex = 0
+        const continuationMessages: string[] = []
         while (true) {
           ruleCtx = item.buildCtx(context)
           const mutableBeforeEffect = mutableTriggerContextSnapshot(ruleCtx)
@@ -951,17 +957,26 @@ export class TriggerSystem {
           result = withBattlePresentationSource(battle, {
             sourcePieceId: item.sourceId, actorPlayerId: ruleOwnerPlayerId,
             ruleId: item.ruleId, label: item.rule.name,
-          }, () => item.rule.effect!(battle, ruleCtx))
+          }, () => continuation
+            ? executeRuleContinuation(battle, continuation.prompt, continuation.answer, ruleCtx, item.sourceId, item.ruleId)
+            : item.rule.effect!(battle, ruleCtx))
+          result = normalizePendingResult(result)
           writeBackMutableTriggerContext(ruleCtx, context, mutableBeforeEffect)
           if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
+          if (result.effectCode && result.message) continuationMessages.push(result.message)
           if (previewReactionPolicy?.onPendingConsumer?.('rule', item.ruleId, item.sourceId, context.type)) {
             throw new PreviewReactionPendingError('rule', item.ruleId, item.sourceId, context.type)
           }
           if (!transactionRuntime || !interactionKey) break
-          const nextInput = transactionRuntime.takeAnswer(interactionKey)
+          const savedContinuationInput = result.effectCode ? transactionInputs[continuationAnswerIndex] : undefined
+          const nextInput = savedContinuationInput ?? transactionRuntime.takeAnswer(interactionKey)
           if (nextInput) {
             transactionInput = nextInput
-            transactionInputs.push(nextInput)
+            if (!savedContinuationInput) transactionInputs.push(nextInput)
+            if (result.effectCode) {
+              continuation = { prompt: result, answer: nextInput }
+              continuationAnswerIndex++
+            } else continuation = undefined
             continue
           }
           transactionRuntime.suspend(interactionKey, result.needsOptionSelection
@@ -1002,6 +1017,7 @@ export class TriggerSystem {
           && Number(context.damage) <= 0) {
           blocked = true
         }
+        triggeredEffects.push(...continuationMessages)
         if (typeof result?.targetReplacementPieceId === 'string') {
           const replacement = battle.pieces.find(piece => (
             piece.instanceId === result.targetReplacementPieceId && piece.currentHp > 0
@@ -1035,6 +1051,16 @@ export class TriggerSystem {
         if (result && result.needsTargetSelection) {
           needsTargetSelection = true
           pendingTargetType = result.targetType
+          pendingTargetDetails = {
+            targetCandidates: result.targetCandidates,
+            selectionMode: result.selectionMode,
+            minSelections: result.minSelections,
+            maxSelections: result.maxSelections,
+            effectCode: result.effectCode,
+            payload: result.payload,
+            resumeOnCancel: result.resumeOnCancel,
+            rollbackOnCancel: result.rollbackOnCancel,
+          }
           pendingRange = result.range
           pendingFilter = result.filter
           pendingTitle = result.title
@@ -1063,7 +1089,7 @@ export class TriggerSystem {
 
     // 只在没有挂起交互时才执行响应卡（避免乱序）
     if (interactionNeeded) {
-      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards, targetReplacementPieceId, summonAfterDeath } as any, context)
+      return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, canCancel: pendingCanCancel, cancelValue: pendingCancelValue, selectionMode: pendingSelectionMode, presentation: pendingPresentation, minSelections: pendingMinSelections, maxSelections: pendingMaxSelections, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: pendingQueue.length > 0 ? pendingQueue : undefined, pendingReactiveCards, targetReplacementPieceId, summonAfterDeath, ...pendingTargetDetails } as any, context)
     }
 
     // 4. 按事件开始时冻结的快照执行 reactive 卡牌，恢复规则队列时不得重复扫描。
@@ -1181,7 +1207,7 @@ export class TriggerSystem {
     }
 
 
-    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined, targetReplacementPieceId, summonAfterDeath } as any, context)
+    return this.withEventChain({ success, messages: triggeredEffects, blocked, needsOptionSelection: needsOptionSelection || undefined, options: pendingOptions, title: pendingTitle, playerId: pendingPlayerId, pendingRuleId, pendingRuleSourceId, needsTargetSelection: needsTargetSelection || undefined, targetType: pendingTargetType, range: pendingRange, filter: pendingFilter, pendingQueue: undefined, targetReplacementPieceId, summonAfterDeath, ...pendingTargetDetails } as any, context)
   }
 
   // 条件评估方法已移除，所有条件判断都在技能代码中通过if语句实现

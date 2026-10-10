@@ -3,9 +3,19 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from '../../electron-editor/content-project'
-import { applyGameplayModuleGraph, createGameplayModuleGraph } from '../../lib/skill-graph/module-document'
+import { applyGameplayModuleGraph, assertGameplayModuleDocument, createGameplayModuleGraph } from '../../lib/skill-graph/module-document'
 
 const roots: string[] = []
+it('validates Cluster identities only at authoring save, preserving runtime skill copies', () => {
+  const file = path.join(fixture(), 'skill.json')
+  const original = { id: 'original', cluster: { version: 'rvb-skill-cluster/v1', id: 'skills:original', links: [] } }
+  writeFileSync(file, JSON.stringify(original))
+  const before = readDocumentSnapshot(file)
+  const copy = { ...original, id: 'runtime-copy' }
+  expect(() => assertGameplayModuleDocument(copy)).not.toThrow()
+  expect(() => writeDocumentSnapshot(file, copy, before.revision)).toThrow()
+  expect(readDocumentSnapshot(file)).toEqual(before)
+})
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), 'rvb-content-project-'))
   roots.push(root)

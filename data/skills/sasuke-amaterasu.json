@@ -19,7 +19,7 @@
   "powerMultiplier": 1,
   "actionPointCost": 2,
   "code": "function executeSkill(context) { var added, battle, caster, center; var _pc = \"n40\"; for (var _step = 0; _step <= 19; _step++) { switch (_pc) { case \"n40\": caster = (context)[\"piece\"]; _pc = \"n39\"; break; case \"n39\": battle = (context)[\"battle\"]; _pc = \"n38\"; break; case \"n38\": center = selectTarget({type: \"grid\", range: 5, filter: \"all\"}); _pc = \"n37\"; break; case \"n37\": _pc = (! (! ((! center) || (center)[\"needsTargetSelection\"]))) ? \"n36\" : \"n35\"; break; case \"n35\": _pc = (! (! (! (battle)[\"extensions\"]))) ? \"n34\" : \"n33\"; break; case \"n34\": (battle)[\"extensions\"] = {}; _pc = \"n33\"; break; case \"n33\": _pc = (! (! (! ((battle)[\"extensions\"])[\"tileEffects\"]))) ? \"n32\" : \"n31\"; break; case \"n32\": ((battle)[\"extensions\"])[\"tileEffects\"] = []; _pc = \"n31\"; break; case \"n31\": _pc = (! (! (! ((battle)[\"extensions\"])[\"amaterasuCells\"]))) ? \"n30\" : \"n29\"; break; case \"n30\": ((battle)[\"extensions\"])[\"amaterasuCells\"] = []; _pc = \"n29\"; break; case \"n29\": added = 0; _pc = \"n7\"; break; case \"n7\": ((context)[\"presentationQueue\"]).push(\"tileEffectAdded\", function () { var cx, cy, dx, dy, tile; { var __rvb_content_graph_region_pc_0 = \"n28\"; while (__rvb_content_graph_region_pc_0 !== \"n8\") { switch (__rvb_content_graph_region_pc_0) { case \"n28\": dx = (- 1); __rvb_content_graph_region_pc_0 = \"n27\"; break; case \"n27\": var __rvb_content_graph_loop_break_1 = false, __rvb_content_graph_loop_continue_2 = false; while ((! (! (dx <= 1)))) { __rvb_content_graph_loop_continue_2 = false; { var __rvb_content_graph_region_pc_3 = \"n24\"; while (__rvb_content_graph_region_pc_3 !== \"n9\") { switch (__rvb_content_graph_region_pc_3) { case \"n24\": dy = (- 1); __rvb_content_graph_region_pc_3 = \"n23\"; break; case \"n23\": var __rvb_content_graph_loop_break_4 = false, __rvb_content_graph_loop_continue_5 = false; while ((! (! (dy <= 1)))) { __rvb_content_graph_loop_continue_5 = false; { var __rvb_content_graph_region_pc_6 = \"n20\"; while (__rvb_content_graph_region_pc_6 !== \"n10\") { switch (__rvb_content_graph_region_pc_6) { case \"n20\": cx = ((center)[\"x\"] + dx); __rvb_content_graph_region_pc_6 = \"n19\"; break; case \"n19\": cy = ((center)[\"y\"] + dy); __rvb_content_graph_region_pc_6 = \"n18\"; break; case \"n18\": tile = (((battle)[\"map\"] && ((battle)[\"map\"])[\"tiles\"]) && (((battle)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === cx) && ((t)[\"y\"] === cy)); })); __rvb_content_graph_region_pc_6 = \"n17\"; break; case \"n17\": __rvb_content_graph_region_pc_6 = (! (! (! tile))) ? \"n16\" : \"n15\"; break; case \"n15\": __rvb_content_graph_region_pc_6 = (! (! (! (((battle)[\"extensions\"])[\"tileEffects\"])[\"some\"](function (t) { return ((((t)[\"tileType\"] === \"amaterasu\") && ((t)[\"x\"] === cx)) && ((t)[\"y\"] === cy)); })))) ? \"n14\" : \"n12\"; break; case \"n14\": (((battle)[\"extensions\"])[\"tileEffects\"]).push({x: cx, y: cy, sourceId: \"amaterasu\", tileType: \"amaterasu\", presentation: \"expand\", presentationStep: Math.max(Math.abs(dx), Math.abs(dy)), icon: \"🌑\", iconPosition: \"bottom-right\"}); __rvb_content_graph_region_pc_6 = \"n13\"; break; case \"n13\": added = ((+ added) + 1); __rvb_content_graph_region_pc_6 = \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_6 = (! (! (! (((battle)[\"extensions\"])[\"amaterasuCells\"])[\"some\"](function (c) { return (((c)[\"x\"] === cx) && ((c)[\"y\"] === cy)); })))) ? \"n11\" : \"n10\"; break; case \"n11\": (((battle)[\"extensions\"])[\"amaterasuCells\"]).push({x: cx, y: cy, sourcePieceId: (caster)[\"instanceId\"], ownerPlayerId: (caster)[\"ownerPlayerId\"]}); __rvb_content_graph_region_pc_6 = \"n10\"; break; case \"n10\": __rvb_content_graph_region_pc_6 = \"n10\"; break; case \"n16\": __rvb_content_graph_loop_continue_5 = true; __rvb_content_graph_region_pc_6 = \"n10\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; { var __rvb_content_graph_region_pc_7 = \"n22\"; while (__rvb_content_graph_region_pc_7 !== \"n21\") { switch (__rvb_content_graph_region_pc_7) { case \"n22\": dy = ((+ dy) + 1); __rvb_content_graph_region_pc_7 = \"n21\"; break; case \"n21\": __rvb_content_graph_region_pc_7 = \"n21\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_4) break; if (__rvb_content_graph_loop_continue_5) { __rvb_content_graph_loop_continue_5 = false; continue; } } __rvb_content_graph_region_pc_3 = \"n9\"; break; case \"n9\": __rvb_content_graph_region_pc_3 = \"n9\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; { var __rvb_content_graph_region_pc_8 = \"n26\"; while (__rvb_content_graph_region_pc_8 !== \"n25\") { switch (__rvb_content_graph_region_pc_8) { case \"n26\": dx = ((+ dx) + 1); __rvb_content_graph_region_pc_8 = \"n25\"; break; case \"n25\": __rvb_content_graph_region_pc_8 = \"n25\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_1) break; if (__rvb_content_graph_loop_continue_2) { __rvb_content_graph_loop_continue_2 = false; continue; } } __rvb_content_graph_region_pc_0 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_0 = \"n8\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n6\"; break; case \"n6\": _pc = (! (! (! ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"]))) ? \"n5\" : \"n4\"; break; case \"n5\": ((battle)[\"extensions\"])[\"amaterasuOwnerPlayerId\"] = (caster)[\"ownerPlayerId\"]; _pc = \"n4\"; break; case \"n4\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-move\"); _pc = \"n3\"; break; case \"n3\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-stack\"); _pc = \"n2\"; break; case \"n2\": addPlayerRuleById((caster)[\"ownerPlayerId\"], \"rule-sasuke-amaterasu-damage\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((((((((caster)[\"name\"] + \"释放天照，以(\") + (center)[\"x\"]) + \",\") + (center)[\"y\"]) + \")为中心标记了\") + added) + \"个格子为永久天照范围！凡踏入者将遭受黑炎灼烧\")}; case \"n36\": return center; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择地格（5），将周围3×3永久化为天照地格。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"选择地格（5），将周围3×3永久化为天照地格。\" === __gameplayInvalid) || (\"选择地格（5），将周围3×3永久化为天照地格。\" === undefined) || (\"选择地格（5），将周围3×3永久化为天照地格。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"选择地格（5），将周围3×3永久化为天照地格。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
     "surface": "skill",
@@ -1235,39 +1235,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择地格（5），将周围3×3永久化为天照地格。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择地格（5），将周围3×3永久化为天照地格。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:sasuke-amaterasu",
+    "links": []
   }
 }

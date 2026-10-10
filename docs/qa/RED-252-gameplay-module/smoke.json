@@ -1,16 +1,26 @@
 {
   "ok": true,
-  "startedAt": "2026-10-09T16:47:35.977Z",
-  "completedAt": "2026-10-09T16:47:37.814Z",
+  "startedAt": "2026-10-09T18:58:37.903Z",
+  "completedAt": "2026-10-09T18:58:43.900Z",
   "checks": [
     "real Electron mount",
     "registered palette",
+    "category filters and collapsible groups",
+    "structured text binding controls",
     "typed literal parameters",
     "typed prior-output reference",
     "composite navigation and persistence",
     "module document save and reload",
     "unknown fields preserved",
-    "controls fit detail pane"
+    "controls fit detail pane",
+    "normal flow before long palette list",
+    "wrapped categories without horizontal overflow",
+    "expanded flow starts within 220px",
+    "expanded workspace save entry forwarding with Escape focus and scroll restore",
+    "narrow layout without horizontal overflow"
   ],
-  "screenshot": "gameplay-module-editor.png"
+  "screenshots": [
+    "gameplay-module-editor.png",
+    "gameplay-module-editor-expanded.png"
+  ]
 }

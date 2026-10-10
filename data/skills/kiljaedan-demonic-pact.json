@@ -975,5 +975,17 @@
     ]
   },
   "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:kiljaedan-demonic-pact",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-kiljaedan-gamestart",
+        "relation": "owned",
+        "source": "pieces/kiljaedan.rules"
+      }
+    ]
+  }
 }

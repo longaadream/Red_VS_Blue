@@ -34,5 +34,10 @@
   "rules": [
     "rule-colt-big-stride",
     "rule-colt-zone-endturn"
-  ]
+  ],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:colt",
+    "links": []
+  }
 }

@@ -26,5 +26,10 @@
   ],
   "rarity": "epic",
   "description": "输出 / 机动 / 控制",
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:alfonso",
+    "links": []
+  }
 }

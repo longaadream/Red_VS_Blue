@@ -34,5 +34,10 @@
     "holy-heal",
     "holy-charge"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:tyrande",
+    "links": []
+  }
 }

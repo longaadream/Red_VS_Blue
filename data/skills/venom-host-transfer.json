@@ -30,7 +30,7 @@
     ]
   },
   "code": "function executeSkill(context) { var __rvb_import_effect_0, caster, target, x, y; var _pc = \"n18\"; for (var _step = 0; _step <= 18; _step++) { switch (_pc) { case \"n18\": caster = (context)[\"piece\"]; _pc = \"n17\"; break; case \"n17\": target = selectTarget({type: \"piece\", range: 7, filter: \"all\"}); _pc = \"n16\"; break; case \"n16\": _pc = (! (! ((! target) || (target)[\"needsTargetSelection\"]))) ? \"n15\" : \"n14\"; break; case \"n14\": _pc = (! (! ((target)[\"instanceId\"] === (caster)[\"instanceId\"]))) ? \"n13\" : \"n12\"; break; case \"n12\": _pc = (! (! ((((((target)[\"currentHp\"] <= 0) || ((target)[\"x\"] == null)) || ((target)[\"y\"] == null)) || ((caster)[\"x\"] == null)) || ((caster)[\"y\"] == null)))) ? \"n11\" : \"n10\"; break; case \"n10\": _pc = (! (! ((Math.abs(((caster)[\"x\"] - (target)[\"x\"])) + Math.abs(((caster)[\"y\"] - (target)[\"y\"]))) > 7))) ? \"n9\" : \"n8\"; break; case \"n8\": x = (caster)[\"x\"]; _pc = \"n7\"; break; case \"n7\": y = (caster)[\"y\"]; _pc = \"n6\"; break; case \"n6\": __rvb_import_effect_0 = flow.effects.displace([{pieceId: (caster)[\"instanceId\"], x: (target)[\"x\"], y: (target)[\"y\"]}, {pieceId: (target)[\"instanceId\"], x: x, y: y}], \"swap\"); _pc = \"n5\"; break; case \"n5\": _pc = (! (! (! (__rvb_import_effect_0)[\"success\"]))) ? \"n4\" : \"n3\"; break; case \"n3\": _pc = (! (! (! arePlayersAllied(battle, (target)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"])))) ? \"n2\" : \"n1\"; break; case \"n2\": addStatusEffectById((target)[\"instanceId\"], {id: (((\"root-\" + (caster)[\"instanceId\"]) + \"-\") + (target)[\"instanceId\"]), name: \"定身\", type: \"root\", currentDuration: 1, currentUses: (- 1), intensity: 1, stacks: 1, sourceId: (caster)[\"instanceId\"]}); _pc = \"n1\"; break; case \"n1\": return {success: true, message: (((((caster)[\"name\"] + \"发动宿主转移，与\") + (target)[\"name\"]) + \"交换位置\") + ((! arePlayersAllied(battle, (target)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"])) ? \"并使其定身1回合\" : \"\"))}; case \"n4\": return {success: true, message: \"换位被阻挡，双方保持原位\"}; case \"n9\": return {success: false, message: \"目标距离超过7格\"}; case \"n11\": return {success: false, message: \"宿主转移只能选择场上的存活角色\"}; case \"n13\": return {success: false, message: \"宿主转移不能选择毒液自身\"}; case \"n15\": return target; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"选择本棋子7格内1个其他棋子，与其换位；若目标为敌人，对其施加定身[1]。\", expectedValues: {range: 7}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; var _record0 = ({\"range\": 7}); var _record1 = ({\"description\": \"选择本棋子7格内1个其他棋子，与其换位；若目标为敌人，对其施加定身[1]。\", \"expectedValues\": _record0}); if (!((_record1 === __gameplayInvalid))) { return _record1; } }",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
     "surface": "skill",
@@ -846,47 +846,97 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": {
+                "kind": "record",
+                "schema": "constant-preview-result@1"
+              }
+            }
+          ],
+          "schemas": [
+            {
+              "id": "constant-record-1",
+              "version": "1",
+              "fields": [
                 {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "选择本棋子7格内1个其他棋子，与其换位；若目标为敌人，对其施加定身[1]。"
-                  }
+                  "name": "range",
+                  "type": "number"
+                }
+              ]
+            },
+            {
+              "id": "constant-preview-result",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "description",
+                  "type": "string"
                 },
                 {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": [
-                      {
-                        "key": "range",
-                        "value": {
-                          "kind": "literal",
-                          "value": 7
-                        }
-                      }
-                    ]
+                  "name": "expectedValues",
+                  "type": {
+                    "kind": "record",
+                    "schema": "constant-record-1@1"
                   }
                 }
               ]
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "record.create",
+              "id": "record-0",
+              "schema": "constant-record-1@1",
+              "fields": {
+                "range": {
+                  "kind": "literal",
+                  "value": 7
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "record-1",
+              "schema": "constant-preview-result@1",
+              "fields": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择本棋子7格内1个其他棋子，与其换位；若目标为敌人，对其施加定身[1]。"
+                },
+                "expectedValues": {
+                  "kind": "output",
+                  "node": "record-0",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "record-1",
+                "port": "value"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:venom-host-transfer",
+    "links": []
   }
 }

@@ -26,5 +26,10 @@
     }
   ],
   "rules": [],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:arthas",
+    "links": []
+  }
 }

@@ -16,5 +16,10 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill() { return { success: false, message: '' }; }"
+  "code": "function executeSkill() { return { success: false, message: '' }; }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:venom-corrosion",
+    "links": []
+  }
 }

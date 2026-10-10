@@ -24,16 +24,23 @@ __export(module_document_exports, {
   GAMEPLAY_COMPILER_VERSION: () => GAMEPLAY_COMPILER_VERSION,
   GAMEPLAY_GRAPH_VERSION: () => GAMEPLAY_GRAPH_VERSION,
   GAMEPLAY_MODULE_COMPILER_VERSION: () => GAMEPLAY_MODULE_COMPILER_VERSION,
-  GAMEPLAY_MODULE_DOCUMENT_VERSION: () => GAMEPLAY_MODULE_DOCUMENT_VERSION,
+  GAMEPLAY_MODULE_DOCUMENT_VERSION: () => GAMEPLAY_MODULE_DOCUMENT_VERSION2,
   GAMEPLAY_MODULE_GRAPH_VERSION: () => GAMEPLAY_MODULE_GRAPH_VERSION,
   GAMEPLAY_MODULE_REGISTRY: () => GAMEPLAY_MODULE_REGISTRY,
   GAMEPLAY_MODULE_VERSION: () => GAMEPLAY_MODULE_VERSION,
   GameplayModuleCompileError: () => GameplayModuleCompileError,
   MODULE_COMPILER_VERSION: () => MODULE_COMPILER_VERSION,
   MODULE_GRAPH_VERSION: () => MODULE_GRAPH_VERSION,
+  SKILL_CLUSTER_DEFINITION_VERSION: () => SKILL_CLUSTER_DEFINITION_VERSION,
+  SKILL_CLUSTER_VERSION: () => SKILL_CLUSTER_VERSION,
   applyGameplayModuleGraph: () => applyGameplayModuleGraph,
+  applyGameplayModuleTextBindings: () => applyGameplayModuleTextBindings,
   assertGameplayModuleDocument: () => assertGameplayModuleDocument,
   assertGameplayModuleTransition: () => assertGameplayModuleTransition,
+  assertSkillClusterMetadata: () => assertSkillClusterMetadata,
+  buildSkillCluster: () => buildSkillCluster,
+  buildSkillClusterCatalog: () => buildSkillClusterCatalog,
+  cloneSkillClusterDefinition: () => cloneSkillClusterDefinition,
   compileGameplayGraph: () => compileGameplayGraph,
   compileGameplayModuleGraph: () => compileGameplayModuleGraph,
   compileModuleGraph: () => compileModuleGraph,
@@ -42,7 +49,10 @@ __export(module_document_exports, {
   gameplayModuleDescriptors: () => gameplayModuleDescriptors,
   getGameplayModule: () => getGameplayModule,
   getGameplayModuleCatalog: () => getGameplayModuleCatalog,
-  getGameplayModuleGraph: () => getGameplayModuleGraph
+  getGameplayModuleGraph: () => getGameplayModuleGraph,
+  renderGameplayModuleText: () => renderGameplayModuleText,
+  validateSkillClusterDefinition: () => validateSkillClusterDefinition,
+  validateSkillClusterMetadata: () => validateSkillClusterMetadata
 });
 module.exports = __toCommonJS(module_document_exports);
 
@@ -67,7 +77,9 @@ function createGameplayModuleGraph(surface) {
     inputBindings: {},
     outputs: [],
     body: [],
-    composites: []
+    composites: [],
+    schemas: [],
+    continuations: []
   };
 }
 
@@ -98,7 +110,8 @@ var limitsDefault = {
   maxCompositeDepth: 32,
   maxExpandedStatements: 1e4,
   maxExpandedCalls: 2e3,
-  maxLiteralBytes: 256 * 1024
+  maxLiteralBytes: 256 * 1024,
+  maxCollectionIterations: 1e4
 };
 var CompilerFailure = class extends GameplayModuleCompileError {
   constructor(message, path, code = "GAMEPLAY_MODULE_INVALID") {
@@ -108,8 +121,8 @@ var CompilerFailure = class extends GameplayModuleCompileError {
 function fail(message, path, code) {
   throw new CompilerFailure(message, path, code);
 }
-function own(record2, key) {
-  return Object.prototype.hasOwnProperty.call(record2, key);
+function own(record3, key) {
+  return Object.prototype.hasOwnProperty.call(record3, key);
 }
 function isObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -129,9 +142,9 @@ function plain(value, path) {
   }
   return value;
 }
-function allowed(record2, keys, path) {
+function allowed(record3, keys, path) {
   const set = new Set(keys);
-  for (const key of Object.keys(record2)) if (!set.has(key)) fail('unknown field "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+  for (const key of Object.keys(record3)) if (!set.has(key)) fail('unknown field "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
 }
 function nonempty(value, path) {
   if (typeof value !== "string" || value.trim().length === 0) fail("must be a non-empty string", path, "GAMEPLAY_MODULE_INVALID_NAME");
@@ -181,18 +194,18 @@ function json(value, path, budget) {
     }
     return;
   }
-  const record2 = plain(value, path);
-  for (const key of Object.keys(record2)) {
+  const record3 = plain(value, path);
+  for (const key of Object.keys(record3)) {
     if (key === "__proto__" || key === "prototype" || key === "constructor") fail('unsafe object key "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNSAFE_VALUE");
-    json(record2[key], path + "." + key, budget);
+    json(record3[key], path + "." + key, budget);
   }
 }
 function clone(value) {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map(clone);
   const result = /* @__PURE__ */ Object.create(null);
-  const record2 = value;
-  for (const key of Object.keys(record2)) result[key] = clone(record2[key]);
+  const record3 = value;
+  for (const key of Object.keys(record3)) result[key] = clone(record3[key]);
   return result;
 }
 function rejectUnschematizedRecord(value, path) {
@@ -227,25 +240,29 @@ function typeValue(value, path) {
     if (value === "unknown" || value === "any") fail("universal value types are not allowed", path, "GAMEPLAY_MODULE_INVALID_TYPE");
     return value;
   }
-  const record2 = plain(value, path);
-  if (record2.kind === "list") {
-    allowed(record2, ["kind", "element"], path);
-    if (!own(record2, "element")) fail("list type requires element", path, "GAMEPLAY_MODULE_INVALID_TYPE");
-    return { kind: "list", element: typeValue(record2.element, path + ".element") };
+  const record3 = plain(value, path);
+  if (record3.kind === "list") {
+    allowed(record3, ["kind", "element"], path);
+    if (!own(record3, "element")) fail("list type requires element", path, "GAMEPLAY_MODULE_INVALID_TYPE");
+    return { kind: "list", element: typeValue(record3.element, path + ".element") };
   }
-  if (record2.kind === "nullable") {
-    allowed(record2, ["kind", "value"], path);
-    if (!own(record2, "value")) fail("nullable type requires value", path, "GAMEPLAY_MODULE_INVALID_TYPE");
-    return { kind: "nullable", value: typeValue(record2.value, path + ".value") };
+  if (record3.kind === "nullable") {
+    allowed(record3, ["kind", "value"], path);
+    if (!own(record3, "value")) fail("nullable type requires value", path, "GAMEPLAY_MODULE_INVALID_TYPE");
+    return { kind: "nullable", value: typeValue(record3.value, path + ".value") };
+  }
+  if (record3.kind === "record") {
+    allowed(record3, ["kind", "schema"], path);
+    return { kind: "record", schema: nonempty(record3.schema, path + ".schema") };
   }
   fail("unsupported value type descriptor", path, "GAMEPLAY_MODULE_INVALID_TYPE");
 }
 function port(value, path) {
-  const record2 = plain(value, path);
-  allowed(record2, ["name", "type", "optional", "nullable", "label", "description"], path);
-  const result = { name: safeName(record2.name, path + ".name"), type: typeValue(record2.type, path + ".type") };
-  for (const key of ["optional", "nullable"]) if (record2[key] !== void 0) result[key] = bool(record2[key], path + "." + key);
-  for (const key of ["label", "description"]) if (record2[key] !== void 0) result[key] = nonempty(record2[key], path + "." + key);
+  const record3 = plain(value, path);
+  allowed(record3, ["name", "type", "optional", "nullable", "label", "description"], path);
+  const result = { name: safeName(record3.name, path + ".name"), type: typeValue(record3.type, path + ".type") };
+  for (const key of ["optional", "nullable"]) if (record3[key] !== void 0) result[key] = bool(record3[key], path + "." + key);
+  for (const key of ["label", "description"]) if (record3[key] !== void 0) result[key] = nonempty(record3[key], path + "." + key);
   return result;
 }
 function ports(value, path) {
@@ -260,31 +277,31 @@ function ports(value, path) {
   return result;
 }
 function parameter(value, path) {
-  const record2 = plain(value, path);
-  allowed(record2, ["name", "type", "optional", "nullable", "label", "description", "default", "enum", "minimum", "maximum"], path);
+  const record3 = plain(value, path);
+  allowed(record3, ["name", "type", "optional", "nullable", "label", "description", "default", "enum", "minimum", "maximum"], path);
   const base = /* @__PURE__ */ Object.create(null);
-  for (const key of ["name", "type", "optional", "nullable", "label", "description"]) if (own(record2, key)) base[key] = record2[key];
+  for (const key of ["name", "type", "optional", "nullable", "label", "description"]) if (own(record3, key)) base[key] = record3[key];
   const result = { ...port(base, path) };
-  if (own(record2, "default")) {
+  if (own(record3, "default")) {
     const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-    json(record2.default, path + ".default", budget);
-    rejectUnschematizedRecord(record2.default, path + ".default");
-    result.default = clone(record2.default);
+    json(record3.default, path + ".default", budget);
+    rejectUnschematizedRecord(record3.default, path + ".default");
+    result.default = clone(record3.default);
   }
-  if (record2.enum !== void 0) {
-    if (!Array.isArray(record2.enum)) fail("enum must be an array", path + ".enum", "GAMEPLAY_MODULE_INVALID_PARAMETER");
+  if (record3.enum !== void 0) {
+    if (!Array.isArray(record3.enum)) fail("enum must be an array", path + ".enum", "GAMEPLAY_MODULE_INVALID_PARAMETER");
     const values = [];
-    for (let i = 0; i < record2.enum.length; i += 1) {
+    for (let i = 0; i < record3.enum.length; i += 1) {
       const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-      json(record2.enum[i], path + ".enum[" + i + "]", budget);
-      rejectUnschematizedRecord(record2.enum[i], path + ".enum[" + i + "]");
-      values.push(clone(record2.enum[i]));
+      json(record3.enum[i], path + ".enum[" + i + "]", budget);
+      rejectUnschematizedRecord(record3.enum[i], path + ".enum[" + i + "]");
+      values.push(clone(record3.enum[i]));
     }
     result.enum = values;
   }
-  for (const key of ["minimum", "maximum"]) if (own(record2, key)) {
-    if (typeof record2[key] !== "number" || !Number.isFinite(record2[key])) fail(key + " must be a finite number", path + "." + key, "GAMEPLAY_MODULE_INVALID_PARAMETER");
-    result[key] = record2[key];
+  for (const key of ["minimum", "maximum"]) if (own(record3, key)) {
+    if (typeof record3[key] !== "number" || !Number.isFinite(record3[key])) fail(key + " must be a finite number", path + "." + key, "GAMEPLAY_MODULE_INVALID_PARAMETER");
+    result[key] = record3[key];
   }
   const declaration = result;
   if (own(result, "default")) {
@@ -325,9 +342,9 @@ function inspectReferences(value, inputs, path) {
   for (let index = 0; index < value.length; index += 1) {
     const name = nonempty(value[index], path + "[" + index + "]");
     if (result.includes(name)) fail('duplicate inspected input "' + name + '"', path, "GAMEPLAY_MODULE_DUPLICATE_REFERENCE_INSPECTION");
-    const input2 = inputMap.get(name);
-    if (!input2) fail('inspectReferences names unknown input "' + name + '"', path + "[" + index + "]", "GAMEPLAY_MODULE_UNKNOWN_PORT");
-    const reference = referenceKind(effective(input2));
+    const input11 = inputMap.get(name);
+    if (!input11) fail('inspectReferences names unknown input "' + name + '"', path + "[" + index + "]", "GAMEPLAY_MODULE_UNKNOWN_PORT");
+    const reference = referenceKind(effective(input11));
     if (!reference) fail('inspectReferences input "' + name + '" must be a piece or player reference', path + "[" + index + "]", "GAMEPLAY_MODULE_INVALID_REFERENCE_INSPECTION");
     result.push(name);
   }
@@ -335,88 +352,159 @@ function inspectReferences(value, inputs, path) {
 }
 function layout(value, path) {
   if (value === void 0) return void 0;
-  const record2 = plain(value, path);
+  const record3 = plain(value, path);
   const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-  json(record2, path, budget);
+  json(record3, path, budget);
   const result = /* @__PURE__ */ Object.create(null);
-  for (const key of Object.keys(record2)) result[key] = clone(record2[key]);
+  for (const key of Object.keys(record3)) result[key] = clone(record3[key]);
   return result;
 }
 function valueRef(value, path) {
-  const record2 = plain(value, path);
-  const kind = nonempty(record2.kind, path + ".kind");
+  const record3 = plain(value, path);
+  const kind = nonempty(record3.kind, path + ".kind");
   if (kind === "literal") {
-    allowed(record2, ["kind", "value"], path);
-    if (!own(record2, "value")) fail("literal requires value", path, "GAMEPLAY_MODULE_INVALID_VALUE");
+    allowed(record3, ["kind", "value"], path);
+    if (!own(record3, "value")) fail("literal requires value", path, "GAMEPLAY_MODULE_INVALID_VALUE");
     const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-    json(record2.value, path + ".value", budget);
-    rejectUnschematizedRecord(record2.value, path + ".value");
-    return { kind: "literal", value: clone(record2.value) };
+    json(record3.value, path + ".value", budget);
+    rejectUnschematizedRecord(record3.value, path + ".value");
+    return { kind: "literal", value: clone(record3.value) };
   }
   if (kind === "input") {
-    allowed(record2, ["kind", "name"], path);
-    return { kind: "input", name: nonempty(record2.name, path + ".name") };
+    allowed(record3, ["kind", "name"], path);
+    return { kind: "input", name: nonempty(record3.name, path + ".name") };
   }
   if (kind === "output") {
-    allowed(record2, ["kind", "node", "port"], path);
-    return { kind: "output", node: nonempty(record2.node, path + ".node"), port: nonempty(record2.port, path + ".port") };
+    allowed(record3, ["kind", "node", "port"], path);
+    return { kind: "output", node: nonempty(record3.node, path + ".node"), port: nonempty(record3.port, path + ".port") };
   }
   fail('unsupported value kind "' + kind + '"', path, "GAMEPLAY_MODULE_UNSAFE_VALUE");
 }
 function valueMap(value, path) {
-  const record2 = plain(value, path);
+  const record3 = plain(value, path);
   const result = /* @__PURE__ */ Object.create(null);
-  for (const key of Object.keys(record2)) result[key] = valueRef(record2[key], path + "." + key);
+  for (const key of Object.keys(record3)) result[key] = valueRef(record3[key], path + "." + key);
   return result;
 }
 function literalMap(value, path) {
-  const record2 = plain(value, path);
+  const record3 = plain(value, path);
   const result = /* @__PURE__ */ Object.create(null);
-  for (const key of Object.keys(record2)) {
+  for (const key of Object.keys(record3)) {
     const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-    json(record2[key], path + "." + key, budget);
-    rejectUnschematizedRecord(record2[key], path + "." + key);
-    result[key] = clone(record2[key]);
+    json(record3[key], path + "." + key, budget);
+    rejectUnschematizedRecord(record3[key], path + "." + key);
+    result[key] = clone(record3[key]);
   }
   return result;
 }
+function recordFields(value, path) {
+  if (value === void 0) return {};
+  return valueMap(value, path);
+}
+function collectionStatement(value, path) {
+  const record3 = plain(value, path);
+  const rawKind = nonempty(record3.kind, path + ".kind");
+  const method = rawKind === "collection" ? nonempty(record3.method, path + ".method") : rawKind.slice("collection.".length);
+  if (method !== "map" && method !== "filter" && method !== "reduce") fail('unsupported collection method "' + method + '"', path + ".method", "GAMEPLAY_MODULE_UNSUPPORTED_STATEMENT");
+  const allowedFields = ["kind", "method", "id", "items", "inputs", "item", "index", "accumulator", "initial", "body"];
+  allowed(record3, allowedFields, path);
+  if (rawKind !== "collection" && (own(record3, "method") || method !== "reduce" && (own(record3, "accumulator") || own(record3, "initial")))) fail("collection discriminator conflicts with method fields", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+  if (method !== "reduce" && (own(record3, "accumulator") || own(record3, "initial"))) fail("map/filter collections cannot declare accumulator or initial", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+  if (!Array.isArray(record3.body)) fail("collection.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+  const node = {
+    kind: "collection",
+    id: nonempty(record3.id, path + ".id"),
+    method,
+    items: valueRef(record3.items, path + ".items"),
+    inputs: record3.inputs === void 0 ? {} : valueMap(record3.inputs, path + ".inputs"),
+    body: statements(record3.body, path + ".body")
+  };
+  if (record3.item !== void 0) node.item = safeName(record3.item, path + ".item");
+  if (record3.index !== void 0) node.index = safeName(record3.index, path + ".index");
+  if (record3.accumulator !== void 0) node.accumulator = safeName(record3.accumulator, path + ".accumulator");
+  if (record3.initial !== void 0) node.initial = valueRef(record3.initial, path + ".initial");
+  return node;
+}
 function statement(value, path) {
-  const record2 = plain(value, path);
-  const kind = nonempty(record2.kind, path + ".kind");
+  const record3 = plain(value, path);
+  const kind = nonempty(record3.kind, path + ".kind");
   if (kind === "call") {
-    allowed(record2, ["kind", "id", "module", "version", "inputs", "parameters", "layout"], path);
-    const node = { kind, id: nonempty(record2.id, path + ".id"), module: nonempty(record2.module, path + ".module"), version: nonempty(record2.version, path + ".version"), inputs: record2.inputs === void 0 ? {} : valueMap(record2.inputs, path + ".inputs"), parameters: record2.parameters === void 0 ? {} : literalMap(record2.parameters, path + ".parameters") };
-    const nodeLayout = layout(record2.layout, path + ".layout");
+    allowed(record3, ["kind", "id", "module", "version", "inputs", "parameters", "layout"], path);
+    const node = { kind, id: nonempty(record3.id, path + ".id"), module: nonempty(record3.module, path + ".module"), version: nonempty(record3.version, path + ".version"), inputs: record3.inputs === void 0 ? {} : valueMap(record3.inputs, path + ".inputs"), parameters: record3.parameters === void 0 ? {} : literalMap(record3.parameters, path + ".parameters") };
+    const nodeLayout = layout(record3.layout, path + ".layout");
     if (nodeLayout !== void 0) node.layout = nodeLayout;
     return node;
   }
   if (kind === "if") {
-    allowed(record2, ["kind", "id", "condition", "then", "else", "layout"], path);
-    if (!Array.isArray(record2.then)) fail("if.then must be an array", path + ".then", "GAMEPLAY_MODULE_SHAPE");
-    if (record2.else !== void 0 && !Array.isArray(record2.else)) fail("if.else must be an array", path + ".else", "GAMEPLAY_MODULE_SHAPE");
-    const node = { kind, id: nonempty(record2.id, path + ".id"), condition: valueRef(record2.condition, path + ".condition"), then: statements(record2.then, path + ".then") };
-    if (record2.else !== void 0) node.else = statements(record2.else, path + ".else");
-    const nodeLayout = layout(record2.layout, path + ".layout");
+    allowed(record3, ["kind", "id", "condition", "then", "else", "layout"], path);
+    if (!Array.isArray(record3.then)) fail("if.then must be an array", path + ".then", "GAMEPLAY_MODULE_SHAPE");
+    if (record3.else !== void 0 && !Array.isArray(record3.else)) fail("if.else must be an array", path + ".else", "GAMEPLAY_MODULE_SHAPE");
+    const node = { kind, id: nonempty(record3.id, path + ".id"), condition: valueRef(record3.condition, path + ".condition"), then: statements(record3.then, path + ".then") };
+    if (record3.else !== void 0) node.else = statements(record3.else, path + ".else");
+    const nodeLayout = layout(record3.layout, path + ".layout");
     if (nodeLayout !== void 0) node.layout = nodeLayout;
     return node;
   }
   if (kind === "foreach") {
-    allowed(record2, ["kind", "id", "items", "item", "index", "body", "layout"], path);
-    if (!Array.isArray(record2.body)) fail("foreach.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
-    const node = { kind, id: nonempty(record2.id, path + ".id"), items: valueRef(record2.items, path + ".items"), body: statements(record2.body, path + ".body") };
-    if (record2.item !== void 0) node.item = nonempty(record2.item, path + ".item");
-    if (record2.index !== void 0) node.index = nonempty(record2.index, path + ".index");
-    const nodeLayout = layout(record2.layout, path + ".layout");
+    allowed(record3, ["kind", "id", "items", "item", "index", "body", "layout"], path);
+    if (!Array.isArray(record3.body)) fail("foreach.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+    const node = { kind, id: nonempty(record3.id, path + ".id"), items: valueRef(record3.items, path + ".items"), body: statements(record3.body, path + ".body") };
+    if (record3.item !== void 0) node.item = nonempty(record3.item, path + ".item");
+    if (record3.index !== void 0) node.index = nonempty(record3.index, path + ".index");
+    const nodeLayout = layout(record3.layout, path + ".layout");
     if (nodeLayout !== void 0) node.layout = nodeLayout;
     return node;
   }
+  if (kind === "record.create") {
+    allowed(record3, ["kind", "id", "schema", "fields"], path);
+    return {
+      kind,
+      id: safeName(record3.id, path + ".id"),
+      schema: nonempty(record3.schema, path + ".schema"),
+      fields: recordFields(record3.fields, path + ".fields")
+    };
+  }
+  if (kind === "record.get") {
+    allowed(record3, ["kind", "id", "record", "field"], path);
+    return {
+      kind,
+      id: safeName(record3.id, path + ".id"),
+      record: valueRef(record3.record, path + ".record"),
+      field: safeName(record3.field, path + ".field")
+    };
+  }
+  if (kind === "record.with") {
+    allowed(record3, ["kind", "id", "record", "fields"], path);
+    return {
+      kind,
+      id: safeName(record3.id, path + ".id"),
+      record: valueRef(record3.record, path + ".record"),
+      fields: recordFields(record3.fields, path + ".fields")
+    };
+  }
+  if (kind === "collection" || kind === "collection.map" || kind === "collection.filter" || kind === "collection.reduce") return collectionStatement(value, path);
+  if (kind === "defer-choice") {
+    allowed(record3, ["kind", "id", "graph", "payload", "player", "title", "targetType", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"], path);
+    if (own(record3, "min") && own(record3, "minSelections")) fail("defer-choice cannot contain both min and minSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+    if (own(record3, "max") && own(record3, "maxSelections")) fail("defer-choice cannot contain both max and maxSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+    const node = {
+      kind,
+      id: safeName(record3.id, path + ".id"),
+      graph: nonempty(record3.graph, path + ".graph"),
+      payload: valueRef(record3.payload, path + ".payload")
+    };
+    for (const key of ["player", "title", "targetType", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"]) {
+      if (record3[key] !== void 0) node[key] = valueRef(record3[key], path + "." + key);
+    }
+    return node;
+  }
   if (kind === "return") {
-    allowed(record2, ["kind", "id", "values", "value", "layout"], path);
-    if (own(record2, "values") && own(record2, "value")) fail("return cannot contain both values and value", path, "GAMEPLAY_MODULE_INVALID_RETURN");
-    const node = { kind, id: nonempty(record2.id, path + ".id") };
-    if (own(record2, "values")) node.values = valueMap(record2.values, path + ".values");
-    if (own(record2, "value")) node.value = valueRef(record2.value, path + ".value");
-    const nodeLayout = layout(record2.layout, path + ".layout");
+    allowed(record3, ["kind", "id", "values", "value", "layout"], path);
+    if (own(record3, "values") && own(record3, "value")) fail("return cannot contain both values and value", path, "GAMEPLAY_MODULE_INVALID_RETURN");
+    const node = { kind, id: nonempty(record3.id, path + ".id") };
+    if (own(record3, "values")) node.values = valueMap(record3.values, path + ".values");
+    if (own(record3, "value")) node.value = valueRef(record3.value, path + ".value");
+    const nodeLayout = layout(record3.layout, path + ".layout");
     if (nodeLayout !== void 0) node.layout = nodeLayout;
     return node;
   }
@@ -438,16 +526,16 @@ function allowedSurfaces(value, path) {
   return result;
 }
 function composite(value, path) {
-  const record2 = plain(value, path);
-  allowed(record2, ["id", "version", "label", "description", "inputs", "outputs", "parameters", "allowedSurfaces", "body", "layout"], path);
-  const result = { id: nonempty(record2.id, path + ".id"), version: nonempty(record2.version, path + ".version"), inputs: ports(record2.inputs, path + ".inputs"), outputs: ports(record2.outputs, path + ".outputs"), body: statements(record2.body, path + ".body") };
-  if (record2.label !== void 0) result.label = nonempty(record2.label, path + ".label");
-  if (record2.description !== void 0) result.description = nonempty(record2.description, path + ".description");
-  const params = parameters(record2.parameters, path + ".parameters");
+  const record3 = plain(value, path);
+  allowed(record3, ["id", "version", "label", "description", "inputs", "outputs", "parameters", "allowedSurfaces", "body", "layout"], path);
+  const result = { id: nonempty(record3.id, path + ".id"), version: nonempty(record3.version, path + ".version"), inputs: ports(record3.inputs, path + ".inputs"), outputs: ports(record3.outputs, path + ".outputs"), body: statements(record3.body, path + ".body") };
+  if (record3.label !== void 0) result.label = nonempty(record3.label, path + ".label");
+  if (record3.description !== void 0) result.description = nonempty(record3.description, path + ".description");
+  const params = parameters(record3.parameters, path + ".parameters");
   if (params.length) result.parameters = params;
   if (params.length) fail("composite parameters are not supported; use typed inputs", path + ".parameters", "GAMEPLAY_MODULE_UNSUPPORTED_PARAMETER");
-  if (record2.allowedSurfaces !== void 0) result.allowedSurfaces = allowedSurfaces(record2.allowedSurfaces, path + ".allowedSurfaces");
-  const nodeLayout = layout(record2.layout, path + ".layout");
+  if (record3.allowedSurfaces !== void 0) result.allowedSurfaces = allowedSurfaces(record3.allowedSurfaces, path + ".allowedSurfaces");
+  const nodeLayout = layout(record3.layout, path + ".layout");
   if (nodeLayout !== void 0) result.layout = nodeLayout;
   return result;
 }
@@ -461,7 +549,7 @@ function ids(body, path) {
         visit(node.then, nested + "[" + index + "].then");
         if (node.else) visit(node.else, nested + "[" + index + "].else");
       }
-      if (node.kind === "foreach") visit(node.body, nested + "[" + index + "].body");
+      if (node.kind === "foreach" || node.kind === "collection") visit(node.body, nested + "[" + index + "].body");
     });
   };
   visit(body, path);
@@ -473,81 +561,240 @@ function bodyGuaranteesReturn(body) {
   }
   return false;
 }
-function graph(value) {
-  const record2 = plain(value, "graph");
-  allowed(record2, ["version", "surface", "inputs", "inputBindings", "outputs", "body", "composites", "layout"], "graph");
-  if (record2.version !== GAMEPLAY_MODULE_GRAPH_VERSION) fail('unsupported graph version "' + String(record2.version) + '"', "graph.version", "GAMEPLAY_MODULE_VERSION_MISMATCH");
-  const surface = nonempty(record2.surface, "graph.surface");
-  if (!surfaceSet.has(surface)) fail('unsupported surface "' + surface + '"', "graph.surface", "GAMEPLAY_MODULE_INVALID_SURFACE");
-  if (!Array.isArray(record2.body)) fail("graph.body must be an array", "graph.body", "GAMEPLAY_MODULE_SHAPE");
-  const graphLayout = layout(record2.layout, "graph.layout");
-  const inputPorts = ports(record2.inputs, "graph.inputs");
-  const inputBindings = record2.inputBindings === void 0 ? {} : literalMap(record2.inputBindings, "graph.inputBindings");
-  const outputPorts = ports(record2.outputs, "graph.outputs");
-  const body = statements(record2.body, "graph.body");
-  const composites = record2.composites === void 0 ? [] : !Array.isArray(record2.composites) ? fail("graph.composites must be an array", "graph.composites", "GAMEPLAY_MODULE_SHAPE") : record2.composites.map((entry, index) => composite(entry, "graph.composites[" + index + "]"));
+var pendingHostNames = /* @__PURE__ */ new Set(["payload", "selectedTargets", "targetCell", "targetPiece", "sourcePiece", "player"]);
+var pendingHostTypeNames = {
+  selectedTargets: { kind: "list", element: "choice" },
+  targetCell: { kind: "nullable", value: "cell" },
+  targetPiece: "piece",
+  sourcePiece: "piece",
+  player: "player"
+};
+function schema(value, path) {
+  const record3 = plain(value, path);
+  allowed(record3, ["id", "version", "fields"], path);
+  if (!own(record3, "fields")) fail("record schema requires fields", path + ".fields", "GAMEPLAY_MODULE_SHAPE");
+  return { id: safeName(record3.id, path + ".id"), version: nonempty(record3.version, path + ".version"), fields: ports(record3.fields, path + ".fields") };
+}
+function schemaList(value, path) {
+  if (value === void 0) return [];
+  if (!Array.isArray(value)) fail("schemas must be an array", path, "GAMEPLAY_MODULE_SHAPE");
+  const result = value.map((entry, index) => schema(entry, path + "[" + index + "]"));
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of result) {
+    const key = moduleKey(entry.id, entry.version);
+    if (seen.has(key)) fail('duplicate record schema "' + entry.id + "@" + entry.version + '"', path, "GAMEPLAY_MODULE_DUPLICATE_SCHEMA");
+    seen.add(key);
+  }
+  return result;
+}
+function hostBindingType(value, name, path) {
+  if (isObject(value) && own(value, "type")) {
+    allowed(value, ["name", "type", "optional", "nullable", "label", "description"], path);
+    const declared = port(value, path);
+    if (declared.name !== name) fail("host binding port name must match its key", path + ".name", "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
+    return effective(declared);
+  }
+  return typeValue(value, path);
+}
+function hostBindings(value, surface, path) {
+  if (value === void 0) return {};
+  if (surface !== "pending") fail("hostBindings are only available on pending graphs", path, "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
+  const record3 = plain(value, path);
+  const result = /* @__PURE__ */ Object.create(null);
+  for (const key of Object.keys(record3)) {
+    if (!pendingHostNames.has(key)) fail('unsupported pending host binding "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
+    result[key] = hostBindingType(record3[key], key, path + "." + key);
+  }
+  const payload = result.payload;
+  if (payload !== void 0 && (typeof payload !== "object" || payload.kind !== "record")) fail("pending payload host binding must be a typed record", path + ".payload", "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
+  for (const name of Object.keys(pendingHostTypeNames)) if (result[name] !== void 0 && (!assignable(result[name], pendingHostTypeNames[name]) || !assignable(pendingHostTypeNames[name], result[name]))) fail('pending host binding "' + name + '" has the wrong type', path + "." + name, "GAMEPLAY_MODULE_PORT_TYPE");
+  return result;
+}
+function continuationList(value, context5, path) {
+  if (value === void 0) return [];
+  const entries = Array.isArray(value) ? value : isObject(value) ? Object.keys(value).map((id) => {
+    const entry = value[id];
+    return isObject(entry) && !own(entry, "id") ? { ...entry, id } : entry;
+  }) : [];
+  if (!Array.isArray(value) && !isObject(value)) fail("continuations must be an array or object map", path, "GAMEPLAY_MODULE_SHAPE");
+  const result = [];
+  const seen = /* @__PURE__ */ new Set();
+  entries.forEach((entry, index) => {
+    const record3 = plain(entry, path + "[" + index + "]");
+    allowed(record3, ["id", "version", "graph", "payloadType", "payload"], path + "[" + index + "]");
+    const id = safeName(record3.id, path + "[" + index + "].id");
+    const version = nonempty(record3.version, path + "[" + index + "].version");
+    const key = moduleKey(id, version);
+    if (seen.has(key)) fail('duplicate continuation "' + id + "@" + version + '"', path, "GAMEPLAY_MODULE_DUPLICATE_CONTINUATION");
+    seen.add(key);
+    if (!own(record3, "graph")) fail("continuation requires a pending graph", path + "[" + index + "].graph", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
+    const payloadTypeValue = record3.payloadType ?? record3.payload;
+    if (record3.payloadType !== void 0 && record3.payload !== void 0) fail("continuation cannot contain both payloadType and payload", path + "[" + index + "]", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
+    const child = parseGraph(record3.graph, { active: /* @__PURE__ */ new Set([...context5.active]) }, path + "[" + index + "].graph");
+    if (child.surface !== "pending") fail("continuation graph must use the pending surface", path + "[" + index + "].graph.surface", "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
+    result.push({ id, version, graph: child, payloadType: payloadTypeValue === void 0 ? void 0 : typeValue(payloadTypeValue, path + "[" + index + "].payloadType") });
+  });
+  return result;
+}
+function parseGraph(value, context5 = { active: /* @__PURE__ */ new Set() }, rootPath = "graph") {
+  const record3 = plain(value, rootPath);
+  if (context5.active.has(value)) fail("continuation graph cycle detected", rootPath, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
+  const active3 = new Set(context5.active);
+  active3.add(value);
+  allowed(record3, ["version", "surface", "inputs", "inputBindings", "outputs", "body", "composites", "schemas", "hostBindings", "continuations", "layout"], rootPath);
+  if (record3.version !== GAMEPLAY_MODULE_GRAPH_VERSION) fail('unsupported graph version "' + String(record3.version) + '"', rootPath + ".version", "GAMEPLAY_MODULE_VERSION_MISMATCH");
+  const surface = nonempty(record3.surface, rootPath + ".surface");
+  if (!surfaceSet.has(surface)) fail('unsupported surface "' + surface + '"', rootPath + ".surface", "GAMEPLAY_MODULE_INVALID_SURFACE");
+  if (!Array.isArray(record3.body)) fail("graph.body must be an array", rootPath + ".body", "GAMEPLAY_MODULE_SHAPE");
+  const graphLayout = layout(record3.layout, rootPath + ".layout");
+  const inputPorts = ports(record3.inputs, rootPath + ".inputs");
+  const inputBindings = record3.inputBindings === void 0 ? {} : literalMap(record3.inputBindings, rootPath + ".inputBindings");
+  const outputPorts = ports(record3.outputs, rootPath + ".outputs");
+  const body = statements(record3.body, rootPath + ".body");
+  const composites = record3.composites === void 0 ? [] : !Array.isArray(record3.composites) ? fail("graph.composites must be an array", rootPath + ".composites", "GAMEPLAY_MODULE_SHAPE") : record3.composites.map((entry, index) => composite(entry, rootPath + ".composites[" + index + "]"));
+  const schemas = schemaList(record3.schemas, rootPath + ".schemas");
+  const bindings = hostBindings(record3.hostBindings, surface, rootPath + ".hostBindings");
+  const continuationValues = continuationList(record3.continuations, { active: active3 }, rootPath + ".continuations");
+  const hostInputPorts = [];
+  if (surface === "pending") for (const [name, type] of Object.entries(bindings)) hostInputPorts.push({ name, type });
+  const normalizedInputs = inputPorts.length ? inputPorts : hostInputPorts;
   const inputNames = /* @__PURE__ */ new Set();
-  for (const input2 of inputPorts) {
-    if (inputNames.has(input2.name)) fail('duplicate input "' + input2.name + '"', "graph.inputs", "GAMEPLAY_MODULE_DUPLICATE_PORT");
-    inputNames.add(input2.name);
-    if (input2.name === "context" || input2.name === "ctx") fail("reserved root input name", "graph.inputs", "GAMEPLAY_MODULE_INVALID_NAME");
-    if (surface !== "preview" && !own(inputBindings, input2.name)) fail("root inputs require static inputBindings", "graph.inputs." + input2.name, "GAMEPLAY_MODULE_ROOT_INPUT");
-    if (surface === "preview" && !own(inputBindings, input2.name)) {
-      const hostType = previewHostType(input2.name);
-      if (!hostType) fail("root input requires a static binding or fixed preview host name", "graph.inputs." + input2.name, "GAMEPLAY_MODULE_ROOT_INPUT");
-      if (!matchesPreviewHostType(effective(input2), hostType)) fail('preview host input "' + input2.name + '" has an incompatible type', "graph.inputs." + input2.name, "GAMEPLAY_MODULE_PORT_TYPE");
+  for (const input11 of normalizedInputs) {
+    if (inputNames.has(input11.name)) fail('duplicate input "' + input11.name + '"', rootPath + ".inputs", "GAMEPLAY_MODULE_DUPLICATE_PORT");
+    inputNames.add(input11.name);
+    if (input11.name === "context" || input11.name === "ctx") fail("reserved root input name", rootPath + ".inputs", "GAMEPLAY_MODULE_INVALID_NAME");
+    const hostType = surface === "pending" ? bindings[input11.name] : void 0;
+    if (hostType !== void 0 && (!assignable(effective(input11), hostType) || !assignable(hostType, effective(input11)))) fail('pending host input "' + input11.name + '" has an incompatible type', rootPath + ".inputs." + input11.name, "GAMEPLAY_MODULE_PORT_TYPE");
+    if (surface === "pending" && hostType !== void 0 && own(inputBindings, input11.name)) fail("pending host input cannot have a static binding", rootPath + ".inputBindings." + input11.name, "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
+    if (surface !== "pending" && !own(inputBindings, input11.name)) {
+      if (surface !== "preview") fail("root inputs require static inputBindings", rootPath + ".inputs." + input11.name, "GAMEPLAY_MODULE_ROOT_INPUT");
+      const previewType = previewHostType(input11.name);
+      if (!previewType) fail("root input requires a static binding or fixed preview host name", rootPath + ".inputs." + input11.name, "GAMEPLAY_MODULE_ROOT_INPUT");
+      if (!matchesPreviewHostType(effective(input11), previewType)) fail('preview host input "' + input11.name + '" has an incompatible type', rootPath + ".inputs." + input11.name, "GAMEPLAY_MODULE_PORT_TYPE");
     }
-    if (own(inputBindings, input2.name)) {
-      const actual = typeOfLiteral(inputBindings[input2.name]);
-      if (!assignable(actual, effective(input2))) fail("root input binding expects " + typeName(effective(input2)) + ", got " + typeName(actual), "graph.inputBindings." + input2.name, "GAMEPLAY_MODULE_PORT_TYPE");
+    if (surface === "pending" && hostType === void 0 && !own(inputBindings, input11.name)) fail("pending root input requires a fixed host binding or static binding", rootPath + ".inputs." + input11.name, "GAMEPLAY_MODULE_ROOT_INPUT");
+    if (own(inputBindings, input11.name)) {
+      const actual = typeOfLiteral(inputBindings[input11.name]);
+      if (!assignable(actual, effective(input11))) fail("root input binding expects " + typeName(effective(input11)) + ", got " + typeName(actual), rootPath + ".inputBindings." + input11.name, "GAMEPLAY_MODULE_PORT_TYPE");
     }
   }
-  for (const key of Object.keys(inputBindings)) if (!inputNames.has(key)) fail('unknown root input binding "' + key + '"', "graph.inputBindings." + key, "GAMEPLAY_MODULE_UNKNOWN_INPUT");
+  for (const key of Object.keys(inputBindings)) if (!inputNames.has(key)) fail('unknown root input binding "' + key + '"', rootPath + ".inputBindings." + key, "GAMEPLAY_MODULE_UNKNOWN_INPUT");
+  if (surface !== "pending" && Object.keys(bindings).length) fail("hostBindings are only available on pending graphs", rootPath + ".hostBindings", "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
   const compositeKeys = /* @__PURE__ */ new Set();
   for (const entry of composites) {
     const key = moduleKey(entry.id, entry.version);
-    if (compositeKeys.has(key)) fail('duplicate composite "' + entry.id + "@" + entry.version + '"', "graph.composites", "GAMEPLAY_MODULE_DUPLICATE_MODULE");
+    if (compositeKeys.has(key)) fail('duplicate composite "' + entry.id + "@" + entry.version + '"', rootPath + ".composites", "GAMEPLAY_MODULE_DUPLICATE_MODULE");
     compositeKeys.add(key);
-    ids(entry.body, "graph.composites." + entry.id + ".body");
+    ids(entry.body, rootPath + ".composites." + entry.id + ".body");
   }
-  ids(body, "graph.body");
-  return { version: GAMEPLAY_MODULE_GRAPH_VERSION, surface, inputs: inputPorts, inputBindings, outputs: outputPorts, body, composites, layout: graphLayout };
+  ids(body, rootPath + ".body");
+  return { version: GAMEPLAY_MODULE_GRAPH_VERSION, surface, inputs: normalizedInputs, inputBindings, outputs: outputPorts, body, composites, schemas, hostBindings: bindings, continuations: continuationValues, layout: graphLayout };
+}
+function graph(value) {
+  return parseGraph(value);
+}
+function schemaTable(graphValue, inherited = /* @__PURE__ */ new Map()) {
+  const table = new Map(inherited);
+  for (const entry of graphValue.schemas) {
+    const key = moduleKey(entry.id, entry.version);
+    const previous = table.get(key);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(entry)) fail("continuation redeclares a record schema with different fields", "graph.schemas." + entry.id, "GAMEPLAY_MODULE_DUPLICATE_SCHEMA");
+    table.set(key, entry);
+  }
+  return table;
+}
+function schemaFor(table, reference, path) {
+  const matches = [...table.values()].filter((entry) => entry.id === reference || moduleKey(entry.id, entry.version) === reference || entry.id + "@" + entry.version === reference);
+  if (!matches.length) fail('unknown record schema "' + reference + '"', path, "GAMEPLAY_MODULE_UNKNOWN_SCHEMA");
+  if (matches.length > 1 && !reference.includes("@")) fail("record schema id is ambiguous; use id@version", path, "GAMEPLAY_MODULE_AMBIGUOUS_SCHEMA");
+  return matches[0];
+}
+function validateTypeSchemas(value, table, path) {
+  if (typeof value === "string") return;
+  if (value.kind === "list") return validateTypeSchemas(value.element, table, path + ".element");
+  if (value.kind === "nullable") return validateTypeSchemas(value.value, table, path + ".value");
+  schemaFor(table, value.schema, path + ".schema");
+}
+function validatePortSchemas(value, table, path) {
+  value.forEach((entry, index) => validateTypeSchemas(effective(entry), table, path + "[" + index + "].type"));
+}
+function validateGraphSchemas(graphValue, inherited = /* @__PURE__ */ new Map(), path = "graph", active3 = /* @__PURE__ */ new Set()) {
+  if (active3.has(graphValue)) fail("continuation graph cycle detected", path, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
+  const nextActive = new Set(active3);
+  nextActive.add(graphValue);
+  const table = schemaTable(graphValue, inherited);
+  for (const schemaValue of graphValue.schemas) validatePortSchemas(schemaValue.fields, table, path + ".schemas." + schemaValue.id + "@" + schemaValue.version + ".fields");
+  validatePortSchemas(graphValue.inputs, table, path + ".inputs");
+  validatePortSchemas(graphValue.outputs, table, path + ".outputs");
+  for (const [name, value] of Object.entries(graphValue.hostBindings)) validateTypeSchemas(value, table, path + ".hostBindings." + name);
+  for (const compositeValue of graphValue.composites) {
+    validatePortSchemas(compositeValue.inputs, table, path + ".composites." + compositeValue.id + ".inputs");
+    validatePortSchemas(compositeValue.outputs, table, path + ".composites." + compositeValue.id + ".outputs");
+  }
+  for (const continuation of graphValue.continuations) {
+    if (continuation.payloadType) validateTypeSchemas(continuation.payloadType, table, path + ".continuations." + continuation.id + ".payloadType");
+    validateGraphSchemas(continuation.graph, table, path + ".continuations." + continuation.id + ".graph", nextActive);
+    const payload = continuation.graph.hostBindings.payload;
+    if (payload && continuation.payloadType && (!assignable(continuation.payloadType, payload) || !assignable(payload, continuation.payloadType))) fail("continuation payload type does not match pending payload host binding", path + ".continuations." + continuation.id, "GAMEPLAY_MODULE_WRONG_PAYLOAD_TYPE");
+  }
 }
 function validateGraphLiteralBudget(value, limit) {
   const budget = { bytes: 0, limit };
-  const visitValue = (entry) => {
-    if (entry.kind === "literal") json(entry.value, "graph.literal", budget);
+  const visitValue = (entry, currentBudget = budget) => {
+    if (entry.kind === "literal") json(entry.value, "graph.literal", currentBudget);
   };
-  const visitBody = (body) => {
+  const visitBody = (body, currentBudget = budget) => {
     for (const node of body) {
-      if (node.layout !== void 0) json(node.layout, "graph.layout", budget);
+      if ("layout" in node && node.layout !== void 0) json(node.layout, "graph.layout", currentBudget);
       if (node.kind === "call") {
-        for (const entry of Object.values(node.inputs ?? {})) visitValue(entry);
-        for (const entry of Object.values(node.parameters ?? {})) json(entry, "graph.parameters", budget);
+        for (const entry of Object.values(node.inputs ?? {})) visitValue(entry, currentBudget);
+        for (const entry of Object.values(node.parameters ?? {})) json(entry, "graph.parameters", currentBudget);
       } else if (node.kind === "if") {
-        visitValue(node.condition);
-        visitBody(node.then);
-        if (node.else) visitBody(node.else);
+        visitValue(node.condition, currentBudget);
+        visitBody(node.then, currentBudget);
+        if (node.else) visitBody(node.else, currentBudget);
       } else if (node.kind === "foreach") {
-        visitValue(node.items);
-        visitBody(node.body);
-      } else {
-        if (node.values) for (const entry of Object.values(node.values)) visitValue(entry);
-        if (node.value) visitValue(node.value);
+        visitValue(node.items, currentBudget);
+        visitBody(node.body, currentBudget);
+      } else if (node.kind === "record.create") {
+        for (const entry of Object.values(node.fields ?? {})) visitValue(entry, currentBudget);
+      } else if (node.kind === "record.get") {
+        visitValue(node.record, currentBudget);
+      } else if (node.kind === "record.with") {
+        visitValue(node.record, currentBudget);
+        for (const entry of Object.values(node.fields ?? {})) visitValue(entry, currentBudget);
+      } else if (node.kind === "collection") {
+        visitValue(node.items, currentBudget);
+        for (const entry of Object.values(node.inputs ?? {})) visitValue(entry, currentBudget);
+        if (node.initial !== void 0) visitValue(node.initial, currentBudget);
+        visitBody(node.body, currentBudget);
+      } else if (node.kind === "defer-choice") {
+        visitValue(node.payload, currentBudget);
+        for (const name of ["player", "title", "targetType", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"]) {
+          const value2 = node[name];
+          if (value2 !== void 0) visitValue(value2, currentBudget);
+        }
+      } else if (node.kind === "return") {
+        if (node.values) for (const entry of Object.values(node.values)) visitValue(entry, currentBudget);
+        if (node.value) visitValue(node.value, currentBudget);
       }
     }
   };
-  for (const entry of Object.values(value.inputBindings)) json(entry, "graph.inputBindings", budget);
-  if (value.layout !== void 0) json(value.layout, "graph.layout", budget);
-  visitBody(value.body);
-  for (const compositeValue of value.composites) {
-    if (compositeValue.layout !== void 0) json(compositeValue.layout, "graph.composite.layout", budget);
-    for (const parameterValue of compositeValue.parameters ?? []) {
-      if (Object.prototype.hasOwnProperty.call(parameterValue, "default")) json(parameterValue.default, "graph.composite.parameters", budget);
-      for (const entry of parameterValue.enum ?? []) json(entry, "graph.composite.parameters", budget);
+  const visitGraph = (graphValue) => {
+    for (const entry of Object.values(graphValue.inputBindings)) json(entry, "graph.inputBindings", budget);
+    if (graphValue.layout !== void 0) json(graphValue.layout, "graph.layout", budget);
+    visitBody(graphValue.body, budget);
+    for (const compositeValue of graphValue.composites) {
+      if (compositeValue.layout !== void 0) json(compositeValue.layout, "graph.composite.layout", budget);
+      for (const parameterValue of compositeValue.parameters ?? []) {
+        if (Object.prototype.hasOwnProperty.call(parameterValue, "default")) json(parameterValue.default, "graph.composite.parameters", budget);
+        for (const entry of parameterValue.enum ?? []) json(entry, "graph.composite.parameters", budget);
+      }
+      visitBody(compositeValue.body, budget);
     }
-    visitBody(compositeValue.body);
-  }
+    for (const continuation of graphValue.continuations) visitGraph(continuation.graph);
+  };
+  visitGraph(value);
 }
 function typeOfLiteral(value) {
   if (value === null) return "null";
@@ -568,17 +815,25 @@ function assignable(actual, expected) {
     if (actual === "never") return true;
     if (expected === "null") return actual === "null";
     if (typeof actual === "string") return actual === expected;
+    if (expected === "record" && actual.kind === "record") return true;
     return false;
   }
   if (expected.kind === "nullable") {
     if (actual === "null") return true;
     return typeof actual === "object" ? actual.kind === "nullable" ? assignable(actual.value, expected.value) : assignable(actual, expected.value) : assignable(actual, expected.value);
   }
+  if (expected.kind === "record") {
+    if (typeof actual !== "object" || actual.kind !== "record") return false;
+    return actual.schema === expected.schema || actual.schema.indexOf("@") < 0 && expected.schema.startsWith(actual.schema + "@") || expected.schema.indexOf("@") < 0 && actual.schema.startsWith(expected.schema + "@");
+  }
   if (typeof actual !== "object" || actual.kind !== "list") return false;
   return expected.kind === "list" && (actual.element === "never" || assignable(actual.element, expected.element));
 }
 function typeName(value) {
-  return typeof value === "string" ? value : value.kind === "list" ? "list<" + typeName(value.element) + ">" : "nullable<" + typeName(value.value) + ">";
+  if (typeof value === "string") return value;
+  if (value.kind === "list") return "list<" + typeName(value.element) + ">";
+  if (value.kind === "nullable") return "nullable<" + typeName(value.value) + ">";
+  return "record<" + value.schema + ">";
 }
 function effective(portValue) {
   return portValue.nullable ? { kind: "nullable", value: portValue.type } : portValue.type;
@@ -594,35 +849,35 @@ function mapParams(values) {
   return map;
 }
 function validateEffects(value, path) {
-  const record2 = plain(value, path);
-  allowed(record2, ["previewSafe", "pure", "writes", "reads", "random", "pending", "events", "description"], path);
+  const record3 = plain(value, path);
+  allowed(record3, ["previewSafe", "pure", "writes", "reads", "random", "pending", "events", "description"], path);
   const result = {};
-  for (const key of ["previewSafe", "pure", "random", "pending"]) if (record2[key] !== void 0) result[key] = bool(record2[key], path + "." + key);
-  for (const key of ["writes", "reads", "events"]) if (record2[key] !== void 0) {
-    if (!Array.isArray(record2[key])) fail(key + " must be an array", path + "." + key, "GAMEPLAY_MODULE_INVALID_EFFECTS");
-    result[key] = record2[key].map((entry, index) => nonempty(entry, path + "." + key + "[" + index + "]"));
+  for (const key of ["previewSafe", "pure", "random", "pending"]) if (record3[key] !== void 0) result[key] = bool(record3[key], path + "." + key);
+  for (const key of ["writes", "reads", "events"]) if (record3[key] !== void 0) {
+    if (!Array.isArray(record3[key])) fail(key + " must be an array", path + "." + key, "GAMEPLAY_MODULE_INVALID_EFFECTS");
+    result[key] = record3[key].map((entry, index) => nonempty(entry, path + "." + key + "[" + index + "]"));
   }
-  if (record2.description !== void 0) result.description = nonempty(record2.description, path + ".description");
+  if (record3.description !== void 0) result.description = nonempty(record3.description, path + ".description");
   return result;
 }
 function descriptor(value, id, version) {
   if (!isObject(value)) fail("registry returned an invalid descriptor", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-  const record2 = value;
-  for (const key of ["id", "version", "label", "inputs", "outputs", "allowedSurfaces", "effects", "lower"]) if (!own(record2, key)) fail("registry descriptor is missing " + key, "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-  allowed(record2, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "parameters", "inspectReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
-  const actualId = nonempty(record2.id, "registry." + id + ".id");
-  const actualVersion = nonempty(record2.version, "registry." + id + ".version");
+  const record3 = value;
+  for (const key of ["id", "version", "label", "inputs", "outputs", "allowedSurfaces", "effects", "lower"]) if (!own(record3, key)) fail("registry descriptor is missing " + key, "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
+  allowed(record3, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "parameters", "inspectReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
+  const actualId = nonempty(record3.id, "registry." + id + ".id");
+  const actualVersion = nonempty(record3.version, "registry." + id + ".version");
   if (actualId !== id || actualVersion !== version) fail("registry descriptor does not match requested module", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-  const inputPorts = ports(record2.inputs, "registry." + id + ".inputs");
-  const result = { id: actualId, version: actualVersion, label: nonempty(record2.label, "registry." + id + ".label"), inputs: inputPorts, outputs: ports(record2.outputs, "registry." + id + ".outputs"), allowedSurfaces: allowedSurfaces(record2.allowedSurfaces, "registry." + id + ".allowedSurfaces"), effects: validateEffects(record2.effects, "registry." + id + ".effects"), lower: record2.lower };
-  if (record2.description !== void 0) result.description = nonempty(record2.description, "registry." + id + ".description");
-  if (record2.uiDescription !== void 0) result.uiDescription = nonempty(record2.uiDescription, "registry." + id + ".uiDescription");
-  const params = parameters(record2.parameters, "registry." + id + ".parameters");
+  const inputPorts = ports(record3.inputs, "registry." + id + ".inputs");
+  const result = { id: actualId, version: actualVersion, label: nonempty(record3.label, "registry." + id + ".label"), inputs: inputPorts, outputs: ports(record3.outputs, "registry." + id + ".outputs"), allowedSurfaces: allowedSurfaces(record3.allowedSurfaces, "registry." + id + ".allowedSurfaces"), effects: validateEffects(record3.effects, "registry." + id + ".effects"), lower: record3.lower };
+  if (record3.description !== void 0) result.description = nonempty(record3.description, "registry." + id + ".description");
+  if (record3.uiDescription !== void 0) result.uiDescription = nonempty(record3.uiDescription, "registry." + id + ".uiDescription");
+  const params = parameters(record3.parameters, "registry." + id + ".parameters");
   if (params.length) result.parameters = params;
-  const inspected = inspectReferences(record2.inspectReferences, inputPorts, "registry." + id + ".inspectReferences");
+  const inspected = inspectReferences(record3.inspectReferences, inputPorts, "registry." + id + ".inspectReferences");
   if (inspected !== void 0) result.inspectReferences = inspected;
-  if (record2.ui !== void 0) result.ui = plain(record2.ui, "registry." + id + ".ui");
-  if (typeof record2.lower !== "function") fail("registry descriptor lower must be a function", "registry." + id + ".lower", "GAMEPLAY_MODULE_REGISTRY_INVALID");
+  if (record3.ui !== void 0) result.ui = plain(record3.ui, "registry." + id + ".ui");
+  if (typeof record3.lower !== "function") fail("registry descriptor lower must be a function", "registry." + id + ".lower", "GAMEPLAY_MODULE_REGISTRY_INVALID");
   return result;
 }
 function registryGet(registry, id, version) {
@@ -630,22 +885,22 @@ function registryGet(registry, id, version) {
     const value = registry.get(moduleKey(id, version)) ?? registry.get(id + "@" + version) ?? registry.get(id);
     return Array.isArray(value) ? value.find((entry) => isObject(entry) && entry.id === id && entry.version === version) : value;
   }
-  const object = registry;
-  if (typeof object.resolve === "function") {
-    const value = object.resolve(id, version);
+  const object2 = registry;
+  if (typeof object2.resolve === "function") {
+    const value = object2.resolve(id, version);
     if (value) return value;
   }
-  if (typeof object.get === "function") {
-    const value = object.get(id, version) ?? object.get(id);
+  if (typeof object2.get === "function") {
+    const value = object2.get(id, version) ?? object2.get(id);
     return Array.isArray(value) ? value.find((entry) => isObject(entry) && entry.id === id && entry.version === version) : value;
   }
-  if (Array.isArray(object.descriptors)) return object.descriptors.find((entry) => entry.id === id && entry.version === version);
+  if (Array.isArray(object2.descriptors)) return object2.descriptors.find((entry) => entry.id === id && entry.version === version);
   fail("registry must expose get, resolve, descriptors, or Map lookup", "registry", "GAMEPLAY_MODULE_REGISTRY_INVALID");
 }
-function makeResolver(value, registry, limits) {
+function makeResolver(value, registry, limits, inheritedSchemas = /* @__PURE__ */ new Map()) {
   const composites = /* @__PURE__ */ new Map();
   for (const entry of value.composites) composites.set(moduleKey(entry.id, entry.version), entry);
-  return { graph: value, composites, native: /* @__PURE__ */ new Map(), calls: /* @__PURE__ */ new Map(), dependencies: /* @__PURE__ */ new Map(), expanded: [], limits, registry, statementCount: 0 };
+  return { graph: value, composites, native: /* @__PURE__ */ new Map(), calls: /* @__PURE__ */ new Map(), dependencies: /* @__PURE__ */ new Map(), expanded: [], limits, registry, schemas: schemaTable(value, inheritedSchemas), statementCount: 0 };
 }
 function resolve(resolver, id, version, path) {
   const compositeValue = resolver.composites.get(moduleKey(id, version));
@@ -716,7 +971,149 @@ function validateReturn(node, outputs, environment, path) {
   }
   if (outputs.some((output) => !output.optional)) fail("return must provide all declared outputs", path, "GAMEPLAY_MODULE_MISSING_OUTPUT");
 }
-function validateBody(list, resolver, environment, outputs, path, active, depth) {
+function recordType(schemaReference) {
+  return { kind: "record", schema: schemaReference };
+}
+function resolveRecordSchema(resolver, reference, path) {
+  return schemaFor(resolver.schemas, reference, path);
+}
+function collectionNames(node, method, path) {
+  const item = node.item ?? "item";
+  const index = node.index ?? "index";
+  const accumulator = method === "reduce" ? node.accumulator ?? "accumulator" : void 0;
+  if (item === index || accumulator === item || accumulator === index) fail("collection local names must be distinct", path, "GAMEPLAY_MODULE_INVALID_NAME");
+  return { item, index, accumulator };
+}
+function collectionReturnValue(node, environment, path) {
+  if (node.value !== void 0) return valueType(node.value, environment, path + ".value");
+  if (node.values !== void 0) {
+    const keys = Object.keys(node.values);
+    if (keys.length !== 1 || !own(node.values, "value")) fail("collection body return must provide one scalar value", path + ".values", "GAMEPLAY_MODULE_INVALID_RETURN");
+    return valueType(node.values.value, environment, path + ".values.value");
+  }
+  fail("collection body must return a typed value", path, "GAMEPLAY_MODULE_MISSING_OUTPUT");
+}
+function collectCollectionReturns(list, resolver, environment, path, validateCollections = true) {
+  const bindings = new Map(environment.bindings);
+  const result = [];
+  list.forEach((node, index) => {
+    const nodePath = path + "[" + index + "]";
+    if (node.kind === "call") {
+      const metadata = resolver.calls.get(node);
+      if (!metadata) fail("missing collection call metadata", nodePath, "GAMEPLAY_MODULE_INTERNAL_ERROR");
+      const outputs = metadata.module.kind === "native" ? metadata.module.descriptor.outputs : metadata.module.definition.outputs;
+      const types = /* @__PURE__ */ new Map();
+      for (const output of outputs) types.set(output.name, effective(output));
+      bindings.set(node.id, types);
+    } else if (node.kind === "record.create") {
+      resolveRecordSchema(resolver, node.schema, nodePath + ".schema");
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(node.schema)]]));
+    } else if (node.kind === "record.get") {
+      const actual = valueType(node.record, { inputs: environment.inputs, bindings }, nodePath + ".record");
+      const schemaValue = typeof actual === "object" && actual.kind === "record" ? resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema") : void 0;
+      if (!schemaValue) fail("record.get requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
+      const field = schemaValue.fields.find((entry) => entry.name === node.field);
+      if (!field) fail('unknown record field "' + node.field + '"', nodePath + ".field", "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", effective(field)]]));
+    } else if (node.kind === "record.with") {
+      const actual = valueType(node.record, { inputs: environment.inputs, bindings }, nodePath + ".record");
+      if (typeof actual !== "object" || actual.kind !== "record") fail("record.with requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
+      const schemaValue = resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema");
+      const fields3 = node.fields ?? {};
+      const declared = mapPorts(schemaValue.fields);
+      for (const key of Object.keys(fields3)) {
+        const field = declared.get(key);
+        if (!field) fail('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+        const type = valueType(fields3[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
+        if (!assignable(type, effective(field))) fail('record field "' + key + '" expects ' + typeName(effective(field)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+      }
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(actual.schema)]]));
+    } else if (node.kind === "collection") {
+      const output = collectionOutputType(node, resolver, { inputs: environment.inputs, bindings }, nodePath, validateCollections);
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", output]]));
+    } else if (node.kind === "if") {
+      result.push(...collectCollectionReturns(node.then, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, nodePath + ".then", validateCollections));
+      if (node.else) result.push(...collectCollectionReturns(node.else, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, nodePath + ".else", validateCollections));
+    } else if (node.kind === "foreach") {
+      const collection = valueType(node.items, { inputs: environment.inputs, bindings }, nodePath + ".items");
+      if (typeof collection !== "object" || collection.kind !== "list") fail("foreach items must be a list", nodePath + ".items", "GAMEPLAY_MODULE_PORT_TYPE");
+      const loopInputs = new Map(environment.inputs);
+      if (node.item) loopInputs.set(node.item, collection.element);
+      if (node.index) loopInputs.set(node.index, "number");
+      const loopBindings = new Map(bindings);
+      loopBindings.set(node.id, /* @__PURE__ */ new Map([["item", collection.element], ["index", "number"]]));
+      result.push(...collectCollectionReturns(node.body, resolver, { inputs: loopInputs, bindings: loopBindings }, nodePath + ".body", validateCollections));
+    } else if (node.kind === "return") {
+      result.push(collectionReturnValue(node, { inputs: environment.inputs, bindings }, nodePath));
+    }
+  });
+  return result;
+}
+function collectionOutputType(node, resolver, environment, path, validate = true) {
+  const collection = valueType(node.items, environment, path + ".items");
+  if (typeof collection !== "object" || collection.kind !== "list") fail("collection items must be a list", path + ".items", "GAMEPLAY_MODULE_PORT_TYPE");
+  const names = collectionNames(node, node.method, path);
+  const bodyInputs = /* @__PURE__ */ new Map();
+  const captures = node.inputs ?? {};
+  for (const key of Object.keys(captures)) {
+    if (key === names.item || key === names.index || key === names.accumulator) fail("collection capture shadows a local input", path + ".inputs." + key, "GAMEPLAY_MODULE_INVALID_NAME");
+    bodyInputs.set(key, valueType(captures[key], environment, path + ".inputs." + key));
+  }
+  bodyInputs.set(names.item, collection.element);
+  bodyInputs.set(names.index, "number");
+  let accumulatorType;
+  if (node.method === "reduce") {
+    if (node.initial !== void 0) accumulatorType = valueType(node.initial, environment, path + ".initial");
+    else accumulatorType = collection.element;
+    bodyInputs.set(names.accumulator, accumulatorType);
+  }
+  const bodyEnvironment = { inputs: bodyInputs, bindings: /* @__PURE__ */ new Map() };
+  if (validate) validateBody(node.body, resolver, bodyEnvironment, [{ name: "value", type: "any" }], path + ".body", [], 0, true);
+  const returns = collectCollectionReturns(node.body, resolver, bodyEnvironment, path + ".body", validate);
+  if (!returns.length) fail("collection body must return a typed value", path + ".body", "GAMEPLAY_MODULE_MISSING_OUTPUT");
+  const output = returns[0];
+  for (const value of returns.slice(1)) if (!assignable(value, output) || !assignable(output, value)) fail("collection body returns inconsistent types", path + ".body", "GAMEPLAY_MODULE_PORT_TYPE");
+  if (node.method === "filter") {
+    if (!assignable(output, "boolean")) fail("filter body must return boolean", path + ".body", "GAMEPLAY_MODULE_PORT_TYPE");
+    return { kind: "list", element: collection.element };
+  }
+  if (node.method === "map") return { kind: "list", element: output };
+  if (accumulatorType && (!assignable(output, accumulatorType) || !assignable(accumulatorType, output))) fail("reduce body must return the accumulator type", path + ".body", "GAMEPLAY_MODULE_PORT_TYPE");
+  return output;
+}
+var deferChoiceFieldTypes = {
+  player: "player",
+  title: "string",
+  targetType: "string",
+  candidates: { kind: "list", element: "choice" },
+  selectionMode: "string",
+  min: "number",
+  max: "number",
+  minSelections: "number",
+  maxSelections: "number",
+  canCancel: "boolean",
+  resumeOnCancel: "boolean",
+  message: "string"
+};
+function validateDeferChoiceField(name, value, environment, path) {
+  const actual = valueType(value, environment, path);
+  const expected = deferChoiceFieldTypes[name];
+  if (!assignable(actual, expected)) fail('pending field "' + name + '" expects ' + typeName(expected) + ", got " + typeName(actual), path, "GAMEPLAY_MODULE_PORT_TYPE");
+  if (value.kind === "literal") {
+    if (name === "targetType" && !["piece", "cell", "grid"].includes(value.value)) fail("targetType must be piece, cell, or grid", path, "GAMEPLAY_MODULE_INVALID_VALUE");
+    if (name === "selectionMode" && !["single", "multi"].includes(value.value)) fail("selectionMode must be single or multi", path, "GAMEPLAY_MODULE_INVALID_VALUE");
+    if ((name === "min" || name === "max" || name === "minSelections" || name === "maxSelections") && (!Number.isSafeInteger(value.value) || value.value < 0)) fail("selection bounds must be non-negative integers", path, "GAMEPLAY_MODULE_INVALID_VALUE");
+  }
+  return actual;
+}
+function collectionEffectError(resolved, path) {
+  if (resolved.kind !== "native") return;
+  const effects2 = resolved.descriptor.effects;
+  if (effects2.pure === false || effects2.random === true || effects2.pending === true || (effects2.writes?.length ?? 0) > 0 || (effects2.events?.length ?? 0) > 0) {
+    fail('collection body cannot call effectful module "' + resolved.descriptor.id + '"', path, "GAMEPLAY_MODULE_COLLECTION_EFFECT");
+  }
+}
+function validateBody(list, resolver, environment, outputs, path, active3, depth, dataOnly = false) {
   const bindings = new Map(environment.bindings);
   for (let index = 0; index < list.length; index += 1) {
     resolver.statementCount += 1;
@@ -725,15 +1122,20 @@ function validateBody(list, resolver, environment, outputs, path, active, depth)
     const nodePath = path + "[" + index + "]";
     if (node.kind === "call") {
       const resolved = resolve(resolver, node.module, node.version, nodePath + ".module");
+      if (dataOnly) collectionEffectError(resolved, nodePath + ".module");
       if (resolved.kind === "native") {
         if (!resolved.descriptor.allowedSurfaces.includes(resolver.graph.surface)) fail("module is not allowed on " + resolver.graph.surface, nodePath + ".module", "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
         if (resolver.graph.surface === "preview" && !previewSafe(resolved.descriptor.effects)) fail("module has effects forbidden in preview", nodePath + ".module", "GAMEPLAY_MODULE_PREVIEW_EFFECT");
+        validatePortSchemas(resolved.descriptor.inputs, resolver.schemas, nodePath + ".module.inputs");
+        validatePortSchemas(resolved.descriptor.outputs, resolver.schemas, nodePath + ".module.outputs");
       } else {
         const key = moduleKey(resolved.definition.id, resolved.definition.version);
         if (resolved.definition.allowedSurfaces && !resolved.definition.allowedSurfaces.includes(resolver.graph.surface)) fail("composite is not allowed on " + resolver.graph.surface, nodePath + ".module", "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
-        if (active.includes(key)) fail("composite cycle detected", nodePath + ".module", "GAMEPLAY_MODULE_COMPOSITE_CYCLE");
+        if (active3.includes(key)) fail("composite cycle detected", nodePath + ".module", "GAMEPLAY_MODULE_COMPOSITE_CYCLE");
         if (depth >= resolver.limits.maxCompositeDepth) fail("composite expansion depth exceeded", nodePath + ".module", "GAMEPLAY_MODULE_BUDGET_EXCEEDED");
         if (resolved.definition.outputs.some((output) => !output.optional) && !bodyGuaranteesReturn(resolved.definition.body)) fail("composite can fall through without returning its required outputs", nodePath + ".module", "GAMEPLAY_MODULE_MISSING_OUTPUT");
+        validatePortSchemas(resolved.definition.inputs, resolver.schemas, nodePath + ".module.inputs");
+        validatePortSchemas(resolved.definition.outputs, resolver.schemas, nodePath + ".module.outputs");
       }
       const inputPorts = resolved.kind === "native" ? resolved.descriptor.inputs : resolved.definition.inputs;
       const parameterPorts = resolved.kind === "native" ? resolved.descriptor.parameters ?? [] : resolved.definition.parameters ?? [];
@@ -756,26 +1158,79 @@ function validateBody(list, resolver, environment, outputs, path, active, depth)
       if (resolved.kind === "composite") {
         const compositeInputs = /* @__PURE__ */ new Map();
         const declaredInputs = mapPorts(resolved.definition.inputs);
-        for (const input2 of resolved.definition.inputs) {
-          const supplied = node.inputs?.[input2.name];
+        for (const input11 of resolved.definition.inputs) {
+          const supplied = node.inputs?.[input11.name];
           if (supplied === void 0) {
-            if (!input2.optional) fail('missing composite input "' + input2.name + '"', nodePath + ".inputs", "GAMEPLAY_MODULE_MISSING_PORT");
-            compositeInputs.set(input2.name, effective(input2));
+            if (!input11.optional) fail('missing composite input "' + input11.name + '"', nodePath + ".inputs", "GAMEPLAY_MODULE_MISSING_PORT");
+            compositeInputs.set(input11.name, effective(input11));
           } else {
-            const actual = valueType(supplied, { inputs: environment.inputs, bindings }, nodePath + ".inputs." + input2.name);
-            if (!assignable(actual, effective(input2))) fail("composite input type mismatch", nodePath + ".inputs." + input2.name, "GAMEPLAY_MODULE_PORT_TYPE");
-            compositeInputs.set(input2.name, effective(input2));
+            const actual = valueType(supplied, { inputs: environment.inputs, bindings }, nodePath + ".inputs." + input11.name);
+            if (!assignable(actual, effective(input11))) fail("composite input type mismatch", nodePath + ".inputs." + input11.name, "GAMEPLAY_MODULE_PORT_TYPE");
+            compositeInputs.set(input11.name, effective(input11));
           }
         }
         for (const key of Object.keys(node.inputs ?? {})) if (!declaredInputs.has(key)) fail('unknown composite input "' + key + '"', nodePath + ".inputs." + key, "GAMEPLAY_MODULE_UNKNOWN_PORT");
-        validateBody(resolved.definition.body, resolver, { inputs: compositeInputs, bindings: /* @__PURE__ */ new Map() }, resolved.definition.outputs, nodePath + ".composite", active.concat(moduleKey(resolved.definition.id, resolved.definition.version)), depth + 1);
+        validateBody(resolved.definition.body, resolver, { inputs: compositeInputs, bindings: /* @__PURE__ */ new Map() }, resolved.definition.outputs, nodePath + ".composite", active3.concat(moduleKey(resolved.definition.id, resolved.definition.version)), depth + 1, dataOnly);
       }
       bindings.set(node.id, outputTypes);
+    } else if (node.kind === "record.create") {
+      const schemaValue = resolveRecordSchema(resolver, node.schema, nodePath + ".schema");
+      const declared = mapPorts(schemaValue.fields);
+      const fields3 = node.fields ?? {};
+      for (const key of Object.keys(fields3)) {
+        const field = declared.get(key);
+        if (!field) fail('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+        const actual = valueType(fields3[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
+        if (!assignable(actual, effective(field))) fail('record field "' + key + '" expects ' + typeName(effective(field)) + ", got " + typeName(actual), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+      }
+      for (const field of schemaValue.fields) if (!field.optional && !own(fields3, field.name)) fail('missing record field "' + field.name + '"', nodePath + ".fields", "GAMEPLAY_MODULE_MISSING_FIELD");
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(node.schema)]]));
+    } else if (node.kind === "record.get") {
+      const actual = valueType(node.record, { inputs: environment.inputs, bindings }, nodePath + ".record");
+      if (typeof actual !== "object" || actual.kind !== "record") fail("record.get requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
+      const schemaValue = resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema");
+      const field = schemaValue.fields.find((entry) => entry.name === node.field);
+      if (!field) fail('unknown record field "' + node.field + '"', nodePath + ".field", "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", effective(field)]]));
+    } else if (node.kind === "record.with") {
+      const actual = valueType(node.record, { inputs: environment.inputs, bindings }, nodePath + ".record");
+      if (typeof actual !== "object" || actual.kind !== "record") fail("record.with requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
+      const schemaValue = resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema");
+      const declared = mapPorts(schemaValue.fields);
+      for (const key of Object.keys(node.fields ?? {})) {
+        const field = declared.get(key);
+        if (!field) fail('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+        const type = valueType(node.fields[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
+        if (!assignable(type, effective(field))) fail('record field "' + key + '" expects ' + typeName(effective(field)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+      }
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", actual]]));
+    } else if (node.kind === "collection") {
+      const collection = valueType(node.items, { inputs: environment.inputs, bindings }, nodePath + ".items");
+      if (typeof collection === "object" && collection.kind === "list" && node.items.kind === "literal" && Array.isArray(node.items.value) && node.items.value.length > resolver.limits.maxCollectionIterations) fail("collection iteration budget exceeded", nodePath + ".items", "GAMEPLAY_MODULE_BUDGET_EXCEEDED");
+      const output = collectionOutputType(node, resolver, { inputs: environment.inputs, bindings }, nodePath);
+      bindings.set(node.id, /* @__PURE__ */ new Map([["value", output]]));
+    } else if (node.kind === "defer-choice") {
+      if (dataOnly) fail("collection body cannot suspend into a pending choice", nodePath, "GAMEPLAY_MODULE_COLLECTION_EFFECT");
+      if (resolver.graph.surface === "preview") fail("defer-choice is not allowed on preview graphs", nodePath, "GAMEPLAY_MODULE_PREVIEW_EFFECT");
+      const continuation = continuationFor(resolver, node.graph, nodePath + ".graph");
+      const payload = valueType(node.payload, { inputs: environment.inputs, bindings }, nodePath + ".payload");
+      const expected = continuation.payloadType ?? continuation.graph.hostBindings.payload;
+      if (!expected || typeof expected !== "object" || expected.kind !== "record") fail("continuation payload must be a typed record", nodePath + ".payload", "GAMEPLAY_MODULE_WRONG_PAYLOAD_TYPE");
+      if (!assignable(payload, expected)) fail("continuation payload type mismatch", nodePath + ".payload", "GAMEPLAY_MODULE_WRONG_PAYLOAD_TYPE");
+      for (const name of Object.keys(deferChoiceFieldTypes)) {
+        const value = node[name];
+        if (value !== void 0) validateDeferChoiceField(name, value, { inputs: environment.inputs, bindings }, nodePath + "." + name);
+      }
+      const min = node.min ?? node.minSelections;
+      const max = node.max ?? node.maxSelections;
+      const minValue = min?.kind === "literal" && typeof min.value === "number" ? min.value : min === void 0 ? 1 : void 0;
+      const maxValue = max?.kind === "literal" && typeof max.value === "number" ? max.value : max === void 0 ? 1 : void 0;
+      if (minValue !== void 0 && maxValue !== void 0 && minValue > maxValue) fail("pending minimum cannot exceed maximum", nodePath, "GAMEPLAY_MODULE_INVALID_VALUE");
     } else if (node.kind === "if") {
       const condition = valueType(node.condition, { inputs: environment.inputs, bindings }, nodePath + ".condition");
       if (!assignable(condition, "boolean")) fail("if condition must be boolean", nodePath + ".condition", "GAMEPLAY_MODULE_PORT_TYPE");
-      validateBody(node.then, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + ".then", active, depth);
-      if (node.else) validateBody(node.else, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + ".else", active, depth);
+      validateBody(node.then, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + ".then", active3, depth, dataOnly);
+      if (node.else) validateBody(node.else, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + ".else", active3, depth, dataOnly);
     } else if (node.kind === "foreach") {
       const collection = valueType(node.items, { inputs: environment.inputs, bindings }, nodePath + ".items");
       if (typeof collection !== "object" || collection.kind !== "list") fail("foreach items must be a list", nodePath + ".items", "GAMEPLAY_MODULE_PORT_TYPE");
@@ -791,8 +1246,8 @@ function validateBody(list, resolver, environment, outputs, path, active, depth)
       const loopOutputs = /* @__PURE__ */ new Map([["item", collection.element], ["index", "number"]]);
       const loopBindings = new Map(bindings);
       loopBindings.set(node.id, loopOutputs);
-      validateBody(node.body, resolver, { inputs: bodyInputs, bindings: loopBindings }, outputs, nodePath + ".body", active, depth);
-    } else validateReturn(node, outputs, { inputs: environment.inputs, bindings }, nodePath);
+      validateBody(node.body, resolver, { inputs: bodyInputs, bindings: loopBindings }, outputs, nodePath + ".body", active3, depth, dataOnly);
+    } else if (node.kind === "return") validateReturn(node, outputs, { inputs: environment.inputs, bindings }, nodePath);
   }
 }
 function nextVariable(state, prefix) {
@@ -801,6 +1256,14 @@ function nextVariable(state, prefix) {
 function rootStaticInput(graphValue, name) {
   if (own(graphValue.inputBindings, name)) return "(" + literalSource(graphValue.inputBindings[name]) + ")";
   if (graphValue.surface === "preview" && ["piece", "skillDef", "currentCooldown"].includes(name)) return "(context[" + JSON.stringify(name) + "])";
+  if (graphValue.surface === "pending" && own(graphValue.hostBindings, name)) {
+    if (name === "payload") return '(ctx["payload"])';
+    if (name === "selectedTargets") return '((ctx["pending"] && Array.isArray(ctx["pending"]["selectedTargets"])) ? ctx["pending"]["selectedTargets"] : [])';
+    if (name === "targetCell") return '((ctx["targetX"] !== undefined && ctx["targetY"] !== undefined) ? { x: ctx["targetX"], y: ctx["targetY"] } : null)';
+    if (name === "targetPiece") return '((ctx["targetPiece"] && ctx["targetPiece"]["instanceId"] !== undefined) ? ctx["targetPiece"]["instanceId"] : undefined)';
+    if (name === "sourcePiece") return '((ctx["pending"] && ctx["pending"]["triggerContext"] && ctx["pending"]["triggerContext"]["sourcePiece"] && ctx["pending"]["triggerContext"]["sourcePiece"]["instanceId"] !== undefined) ? ctx["pending"]["triggerContext"]["sourcePiece"]["instanceId"] : ((ctx["pending"] && ctx["pending"]["source"] && ctx["pending"]["source"]["pieceId"] !== undefined) ? ctx["pending"]["source"]["pieceId"] : undefined))';
+    if (name === "player") return '(ctx["playerId"])';
+  }
   return void 0;
 }
 function emit(value, environment) {
@@ -819,14 +1282,25 @@ function emit(value, environment) {
   if (binding.ports.size === 1) return "((" + binding.expression + " !== null && typeof " + binding.expression + ' === "object" && Object.prototype.hasOwnProperty.call(' + binding.expression + ", " + key + ")) ? " + binding.expression + "[" + key + "] : " + binding.expression + ")";
   return "(" + binding.expression + "[" + key + "])";
 }
+function compileValueType(value, environment, resolver) {
+  if (value.kind === "input") {
+    const type = environment.inputTypes?.get(value.name);
+    if (type !== void 0) return type;
+    const port12 = resolver.graph.inputs.find((entry) => entry.name === value.name);
+    return port12 === void 0 ? void 0 : effective(port12);
+  }
+  return value.kind === "output" ? environment.bindings.get(value.node)?.ports.get(value.port) : typeOfLiteral(value.value);
+}
 function listElement(value, environment, resolver) {
   if (value.kind === "literal") {
     const type2 = typeOfLiteral(value.value);
     return typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
   }
   if (value.kind === "input") {
-    const port3 = resolver.graph.inputs.find((entry) => entry.name === value.name);
-    const type2 = port3 && effective(port3);
+    const type2 = environment.inputTypes?.get(value.name) ?? (() => {
+      const port12 = resolver.graph.inputs.find((entry) => entry.name === value.name);
+      return port12 === void 0 ? void 0 : effective(port12);
+    })();
     return type2 && typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
   }
   const binding = environment.bindings.get(value.node);
@@ -925,11 +1399,155 @@ function returnCode(node, outputs, environment, target) {
   const guard = invalidChecks.length === 0 ? void 0 : invalidChecks.join(" || ");
   return guard === void 0 ? action : "if (!(" + guard + ")) { " + action + " }";
 }
-function emitStatements(list, environment, state, outputs, target, active, depth) {
+function emitRecordCreate(node, environment, resolver) {
+  const schemaValue = resolveRecordSchema(resolver, node.schema, "graph." + node.id + ".schema");
+  const fields3 = node.fields ?? {};
+  const entries = [];
+  for (const field of schemaValue.fields) if (own(fields3, field.name)) entries.push(JSON.stringify(field.name) + ": " + emit(fields3[field.name], environment));
+  return "({" + entries.join(", ") + "})";
+}
+function emitRecordGet(node, environment) {
+  const recordValue = emit(node.record, environment);
+  return "((" + recordValue + " === __gameplayInvalid || " + recordValue + " == null) ? __gameplayInvalid : (" + recordValue + ")[" + JSON.stringify(node.field) + "])";
+}
+function emitRecordWith(node, environment, resolver) {
+  const actual = compileValueType(node.record, environment, resolver);
+  const schemaValue = typeof actual === "object" && actual.kind === "record" ? resolveRecordSchema(resolver, actual.schema, "record.with") : void 0;
+  const recordValue = emit(node.record, environment);
+  if (!schemaValue) return "__gameplayInvalid";
+  const fields3 = node.fields ?? {};
+  const entries = [];
+  for (const field of schemaValue.fields) entries.push(JSON.stringify(field.name) + ": " + (own(fields3, field.name) ? emit(fields3[field.name], environment) : "(" + recordValue + ")[" + JSON.stringify(field.name) + "]"));
+  return "((function(__gameplayRecord){ return (__gameplayRecord === __gameplayInvalid || __gameplayRecord == null) ? __gameplayInvalid : ({" + entries.join(", ") + "}); })(" + recordValue + "))";
+}
+function emitCollection(node, environment, state, outputs, active3, depth) {
+  const result = nextVariable(state, "collection");
+  const items = nextVariable(state, "items");
+  const index = nextVariable(state, "index");
+  const item = nextVariable(state, "item");
+  const accumulator = node.method === "reduce" ? nextVariable(state, "accumulator") : void 0;
+  const start = node.method === "reduce" ? nextVariable(state, "start") : void 0;
+  const stepResult = nextVariable(state, "collectionResult");
+  const label = nextVariable(state, "collectionDone");
+  const names = collectionNames(node, node.method, "graph." + node.id);
+  const initial = node.initial === void 0 ? void 0 : emit(node.initial, environment);
+  const itemInputs = /* @__PURE__ */ new Map();
+  const itemInputTypes = /* @__PURE__ */ new Map();
+  for (const [key, value] of Object.entries(node.inputs ?? {})) itemInputs.set(key, emit(value, environment));
+  for (const [key, value] of Object.entries(node.inputs ?? {})) {
+    const type = compileValueType(value, environment, state.resolver);
+    if (type) itemInputTypes.set(key, type);
+  }
+  itemInputs.set(names.item, item);
+  itemInputs.set(names.index, index);
+  const itemsType = compileValueType(node.items, environment, state.resolver);
+  if (itemsType && typeof itemsType === "object" && itemsType.kind === "list") itemInputTypes.set(names.item, itemsType.element);
+  itemInputTypes.set(names.index, "number");
+  if (names.accumulator && accumulator) itemInputs.set(names.accumulator, accumulator);
+  if (names.accumulator && accumulator) itemInputTypes.set(names.accumulator, node.initial === void 0 ? itemsType && typeof itemsType === "object" && itemsType.kind === "list" ? itemsType.element : "any" : compileValueType(node.initial, environment, state.resolver) ?? "any");
+  const body = emitStatements(node.body, { inputs: itemInputs, inputTypes: itemInputTypes, bindings: /* @__PURE__ */ new Map() }, state, [{ name: "value", type: "any" }], { result: stepResult, label, outputs: [{ name: "value", type: "any" }] }, active3, depth);
+  const output = nextVariable(state, "collectionValues");
+  const startCode = node.method === "reduce" ? initial === void 0 ? "var " + accumulator + " = " + items + ".length === 0 ? __gameplayInvalid : " + items + "[0]; var " + start + " = " + items + ".length === 0 ? 0 : 1;" : "var " + accumulator + " = " + initial + "; var " + start + " = 0;" : "";
+  const perIteration = node.method === "map" ? "if (" + stepResult + " !== __gameplayInvalid && " + stepResult + " != null) { " + output + ".push(" + stepResult + '["value"]); }' : node.method === "filter" ? "if (" + stepResult + " !== __gameplayInvalid && " + stepResult + " != null && " + stepResult + '["value"]) { ' + output + ".push(" + item + "); }" : "if (" + stepResult + " !== __gameplayInvalid && " + stepResult + " != null) { " + accumulator + " = " + stepResult + '["value"]; }';
+  const finalResult = node.method === "reduce" ? accumulator : output;
+  const code = [
+    "var " + result + " = __gameplayInvalid; var " + items + " = " + emit(node.items, environment) + ";",
+    "if (Array.isArray(" + items + ")) {",
+    "if (" + items + ".length > " + String(state.resolver.limits.maxCollectionIterations) + ') { throw new Error("gameplay collection iteration budget exceeded"); }',
+    "var " + output + " = [];",
+    startCode,
+    "for (var " + index + " = " + (start ?? "0") + "; " + index + " < " + items + ".length; " + index + " += 1) {",
+    "var " + item + " = " + items + "[" + index + "]; var " + stepResult + " = __gameplayInvalid;",
+    label + ": { " + body + " }",
+    perIteration,
+    "}",
+    "var " + result + " = " + finalResult + ";",
+    "}"
+  ].join(" ");
+  return { code, result };
+}
+function continuationFor(resolver, reference, path) {
+  const matches = resolver.graph.continuations.filter((entry) => entry.id === reference || entry.id + "@" + entry.version === reference);
+  if (!matches.length) fail('unknown continuation graph "' + reference + '"', path, "GAMEPLAY_MODULE_UNKNOWN_CONTINUATION");
+  if (matches.length > 1 && !reference.includes("@")) fail("continuation graph id is ambiguous; use id@version", path, "GAMEPLAY_MODULE_AMBIGUOUS_CONTINUATION");
+  return matches[0];
+}
+function compileContinuation(continuation, state, path) {
+  const key = moduleKey(continuation.id, continuation.version);
+  if (state.continuationStack.includes(key)) fail("continuation graph cycle detected", path, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
+  const child = continuation.graph;
+  const childResolver = makeResolver(child, state.resolver.registry, state.resolver.limits, state.resolver.schemas);
+  childResolver.statementCount = state.resolver.statementCount;
+  validateGraphSchemas(child, state.resolver.schemas, path + ".graph");
+  const inputTypes = /* @__PURE__ */ new Map();
+  for (const inputPort of child.inputs) inputTypes.set(inputPort.name, effective(inputPort));
+  validateBody(child.body, childResolver, { inputs: inputTypes, bindings: /* @__PURE__ */ new Map() }, child.outputs, path + ".graph.body", [], 0);
+  if (child.outputs.some((output) => !output.optional) && !bodyGuaranteesReturn(child.body)) fail("continuation graph can fall through without returning its required outputs", path + ".graph.body", "GAMEPLAY_MODULE_MISSING_OUTPUT");
+  childResolver.statementCount = Math.max(childResolver.statementCount, state.resolver.statementCount);
+  state.resolver.statementCount = childResolver.statementCount;
+  if (childResolver.expanded.length + state.resolver.expanded.length > state.resolver.limits.maxExpandedCalls) fail("module call budget exceeded", path, "GAMEPLAY_MODULE_BUDGET_EXCEEDED");
+  for (const [dependency, value] of childResolver.dependencies) state.resolver.dependencies.set(dependency, value);
+  for (const entry of childResolver.expanded) state.resolver.expanded.push({ ...entry, depth: entry.depth + 1 });
+  const childState = { next: state.next, resolver: childResolver, loweringDependencies: state.loweringDependencies, continuationStack: state.continuationStack.concat(key) };
+  const rootInputs = /* @__PURE__ */ new Map();
+  for (const inputPort of child.inputs) {
+    const expression2 = rootStaticInput(child, inputPort.name);
+    if (expression2) rootInputs.set(inputPort.name, expression2);
+  }
+  const body = emitStatements(child.body, { inputs: rootInputs, bindings: /* @__PURE__ */ new Map() }, childState, child.outputs, void 0, [], 0);
+  state.next = childState.next;
+  return wrapper("pending", body);
+}
+function valueEnvironment(environment, resolver, bindings) {
+  const inputs = new Map(environment.inputTypes ?? []);
+  if (!environment.inputTypes) for (const input11 of resolver.graph.inputs) inputs.set(input11.name, effective(input11));
+  const typedBindings = /* @__PURE__ */ new Map();
+  for (const [name, binding] of bindings) typedBindings.set(name, binding.ports);
+  return { inputs, bindings: typedBindings };
+}
+function recordOutputType(node, environment, resolver) {
+  const actual = compileValueType(node.record, environment, resolver);
+  if (actual && typeof actual === "object" && actual.kind === "record") {
+    const schemaValue = resolveRecordSchema(resolver, actual.schema, "graph." + node.id + ".record.schema");
+    const field = schemaValue.fields.find((entry) => entry.name === node.field);
+    if (field) return effective(field);
+  }
+  return "record";
+}
+function emitPendingChoice(node, continuation, payload, effectCode, environment, target) {
+  if (target !== void 0) fail("defer-choice cannot be nested in a composite or collection body", "graph." + node.id, "GAMEPLAY_MODULE_PENDING_NESTING");
+  const field = (name) => {
+    const value = node[name];
+    return value && typeof value === "object" && "kind" in value ? emit(value, environment) : void 0;
+  };
+  const player = field("player") ?? environment.inputs.get("player") ?? '(typeof context !== "undefined" ? context["playerId"] : undefined)';
+  const title = field("title") ?? literalSource("\u8BF7\u9009\u62E9\u76EE\u6807");
+  const targetType = field("targetType") ?? (continuation.graph.hostBindings.targetPiece !== void 0 ? literalSource("piece") : literalSource("cell"));
+  const candidates = field("candidates") ?? "undefined";
+  const selectionMode = field("selectionMode") ?? literalSource("single");
+  const min = field("min") ?? field("minSelections") ?? "1";
+  const max = field("max") ?? field("maxSelections") ?? "1";
+  const canCancel = field("canCancel") ?? "true";
+  const resume = field("resumeOnCancel");
+  const message = field("message");
+  const pending = "{ success: true" + (message === void 0 ? "" : ", message: " + message) + ", pendingTargetSelection: { playerId: " + player + ", title: " + title + ", targetType: " + targetType + ", candidates: " + candidates + ", selectionMode: " + selectionMode + ", min: " + min + ", max: " + max + ", minSelections: " + min + ", maxSelections: " + max + ", canCancel: " + canCancel + (resume === void 0 ? "" : ", resumeOnCancel: " + resume) + ", payload: " + payload + ", effectCode: " + literalSource(effectCode) + " } }";
+  const action = "return " + pending + ";";
+  const checks = [payload, "(" + payload + " !== null)", "(typeof " + payload + ' === "object")', "(!Array.isArray(" + payload + "))"];
+  if (node.player || environment.inputs.has("player")) checks.push(player);
+  for (const name of ["title", "targetType", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"]) {
+    const value = node[name];
+    if (value !== void 0) {
+      const expression2 = field(name);
+      if (expression2) checks.push(expression2);
+    }
+  }
+  return "if (" + checks.map((expression2) => "(" + expression2 + " !== __gameplayInvalid)").join(" && ") + ") { " + action + " }";
+}
+function emitStatements(list, environment, state, outputs, target, active3, depth) {
   const bindings = new Map(environment.bindings);
   const chunks = [];
   for (const node of list) {
-    const currentEnvironment = { inputs: environment.inputs, bindings };
+    const currentEnvironment = { inputs: environment.inputs, inputTypes: environment.inputTypes, bindings };
     if (node.kind === "call") {
       const metadata = state.resolver.calls.get(node);
       if (!metadata) fail("missing call metadata", node.id, "GAMEPLAY_MODULE_INTERNAL_ERROR");
@@ -945,13 +1563,17 @@ function emitStatements(list, environment, state, outputs, target, active, depth
       } else {
         const definition = metadata.module.definition;
         const key = moduleKey(definition.id, definition.version);
-        if (active.includes(key)) fail("composite cycle detected", node.id, "GAMEPLAY_MODULE_COMPOSITE_CYCLE");
+        if (active3.includes(key)) fail("composite cycle detected", node.id, "GAMEPLAY_MODULE_COMPOSITE_CYCLE");
         if (depth >= state.resolver.limits.maxCompositeDepth) fail("composite expansion depth exceeded", node.id, "GAMEPLAY_MODULE_BUDGET_EXCEEDED");
         const result = nextVariable(state, "composite");
         const label = nextVariable(state, "done");
         const compositeInputs = /* @__PURE__ */ new Map();
-        for (const input2 of definition.inputs) compositeInputs.set(input2.name, metadata.inputs[input2.name] === void 0 ? "__gameplayInvalid" : emit(metadata.inputs[input2.name], currentEnvironment));
-        const body = emitStatements(definition.body, { inputs: compositeInputs, bindings: /* @__PURE__ */ new Map() }, state, definition.outputs, { result, label, outputs: definition.outputs }, active.concat(key), depth + 1);
+        const compositeInputTypes = /* @__PURE__ */ new Map();
+        for (const input11 of definition.inputs) {
+          compositeInputs.set(input11.name, metadata.inputs[input11.name] === void 0 ? "__gameplayInvalid" : emit(metadata.inputs[input11.name], currentEnvironment));
+          compositeInputTypes.set(input11.name, effective(input11));
+        }
+        const body = emitStatements(definition.body, { inputs: compositeInputs, inputTypes: compositeInputTypes, bindings: /* @__PURE__ */ new Map() }, state, definition.outputs, { result, label, outputs: definition.outputs }, active3.concat(key), depth + 1);
         const outputTypes = /* @__PURE__ */ new Map();
         for (const output of definition.outputs) outputTypes.set(output.name, effective(output));
         const guard = inputGuard(metadata.module, metadata, currentEnvironment, state.resolver.graph.surface);
@@ -959,9 +1581,35 @@ function emitStatements(list, environment, state, outputs, target, active, depth
         bindings.set(node.id, { ports: outputTypes, expression: result });
         chunks.push(bodyCode);
       }
+    } else if (node.kind === "record.create") {
+      const expression2 = emitRecordCreate(node, currentEnvironment, state.resolver);
+      const variable = nextVariable(state, "record");
+      chunks.push("var " + variable + " = " + expression2 + ";");
+      bindings.set(node.id, { ports: /* @__PURE__ */ new Map([["value", { kind: "record", schema: node.schema }]]), expression: variable, portExpressions: /* @__PURE__ */ new Map([["value", variable]]) });
+    } else if (node.kind === "record.get") {
+      const expression2 = emitRecordGet(node, currentEnvironment);
+      const variable = nextVariable(state, "recordGet");
+      chunks.push("var " + variable + " = " + expression2 + ";");
+      bindings.set(node.id, { ports: /* @__PURE__ */ new Map([["value", recordOutputType(node, currentEnvironment, state.resolver)]]), expression: variable, portExpressions: /* @__PURE__ */ new Map([["value", variable]]) });
+    } else if (node.kind === "record.with") {
+      const expression2 = emitRecordWith(node, currentEnvironment, state.resolver);
+      const variable = nextVariable(state, "recordWith");
+      chunks.push("var " + variable + " = " + expression2 + ";");
+      const actual = compileValueType(node.record, currentEnvironment, state.resolver);
+      const outputType = actual && typeof actual === "object" && actual.kind === "record" ? actual : { kind: "record", schema: node.id };
+      bindings.set(node.id, { ports: /* @__PURE__ */ new Map([["value", outputType]]), expression: variable, portExpressions: /* @__PURE__ */ new Map([["value", variable]]) });
+    } else if (node.kind === "collection") {
+      const emitted = emitCollection(node, currentEnvironment, state, outputs, active3, depth);
+      const outputType = collectionOutputType(node, state.resolver, valueEnvironment(currentEnvironment, state.resolver, bindings), "graph." + node.id, false);
+      bindings.set(node.id, { ports: /* @__PURE__ */ new Map([["value", outputType]]), expression: emitted.result, portExpressions: /* @__PURE__ */ new Map([["value", emitted.result]]) });
+      chunks.push(emitted.code);
+    } else if (node.kind === "defer-choice") {
+      const continuation = continuationFor(state.resolver, node.graph, node.id + ".graph");
+      const effectCode = compileContinuation(continuation, state, node.id + ".graph");
+      chunks.push(emitPendingChoice(node, continuation, emit(node.payload, currentEnvironment), effectCode, currentEnvironment, target));
     } else if (node.kind === "if") {
-      const thenCode = emitStatements(node.then, { inputs: new Map(environment.inputs), bindings: new Map(bindings) }, state, outputs, target, active, depth);
-      const elseCode = node.else ? emitStatements(node.else, { inputs: new Map(environment.inputs), bindings: new Map(bindings) }, state, outputs, target, active, depth) : "";
+      const thenCode = emitStatements(node.then, { inputs: new Map(environment.inputs), inputTypes: environment.inputTypes && new Map(environment.inputTypes), bindings: new Map(bindings) }, state, outputs, target, active3, depth);
+      const elseCode = node.else ? emitStatements(node.else, { inputs: new Map(environment.inputs), inputTypes: environment.inputTypes && new Map(environment.inputTypes), bindings: new Map(bindings) }, state, outputs, target, active3, depth) : "";
       const condition = nextVariable(state, "condition");
       chunks.push("var " + condition + " = " + emit(node.condition, currentEnvironment) + "; if (" + condition + " !== __gameplayInvalid && " + condition + ") { " + thenCode + " }" + (node.else ? " else if (" + condition + " !== __gameplayInvalid) { " + elseCode + " }" : ""));
     } else if (node.kind === "foreach") {
@@ -969,15 +1617,22 @@ function emitStatements(list, environment, state, outputs, target, active, depth
       const items = nextVariable(state, "items");
       const item = nextVariable(state, "item");
       const loopInputs = new Map(environment.inputs);
-      if (node.item) loopInputs.set(node.item, item);
-      if (node.index) loopInputs.set(node.index, index);
+      const loopInputTypes = environment.inputTypes ? new Map(environment.inputTypes) : /* @__PURE__ */ new Map();
+      if (node.item) {
+        loopInputs.set(node.item, item);
+        loopInputTypes.set(node.item, listElement(node.items, currentEnvironment, state.resolver));
+      }
+      if (node.index) {
+        loopInputs.set(node.index, index);
+        loopInputTypes.set(node.index, "number");
+      }
       const loopPorts = /* @__PURE__ */ new Map([["item", listElement(node.items, currentEnvironment, state.resolver)], ["index", "number"]]);
       const loopExpressions = /* @__PURE__ */ new Map([["item", item], ["index", index]]);
       const loopBindings = new Map(bindings);
       loopBindings.set(node.id, { ports: loopPorts, expression: item, portExpressions: loopExpressions });
-      const body = emitStatements(node.body, { inputs: loopInputs, bindings: loopBindings }, state, outputs, target, active, depth);
+      const body = emitStatements(node.body, { inputs: loopInputs, inputTypes: loopInputTypes, bindings: loopBindings }, state, outputs, target, active3, depth);
       chunks.push("for (var " + index + " = 0, " + items + " = " + emit(node.items, currentEnvironment) + "; " + items + " !== __gameplayInvalid && " + items + " != null && " + index + " < " + items + ".length; " + index + " += 1) { var " + item + " = " + items + "[" + index + "]; " + body + " }");
-    } else chunks.push(returnCode(node, outputs, currentEnvironment, target));
+    } else if (node.kind === "return") chunks.push(returnCode(node, outputs, currentEnvironment, target));
   }
   return chunks.join(" ");
 }
@@ -1000,9 +1655,10 @@ function options(value) {
   }
   return result;
 }
-function compileGameplayModuleGraph(input2, registry, compilerOptions) {
+function compileGameplayModuleGraph(input11, registry, compilerOptions) {
   const compileLimits = options(compilerOptions);
-  const graphValue = graph(input2);
+  const graphValue = graph(input11);
+  validateGraphSchemas(graphValue);
   validateGraphLiteralBudget(graphValue, compileLimits.maxLiteralBytes);
   const resolver = makeResolver(graphValue, registry, compileLimits);
   const inputTypes = /* @__PURE__ */ new Map();
@@ -1010,13 +1666,13 @@ function compileGameplayModuleGraph(input2, registry, compilerOptions) {
   validateBody(graphValue.body, resolver, { inputs: inputTypes, bindings: /* @__PURE__ */ new Map() }, graphValue.outputs, "graph.body", [], 0);
   if (graphValue.outputs.some((output) => !output.optional) && !bodyGuaranteesReturn(graphValue.body)) fail("graph can fall through without returning its required outputs", "graph.body", "GAMEPLAY_MODULE_MISSING_OUTPUT");
   if (resolver.expanded.length > resolver.limits.maxExpandedCalls) fail("module call budget exceeded", "graph.body", "GAMEPLAY_MODULE_BUDGET_EXCEEDED");
-  const state = { next: 0, resolver, loweringDependencies: /* @__PURE__ */ new Set() };
+  const state = { next: 0, resolver, loweringDependencies: /* @__PURE__ */ new Set(), continuationStack: [] };
   const rootInputs = /* @__PURE__ */ new Map();
   for (const inputPort of graphValue.inputs) {
     const expression2 = rootStaticInput(graphValue, inputPort.name);
     if (expression2) rootInputs.set(inputPort.name, expression2);
   }
-  const body = emitStatements(graphValue.body, { inputs: rootInputs, bindings: /* @__PURE__ */ new Map() }, state, graphValue.outputs, void 0, [], 0);
+  const body = emitStatements(graphValue.body, { inputs: rootInputs, inputTypes, bindings: /* @__PURE__ */ new Map() }, state, graphValue.outputs, void 0, [], 0);
   const code = wrapper(graphValue.surface, body);
   const dependencyMap = new Map(resolver.dependencies);
   for (const dependency of state.loweringDependencies) if (![...dependencyMap.values()].some((entry) => entry.id === dependency || entry.id + "@" + entry.version === dependency)) dependencyMap.set(dependency, { id: dependency, version: "", kind: "native" });
@@ -1026,64 +1682,1252 @@ var compileModuleGraph = compileGameplayModuleGraph;
 var compileGameplayGraph = compileGameplayModuleGraph;
 var compileSemanticModuleGraph = compileGameplayModuleGraph;
 
-// lib/skill-graph/module-registry.ts
-var GAMEPLAY_MODULE_VERSION = "1";
+// lib/skill-graph/module-registry-query.ts
+var active = ["skill", "card", "rule", "triggerSkill", "pending"];
+var port2 = (name, type) => ({ name, type });
+var flow = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var context = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
+var battle = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var read = (domains) => ({ pure: true, previewSafe: false, reads: domains });
+function define(value) {
+  return { version: "1", allowedSurfaces: active, ...value };
+}
+var QUERY_GAMEPLAY_MODULES = [
+  define({
+    id: "skill.power-multiplier",
+    label: "\u6280\u80FD\u5A01\u529B\u500D\u7387",
+    inputs: [],
+    outputs: [port2("value", "number")],
+    effects: read(["skill"]),
+    lower: (ctx) => `${context(ctx)}.skill.powerMultiplier`,
+    ui: { category: "query" }
+  }),
+  define({
+    id: "choice.is-unresolved",
+    label: "\u9009\u62E9\u672A\u5B8C\u6210\u6216\u5DF2\u53D6\u6D88",
+    inputs: [{ name: "choice", type: "choice", nullable: true, optional: true }],
+    outputs: [port2("value", "boolean")],
+    effects: read(["choice"]),
+    lower: (ctx) => `(!${ctx.inputs.choice} || Boolean(${ctx.inputs.choice}.needsTargetSelection) || Boolean(${ctx.inputs.choice}.needsOptionSelection))`,
+    ui: { category: "choice" }
+  }),
+  define({
+    id: "choice.as-result",
+    label: "\u8FD4\u56DE\u6743\u5A01\u9009\u62E9\u7ED3\u679C",
+    inputs: [{ name: "choice", type: "choice", nullable: true, optional: true }],
+    outputs: [{ name: "result", type: "record", nullable: true }],
+    effects: read(["choice"]),
+    lower: (ctx) => ctx.inputs.choice,
+    ui: { category: "choice" }
+  }),
+  define({
+    id: "result.action",
+    label: "\u6784\u9020\u884C\u52A8\u7ED3\u679C",
+    inputs: [port2("success", "boolean"), { name: "message", type: "string", optional: true }],
+    outputs: [port2("result", "record")],
+    effects: { pure: true, previewSafe: true },
+    lower: (ctx) => `({success: ${ctx.inputs.success}${ctx.inputs.message === void 0 ? "" : ", message: " + ctx.inputs.message}})`,
+    ui: { category: "result" }
+  }),
+  define({
+    id: "turn.number",
+    label: "\u5F53\u524D\u56DE\u5408\u7F16\u53F7",
+    inputs: [],
+    outputs: [port2("value", "number")],
+    effects: read(["turn"]),
+    lower: (ctx) => `${battle(ctx)}.turn.turnNumber`,
+    ui: { category: "query" }
+  }),
+  define({
+    id: "turn.current-player",
+    label: "\u5F53\u524D\u56DE\u5408\u73A9\u5BB6",
+    inputs: [],
+    outputs: [port2("player", "player")],
+    effects: read(["turn"]),
+    lower: (ctx) => `${battle(ctx)}.turn.currentPlayerId`,
+    ui: { category: "query" }
+  }),
+  define({
+    id: "ref.event-piece",
+    label: "\u5F53\u524D\u4E8B\u4EF6\u68CB\u5B50",
+    inputs: [],
+    outputs: [port2("piece", "piece")],
+    effects: read(["event"]),
+    lower: (ctx) => `(${context(ctx)}.piece ? ${context(ctx)}.piece.instanceId : null)`,
+    ui: { category: "context" }
+  }),
+  define({
+    id: "piece.owner",
+    label: "\u68CB\u5B50\u6240\u5C5E\u73A9\u5BB6",
+    inputs: [port2("piece", "piece")],
+    outputs: [port2("player", "player")],
+    effects: read(["pieces"]),
+    lower: (ctx) => `${flow(ctx)}.query.piece(${ctx.inputs.piece}).ownerPlayerId`,
+    ui: { category: "query" }
+  }),
+  ...["has", "count"].map((operation) => define({
+    id: `status.${operation}-piece`,
+    label: operation === "has" ? "\u68CB\u5B50\u5177\u6709\u72B6\u6001\u7C7B\u578B" : "\u68CB\u5B50\u72B6\u6001\u6570\u91CF",
+    inputs: [port2("piece", "piece")],
+    outputs: [port2("value", operation === "has" ? "boolean" : "number")],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: read(["statuses"]),
+    lower: (ctx) => `((${flow(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).${operation === "has" ? "some" : "filter"}(function(tag) { return tag.type === ${ctx.emitLiteral(ctx.parameters.statusType)}; })${operation === "count" ? ".length" : ""})`,
+    ui: { category: "status" }
+  })),
+  define({
+    id: "attribute.adjust",
+    label: "\u589E\u52A0\u68CB\u5B50\u5C5E\u6027",
+    inputs: [port2("piece", "piece"), port2("amount", "number")],
+    outputs: [port2("value", "number")],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange"], default: "attack" }],
+    effects: { pure: false, previewSafe: false, writes: ["attributes"] },
+    lower: (ctx) => `${flow(ctx)}.attributes.add(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.attribute)}, ${ctx.inputs.amount})`,
+    ui: { category: "effect" }
+  }),
+  define({
+    id: "event.block",
+    label: "\u963B\u6321\u5F53\u524D\u4E8B\u4EF6",
+    inputs: [port2("message", "string")],
+    outputs: [port2("success", "boolean"), port2("blocked", "boolean"), port2("message", "string")],
+    effects: { pure: false, previewSafe: false, writes: ["event-result"] },
+    lower: (ctx) => `({success: true, blocked: true, message: ${ctx.inputs.message}})`,
+    ui: { category: "event" }
+  })
+];
+
+// lib/skill-graph/module-registry-preview.ts
+var PREVIEW_GAMEPLAY_MODULES = [
+  {
+    id: "preview.piece-number",
+    version: "1",
+    label: "\u9884\u89C8\u68CB\u5B50\u6570\u503C",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange", "currentHp", "maxHp"], default: "attack" }],
+    allowedSurfaces: ["preview"],
+    effects: { pure: true, previewSafe: true, reads: ["preview-piece"] },
+    lower: (ctx) => `(${ctx.inputs.piece})[${ctx.emitLiteral(ctx.parameters.attribute)}]`,
+    ui: { category: "preview" }
+  },
+  {
+    id: "preview.skill-number",
+    version: "1",
+    label: "\u9884\u89C8\u6280\u80FD\u6570\u503C",
+    inputs: [{ name: "skill", type: "content" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["powerMultiplier", "actionPointCost", "chargeCost", "cooldown"], default: "powerMultiplier" }],
+    allowedSurfaces: ["preview"],
+    effects: { pure: true, previewSafe: true, reads: ["preview-skill"] },
+    lower: (ctx) => `(${ctx.inputs.skill})[${ctx.emitLiteral(ctx.parameters.attribute)}]`,
+    ui: { category: "preview" }
+  },
+  {
+    id: "preview.result",
+    version: "1",
+    label: "\u6280\u80FD\u9884\u89C8\u7ED3\u679C",
+    inputs: [{ name: "description", type: "string" }, ...["damage", "heal", "attackBonus", "selfDamage"].map((name) => ({ name, type: "number", optional: true }))],
+    outputs: [{ name: "result", type: "record" }],
+    allowedSurfaces: ["preview"],
+    effects: { pure: true, previewSafe: true },
+    lower: (ctx) => `({description: ${ctx.inputs.description}, expectedValues: {${["damage", "heal", "attackBonus", "selfDamage"].filter((name) => ctx.inputs[name] !== void 0).map((name) => `${name}: ${ctx.inputs[name]}`).join(", ")}}})`,
+    ui: { category: "preview" }
+  }
+];
+
+// lib/skill-graph/module-registry-flight-primitives.ts
 var ACTIVE_SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
-var EFFECT_SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
-var QUERY_SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
-var PURE_SURFACES = [...ACTIVE_SURFACES, "preview"];
 var pieceType = "piece";
-var playerType = "player";
 var cellType = "cell";
 var numberType = "number";
 var booleanType = "boolean";
 var stringType = "string";
-var recordType = "record";
-var choiceType = "choice";
-var pieceListType = { kind: "list", element: pieceType };
-var stringListType = { kind: "list", element: stringType };
-var port2 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var recordType2 = "record";
+var port3 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var parameter2 = (name, type, options2 = {}) => ({ name, type, ...options2 });
-var pure = (reads = []) => ({
+var flow2 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle2 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var input = (ctx, name) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  return value;
+};
+var literal = (ctx, name) => ctx.emitLiteral(ctx.parameters[name]);
+var pure = (reads = []) => ({ pure: true, previewSafe: false, reads });
+var writes = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define2 = (value) => ({
+  version: "1",
+  allowedSurfaces: value.allowedSurfaces ?? ACTIVE_SURFACES,
+  ...value
+});
+var PIECE_PRIMITIVES = [
+  define2({
+    id: "piece.identifier",
+    label: "\u68CB\u5B50\u6807\u8BC6",
+    description: "\u8BFB\u53D6\u7ECF\u67E5\u8BE2\u9A8C\u8BC1\u7684\u7A33\u5B9A\u68CB\u5B50\u5B9E\u4F8B\u6807\u8BC6\u3002",
+    inputs: [port3("piece", pieceType)],
+    outputs: [port3("id", stringType)],
+    effects: pure(["pieces"]),
+    lower: (ctx) => `(${flow2(ctx)}.query.piece(${input(ctx, "piece")}).instanceId)`,
+    ui: { category: "query" }
+  }),
+  define2({
+    id: "piece.alive",
+    label: "\u68CB\u5B50\u5B58\u6D3B",
+    description: "\u5224\u65AD\u68CB\u5B50\u5F15\u7528\u4ECD\u5728\u5F53\u524D\u6218\u6597\u4E14\u751F\u547D\u503C\u5927\u4E8E\u96F6\u3002",
+    inputs: [port3("piece", pieceType, { nullable: true, optional: true })],
+    outputs: [port3("alive", booleanType)],
+    effects: pure(["pieces"]),
+    lower: (ctx) => `(${flow2(ctx)}.query.hasPiece(${ctx.inputs.piece ?? "null"}) && ${flow2(ctx)}.query.piece(${ctx.inputs.piece ?? "null"}).currentHp > 0)`,
+    ui: { category: "query" }
+  })
+];
+var SPATIAL_PRIMITIVES = [
+  define2({
+    id: "spatial.cell",
+    label: "\u6784\u9020\u5730\u683C\u8BB0\u5F55",
+    description: "\u7531\u4E24\u4E2A\u6709\u9650\u5750\u6807\u6784\u9020\u4E0D\u900F\u660E\u5730\u683C\u503C\u3002",
+    inputs: [port3("x", numberType), port3("y", numberType)],
+    outputs: [port3("cell", cellType)],
+    effects: pure(),
+    lower: (ctx) => `({x: ${input(ctx, "x")}, y: ${input(ctx, "y")}})`,
+    ui: { category: "position" }
+  }),
+  define2({
+    id: "spatial.cell-adjacent",
+    label: "\u76F8\u90BB\u5730\u683C",
+    description: "\u5224\u65AD\u4E24\u4E2A\u5730\u683C\u662F\u5426\u6B63\u4EA4\u76F8\u90BB\u3002",
+    inputs: [port3("left", cellType), port3("right", cellType)],
+    outputs: [port3("value", booleanType)],
+    effects: pure(),
+    lower: (ctx) => `(Math.abs((${input(ctx, "left")}).x - (${input(ctx, "right")}).x) + Math.abs((${input(ctx, "left")}).y - (${input(ctx, "right")}).y) === 1)`,
+    ui: { category: "position" }
+  }),
+  define2({
+    id: "spatial.cell-coordinates",
+    label: "\u8BFB\u53D6\u5730\u683C\u5750\u6807",
+    description: "\u8BFB\u53D6\u5DF2\u9A8C\u8BC1\u5730\u683C\u7684\u4E24\u4E2A\u5750\u6807\u4E8B\u5B9E\u3002",
+    inputs: [port3("cell", cellType)],
+    outputs: [port3("x", numberType), port3("y", numberType)],
+    effects: pure(),
+    lower: (ctx) => `({x: (${input(ctx, "cell")}).x, y: (${input(ctx, "cell")}).y})`,
+    ui: { category: "position" }
+  }),
+  define2({
+    id: "spatial.cell-landing-legal",
+    label: "\u5408\u6CD5\u843D\u70B9",
+    description: "\u6309\u65E2\u6709\u843D\u70B9\u7EA6\u675F\u91CD\u65B0\u9A8C\u8BC1\u5730\u683C\u3001\u53EF\u884C\u8D70\u5730\u5F62\u548C\u5B58\u6D3B\u5360\u4F4D\uFF1B\u53EF\u5217\u51FA\u540C\u6B21\u4F4D\u79FB\u4E2D\u5C06\u79BB\u5F00\u7684\u68CB\u5B50\u3002",
+    inputs: [
+      port3("cell", cellType),
+      port3("ignoreA", pieceType, { nullable: true, optional: true }),
+      port3("ignoreB", pieceType, { nullable: true, optional: true })
+    ],
+    outputs: [port3("legal", booleanType)],
+    parameters: [parameter2("terrainPolicy", stringType, { enum: ["floor-or-cover", "walkable"] })],
+    effects: pure(["position", "pieces"]),
+    lower: (ctx) => {
+      const target = input(ctx, "cell");
+      const ignoreA = ctx.inputs.ignoreA ?? "null";
+      const ignoreB = ctx.inputs.ignoreB ?? "null";
+      const state = battle2(ctx);
+      const terrainPolicy = literal(ctx, "terrainPolicy");
+      return `(function(cell, ignoreA, ignoreB, terrainPolicy) { var tile = ${state}.map && Array.isArray(${state}.map.tiles) ? ${state}.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; if (!tile || !tile.props || !tile.props.walkable || (terrainPolicy === "floor-or-cover" && tile.props.type !== "floor" && tile.props.type !== "cover")) return false; var ignored = []; if (ignoreA != null) ignored.push(String(ignoreA)); if (ignoreB != null) ignored.push(String(ignoreB)); return !(Array.isArray(${state}.pieces) && ${state}.pieces.some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && ignored.indexOf(String(piece.instanceId)) < 0; })); })(${target}, ${ignoreA}, ${ignoreB}, ${terrainPolicy})`;
+    },
+    ui: { category: "position" }
+  })
+];
+var TILE_PRIMITIVES = [
+  define2({
+    id: "tile.has-effect",
+    label: "\u5730\u683C\u5177\u6709\u9644\u7740",
+    description: "\u67E5\u8BE2\u767D\u540D\u5355\u5730\u683C\u9644\u7740\u7C7B\u578B\u5728\u6307\u5B9A\u5750\u6807\u662F\u5426\u5B58\u5728\u3002",
+    inputs: [port3("cell", cellType)],
+    outputs: [port3("exists", booleanType)],
+    parameters: [parameter2("effectType", stringType)],
+    effects: pure(["tile-effects"]),
+    lower: (ctx) => {
+      const state = battle2(ctx);
+      return `(Array.isArray(${state}.extensions && ${state}.extensions.tileEffects) && ${state}.extensions.tileEffects.some(function(effect) { return effect && effect.type === ${literal(ctx, "effectType")} && effect.x === (${input(ctx, "cell")}).x && effect.y === (${input(ctx, "cell")}).y; }))`;
+    },
+    ui: { category: "position" }
+  }),
+  define2({
+    id: "tile.add-reservation",
+    label: "\u6DFB\u52A0\u5730\u683C\u9884\u7559\u6807\u8BB0",
+    description: "\u901A\u8FC7\u6743\u5A01 tileBatch \u6DFB\u52A0\u4E0D\u963B\u6321\u8FDB\u5165\u7684\u53CC\u5C3E\u98DE\u884C\u9884\u7559\u8BB0\u5F55\u3002",
+    inputs: [port3("cell", cellType), port3("id", stringType), port3("flightId", stringType)],
+    outputs: [port3("success", booleanType)],
+    parameters: [parameter2("effectType", stringType)],
+    effects: writes(["tile-effects"], ["tileEffectAdded"]),
+    lower: (ctx) => {
+      const effect = `{id: ${input(ctx, "id")}, type: ${literal(ctx, "effectType")}, x: (${input(ctx, "cell")}).x, y: (${input(ctx, "cell")}).y, flightId: ${input(ctx, "flightId")}}`;
+      return `(function(effect) { var committed = ${flow2(ctx)}.effects.tileBatch([effect]); if (!committed.length) return false; var sourceKeys = Object.keys(effect); Object.keys(committed[0]).forEach(function(key) { if (sourceKeys.indexOf(key) < 0) delete committed[0][key]; }); return true; })(${effect})`;
+    },
+    ui: { category: "position" }
+  }),
+  define2({
+    id: "tile.clear-flight-reservations",
+    label: "\u6E05\u7406\u98DE\u884C\u9884\u7559",
+    description: "\u53EA\u79FB\u9664\u6307\u5B9A flightId \u7684\u53CC\u5C3E\u98DE\u884C\u9884\u7559\uFF0C\u4FDD\u7559\u5176\u4ED6\u5730\u683C\u6548\u679C\u3002",
+    inputs: [port3("flightId", stringType)],
+    outputs: [port3("success", booleanType)],
+    parameters: [parameter2("effectType", stringType)],
+    effects: writes(["tile-effects"], ["tileEffectRemoved"]),
+    lower: (ctx) => {
+      const state = battle2(ctx);
+      const flightId = input(ctx, "flightId");
+      return `(function(flightId, effectType) { if (${state}.extensions && Array.isArray(${state}.extensions.tileEffects)) ${state}.extensions.tileEffects = ${state}.extensions.tileEffects.filter(function(effect) { return !(effect && effect.type === effectType && effect.flightId === flightId); }); return true; })(${flightId}, ${literal(ctx, "effectType")})`;
+    },
+    ui: { category: "position" }
+  })
+];
+var EFFECT_PRIMITIVES = [
+  define2({
+    id: "effect.teleport-if-present",
+    label: "\u6309\u5B58\u5728\u6027\u4F20\u9001",
+    description: "\u68CB\u5B50\u5F15\u7528\u6709\u6548\u65F6\u901A\u8FC7\u73B0\u6709 flow.effects.move \u4F20\u9001\uFF1B\u65E0\u6548\u5F15\u7528\u8FD4\u56DE\u5931\u8D25\uFF0C\u4E0D\u65C1\u8DEF\u4FEE\u6539\u5750\u6807\u3002",
+    inputs: [port3("piece", pieceType, { nullable: true }), port3("destination", cellType)],
+    outputs: [port3("success", booleanType)],
+    effects: writes(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
+    lower: (ctx) => {
+      const piece = input(ctx, "piece");
+      const destination = input(ctx, "destination");
+      const query = flow2(ctx);
+      return `(function(pieceId, cell) { if (pieceId == null || !${query}.query.hasPiece(pieceId)) return false; return Boolean(${query}.effects.move([{pieceId: pieceId, x: cell.x, y: cell.y}], "teleport").success); })(${piece}, ${destination})`;
+    },
+    ui: { category: "effect" }
+  })
+];
+var STATUS_PRIMITIVES = [
+  define2({
+    id: "status.apply-record",
+    label: "\u9644\u52A0\u7ED3\u6784\u5316\u68CB\u5B50\u72B6\u6001",
+    description: "\u5C06 graph-local typed record \u4EA4\u7ED9\u73B0\u6709 status lifecycle\uFF1B\u4E0D\u5EFA\u7ACB\u7B2C\u4E8C\u4EFD\u72B6\u6001\u5B58\u50A8\u3002",
+    inputs: [port3("target", pieceType), port3("record", recordType2)],
+    outputs: [port3("success", booleanType)],
+    parameters: [{ name: "inputPolicy", type: "string", enum: ["flow", "host"], default: "flow" }],
+    effects: writes(["status", "rule", "events"], ["afterStatusApplied"]),
+    lower: (ctx) => `${flow2(ctx)}.status.add(${input(ctx, "target")}, ${input(ctx, "record")}, "piece"${ctx.parameters.inputPolicy === "host" ? ', "host"' : ""})`,
+    ui: { category: "status" }
+  }),
+  define2({
+    id: "status.find-flight",
+    label: "\u8BFB\u53D6\u98DE\u884C\u8BB0\u5F55",
+    description: "\u4ECE\u6301\u6709\u68CB\u5B50\u7684 statusTags \u4E2D\u8BFB\u53D6\u6307\u5B9A\u72EC\u7ACB\u98DE\u884C\u8BB0\u5F55\u7684\u767D\u540D\u5355\u5B57\u6BB5\u3002",
+    inputs: [port3("target", pieceType)],
+    outputs: [
+      port3("found", booleanType),
+      port3("id", stringType),
+      port3("flightId", stringType),
+      port3("allyId", pieceType, { nullable: true }),
+      port3("x", numberType),
+      port3("y", numberType),
+      port3("allyX", numberType),
+      port3("allyY", numberType),
+      port3("appliedTurn", numberType),
+      port3("currentDuration", numberType)
+    ],
+    parameters: [parameter2("statusType", stringType)],
+    effects: pure(["statuses", "pieces"]),
+    lower: (ctx) => {
+      const target = input(ctx, "target");
+      const type = literal(ctx, "statusType");
+      const query = flow2(ctx);
+      return `(function(pieceId, statusType) { var piece = ${query}.query.piece(pieceId); var tag = ((piece && piece.statusTags) || []).find(function(item) { return item && item.type === statusType && item.ownerId === pieceId; }); var allyId = tag && typeof tag.allyId === "string" && ${query}.query.hasPiece(tag.allyId) && ${query}.query.piece(tag.allyId).currentHp > 0 ? tag.allyId : null; return {found: Boolean(tag), id: tag && typeof tag.id === "string" ? tag.id : "", flightId: tag && typeof tag.flightId === "string" ? tag.flightId : "", allyId: allyId, x: tag && Number.isFinite(tag.x) ? tag.x : 0, y: tag && Number.isFinite(tag.y) ? tag.y : 0, allyX: tag && Number.isFinite(tag.allyX) ? tag.allyX : 0, allyY: tag && Number.isFinite(tag.allyY) ? tag.allyY : 0, appliedTurn: tag && Number.isFinite(tag.appliedTurn) ? tag.appliedTurn : -1, currentDuration: tag && Number.isFinite(tag.currentDuration) ? tag.currentDuration : 0}; })(${target}, ${type})`;
+    },
+    ui: { category: "status" }
+  }),
+  define2({
+    id: "status.remove-by-flight",
+    label: "\u6309\u98DE\u884C\u6807\u8BC6\u79FB\u9664\u72B6\u6001",
+    description: "\u679A\u4E3E\u6307\u5B9A\u68CB\u5B50\u7684\u72EC\u7ACB\u98DE\u884C\u72B6\u6001\uFF0C\u5E76\u9010\u6761\u7ECF status lifecycle \u79FB\u9664\u3002",
+    inputs: [port3("target", pieceType, { nullable: true, optional: true }), port3("flightId", stringType)],
+    outputs: [port3("success", booleanType)],
+    effects: writes(["status", "rule", "events"], ["afterStatusRemoved"]),
+    lower: (ctx) => {
+      const target = ctx.inputs.target ?? "null";
+      const flightId = input(ctx, "flightId");
+      const query = flow2(ctx);
+      return `(function(pieceId, flightId) { if (pieceId == null || !${query}.query.hasPiece(pieceId)) return true; var piece = ${query}.query.piece(pieceId); var tags = ((piece && piece.statusTags) || []).filter(function(tag) { return tag && tag.flightId === flightId; }); tags.forEach(function(tag) { if (tag && typeof tag.id === "string") ${query}.status.remove(pieceId, tag.id, "piece"); }); return true; })(${target}, ${flightId})`;
+    },
+    ui: { category: "status" }
+  })
+];
+var FLIGHT_GAMEPLAY_MODULES = Object.freeze([
+  ...PIECE_PRIMITIVES,
+  ...SPATIAL_PRIMITIVES,
+  ...TILE_PRIMITIVES,
+  ...EFFECT_PRIMITIVES,
+  ...STATUS_PRIMITIVES
+]);
+
+// lib/skill-graph/module-registry-summon-primitives.ts
+var ACTIVE_SURFACES2 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var pieceType2 = "piece";
+var cellType2 = "cell";
+var choiceType = "choice";
+var numberType2 = "number";
+var booleanType2 = "boolean";
+var stringType2 = "string";
+var port4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter3 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var input2 = (ctx, name) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  return value;
+};
+var literal2 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (value === void 0) throw new Error(`module ${ctx.moduleId}: missing parameter ${name}`);
+  return ctx.emitLiteral(value);
+};
+var runtime = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle3 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var pure2 = (reads = []) => ({ pure: true, previewSafe: false, reads });
+var writes2 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define3 = (value) => ({
+  version: "1",
+  allowedSurfaces: value.allowedSurfaces ?? ACTIVE_SURFACES2,
+  ...value
+});
+var CHOICE_PRIMITIVES = [
+  define3({
+    id: "choice.option-pair",
+    label: "\u4E8C\u9009\u4E00\u9009\u9879",
+    description: "\u7528\u4E24\u4E2A\u6587\u672C\u503C\u6784\u9020\u65E2\u6709\u5355\u9009\u534F\u8BAE\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u9009\u9879\u6821\u9A8C\u4ECD\u7531\u6743\u5A01\u5BBF\u4E3B\u8D1F\u8D23\u3002",
+    inputs: [],
+    outputs: [port4("choice", choiceType)],
+    parameters: [
+      parameter3("title", stringType2, { optional: true }),
+      parameter3("firstLabel", stringType2),
+      parameter3("firstValue", stringType2),
+      parameter3("secondLabel", stringType2),
+      parameter3("secondValue", stringType2),
+      parameter3("canCancel", booleanType2, { optional: true })
+    ],
+    effects: { ...writes2(["pending"], ["pendingOptionSelection"]), pending: true },
+    lower: (ctx) => {
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, "title") ? `, title: ${literal2(ctx, "title")}` : "";
+      const canCancel = Object.prototype.hasOwnProperty.call(ctx.parameters, "canCancel") ? `, canCancel: ${literal2(ctx, "canCancel")}` : "";
+      return `(${runtime(ctx)}.choice.option({options: [{label: ${literal2(ctx, "firstLabel")}, value: ${literal2(ctx, "firstValue")}}, {label: ${literal2(ctx, "secondLabel")}, value: ${literal2(ctx, "secondValue")}}]${title}${canCancel}}))`;
+    },
+    ui: { category: "choice" }
+  }),
+  define3({
+    id: "choice.option-value",
+    label: "\u8BFB\u53D6\u9009\u9879\u503C",
+    description: "\u5C06\u6743\u5A01\u5BBF\u4E3B\u8FD4\u56DE\u7684\u5DF2\u5B8C\u6210\u5355\u9009\u89E3\u6790\u4E3A\u6587\u672C\u503C\uFF1B\u6302\u8D77\u5206\u652F\u5FC5\u987B\u5148\u8FD4\u56DE\u3002",
+    inputs: [port4("choice", choiceType, { nullable: true, optional: true })],
+    outputs: [port4("value", stringType2)],
+    effects: pure2(["choice"]),
+    lower: (ctx) => {
+      const value = input2(ctx, "choice");
+      return `(function(value) { if (typeof value === "string") return value; if (value && typeof value.value === "string") return value.value; return ""; })(${value})`;
+    },
+    ui: { category: "choice" }
+  })
+];
+var SPATIAL_PRIMITIVES2 = [
+  define3({
+    id: "spatial.piece-position",
+    label: "\u8BFB\u53D6\u68CB\u5B50\u4F4D\u7F6E",
+    description: "\u8BFB\u53D6\u7ECF\u6743\u5A01\u68CB\u5B50\u67E5\u8BE2\u9A8C\u8BC1\u540E\u7684\u5F53\u524D\u4F4D\u7F6E\u5FEB\u7167\uFF1B\u4E0D\u66B4\u9732\u53EF\u5199\u68CB\u5B50\u5BF9\u8C61\u3002",
+    inputs: [port4("piece", pieceType2)],
+    outputs: [port4("cell", cellType2)],
+    effects: pure2(["pieces", "position"]),
+    lower: (ctx) => `${runtime(ctx)}.query.piece(${input2(ctx, "piece")}) && {x: ${runtime(ctx)}.query.piece(${input2(ctx, "piece")}).x, y: ${runtime(ctx)}.query.piece(${input2(ctx, "piece")}).y}`,
+    ui: { category: "position" }
+  }),
+  define3({
+    id: "spatial.cell-distance",
+    label: "\u5730\u683C\u66FC\u54C8\u987F\u8DDD\u79BB",
+    description: "\u8BFB\u53D6\u4E24\u4E2A\u5DF2\u9A8C\u8BC1\u5730\u683C\u4E4B\u95F4\u7684\u66FC\u54C8\u987F\u8DDD\u79BB\u3002",
+    inputs: [port4("from", cellType2), port4("to", cellType2)],
+    outputs: [port4("distance", numberType2)],
+    effects: pure2(["position"]),
+    lower: (ctx) => `Math.abs((${input2(ctx, "to")}).x - (${input2(ctx, "from")}).x) + Math.abs((${input2(ctx, "to")}).y - (${input2(ctx, "from")}).y)`,
+    ui: { category: "position" }
+  }),
+  define3({
+    id: "spatial.cell-walkable",
+    label: "\u68C0\u67E5\u5730\u683C\u53EF\u884C\u8D70",
+    description: "\u6309\u5F53\u524D\u5730\u56FE\u8BFB\u53D6\u5730\u683C\u548C\u53EF\u884C\u8D70\u5C5E\u6027\uFF1B\u4E0D\u5224\u65AD\u68CB\u5B50\u5360\u4F4D\u3002",
+    inputs: [port4("cell", cellType2)],
+    outputs: [port4("walkable", booleanType2)],
+    effects: pure2(["map"]),
+    lower: (ctx) => {
+      const state = battle3(ctx);
+      const cell = input2(ctx, "cell");
+      return `(function(cell) { var tiles = ${state}.map && Array.isArray(${state}.map.tiles) ? ${state}.map.tiles : []; var tile = tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); return Boolean(tile && tile.props && tile.props.walkable); })(${cell})`;
+    },
+    ui: { category: "position" }
+  })
+];
+var LIFECYCLE_PRIMITIVES = [
+  define3({
+    id: "lifecycle.queue-summon",
+    label: "\u6392\u961F\u58F0\u660E\u5F0F\u53EC\u5524",
+    description: "\u5C06\u4E00\u4E2A\u6765\u6E90\u68CB\u5B50\u548C\u5730\u683C\u4EA4\u7ED9\u5F53\u524D\u5185\u5BB9\u58F0\u660E\u7684\u53EC\u5524\u961F\u5217\uFF1B\u6765\u6E90\u955C\u50CF\u80FD\u529B\u3001\u6570\u91CF\u548C\u53D8\u4F53\u7531\u5BBF\u4E3B\u58F0\u660E\u9A8C\u8BC1\u3002",
+    inputs: [port4("source", pieceType2), port4("destination", cellType2), port4("variant", stringType2)],
+    outputs: [port4("queued", numberType2)],
+    effects: writes2(["summon", "queue"], ["summonQueued"]),
+    lower: (ctx) => {
+      const destination = input2(ctx, "destination");
+      return `${runtime(ctx)}.lifecycle.summon({sourceId: ${input2(ctx, "source")}, summons: [{x: (${destination}).x, y: (${destination}).y, variant: ${input2(ctx, "variant")}}]})`;
+    },
+    ui: { category: "lifecycle" }
+  }),
+  define3({
+    id: "lifecycle.zero-health",
+    label: "\u5C06\u68CB\u5B50\u751F\u547D\u7F6E\u96F6",
+    description: "\u5728\u4F24\u5BB3\u89E6\u53D1\u8FB9\u754C\u5C06\u5DF2\u9A8C\u8BC1\u68CB\u5B50\u7684\u751F\u547D\u7F6E\u96F6\uFF0C\u8BA9\u73B0\u6709 DeathBatch \u7EE7\u7EED\u8D1F\u8D23\u6B63\u5F0F\u6B7B\u4EA1\u548C\u540E\u7EED\u89C4\u5219\uFF1B\u4E0D\u5199\u5165\u4F4D\u7F6E\u3002",
+    inputs: [port4("target", pieceType2)],
+    outputs: [port4("success", booleanType2)],
+    effects: writes2(["health", "damage"]),
+    allowedSurfaces: ["rule"],
+    lower: (ctx) => {
+      const target = input2(ctx, "target");
+      const host2 = runtime(ctx);
+      return `(function(pieceId) { if (${host2}.event.read().type !== "afterDamageTaken") return false; if (pieceId == null || pieceId !== ${host2}.refs.source() || !${host2}.query.hasPiece(pieceId)) return false; ${host2}.query.piece(pieceId).currentHp = 0; return true; })(${target})`;
+    },
+    ui: { category: "lifecycle" }
+  })
+];
+var SUMMON_GAMEPLAY_MODULES = Object.freeze([
+  ...CHOICE_PRIMITIVES,
+  ...SPATIAL_PRIMITIVES2,
+  ...LIFECYCLE_PRIMITIVES
+]);
+
+// lib/skill-graph/module-registry-abilities.ts
+var surfaces2 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var flow3 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var define4 = (item) => ({ version: "1", allowedSurfaces: surfaces2, ...item });
+var ABILITY_GAMEPLAY_MODULES = [
+  define4({
+    id: "compare.allied-players",
+    label: "\u73A9\u5BB6\u662F\u5426\u4E3A\u961F\u53CB",
+    inputs: [{ name: "left", type: "player" }, { name: "right", type: "player" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    effects: { pure: true, previewSafe: false, reads: ["players"] },
+    lower: (ctx) => `${flow3(ctx)}.query.alliedPlayers(${ctx.inputs.left}, ${ctx.inputs.right})`,
+    ui: { category: "condition" }
+  }),
+  define4({
+    id: "skill.identifiers",
+    label: "\u8BFB\u53D6\u68CB\u5B50\u6280\u80FD\u5217\u8868",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "ids", type: { kind: "list", element: "string" } }],
+    effects: { pure: true, previewSafe: false, reads: ["skills"] },
+    lower: (ctx) => `${flow3(ctx)}.query.piece(${ctx.inputs.piece}).skills.map(function(skill) { return skill.skillId; })`,
+    ui: { category: "skill" }
+  }),
+  ...["read", "mark"].map((operation) => define4({
+    id: operation === "read" ? "ability.was-spent" : "ability.mark-spent",
+    label: operation === "read" ? "\u80FD\u529B\u5DF2\u6D88\u8017\u672C\u5C40\u6B21\u6570" : "\u8BB0\u5F55\u80FD\u529B\u5DF2\u6D88\u8017",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: operation === "read" ? [{ name: "value", type: "boolean" }] : [],
+    parameters: [{ name: "abilityId", type: "string" }],
+    effects: { pure: operation === "read", previewSafe: false, ...operation === "read" ? { reads: ["skills"] } : { writes: ["skills"] } },
+    lower: (ctx) => `${flow3(ctx)}.skills.${operation === "read" ? "wasSpent" : "markSpent"}(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.abilityId)})`,
+    ui: { category: "skill" }
+  })),
+  define4({
+    id: "spatial.cell-delta",
+    label: "\u8BA1\u7B97\u5730\u683C\u4F4D\u79FB",
+    inputs: [{ name: "from", type: "cell" }, { name: "to", type: "cell" }],
+    outputs: [{ name: "dx", type: "number" }, { name: "dy", type: "number" }, { name: "chebyshev", type: "number" }, { name: "orthogonal", type: "boolean" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(function(from, to) { var dx = to.x - from.x, dy = to.y - from.y; return {dx: dx, dy: dy, chebyshev: Math.max(Math.abs(dx), Math.abs(dy)), orthogonal: (dx === 0) !== (dy === 0)}; })(${ctx.inputs.from}, ${ctx.inputs.to})`,
+    ui: { category: "position" }
+  }),
+  define4({
+    id: "piece.name-or",
+    label: "\u8BFB\u53D6\u53EF\u9009\u68CB\u5B50\u540D\u79F0",
+    inputs: [{ name: "piece", type: "piece", nullable: true }, { name: "fallback", type: "string" }],
+    outputs: [{ name: "text", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["pieces"] },
+    lower: (ctx) => `(${flow3(ctx)}.query.hasPiece(${ctx.inputs.piece}) ? String(${flow3(ctx)}.query.piece(${ctx.inputs.piece}).name) : ${ctx.inputs.fallback})`,
+    ui: { category: "query" }
+  }),
+  define4({
+    id: "resource.limit",
+    label: "\u8BFB\u53D6\u8D44\u6E90\u4E0A\u9650",
+    inputs: [{ name: "player", type: "player" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "resource", type: "string", enum: ["actionPoints"] }],
+    effects: { pure: true, previewSafe: false, reads: ["players", "resources"] },
+    lower: (ctx) => `${flow3(ctx)}.query.player(${ctx.inputs.player})[${ctx.emitLiteral("maxActionPoints")}]`,
+    ui: { category: "query" }
+  }),
+  define4({
+    id: "compare.text",
+    label: "\u6BD4\u8F83\u6587\u672C\u662F\u5426\u76F8\u540C",
+    inputs: [{ name: "left", type: "string", nullable: true }, { name: "right", type: "string", nullable: true }],
+    outputs: [{ name: "value", type: "boolean" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${ctx.inputs.left} === ${ctx.inputs.right})`,
+    ui: { category: "condition" }
+  }),
+  define4({
+    id: "value.select-text",
+    label: "\u6309\u6761\u4EF6\u9009\u62E9\u6587\u672C",
+    inputs: [{ name: "condition", type: "boolean" }, { name: "whenTrue", type: "string" }, { name: "whenFalse", type: "string" }],
+    outputs: [{ name: "text", type: "string" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${ctx.inputs.condition} ? ${ctx.inputs.whenTrue} : ${ctx.inputs.whenFalse})`,
+    ui: { category: "logic" }
+  }),
+  ...["min", "max"].map((operation) => ({
+    ...define4({
+      id: `math.${operation}`,
+      label: operation === "min" ? "\u53D6\u8F83\u5C0F\u503C" : "\u53D6\u8F83\u5927\u503C",
+      inputs: [{ name: "left", type: "number" }, { name: "right", type: "number" }],
+      outputs: [{ name: "value", type: "number" }],
+      effects: { pure: true, previewSafe: true },
+      lower: (ctx) => `Math.${operation}(${ctx.inputs.left}, ${ctx.inputs.right})`,
+      ui: { category: "value" }
+    }),
+    allowedSurfaces: [...surfaces2, "preview"]
+  })),
+  ...["add", "remove"].map((operation) => define4({
+    id: `skill.${operation}`,
+    label: operation === "add" ? "\u83B7\u5F97\u6280\u80FD" : "\u79FB\u9664\u6280\u80FD",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    parameters: [{ name: "skillId", type: "string" }],
+    effects: { writes: ["skills"], pure: false, previewSafe: false },
+    lower: (ctx) => `Boolean(${flow3(ctx)}.skills.${operation}(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.skillId)}))`,
+    ui: { category: "skill" }
+  })),
+  define4({
+    id: "rule.has-piece",
+    label: "\u68CB\u5B50\u5177\u6709\u89C4\u5219",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    parameters: [{ name: "ruleId", type: "string" }],
+    effects: { reads: ["rules"], pure: true, previewSafe: false },
+    lower: (ctx) => `(${flow3(ctx)}.query.piece(${ctx.inputs.piece}).rules || []).some(function(rule) { return rule.id === ${ctx.emitLiteral(ctx.parameters.ruleId)}; })`,
+    ui: { category: "rule" }
+  }),
+  define4({
+    id: "attribute.set",
+    label: "\u8BBE\u5B9A\u68CB\u5B50\u5C5E\u6027",
+    inputs: [{ name: "piece", type: "piece" }, { name: "value", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange"] }],
+    effects: { writes: ["attributes"], pure: false, previewSafe: false },
+    lower: (ctx) => `${flow3(ctx)}.attributes.set(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.attribute)}, ${ctx.inputs.value})`,
+    ui: { category: "effect" }
+  }),
+  define4({
+    id: "identity.host-time",
+    label: "\u5BBF\u4E3B\u6807\u8BC6\u65F6\u95F4",
+    description: "\u8BFB\u53D6\u73B0\u5F79 SkillCode \u5BBF\u4E3B\u7ED1\u5B9A\u7684 Date.now\uFF0C\u4FDD\u6301\u65E2\u6709\u6807\u8BC6\u751F\u6210\u53CA\u56DE\u653E\u8BED\u4E49\uFF1B\u4E0D\u8BBF\u95EE\u5916\u90E8\u65F6\u949F\u3002",
+    inputs: [],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { reads: ["runtime-identity"], pure: false, previewSafe: false },
+    lower: () => "Date.now()",
+    ui: { category: "context" }
+  })
+];
+
+// lib/skill-graph/module-registry-status-events.ts
+var surfaces3 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var flow4 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var context2 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
+var define5 = (value) => ({ version: "1", allowedSurfaces: surfaces3, ...value });
+var fields = ["stacks", "intensity", "currentDuration", "remainingDuration", "currentUses", "remainingUses", "value"];
+var STATUS_EVENT_GAMEPLAY_MODULES = [
+  define5({
+    id: "status.has-player",
+    label: "\u73A9\u5BB6\u5177\u6709\u72B6\u6001\u7C7B\u578B",
+    inputs: [{ name: "player", type: "player" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses", "players"] },
+    lower: (ctx) => `(${flow4(ctx)}.query.player(${ctx.inputs.player}).statusTags || []).some(function(tag) { return tag.type === ${ctx.emitLiteral(ctx.parameters.statusType)}; })`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.apply-player-record",
+    label: "\u9644\u52A0\u7ED3\u6784\u5316\u73A9\u5BB6\u72B6\u6001",
+    inputs: [{ name: "player", type: "player" }, { name: "record", type: "record" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses", "events"] },
+    lower: (ctx) => `${flow4(ctx)}.status.add(${ctx.inputs.player}, ${ctx.inputs.record}, "player", "host")`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.remove-player-records",
+    label: "\u79FB\u9664\u73A9\u5BB6\u72B6\u6001\u8BB0\u5F55\uFF08\u4E0D\u89E6\u53D1\u4E8B\u4EF6\uFF09",
+    inputs: [{ name: "player", type: "player" }],
+    outputs: [{ name: "count", type: "number" }],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `${flow4(ctx)}.status.removePlayerRecords(${ctx.inputs.player}, ${ctx.emitLiteral(ctx.parameters.statusType)})`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "event.status-text",
+    label: "\u8BFB\u53D6\u4E8B\u4EF6\u72B6\u6001\u6807\u8BC6",
+    inputs: [],
+    outputs: [{ name: "value", type: "string", nullable: true }],
+    parameters: [{ name: "field", type: "string", enum: ["statusId", "statusType"] }],
+    effects: { pure: true, previewSafe: false, reads: ["event"] },
+    lower: (ctx) => `(${context2(ctx)}[${ctx.emitLiteral(ctx.parameters.field)}] ?? null)`,
+    ui: { category: "event" }
+  }),
+  define5({
+    id: "status.remove-record",
+    label: "\u76F4\u63A5\u79FB\u9664\u9996\u4E2A\u5339\u914D\u72B6\u6001\u8BB0\u5F55",
+    description: "\u4FDD\u7559\u65E2\u6709\u76F4\u63A5\u5220\u9664\u72B6\u6001\u8BB0\u5F55\u7684\u8BED\u4E49\uFF0C\u4E0D\u89E6\u53D1\u79FB\u9664\u4E8B\u4EF6\u6216\u6E05\u7406\u5173\u8054\u80FD\u529B\u3002",
+    inputs: [{ name: "piece", type: "piece" }, { name: "value", type: "string", nullable: true }],
+    outputs: [{ name: "removed", type: "boolean" }],
+    parameters: [{ name: "selector", type: "string", enum: ["id", "type"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `(${ctx.inputs.value} == null ? false : ${flow4(ctx)}.status.removeRaw(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.selector)}, ${ctx.inputs.value}))`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.matches-type",
+    label: "\u68C0\u67E5\u72B6\u6001\u7C7B\u578B",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    parameters: [{ name: "statusType", type: "string" }, { name: "legacyStrings", type: "string", enum: ["ignore", "exact", "contains"], default: "ignore" }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => {
+      const type = ctx.emitLiteral(ctx.parameters.statusType);
+      const stringMatch = ctx.parameters.legacyStrings === "exact" ? `tag === ${type}` : ctx.parameters.legacyStrings === "contains" ? `tag.includes(${type})` : "false";
+      return `(${flow4(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).some(function(tag) { return typeof tag === 'string' ? ${stringMatch} : Boolean(tag && tag.type === ${type}); })`;
+    },
+    ui: { category: "status" }
+  }),
+  ...["blocked", "isKilled"].map((field) => define5({
+    id: field === "blocked" ? "damage.was-blocked" : "damage.killed",
+    label: field === "blocked" ? "\u4F24\u5BB3\u5DF2\u88AB\u963B\u6321" : "\u4F24\u5BB3\u9020\u6210\u51FB\u6740",
+    inputs: [{ name: "result", type: "record" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `Boolean(${ctx.inputs.result} && ${ctx.inputs.result}.${field})`,
+    ui: { category: "effect" }
+  })),
+  define5({
+    id: "status.list-ids",
+    label: "\u67E5\u8BE2\u540C\u7C7B\u578B\u72B6\u6001\u6807\u8BC6\u96C6\u5408",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "ids", type: { kind: "list", element: "string" } }],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => `(${flow4(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).filter(function(tag) { return tag.type === ${ctx.emitLiteral(ctx.parameters.statusType)}; }).map(function(tag) { return tag.id; })`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "compare.player-reference",
+    label: "\u6BD4\u8F83\u53EF\u7A7A\u73A9\u5BB6\u5F15\u7528",
+    inputs: [{ name: "left", type: "player", nullable: true }, { name: "right", type: "player", nullable: true }],
+    outputs: [{ name: "value", type: "boolean" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${ctx.inputs.left} === ${ctx.inputs.right})`,
+    ui: { category: "condition" }
+  }),
+  define5({
+    id: "status.find-id",
+    label: "\u67E5\u627E\u9996\u4E2A\u72B6\u6001\u6807\u8BC6",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "id", type: "string", nullable: true }],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow4(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).find(function(tag) { return tag.type === ${ctx.emitLiteral(ctx.parameters.statusType)}; }); return tag ? tag.id : null; })()`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.read-number",
+    label: "\u8BFB\u53D6\u72B6\u6001\u6570\u503C",
+    inputs: [{ name: "piece", type: "piece" }, { name: "statusId", type: "string", nullable: true }, { name: "fallback", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "field", type: "string", enum: fields }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow4(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).find(function(tag) { return tag.id === ${ctx.inputs.statusId}; }); var value = tag && tag[${ctx.emitLiteral(ctx.parameters.field)}]; return value == null ? ${ctx.inputs.fallback} : Number(value); })()`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.set-number",
+    label: "\u8BBE\u5B9A\u72B6\u6001\u6570\u503C",
+    inputs: [{ name: "piece", type: "piece" }, { name: "statusId", type: "string", nullable: true }, { name: "value", type: "number" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    parameters: [{ name: "field", type: "string", enum: ["stacks", "intensity", "value"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `${flow4(ctx)}.status.setNumber(${ctx.inputs.piece}, ${ctx.inputs.statusId}, ${ctx.emitLiteral(ctx.parameters.field)}, ${ctx.inputs.value})`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "status.remove-id",
+    label: "\u6309\u6807\u8BC6\u79FB\u9664\u72B6\u6001",
+    inputs: [{ name: "piece", type: "piece" }, { name: "statusId", type: "string", nullable: true }],
+    outputs: [{ name: "success", type: "boolean" }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses", "rules"], events: ["afterStatusRemoved"] },
+    lower: (ctx) => `(${ctx.inputs.statusId} == null ? false : Boolean(${flow4(ctx)}.status.remove(${ctx.inputs.piece}, ${ctx.inputs.statusId})))`,
+    ui: { category: "status" }
+  }),
+  define5({
+    id: "event.read-number",
+    label: "\u8BFB\u53D6\u4E8B\u4EF6\u6570\u503C",
+    inputs: [{ name: "fallback", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "field", type: "string", enum: ["damage", "actualDamage", "heal", "amount", "targetX", "targetY", "turnNumber"] }],
+    effects: { pure: true, previewSafe: false, reads: ["event"] },
+    lower: (ctx) => `(function() { var value = ${context2(ctx)}[${ctx.emitLiteral(ctx.parameters.field)}]; return value == null ? ${ctx.inputs.fallback} : Number(value); })()`,
+    ui: { category: "event" }
+  }),
+  define5({
+    id: "event.write-number",
+    label: "\u6539\u5199\u7ED3\u7B97\u524D\u4E8B\u4EF6\u6570\u503C",
+    inputs: [{ name: "value", type: "number" }],
+    outputs: [],
+    parameters: [{ name: "field", type: "string", enum: ["damage", "heal", "amount", "targetX", "targetY"] }, { name: "inputPolicy", type: "string", enum: ["floor", "host"], default: "floor" }],
+    effects: { pure: false, previewSafe: false, writes: ["event"] },
+    lower: (ctx) => `${flow4(ctx)}.event.modify(${ctx.emitLiteral(ctx.parameters.field)}, ${ctx.inputs.value}, ${ctx.emitLiteral(ctx.parameters.inputPolicy)})`,
+    ui: { category: "event" }
+  })
+];
+
+// lib/skill-graph/module-registry-preview-values.ts
+var surfaces4 = Object.freeze(["preview"]);
+var define6 = (item) => ({ version: "1", allowedSurfaces: surfaces4, ...item });
+var PREVIEW_VALUE_GAMEPLAY_MODULES = [
+  define6({
+    id: "preview.piece-number-nan",
+    label: "\u9884\u89C8\u68CB\u5B50\u6570\u503C\uFF08\u4FDD\u7559\u7F3A\u7701\u6570\u503C\uFF09",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange", "currentHp", "maxHp"], default: "attack" }],
+    effects: { pure: true, previewSafe: true, reads: ["preview-piece"] },
+    // Number(undefined) intentionally preserves the legacy arithmetic result
+    // (NaN) while keeping the author graph closed over attribute names.
+    lower: (ctx) => `Number((${ctx.inputs.piece})[${ctx.emitLiteral(ctx.parameters.attribute)}])`,
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "preview.piece-number-or-zero",
+    label: "\u9884\u89C8\u68CB\u5B50\u6570\u503C\uFF08\u7F3A\u7701\u4E3A\u96F6\uFF09",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange", "currentHp", "maxHp"], default: "attack" }],
+    effects: { pure: true, previewSafe: true, reads: ["preview-piece"] },
+    lower: (ctx) => `(${ctx.inputs.piece})[${ctx.emitLiteral(ctx.parameters.attribute)}] || 0`,
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "preview.piece-max-hp",
+    label: "\u9884\u89C8\u68CB\u5B50\u751F\u547D\u4E0A\u9650",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "fallback", type: "number", default: 18 }],
+    effects: { pure: true, previewSafe: true, reads: ["preview-piece"] },
+    lower: (ctx) => {
+      const fallback = typeof ctx.parameters.fallback === "number" ? ctx.parameters.fallback : 18;
+      return `(${ctx.inputs.piece})["maxHp"] || ((${ctx.inputs.piece})["stats"] && (${ctx.inputs.piece})["stats"]["maxHp"]) || ${ctx.emitLiteral(fallback)}`;
+    },
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "preview.skill-text",
+    label: "\u9884\u89C8\u6280\u80FD\u6587\u672C",
+    inputs: [{ name: "skill", type: "content" }],
+    outputs: [{ name: "value", type: "string" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["description"], default: "description" }],
+    effects: { pure: true, previewSafe: true, reads: ["preview-skill"] },
+    lower: (ctx) => `(${ctx.inputs.skill})[${ctx.emitLiteral(ctx.parameters.attribute)}]`,
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "preview.skill-number-nan",
+    label: "\u9884\u89C8\u6280\u80FD\u6570\u503C\uFF08\u4FDD\u7559\u7F3A\u7701\u6570\u503C\uFF09",
+    inputs: [{ name: "skill", type: "content" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "attribute", type: "string", enum: ["powerMultiplier", "actionPointCost", "chargeCost", "cooldown"], default: "powerMultiplier" }],
+    effects: { pure: true, previewSafe: true, reads: ["preview-skill"] },
+    lower: (ctx) => `Number((${ctx.inputs.skill})[${ctx.emitLiteral(ctx.parameters.attribute)}])`,
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "preview.piece-status-number",
+    label: "\u9884\u89C8\u68CB\u5B50\u72B6\u6001\u6570\u503C",
+    inputs: [{ name: "piece", type: "piece" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [
+      { name: "statusType", type: "string", default: "shishio-kills" },
+      { name: "attribute", type: "string", enum: ["intensity"], default: "intensity" }
+    ],
+    effects: { pure: true, previewSafe: true, reads: ["preview-piece-status"] },
+    lower: (ctx) => `(((${ctx.inputs.piece})["statusTags"] || []).find(function(tag) { return tag["type"] === ${ctx.emitLiteral(ctx.parameters.statusType)}; }) || {})[${ctx.emitLiteral(ctx.parameters.attribute)}] || 0`,
+    ui: { category: "preview" }
+  }),
+  define6({
+    id: "logic.select-number",
+    label: "\u6309\u6761\u4EF6\u9009\u62E9\u6570\u503C",
+    inputs: [
+      { name: "condition", type: "boolean" },
+      { name: "whenTrue", type: "number", optional: true, nullable: true },
+      { name: "whenFalse", type: "number", optional: true, nullable: true }
+    ],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: true },
+    lower: (ctx) => `(${ctx.inputs.condition} ? ${ctx.inputs.whenTrue} : ${ctx.inputs.whenFalse})`,
+    ui: { category: "logic" }
+  })
+];
+
+// lib/skill-graph/module-registry-area-effects.ts
+var surfaces5 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var flow5 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var define7 = (value) => ({ version: "1", allowedSurfaces: surfaces5, ...value });
+var pieces = { kind: "list", element: "piece" };
+var AREA_EFFECT_GAMEPLAY_MODULES = [
+  define7({
+    id: "source.capture",
+    label: "\u4FDD\u7559\u672C\u6B21\u7ED3\u7B97\u6765\u6E90",
+    description: "\u4EC5\u4E3A\u5F53\u524D\u6267\u884C\u4FDD\u7559\u6765\u6E90\u5F52\u5C5E\uFF1B\u6765\u6E90\u79BB\u573A\u540E\u5DF2\u5F00\u59CB\u7684\u6548\u679C\u53EF\u7EE7\u7EED\u7ED3\u7B97\uFF0C\u4E0D\u5141\u8BB8\u6765\u6E90\u91CD\u65B0\u884C\u52A8\u3002\u53E5\u67C4\u4E0D\u80FD\u8DE8\u6267\u884C\u4F7F\u7528\u3002",
+    inputs: [{ name: "source", type: "piece" }],
+    outputs: [{ name: "source", type: "record" }],
+    effects: { pure: false, previewSafe: false, reads: ["pieces"], writes: ["execution-context"] },
+    lower: (ctx) => `${flow5(ctx)}.effects.captureSource(${ctx.inputs.source})`,
+    ui: { category: "context" }
+  }),
+  ...["damage", "heal"].map((kind) => define7({
+    id: `effect.${kind}-many-captured`,
+    label: kind === "damage" ? "\u4F7F\u7528\u5DF2\u4FDD\u7559\u6765\u6E90\u6279\u91CF\u4F24\u5BB3" : "\u4F7F\u7528\u5DF2\u4FDD\u7559\u6765\u6E90\u6279\u91CF\u6CBB\u7597",
+    inputs: [{ name: "source", type: "record" }, { name: "targets", type: pieces }, { name: "amount", type: "number" }],
+    outputs: [{ name: "result", type: "record" }],
+    parameters: kind === "damage" ? [{ name: "damageType", type: "string", enum: ["physical", "magical", "true"], default: "physical" }] : [],
+    effects: { pure: false, previewSafe: false, reads: ["execution-context"], writes: [kind, "events"] },
+    lower: (ctx) => `${flow5(ctx)}.effects.${kind}ManyCaptured(${ctx.inputs.source}, ${ctx.inputs.targets}, ${ctx.inputs.amount}${kind === "damage" ? ", " + ctx.emitLiteral(ctx.parameters.damageType) : ""})`,
+    ui: { category: "effect" }
+  })),
+  define7({
+    id: "query.pieces-around-cell",
+    label: "\u67E5\u8BE2\u5730\u683C\u5468\u56F4\u68CB\u5B50",
+    inputs: [{ name: "center", type: "cell" }, { name: "owner", type: "player" }],
+    outputs: [{ name: "pieces", type: pieces }],
+    parameters: [{ name: "relation", type: "string", enum: ["all", "ally", "enemy"], default: "all" }, { name: "metric", type: "string", enum: ["manhattan", "chebyshev"], default: "manhattan" }, { name: "minimum", type: "number", default: 0, minimum: 0 }, { name: "maximum", type: "number", default: 1, minimum: 0 }],
+    effects: { pure: true, previewSafe: false, reads: ["pieces", "position", "players"] },
+    lower: (ctx) => {
+      const relation = ctx.parameters.relation === "all" ? "" : `ownerId: ${ctx.inputs.owner}, relation: ${ctx.emitLiteral(ctx.parameters.relation)}`;
+      const distance = ctx.parameters.metric === "chebyshev" ? "Math.max(dx, dy)" : "dx + dy";
+      return `${flow5(ctx)}.query.pieces({${relation}}).filter(function(id) { var p = ${flow5(ctx)}.query.piece(id), dx = Math.abs(p.x - ${ctx.inputs.center}.x), dy = Math.abs(p.y - ${ctx.inputs.center}.y), distance = ${distance}; return distance >= ${ctx.emitLiteral(ctx.parameters.minimum)} && distance <= ${ctx.emitLiteral(ctx.parameters.maximum)}; })`;
+    },
+    ui: { category: "query" }
+  }),
+  define7({
+    id: "collection.piece-count",
+    label: "\u68CB\u5B50\u96C6\u5408\u6570\u91CF",
+    inputs: [{ name: "pieces", type: pieces }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `${ctx.inputs.pieces}.length`,
+    ui: { category: "collection" }
+  }),
+  ...["damage", "heal"].map((kind) => define7({
+    id: `effect.${kind}-many`,
+    label: kind === "damage" ? "\u540C\u65F6\u4F24\u5BB3\u591A\u4E2A\u76EE\u6807" : "\u540C\u65F6\u6CBB\u7597\u591A\u4E2A\u76EE\u6807",
+    inputs: [{ name: "source", type: "piece" }, { name: "targets", type: pieces }, { name: "amount", type: "number" }],
+    outputs: [{ name: "result", type: "record" }],
+    parameters: [...kind === "damage" ? [{ name: "damageType", type: "string", enum: ["normal", "true"], default: "normal" }, { name: "legacyNormalSpelling", type: "string", enum: ["physical", "magical"], default: "physical", label: "\u65E7\u65E5\u5FD7\u4F24\u5BB3\u540D\u79F0" }] : [], { name: "skillId", type: "string", optional: true }],
+    effects: { pure: false, previewSafe: false, writes: [kind, "events"] },
+    lower: (ctx) => `${flow5(ctx)}.effects.${kind}Many(${ctx.inputs.source}, ${ctx.inputs.targets}, ${ctx.inputs.amount}${kind === "damage" ? ", " + ctx.emitLiteral(ctx.parameters.damageType === "true" ? "true" : ctx.parameters.legacyNormalSpelling) : ""}${ctx.parameters.skillId === void 0 ? "" : ", " + ctx.emitLiteral(ctx.parameters.skillId)})`,
+    ui: { category: "effect" }
+  })),
+  define7({
+    id: "damage.batch-kill-count",
+    label: "\u672C\u6279\u4F24\u5BB3\u51FB\u6740\u6570\u91CF",
+    inputs: [{ name: "result", type: "record" }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${ctx.inputs.result}.results || []).filter(function(item) { return item.isKilled; }).length`,
+    ui: { category: "effect" }
+  }),
+  define7({
+    id: "damage.batch-amount-at",
+    label: "\u672C\u6279\u6307\u5B9A\u76EE\u6807\u4F24\u5BB3",
+    inputs: [{ name: "result", type: "record" }, { name: "index", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${ctx.inputs.result}.results && ${ctx.inputs.result}.results[${ctx.inputs.index}] ? ${ctx.inputs.result}.results[${ctx.inputs.index}].damage : 0)`,
+    ui: { category: "effect" }
+  }),
+  define7({
+    id: "text.join-list",
+    label: "\u8FDE\u63A5\u6587\u672C\u96C6\u5408",
+    inputs: [{ name: "items", type: { kind: "list", element: "string" } }],
+    outputs: [{ name: "text", type: "string" }],
+    parameters: [{ name: "separator", type: "string", default: "" }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `${ctx.inputs.items}.join(${ctx.emitLiteral(ctx.parameters.separator)})`,
+    ui: { category: "text" }
+  })
+];
+
+// lib/skill-graph/module-registry-status-timers.ts
+var ACTIVE = ["skill", "card", "rule", "triggerSkill", "pending"];
+var PURE = ACTIVE;
+var PURE_VALUE = [...ACTIVE, "preview"];
+var pieceType3 = "piece";
+var playerType = "player";
+var stringType3 = "string";
+var numberType3 = "number";
+var booleanType3 = "boolean";
+var choiceType2 = "choice";
+var port5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var pure3 = (reads = []) => ({ pure: true, previewSafe: false, reads });
+var pureValue = () => ({ pure: true, previewSafe: true });
+var writes3 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define8 = (value) => ({ version: "1", allowedSurfaces: value.allowedSurfaces ?? ACTIVE, ...value });
+var flow6 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var input3 = (ctx, name, fallback) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) {
+    if (fallback !== void 0) return fallback;
+    throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  }
+  return value;
+};
+var stringLiteral = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "string") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be text`);
+  return ctx.emitLiteral(value);
+};
+var numberLiteral = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
+  return ctx.emitLiteral(value);
+};
+var enumLiteral = (ctx, name, allowed2, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "string" || !allowed2.includes(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} has an unsupported value`);
+  return ctx.emitLiteral(value);
+};
+var descriptors = [
+  define8({
+    id: "value.present-string",
+    label: "\u6587\u672C\u5B58\u5728",
+    description: "\u5224\u65AD\u4E00\u4E2A\u53EF\u7A7A\u6587\u672C\u53E5\u67C4\u662F\u5426\u5B58\u5728\u3002",
+    inputs: [port5("value", stringType3, { nullable: true })],
+    outputs: [port5("present", booleanType3)],
+    allowedSurfaces: PURE_VALUE,
+    effects: pureValue(),
+    lower: (ctx) => `(${input3(ctx, "value")} !== null && ${input3(ctx, "value")} !== undefined)`,
+    ui: { category: "logic" }
+  }),
+  define8({
+    id: "value.string-or-empty",
+    label: "\u53EF\u7A7A\u6587\u672C\u8F6C\u7A7A\u6587\u672C",
+    description: "\u628A\u7F3A\u5931\u7684\u767B\u8BB0\u6587\u672C\u503C\u5F52\u4E00\u4E3A\u7A7A\u6587\u672C\uFF0C\u4F9B\u540E\u7EED\u5C01\u95ED\u6A21\u5757\u5904\u7406\u3002",
+    inputs: [port5("value", stringType3, { nullable: true })],
+    outputs: [port5("text", stringType3)],
+    allowedSurfaces: PURE_VALUE,
+    effects: pureValue(),
+    lower: (ctx) => `((${input3(ctx, "value")}) == null ? "" : String(${input3(ctx, "value")}))`,
+    ui: { category: "value" }
+  }),
+  define8({
+    id: "choice.option-id-value",
+    label: "\u5DF2\u9009\u9009\u9879\u6807\u8BC6",
+    description: "\u8BFB\u53D6\u65E2\u6709\u9009\u9879\u534F\u8BAE\u8FD4\u56DE\u7684\u5B57\u7B26\u4E32\u3001id \u6216 value\uFF0C\u5F52\u4E00\u4E3A\u6587\u672C\u6807\u8BC6\u3002",
+    inputs: [port5("choice", choiceType2, { nullable: true, optional: true })],
+    outputs: [port5("text", stringType3)],
+    allowedSurfaces: PURE_VALUE,
+    effects: pureValue(),
+    lower: (ctx) => `(function(value) { if (typeof value === "string") return value; if (value && typeof value.id === "string") return value.id; if (value && typeof value.value === "string") return value.value; return ""; })(${input3(ctx, "choice")})`,
+    ui: { category: "choice" }
+  }),
+  define8({
+    id: "status.find-id-by-id",
+    label: "\u6309\u6807\u8BC6\u67E5\u627E\u72B6\u6001",
+    description: "\u6309\u7A33\u5B9A\u72B6\u6001\u6807\u8BC6\u8BFB\u53D6\u72B6\u6001\u53E5\u67C4\uFF0C\u4E0D\u628A\u53EF\u53D8\u72B6\u6001\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true, optional: true })],
+    outputs: [port5("id", stringType3, { nullable: true })],
+    parameters: [parameter4("statusId", stringType3, { optional: true })],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => {
+      const statusId = ctx.inputs.statusId ?? (Object.prototype.hasOwnProperty.call(ctx.parameters, "statusId") ? stringLiteral(ctx, "statusId") : "null");
+      return `(function(pieceId, statusId) { var tags = (${flow6(ctx)}.query.piece(pieceId).statusTags || []); var tag = tags.find(function(item) { return item && item.id === statusId; }); return tag ? tag.id : null; })(${input3(ctx, "piece")}, ${statusId})`;
+    },
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.find-id-by-prefix",
+    label: "\u6309\u6807\u8BC6\u524D\u7F00\u67E5\u627E\u72B6\u6001",
+    description: "\u6309\u7A33\u5B9A\u6807\u8BC6\u524D\u7F00\u8BFB\u53D6\u9996\u4E2A\u72B6\u6001\u53E5\u67C4\u3002",
+    inputs: [port5("piece", pieceType3)],
+    outputs: [port5("id", stringType3, { nullable: true })],
+    parameters: [parameter4("prefix", stringType3)],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => `(function(pieceId, prefix) { var tags = (${flow6(ctx)}.query.piece(pieceId).statusTags || []); var tag = tags.find(function(item) { return item && typeof item.id === "string" && item.id.indexOf(prefix) === 0; }); return tag ? tag.id : null; })(${input3(ctx, "piece")}, ${stringLiteral(ctx, "prefix")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.find-id-by-number",
+    label: "\u6309\u72B6\u6001\u6570\u503C\u67E5\u627E\u72B6\u6001",
+    description: "\u6309\u72B6\u6001\u7C7B\u578B\u548C\u767B\u8BB0\u7684\u6570\u503C\u5B57\u6BB5\u8BFB\u53D6\u9996\u4E2A\u5339\u914D\u72B6\u6001\u53E5\u67C4\u3002",
+    inputs: [port5("piece", pieceType3), port5("value", numberType3)],
+    outputs: [port5("id", stringType3, { nullable: true })],
+    parameters: [parameter4("statusType", stringType3), parameter4("field", stringType3, { enum: ["turnNumber"] })],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => `(function(pieceId, expected) { var tags = (${flow6(ctx)}.query.piece(pieceId).statusTags || []); var field = ${enumLiteral(ctx, "field", ["turnNumber"])}; var tag = tags.find(function(item) { return item && item.type === ${stringLiteral(ctx, "statusType")} && Number(item[field]) === Number(expected); }); return tag ? tag.id : null; })(${input3(ctx, "piece")}, ${input3(ctx, "value")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.read-reference",
+    label: "\u8BFB\u53D6\u72B6\u6001\u5173\u8054\u68CB\u5B50",
+    description: "\u8BFB\u53D6\u72B6\u6001\u4E2D\u767B\u8BB0\u7684\u76EE\u6807\u6216\u6765\u6E90\u68CB\u5B50\u5F15\u7528\uFF0C\u5E76\u91CD\u65B0\u7ECF\u8FC7\u5BBF\u4E3B\u5B58\u5728\u6027\u6821\u9A8C\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true })],
+    outputs: [port5("reference", pieceType3, { nullable: true })],
+    parameters: [parameter4("field", stringType3, { enum: ["targetId", "sourceId"] })],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses", "pieces"]),
+    lower: (ctx) => `(function(pieceId, statusId) { if (statusId == null) return null; var tags = (${flow6(ctx)}.query.piece(pieceId).statusTags || []); var tag = tags.find(function(item) { return item && item.id === statusId; }); var reference = tag && tag[${enumLiteral(ctx, "field", ["targetId", "sourceId"])}]; return ${flow6(ctx)}.query.hasPiece(reference) ? ${flow6(ctx)}.query.piece(reference).instanceId : null; })(${input3(ctx, "piece")}, ${input3(ctx, "statusId")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.read-number-truthy",
+    label: "\u6309\u65E7\u89C4\u5219\u771F\u503C\u8BFB\u53D6\u72B6\u6001\u6570\u503C",
+    description: "\u4FDD\u7559\u65E7\u89C4\u5219\u7684 `value || fallback` \u8BED\u4E49\uFF1B\u96F6\u503C\u548C\u5176\u5B83\u5047\u503C\u4F7F\u7528\u56DE\u9000\u503C\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true }), port5("fallback", numberType3)],
+    outputs: [port5("value", numberType3)],
+    parameters: [parameter4("field", stringType3, { enum: ["intensity", "stacks"] })],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => `(function(pieceId, statusId, fallback) { var tag = (${flow6(ctx)}.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && tag[${enumLiteral(ctx, "field", ["intensity", "stacks"])}]; return Number(raw || fallback); })(${input3(ctx, "piece")}, ${input3(ctx, "statusId")}, ${input3(ctx, "fallback")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.read-uses",
+    label: "\u8BFB\u53D6\u72B6\u6001\u4F7F\u7528\u6B21\u6570",
+    description: "\u4FDD\u7559\u65E7\u89C4\u5219\u5148\u8BFB remainingUses\u3001\u7F3A\u5931\u65F6\u518D\u8BFB currentUses \u7684\u751F\u547D\u5468\u671F\u8BFB\u53D6\u987A\u5E8F\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true }), port5("fallback", numberType3)],
+    outputs: [port5("value", numberType3)],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => `(function(pieceId, statusId, fallback) { var tag = (${flow6(ctx)}.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && (tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : fallback)); return Number(raw); })(${input3(ctx, "piece")}, ${input3(ctx, "statusId")}, ${input3(ctx, "fallback")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.read-duration",
+    label: "\u8BFB\u53D6\u72B6\u6001\u6301\u7EED\u65F6\u95F4",
+    description: "\u4FDD\u7559\u65E7\u89C4\u5219 remainingDuration \u4EC5\u5728 undefined \u65F6\u56DE\u9000 currentDuration \u7684\u751F\u547D\u5468\u671F\u8BFB\u53D6\u987A\u5E8F\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true }), port5("fallback", numberType3)],
+    outputs: [port5("value", numberType3)],
+    allowedSurfaces: PURE,
+    effects: pure3(["statuses"]),
+    lower: (ctx) => `(function(pieceId, statusId, fallback) { var tag = (${flow6(ctx)}.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && (tag.remainingDuration === undefined ? tag.currentDuration : tag.remainingDuration); return raw === undefined ? Number(fallback) : Number(raw); })(${input3(ctx, "piece")}, ${input3(ctx, "statusId")}, ${input3(ctx, "fallback")})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "status.consume-counter",
+    label: "\u63A8\u8FDB\u72B6\u6001\u751F\u547D\u5468\u671F\u8BA1\u6570",
+    description: "\u7531\u72B6\u6001\u5BBF\u4E3B\u63A8\u8FDB\u4E00\u4E2A\u767B\u8BB0\u7684\u751F\u547D\u5468\u671F\u8BA1\u6570\uFF0C\u5E76\u8FD4\u56DE\u63A8\u8FDB\u540E\u7684\u6570\u503C\u3002\u6301\u7EED\u65F6\u95F4\u548C\u4F7F\u7528\u6B21\u6570\u4E0D\u80FD\u901A\u8FC7\u901A\u7528\u72B6\u6001\u6570\u503C\u8BBE\u5B9A\u5668\u5199\u5165\u3002",
+    inputs: [port5("piece", pieceType3), port5("statusId", stringType3, { nullable: true })],
+    outputs: [port5("value", numberType3)],
+    parameters: [parameter4("field", stringType3, { enum: ["remainingTurns"] }), parameter4("fallback", numberType3, { default: 1 })],
+    allowedSurfaces: ACTIVE,
+    effects: writes3(["statuses"], ["statusTicked"]),
+    lower: (ctx) => `${flow6(ctx)}.status.consumeCounter(${input3(ctx, "piece")}, ${input3(ctx, "statusId")}, ${enumLiteral(ctx, "field", ["remainingTurns"])}, ${numberLiteral(ctx, "fallback", 1)})`,
+    ui: { category: "status" }
+  }),
+  define8({
+    id: "skill.adjust-cooldown",
+    label: "\u8C03\u6574\u6280\u80FD\u51B7\u5374",
+    description: "\u901A\u8FC7\u6280\u80FD\u751F\u547D\u5468\u671F\u6309\u589E\u52A0\u6216\u81F3\u5C11\u8BBE\u4E3A\u4E24\u79CD\u8BED\u4E49\u8C03\u6574\u5DF2\u6301\u6709\u6280\u80FD\u7684\u51B7\u5374\u3002",
+    inputs: [port5("piece", pieceType3), port5("skillId", stringType3, { nullable: true }), port5("amount", numberType3)],
+    outputs: [port5("success", booleanType3)],
+    parameters: [parameter4("mode", stringType3, { enum: ["add", "atLeast"] })],
+    allowedSurfaces: ACTIVE,
+    effects: writes3(["skills"], ["skillCooldownChanged"]),
+    lower: (ctx) => `Boolean(${flow6(ctx)}.skills.adjustCooldown(${input3(ctx, "piece")}, ${input3(ctx, "skillId")}, ${input3(ctx, "amount")}, ${enumLiteral(ctx, "mode", ["add", "atLeast"])}))`,
+    ui: { category: "skill" }
+  }),
+  define8({
+    id: "effect.damage-with-killer",
+    label: "\u4EE5\u6307\u5B9A\u5F52\u5C5E\u63D0\u4EA4\u4F24\u5BB3",
+    description: "\u901A\u8FC7\u6743\u5A01\u4F24\u5BB3\u6279\u6B21\u63D0\u4EA4\u4F24\u5BB3\uFF0C\u5E76\u4FDD\u7559\u65E7\u5185\u5BB9\u7684\u51FB\u6740\u5F52\u5C5E\u73A9\u5BB6\u3002",
+    inputs: [port5("source", pieceType3), port5("target", pieceType3), port5("amount", numberType3), port5("killerPlayer", playerType, { nullable: true })],
+    outputs: [port5("result", "record"), port5("success", booleanType3), port5("damage", numberType3)],
+    parameters: [parameter4("damageType", stringType3, { enum: ["normal", "true", "toxin"], default: "normal" }), parameter4("skillId", stringType3, { optional: true }), parameter4("inputPolicy", stringType3, { enum: ["floor", "host"], optional: true })],
+    allowedSurfaces: ACTIVE,
+    effects: writes3(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
+    lower: (ctx) => {
+      const type = enumLiteral(ctx, "damageType", ["normal", "true", "toxin"], "normal");
+      const engineType = type === '"normal"' ? '"physical"' : type;
+      const skillId = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral(ctx, "skillId") : `${ctx.surface === "pending" ? "ctx" : "context"}.skill?.id || ${ctx.surface === "pending" ? "ctx" : "context"}.ruleId || "flow"`;
+      const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, "inputPolicy") ? `, ${enumLiteral(ctx, "inputPolicy", ["floor", "host"])}` : "";
+      const call = `${flow6(ctx)}.effects.damageWithKiller(${input3(ctx, "source")}, ${input3(ctx, "target")}, ${input3(ctx, "amount")}, ${engineType}, ${skillId}, ${input3(ctx, "killerPlayer")}${policy})`;
+      return `(function(value){return {result: value, success: value && value.success, damage: value && (value.damage === undefined ? value.totalDamage : value.damage)}})(${call})`;
+    },
+    ui: { category: "effect" }
+  }),
+  define8({
+    id: "choice.required-option-pair",
+    label: "\u5FC5\u9009\u4E8C\u5143\u9009\u9879",
+    description: "\u4F7F\u7528\u65E2\u6709\u9009\u9879\u534F\u8BAE\u5448\u73B0\u4E00\u4E2A\u4E0D\u53EF\u53D6\u6D88\u7684\u4E8C\u5143\u9009\u62E9\uFF0C\u5E76\u4FDD\u7559\u6307\u5B9A\u73A9\u5BB6\u3002",
+    inputs: [port5("player", playerType, { nullable: true, optional: true }), port5("title", stringType3)],
+    outputs: [port5("choice", choiceType2)],
+    parameters: [parameter4("firstLabel", stringType3), parameter4("firstValue", stringType3), parameter4("secondLabel", stringType3), parameter4("secondValue", stringType3)],
+    allowedSurfaces: ACTIVE,
+    effects: writes3(["pending"], ["pendingOptionSelection"]),
+    lower: (ctx) => `${flow6(ctx)}.choice.option({title: ${input3(ctx, "title")}, options: [{id: ${stringLiteral(ctx, "firstValue")}, label: ${stringLiteral(ctx, "firstLabel")}}, {id: ${stringLiteral(ctx, "secondValue")}, label: ${stringLiteral(ctx, "secondLabel")}}], playerId: ${input3(ctx, "player", `${ctx.surface === "pending" ? "ctx" : "context"}.playerId`)}, canCancel: false})`,
+    ui: { category: "choice" }
+  })
+];
+var STATUS_TIMER_GAMEPLAY_MODULES = Object.freeze(descriptors);
+
+// lib/skill-graph/module-registry-content-generation.ts
+var CONTENT_GENERATION_MODULE_VERSION = "1";
+var ACTIVE_SURFACES3 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var PURE_SURFACES = [...ACTIVE_SURFACES3, "preview"];
+var booleanType4 = "boolean";
+var numberType4 = "number";
+var playerType2 = "player";
+var pieceType4 = "piece";
+var stringType4 = "string";
+var choiceType3 = "choice";
+var stringListType = { kind: "list", element: stringType4 };
+var port6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var pure4 = (reads = []) => ({
   pure: true,
   previewSafe: true,
   reads
 });
-var writes = (domains, extra = {}) => ({
-  ...extra,
+var writes4 = (domains, events = []) => ({
   pure: false,
   previewSafe: false,
-  writes: domains
+  writes: domains,
+  events
 });
-function runtime(surface) {
-  return surface === "pending" ? "ctx.flow" : "flow";
+var define9 = (value) => ({
+  version: CONTENT_GENERATION_MODULE_VERSION,
+  allowedSurfaces: value.allowedSurfaces ?? ACTIVE_SURFACES3,
+  ...value
+});
+function flow7(ctx) {
+  return ctx.surface === "pending" ? "ctx.flow" : "flow";
 }
-function context(surface) {
-  return surface === "pending" ? "ctx" : "context";
-}
-function input(ctx, name) {
+function input4(ctx, name) {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
   return value;
 }
-function literal(ctx, name, fallback) {
-  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
-  if (value === void 0) throw new Error(`module ${ctx.moduleId}: missing parameter ${name}`);
-  return ctx.emitLiteral(value);
-}
-function stringLiteral(ctx, name, fallback) {
+function stringLiteral2(ctx, name, fallback) {
   const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
   if (typeof value !== "string") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be text`);
   return ctx.emitLiteral(value);
 }
-function enumLiteral(ctx, name, values, fallback) {
-  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
-  if (typeof value !== "string" || !values.includes(value)) {
-    throw new Error(`module ${ctx.moduleId}: parameter ${name} has an unsupported value`);
-  }
-  return ctx.emitLiteral(value);
-}
-function numberLiteral(ctx, name, fallback) {
+function numberLiteral2(ctx, name, fallback) {
   const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
   if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
   return ctx.emitLiteral(value);
@@ -1093,14 +2937,2339 @@ function booleanLiteral(ctx, name, fallback) {
   if (typeof value !== "boolean") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be boolean`);
   return ctx.emitLiteral(value);
 }
+function stringListLiteral(ctx, name) {
+  const value = ctx.parameters[name];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`module ${ctx.moduleId}: parameter ${name} must be a string list`);
+  }
+  return ctx.emitLiteral(value);
+}
+var CHOICE_AND_LIST_PRIMITIVES = [
+  define9({
+    id: "choice.multi-string",
+    label: "\u591A\u9009\u6587\u672C\u9009\u9879",
+    description: "\u4F7F\u7528\u56FA\u5B9A\u6587\u672C\u9009\u9879\u8FDB\u5165\u73B0\u6709\u591A\u9009\u534F\u8BAE\uFF1B\u5019\u9009\u3001\u6570\u91CF\u3001\u53D6\u6D88\u548C\u6062\u590D\u4ECD\u7531\u6743\u5A01\u9009\u62E9\u5BBF\u4E3B\u5904\u7406\u3002",
+    inputs: [],
+    outputs: [port6("choice", choiceType3)],
+    parameters: [
+      parameter5("title", stringType4, { optional: true }),
+      parameter5("options", stringListType),
+      parameter5("labels", stringListType, { optional: true }),
+      parameter5("minSelections", numberType4, { default: 1, minimum: 1 }),
+      parameter5("maxSelections", numberType4, { default: 1, minimum: 1 }),
+      parameter5("canCancel", booleanType4, { default: false })
+    ],
+    allowedSurfaces: ["skill", "card", "pending"],
+    effects: writes4(["pending"], ["pendingOptionSelection"]),
+    lower: (ctx) => {
+      const options2 = stringListLiteral(ctx, "options");
+      const labels = Object.prototype.hasOwnProperty.call(ctx.parameters, "labels") ? stringListLiteral(ctx, "labels") : void 0;
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, "title") ? `, title: ${stringLiteral2(ctx, "title")}` : "";
+      const optionLabels = labels ? `${options2}.map(function(value, index) { return {label: ${labels}[index] === undefined ? value : ${labels}[index], value: value}; })` : `${options2}.map(function(value) { return {label: value, value: value}; })`;
+      return `${flow7(ctx)}.choice.option({options: ${optionLabels}, selectionMode: "multi", minSelections: ${numberLiteral2(ctx, "minSelections", 1)}, maxSelections: ${numberLiteral2(ctx, "maxSelections", 1)}, canCancel: ${booleanLiteral(ctx, "canCancel", false)}${title}})`;
+    },
+    ui: { category: "choice" }
+  }),
+  define9({
+    id: "choice.as-string-list",
+    label: "\u8BFB\u53D6\u591A\u9009\u6587\u672C",
+    description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u591A\u9009\u7ED3\u679C\u89E3\u6790\u4E3A\u6587\u672C\u96C6\u5408\uFF1B\u6302\u8D77\u7ED3\u679C\u7531\u524D\u7F6E\u9009\u62E9\u5206\u652F\u4FDD\u7559\u3002",
+    inputs: [port6("choice", choiceType3, { nullable: true, optional: true })],
+    outputs: [port6("values", stringListType)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(["choice"]),
+    lower: (ctx) => {
+      const value = input4(ctx, "choice");
+      return `(function(value) { var selected = Array.isArray(value) ? value : (value && Array.isArray(value.value) ? value.value : []); return selected.map(function(item) { return String(item && typeof item === "object" && item.value !== undefined ? item.value : item); }); })(${value})`;
+    },
+    ui: { category: "choice" }
+  }),
+  define9({
+    id: "choice.status-tags",
+    label: "\u9009\u62E9\u68CB\u5B50\u72B6\u6001",
+    description: "\u628A\u76EE\u6807\u68CB\u5B50\u7684\u72B6\u6001\u5217\u8868\u4EA4\u7ED9\u6743\u5A01\u5355\u9009\u534F\u8BAE\uFF1B\u9009\u9879\u5305\u542B\u7A33\u5B9A\u5E8F\u53F7\u548C\u4E0D\u79FB\u9664\u5165\u53E3\u3002",
+    inputs: [port6("target", pieceType4)],
+    outputs: [port6("choice", choiceType3)],
+    parameters: [parameter5("title", stringType4, { optional: true })],
+    allowedSurfaces: ["skill", "card", "pending"],
+    effects: writes4(["pending"], ["pendingOptionSelection"]),
+    lower: (ctx) => {
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, "title") ? `, ${stringLiteral2(ctx, "title")}` : "";
+      return `${flow7(ctx)}.choice.statusTags(${input4(ctx, "target")}${title})`;
+    },
+    ui: { category: "choice" }
+  }),
+  define9({
+    id: "list.count",
+    label: "\u96C6\u5408\u6570\u91CF",
+    description: "\u8BFB\u53D6\u6709\u5E8F\u96C6\u5408\u7684\u6570\u91CF\u3002",
+    inputs: [port6("items", stringListType)],
+    outputs: [port6("count", numberType4)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `Array.isArray(${input4(ctx, "items")}) ? ${input4(ctx, "items")}.length : 0`,
+    ui: { category: "collection" }
+  }),
+  define9({
+    id: "list.has-duplicate",
+    label: "\u96C6\u5408\u6709\u91CD\u590D\u9879",
+    description: "\u6309\u7A33\u5B9A\u6587\u672C\u503C\u5224\u65AD\u96C6\u5408\u4E2D\u662F\u5426\u51FA\u73B0\u91CD\u590D\u9879\u3002",
+    inputs: [port6("items", stringListType)],
+    outputs: [port6("duplicate", booleanType4)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(function(items) { return Array.isArray(items) && new Set(items).size !== items.length; })(${input4(ctx, "items")})`,
+    ui: { category: "collection" }
+  }),
+  define9({
+    id: "list.all-in",
+    label: "\u96C6\u5408\u503C\u57DF\u6821\u9A8C",
+    description: "\u5224\u65AD\u96C6\u5408\u4E2D\u7684\u6BCF\u4E2A\u6587\u672C\u503C\u662F\u5426\u5C5E\u4E8E\u767B\u8BB0\u7684\u5141\u8BB8\u503C\u96C6\u5408\u3002",
+    inputs: [port6("items", stringListType)],
+    outputs: [port6("valid", booleanType4)],
+    parameters: [parameter5("allowed", stringListType)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(function(items, allowed) { return Array.isArray(items) && items.every(function(item) { return allowed.indexOf(item) !== -1; }); })(${input4(ctx, "items")}, ${stringListLiteral(ctx, "allowed")})`,
+    ui: { category: "collection" }
+  }),
+  define9({
+    id: "list.sort-string",
+    label: "\u6587\u672C\u7A33\u5B9A\u6392\u5E8F",
+    description: "\u590D\u5236\u5E76\u6309 JavaScript \u5B57\u7B26\u4E32\u987A\u5E8F\u6392\u5E8F\uFF0C\u4E0D\u6539\u53D8\u6765\u6E90\u96C6\u5408\u3002",
+    inputs: [port6("items", stringListType)],
+    outputs: [port6("sorted", stringListType)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(Array.isArray(${input4(ctx, "items")}) ? ${input4(ctx, "items")}.slice().sort() : [])`,
+    ui: { category: "collection" }
+  }),
+  define9({
+    id: "list.join",
+    label: "\u96C6\u5408\u62FC\u63A5",
+    description: "\u6309\u539F\u96C6\u5408\u987A\u5E8F\u62FC\u63A5\u6587\u672C\u503C\u3002",
+    inputs: [port6("items", stringListType)],
+    outputs: [port6("text", stringType4)],
+    parameters: [parameter5("separator", stringType4, { default: "," })],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(Array.isArray(${input4(ctx, "items")}) ? ${input4(ctx, "items")}.join(${stringLiteral2(ctx, "separator", ",")}) : "")`,
+    ui: { category: "collection" }
+  }),
+  define9({
+    id: "value.select-number",
+    label: "\u6309\u6761\u4EF6\u9009\u62E9\u6570\u5B57",
+    description: "\u5728\u4E24\u4E2A\u5DF2\u8BA1\u7B97\u6570\u5B57\u4E4B\u95F4\u6309\u5E03\u5C14\u6761\u4EF6\u9009\u62E9\u4E00\u4E2A\u503C\u3002",
+    inputs: [port6("condition", booleanType4), port6("whenTrue", numberType4), port6("whenFalse", numberType4)],
+    outputs: [port6("value", numberType4)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(${input4(ctx, "condition")} ? ${input4(ctx, "whenTrue")} : ${input4(ctx, "whenFalse")})`,
+    ui: { category: "logic" }
+  }),
+  define9({
+    id: "text.optional-fragment",
+    label: "\u6761\u4EF6\u6587\u672C\u7247\u6BB5",
+    description: "\u6761\u4EF6\u6210\u7ACB\u65F6\u62FC\u63A5\u4E00\u4E2A\u56FA\u5B9A\u524D\u7F00\u3001\u503C\u548C\u540E\u7F00\uFF0C\u5426\u5219\u8FD4\u56DE\u7A7A\u6587\u672C\u3002",
+    inputs: [port6("condition", booleanType4), port6("value", stringType4)],
+    outputs: [port6("text", stringType4)],
+    parameters: [parameter5("prefix", stringType4, { default: "" }), parameter5("suffix", stringType4, { default: "" })],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(),
+    lower: (ctx) => `(${input4(ctx, "condition")} ? (${stringLiteral2(ctx, "prefix", "")} + ${input4(ctx, "value")} + ${stringLiteral2(ctx, "suffix", "")}) : "")`,
+    ui: { category: "text" }
+  })
+];
+var CONTENT_PRIMITIVES = [
+  define9({
+    id: "content.enemy-player",
+    label: "\u67E5\u627E\u654C\u65B9\u73A9\u5BB6",
+    description: "\u6309\u5F53\u524D\u5BF9\u5C40\u7684\u65E2\u6709\u73A9\u5BB6\u987A\u5E8F\u89E3\u6790\u4E00\u540D\u654C\u65B9\u73A9\u5BB6\uFF0C\u4E0D\u66B4\u9732\u73A9\u5BB6\u96C6\u5408\u7ED9\u4F5C\u8005\u56FE\u3002",
+    inputs: [port6("player", playerType2, { nullable: true, optional: true })],
+    outputs: [port6("enemy", playerType2, { nullable: true })],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: pure4(["players"]),
+    lower: (ctx) => `${flow7(ctx)}.content.enemyPlayer(${input4(ctx, "player")})`,
+    ui: { category: "content" }
+  }),
+  define9({
+    id: "content.filter-hand",
+    label: "\u6309\u540D\u79F0\u6216 ID \u7B5B\u9009\u624B\u724C",
+    description: "\u6309\u56FA\u5B9A\u7684\u540D\u79F0\u7247\u6BB5\u6216\u5361\u724C ID \u524D\u7F00\u7B5B\u9009\u6307\u5B9A\u73A9\u5BB6\u624B\u724C\uFF1B\u4FDD\u7559\u624B\u724C\u987A\u5E8F\u5E76\u62A5\u544A\u624B\u724C\u662F\u5426\u5B58\u5728\u3002",
+    inputs: [port6("player", playerType2, { nullable: true, optional: true })],
+    outputs: [port6("cards", stringListType), port6("hasHand", booleanType4)],
+    parameters: [parameter5("nameContains", stringType4, { optional: true }), parameter5("cardIdPrefix", stringType4, { optional: true })],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: pure4(["hand", "content"]),
+    lower: (ctx) => {
+      const nameContains = Object.prototype.hasOwnProperty.call(ctx.parameters, "nameContains") ? stringLiteral2(ctx, "nameContains") : "null";
+      const cardIdPrefix = Object.prototype.hasOwnProperty.call(ctx.parameters, "cardIdPrefix") ? stringLiteral2(ctx, "cardIdPrefix") : "null";
+      return `${flow7(ctx)}.content.filterHand(${input4(ctx, "player")}, {nameContains: ${nameContains}, cardIdPrefix: ${cardIdPrefix}})`;
+    },
+    ui: { category: "content" }
+  }),
+  define9({
+    id: "content.copy-card",
+    label: "\u590D\u5236\u5361\u724C\u5B9A\u4E49",
+    description: "\u590D\u5236\u5DF2\u5B58\u5728\u7684\u52A8\u6001\u5361\u724C\u5B9A\u4E49\uFF1B\u9759\u6001\u5361\u724C\u6216\u7F3A\u5C11\u52A8\u6001\u5B9A\u4E49\u65F6\u6CBF\u7528\u6765\u6E90 ID\u3002\u672A\u77E5\u5B57\u6BB5\u4E0E\u6A21\u5757\u56FE\u4FDD\u6301\u539F\u6837\u3002",
+    inputs: [port6("sourceId", stringType4), port6("index", numberType4)],
+    outputs: [port6("cardId", stringType4), port6("copied", booleanType4)],
+    parameters: [parameter5("idPrefix", stringType4, { default: "content-copy-" })],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["content", "hand"], ["contentCardCopied"]),
+    lower: (ctx) => `${flow7(ctx)}.content.copyCard(${input4(ctx, "sourceId")}, ${stringLiteral2(ctx, "idPrefix", "content-copy-")}, ${input4(ctx, "index")})`,
+    ui: { category: "content" }
+  }),
+  define9({
+    id: "content.materialize-template",
+    label: "\u5B9E\u4F8B\u5316\u5361\u724C\u6A21\u677F",
+    description: "\u6309\u53D7\u4FE1\u6A21\u677F\u548C\u7ED3\u6784\u5316\u7ED1\u5B9A\u521B\u5EFA\u52A8\u6001\u5361\u724C\u5B9A\u4E49\uFF1B\u751F\u6210\u5B57\u6BB5\u6765\u81EA\u6A21\u677F\u56FE\uFF0C\u4E0D\u63A5\u53D7\u6E90\u7801\u6587\u672C\u3002",
+    inputs: [
+      port6("templateId", stringType4),
+      port6("cardId", stringType4),
+      port6("name", stringType4),
+      port6("description", stringType4),
+      port6("owner", playerType2, { nullable: true, optional: true })
+    ],
+    outputs: [port6("cardId", stringType4), port6("success", booleanType4)],
+    parameters: [parameter5("kind", stringType4, { enum: ["card"], default: "card" })],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["content"], ["contentCardMaterialized"]),
+    lower: (ctx) => `${flow7(ctx)}.content.materializeTemplate({kind: ${stringLiteral2(ctx, "kind", "card")}, templateId: ${input4(ctx, "templateId")}, cardId: ${input4(ctx, "cardId")}, name: ${input4(ctx, "name")}, description: ${input4(ctx, "description")}, owner: ${ctx.inputs.owner ?? "null"}})`,
+    ui: { category: "content" }
+  }),
+  define9({
+    id: "card.hand-add-ref",
+    label: "\u52A0\u5165\u52A8\u6001\u5361\u724C\u624B\u724C",
+    description: "\u4F7F\u7528\u5DF2\u751F\u6210\u7684\u5361\u724C\u5B9A\u4E49 ID \u6CBF\u7528\u65E2\u6709\u624B\u724C\u5BB9\u91CF\u3001\u5B9E\u4F8B\u5316\u548C\u4E8B\u4EF6\u6D41\u7A0B\u3002",
+    inputs: [port6("player", playerType2), port6("cardId", stringType4)],
+    outputs: [port6("success", booleanType4)],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["hand", "events"], ["cardAdded"]),
+    lower: (ctx) => `${flow7(ctx)}.cards.add(${input4(ctx, "player")}, ${input4(ctx, "cardId")})`,
+    ui: { category: "card" }
+  })
+];
+var PIECE_AND_STATUS_PRIMITIVES = [
+  define9({
+    id: "attribute.set-current-hp",
+    label: "\u8BBE\u5B9A\u5F53\u524D\u751F\u547D",
+    description: "\u901A\u8FC7\u5BBF\u4E3B\u7684\u65E0\u4E8B\u4EF6\u751F\u547D\u5199\u5165\u53E3\u8BBE\u5B9A\u5F53\u524D\u751F\u547D\u503C\uFF1B\u7528\u4E8E\u56DE\u5408\u89C4\u5219\u7684\u76F4\u63A5\u6062\u590D\u8BED\u4E49\uFF0C\u4E0D\u89E6\u53D1\u6CBB\u7597\u4E8B\u4EF6\u3002",
+    inputs: [port6("piece", pieceType4), port6("value", numberType4)],
+    outputs: [port6("value", numberType4)],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["attributes"], []),
+    lower: (ctx) => `${flow7(ctx)}.attributes.setCurrentHp(${input4(ctx, "piece")}, ${input4(ctx, "value")})`,
+    ui: { category: "effect" }
+  }),
+  define9({
+    id: "piece.momentum",
+    label: "\u8BFB\u53D6\u52A8\u91CF",
+    description: "\u8BFB\u53D6\u68CB\u5B50\u767B\u8BB0\u7684\u52A8\u91CF\u6570\u503C\uFF1B\u7F3A\u7701\u503C\u6CBF\u7528\u65E7\u5185\u5BB9\u7684\u96F6\u503C\u89C4\u5219\u3002",
+    inputs: [port6("piece", pieceType4)],
+    outputs: [port6("value", numberType4)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(["pieces"]),
+    lower: (ctx) => `Number(${flow7(ctx)}.query.piece(${input4(ctx, "piece")}).momentum || 0)`,
+    ui: { category: "query" }
+  }),
+  define9({
+    id: "status.count-all",
+    label: "\u8BFB\u53D6\u72B6\u6001\u6570\u91CF",
+    description: "\u8BFB\u53D6\u76EE\u6807\u68CB\u5B50\u7684\u5F53\u524D\u72B6\u6001\u6570\u91CF\uFF0C\u7528\u4E8E\u51B3\u5B9A\u662F\u5426\u8FDB\u5165\u72B6\u6001\u9009\u62E9\u534F\u8BAE\u3002",
+    inputs: [port6("target", pieceType4)],
+    outputs: [port6("count", numberType4)],
+    allowedSurfaces: PURE_SURFACES,
+    effects: pure4(["status"]),
+    lower: (ctx) => `${flow7(ctx)}.status.count(${input4(ctx, "target")})`,
+    ui: { category: "status" }
+  }),
+  define9({
+    id: "status.make-id",
+    label: "\u751F\u6210\u72B6\u6001\u6807\u8BC6",
+    description: "\u8BA9\u6743\u5A01\u72B6\u6001\u5BBF\u4E3B\u751F\u6210\u4E00\u4E2A\u53EF\u56DE\u653E\u7684\u552F\u4E00\u72B6\u6001\u6807\u8BC6\uFF1B\u4F5C\u8005\u56FE\u53EA\u63D0\u4F9B\u7A33\u5B9A\u524D\u7F00\u3002",
+    inputs: [port6("target", pieceType4)],
+    outputs: [port6("id", stringType4)],
+    parameters: [parameter5("prefix", stringType4)],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["status"], ["statusIdAllocated"]),
+    lower: (ctx) => `${flow7(ctx)}.status.generatedId(${input4(ctx, "target")}, ${stringLiteral2(ctx, "prefix")})`,
+    ui: { category: "status" }
+  }),
+  define9({
+    id: "status.append-record",
+    label: "\u517C\u5BB9\u6027\u76F4\u5199\u68CB\u5B50\u72B6\u6001",
+    description: "\u6309\u65E7\u5185\u5BB9\u7684\u76F4\u63A5 statusTags.push \u8BED\u4E49\u8FFD\u52A0\u7ED3\u6784\u5316\u72B6\u6001\uFF1B\u4E0D\u89E6\u53D1\u751F\u547D\u5468\u671F\u4E8B\u4EF6\uFF0C\u4E0D\u63A8\u65AD\u6765\u6E90\uFF0C\u4E5F\u4E0D\u81EA\u52A8\u5B89\u88C5\u89C4\u5219\u3002",
+    inputs: [port6("target", pieceType4), port6("record", "record")],
+    outputs: [port6("success", booleanType4)],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["status"], []),
+    lower: (ctx) => `${flow7(ctx)}.status.appendRaw(${input4(ctx, "target")}, ${input4(ctx, "record")})`,
+    ui: { category: "status" }
+  }),
+  define9({
+    id: "status.remove-choice",
+    label: "\u6309\u9009\u62E9\u79FB\u9664\u72B6\u6001",
+    description: "\u9A8C\u8BC1\u5E76\u6309\u65E7\u5185\u5BB9\u7684\u76F4\u63A5 statusTags.splice \u8BED\u4E49\u79FB\u9664\u4E00\u4E2A\u72B6\u6001\uFF1B\u53D6\u6D88\u9009\u9879\u4E0D\u6539\u53D8\u72B6\u6001\uFF0C\u4E5F\u4E0D\u89E6\u53D1\u751F\u547D\u5468\u671F\u4E8B\u4EF6\u3002",
+    inputs: [port6("target", pieceType4), port6("choice", choiceType3, { nullable: true, optional: true })],
+    outputs: [port6("valid", booleanType4), port6("removed", booleanType4), port6("name", stringType4)],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    effects: writes4(["status"], []),
+    lower: (ctx) => `${flow7(ctx)}.status.removeChoice(${input4(ctx, "target")}, ${ctx.inputs.choice ?? "null"})`,
+    ui: { category: "status" }
+  }),
+  define9({
+    id: "status.refresh-temporary",
+    label: "\u5237\u65B0\u4E34\u65F6\u72B6\u6001",
+    description: "\u6309\u72B6\u6001\u7C7B\u578B\u67E5\u627E\u6216\u521B\u5EFA\u72B6\u6001\uFF0C\u5E76\u628A\u5F53\u524D\u56DE\u5408\u3001\u6301\u7EED\u65F6\u95F4\u548C\u4F7F\u7528\u6B21\u6570\u4EA4\u7ED9\u72B6\u6001\u5BBF\u4E3B\u66F4\u65B0\u3002",
+    inputs: [port6("target", pieceType4), port6("turn", numberType4)],
+    outputs: [port6("success", booleanType4)],
+    parameters: [
+      parameter5("statusType", stringType4),
+      parameter5("name", stringType4),
+      parameter5("idPrefix", stringType4),
+      parameter5("duration", numberType4, { default: 1 }),
+      parameter5("uses", numberType4, { default: 1 }),
+      parameter5("visible", booleanType4, { default: true })
+    ],
+    allowedSurfaces: ACTIVE_SURFACES3,
+    // These two legacy records were written directly and therefore must not
+    // acquire lifecycle events or inferred rule/source metadata when refreshed.
+    effects: writes4(["status"], []),
+    lower: (ctx) => `${flow7(ctx)}.status.refreshTemporary(${input4(ctx, "target")}, {type: ${stringLiteral2(ctx, "statusType")}, name: ${stringLiteral2(ctx, "name")}, idPrefix: ${stringLiteral2(ctx, "idPrefix")}, turn: ${input4(ctx, "turn")}, duration: ${numberLiteral2(ctx, "duration", 1)}, uses: ${numberLiteral2(ctx, "uses", 1)}, visible: ${booleanLiteral(ctx, "visible", true)}})`,
+    ui: { category: "status" }
+  })
+];
+var CONTENT_GENERATION_GAMEPLAY_MODULES = Object.freeze([
+  ...CHOICE_AND_LIST_PRIMITIVES,
+  ...CONTENT_PRIMITIVES,
+  ...PIECE_AND_STATUS_PRIMITIVES
+]);
+
+// lib/skill-graph/module-registry-pending-spatial.ts
+var ACTIVE2 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var numberType5 = "number";
+var booleanType5 = "boolean";
+var stringType5 = "string";
+var pieceType5 = "piece";
+var cellType3 = "cell";
+var choiceType4 = "choice";
+var pieceListType = { kind: "list", element: pieceType5 };
+var cellListType = { kind: "list", element: cellType3 };
+var choiceListType = { kind: "list", element: choiceType4 };
+var port7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var input5 = (ctx, name, fallback) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) {
+    if (fallback !== void 0) return fallback;
+    throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  }
+  return value;
+};
+var runtime2 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle4 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var host = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
+var literal3 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (value === void 0) throw new Error(`module ${ctx.moduleId}: missing parameter ${name}`);
+  return ctx.emitLiteral(value);
+};
+var stringLiteral3 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "string") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be text`);
+  return ctx.emitLiteral(value);
+};
+var numberLiteral3 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
+  return ctx.emitLiteral(value);
+};
+var booleanLiteral2 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "boolean") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be boolean`);
+  return ctx.emitLiteral(value);
+};
+var pure5 = (reads = []) => ({ pure: true, previewSafe: false, reads });
+var writes5 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define10 = (value) => ({
+  version: "1",
+  allowedSurfaces: value.allowedSurfaces ?? ACTIVE2,
+  ...value
+});
+var CONTEXT_PRIMITIVES = [
+  define10({
+    id: "event.selected-targets",
+    label: "\u5DF2\u9009\u76EE\u6807\u96C6\u5408",
+    description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u7ECF\u9A8C\u8BC1\u7684\u591A\u76EE\u6807\u9009\u62E9\u96C6\u5408\u3002",
+    inputs: [],
+    outputs: [port7("targets", choiceListType)],
+    effects: pure5(["event", "choice"]),
+    lower: (ctx) => `(Array.isArray(${host(ctx)}.selectedTargets) ? ${host(ctx)}.selectedTargets : [])`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "event.selected-option",
+    label: "\u5DF2\u9009\u9009\u9879",
+    description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u7ECF\u9A8C\u8BC1\u7684\u9009\u9879\u503C\uFF1B\u5C1A\u672A\u9009\u62E9\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
+    inputs: [],
+    outputs: [port7("value", stringType5, { nullable: true })],
+    effects: pure5(["event", "choice"]),
+    lower: (ctx) => `(${host(ctx)}.selectedOption === undefined || ${host(ctx)}.selectedOption === null ? null : String(${host(ctx)}.selectedOption))`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "event.card-id",
+    label: "\u4E8B\u4EF6\u5361\u724C\u6807\u8BC6",
+    description: "\u8BFB\u53D6\u5F53\u524D\u5361\u724C\u4E8B\u4EF6\u7684\u7A33\u5B9A\u6807\u8BC6\u3002",
+    inputs: [],
+    outputs: [port7("value", stringType5, { nullable: true })],
+    effects: pure5(["event"]),
+    allowedSurfaces: ["rule", "triggerSkill", "pending"],
+    lower: (ctx) => `(${host(ctx)}.cardId === undefined || ${host(ctx)}.cardId === null ? null : String(${host(ctx)}.cardId))`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "event.skill-id",
+    label: "\u4E8B\u4EF6\u6280\u80FD\u6807\u8BC6",
+    description: "\u8BFB\u53D6\u5F53\u524D\u6280\u80FD\u4E8B\u4EF6\u7684\u7A33\u5B9A\u6807\u8BC6\u3002",
+    inputs: [],
+    outputs: [port7("value", stringType5, { nullable: true })],
+    effects: pure5(["event"]),
+    allowedSurfaces: ["rule", "triggerSkill", "pending"],
+    lower: (ctx) => `(${host(ctx)}.skillId === undefined || ${host(ctx)}.skillId === null ? null : String(${host(ctx)}.skillId))`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "event.cancelled",
+    label: "\u4E8B\u4EF6\u5DF2\u53D6\u6D88",
+    description: "\u8BFB\u53D6\u5BBF\u4E3B\u7684\u53D6\u6D88\u4E8B\u5B9E\u3002",
+    inputs: [],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["event"]),
+    allowedSurfaces: ["rule", "triggerSkill", "pending"],
+    lower: (ctx) => `Boolean(${host(ctx)}.cancelled)`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "event.reserved-cells",
+    label: "\u4E8B\u4EF6\u9884\u7559\u5730\u683C",
+    description: "\u8BFB\u53D6\u5F53\u524D\u4F4D\u79FB\u4E8B\u4EF6\u63D0\u4F9B\u7684\u9884\u7559\u5730\u683C\u96C6\u5408\u3002",
+    inputs: [],
+    outputs: [port7("cells", cellListType)],
+    effects: pure5(["event", "position"]),
+    allowedSurfaces: ["rule", "triggerSkill", "pending"],
+    lower: (ctx) => `(Array.isArray(${host(ctx)}.reservedCells) ? ${host(ctx)}.reservedCells : [])`,
+    ui: { category: "context" }
+  })
+];
+var CHOICE_PRIMITIVES2 = [
+  define10({
+    id: "choice.from-pieces",
+    label: "\u68CB\u5B50\u5019\u9009\u96C6\u5408",
+    description: "\u628A\u5DF2\u67E5\u8BE2\u5E76\u6309\u5B9E\u4F8B\u6807\u8BC6\u6392\u5E8F\u7684\u68CB\u5B50\u96C6\u5408\u8F6C\u6362\u4E3A\u76EE\u6807\u5019\u9009\u3002",
+    inputs: [port7("pieces", pieceListType)],
+    outputs: [port7("choices", choiceListType)],
+    effects: pure5(["pieces"]),
+    lower: (ctx) => `((${input5(ctx, "pieces")} || []).map(function(id) { return {type: "piece", pieceId: id}; }).sort(function(a, b) { return String(a.pieceId).localeCompare(String(b.pieceId)); }))`,
+    ui: { category: "choice" }
+  }),
+  define10({
+    id: "choice.from-cells",
+    label: "\u5730\u683C\u5019\u9009\u96C6\u5408",
+    description: "\u628A\u5730\u683C\u96C6\u5408\u6309 y\u3001x \u7684\u7A33\u5B9A\u987A\u5E8F\u8F6C\u6362\u4E3A\u76EE\u6807\u5019\u9009\u3002",
+    inputs: [port7("cells", cellListType)],
+    outputs: [port7("choices", choiceListType)],
+    effects: pure5(["position"]),
+    lower: (ctx) => `((${input5(ctx, "cells")} || []).map(function(cell) { return {type: "cell", x: cell.x, y: cell.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }))`,
+    ui: { category: "choice" }
+  }),
+  define10({
+    id: "choice.selected-pieces",
+    label: "\u8BFB\u53D6\u5DF2\u9009\u68CB\u5B50",
+    description: "\u4ECE\u5BBF\u4E3B\u76EE\u6807\u96C6\u5408\u4E2D\u8BFB\u53D6\u4ECD\u7136\u5B58\u5728\u7684\u68CB\u5B50\u5E76\u6309\u5B9E\u4F8B\u6807\u8BC6\u6392\u5E8F\u3002",
+    inputs: [port7("targets", choiceListType)],
+    outputs: [port7("pieces", pieceListType)],
+    effects: pure5(["pieces", "choice"]),
+    lower: (ctx) => `(function(values) { var seen = {}; return (values || []).filter(function(value) { return value && value.type === "piece" && typeof value.pieceId === "string" && !seen[value.pieceId] && ${runtime2(ctx)}.query.hasPiece(value.pieceId) && ${runtime2(ctx)}.query.piece(value.pieceId).currentHp > 0 && (seen[value.pieceId] = true); }).map(function(value) { return value.pieceId; }).sort(function(a, b) { return String(a).localeCompare(String(b)); }); })(${input5(ctx, "targets")})`,
+    ui: { category: "choice" }
+  }),
+  define10({
+    id: "choice.selected-cell",
+    label: "\u8BFB\u53D6\u5DF2\u9009\u5730\u683C",
+    description: "\u4ECE\u5BBF\u4E3B\u76EE\u6807\u96C6\u5408\u4E2D\u8BFB\u53D6\u9996\u4E2A\u5408\u6CD5\u5730\u683C\u3002",
+    inputs: [port7("targets", choiceListType)],
+    outputs: [port7("cell", cellType3, { nullable: true })],
+    effects: pure5(["choice"]),
+    lower: (ctx) => `(function(values) { var cell = (values || []).find(function(value) { return value && value.type === "cell" && Number.isInteger(value.x) && Number.isInteger(value.y); }); return cell ? {x: cell.x, y: cell.y} : null; })(${input5(ctx, "targets")})`,
+    ui: { category: "choice" }
+  }),
+  define10({
+    id: "choice.binary-option",
+    label: "\u4E8C\u5143\u9009\u9879",
+    description: "\u4F7F\u7528\u73B0\u6709\u9009\u9879\u534F\u8BAE\u5448\u73B0\u4E00\u4E2A\u53EF\u53D6\u6D88\u7684\u4E8C\u5143\u9009\u62E9\u3002",
+    inputs: [port7("player", "player", { nullable: true, optional: true })],
+    outputs: [port7("choice", choiceType4)],
+    parameters: [
+      parameter6("title", stringType5),
+      parameter6("yesLabel", stringType5),
+      parameter6("noLabel", stringType5),
+      parameter6("yesValue", stringType5, { default: "yes" }),
+      parameter6("noValue", stringType5, { default: "no" })
+    ],
+    effects: writes5(["pending"], ["pendingOptionSelection"]),
+    lower: (ctx) => {
+      const player = input5(ctx, "player", `${host(ctx)}.playerId`);
+      const options2 = `[{label: ${stringLiteral3(ctx, "yesLabel")}, value: ${stringLiteral3(ctx, "yesValue", "yes")}}, {label: ${stringLiteral3(ctx, "noLabel")}, value: ${stringLiteral3(ctx, "noValue", "no")}}]`;
+      const config = `{title: ${stringLiteral3(ctx, "title")}, options: ${options2}, playerId: ${player}, canCancel: true, cancelValue: ${stringLiteral3(ctx, "noValue", "no")}}`;
+      return `${runtime2(ctx)}.choice.option(${config})`;
+    },
+    ui: { category: "choice" }
+  }),
+  define10({
+    id: "choice.raw-string-value",
+    label: "\u5DF2\u9009\u9009\u9879\u503C",
+    description: "\u8BFB\u53D6\u5DF2\u5B8C\u6210\u4E8C\u5143\u9009\u9879\u7684\u539F\u59CB\u503C\uFF1B\u5F85\u9009\u62E9\u6216\u53D6\u6D88\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
+    inputs: [port7("choice", choiceType4, { nullable: true, optional: true })],
+    outputs: [port7("value", stringType5, { nullable: true })],
+    effects: pure5(["choice"]),
+    lower: (ctx) => `(typeof ${input5(ctx, "choice")} === "string" ? ${input5(ctx, "choice")} : null)`,
+    ui: { category: "choice" }
+  })
+];
+var QUERY_PRIMITIVES = [
+  define10({
+    id: "piece.is-core",
+    label: "\u6838\u5FC3\u68CB\u5B50",
+    description: "\u8BFB\u53D6\u5185\u5BB9\u6570\u636E\u58F0\u660E\u7684\u6838\u5FC3\u68CB\u5B50\u6807\u8BB0\u3002",
+    inputs: [port7("piece", pieceType5)],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["pieces"]),
+    lower: (ctx) => `Boolean(${runtime2(ctx)}.query.piece(${input5(ctx, "piece")}).isCore === true)`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "piece.has-position",
+    label: "\u68CB\u5B50\u5177\u6709\u5730\u683C",
+    description: "\u5224\u65AD\u68CB\u5B50\u5F53\u524D\u5177\u6709\u53EF\u7528\u4E8E\u79FB\u52A8\u7684\u6709\u9650\u5730\u683C\u5750\u6807\u3002",
+    inputs: [port7("piece", pieceType5)],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["pieces", "position"]),
+    lower: (ctx) => `(function(pieceId) { var piece = ${runtime2(ctx)}.query.piece(pieceId); return Boolean(piece && Number.isFinite(piece.x) && Number.isFinite(piece.y)); })(${input5(ctx, "piece")})`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "piece.require",
+    label: "\u89E3\u6790\u53EF\u7A7A\u68CB\u5B50",
+    description: "\u628A\u5DF2\u7ECF\u901A\u8FC7\u5B58\u6D3B\u6216\u5B58\u5728\u68C0\u67E5\u7684\u53EF\u7A7A\u68CB\u5B50\u5F15\u7528\u89E3\u6790\u4E3A\u7EDF\u4E00\u68CB\u5B50 ID\u3002",
+    inputs: [port7("piece", pieceType5, { nullable: true })],
+    outputs: [port7("piece", pieceType5)],
+    effects: pure5(["pieces"]),
+    lower: (ctx) => `(function(pieceId) { return pieceId && ${runtime2(ctx)}.query.hasPiece(pieceId) ? pieceId : null; })(${input5(ctx, "piece")})`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "spatial.cell-in-list",
+    label: "\u5730\u683C\u5C5E\u4E8E\u5019\u9009",
+    description: "\u6309\u5750\u6807\u5224\u65AD\u5730\u683C\u662F\u5426\u4ECD\u5C5E\u4E8E\u4E00\u7EC4\u5DF2\u8BA1\u7B97\u5019\u9009\u3002",
+    inputs: [port7("cell", cellType3, { nullable: true }), port7("cells", cellListType)],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["position"]),
+    lower: (ctx) => `(function(cell, cells) { return Boolean(cell) && (cells || []).some(function(candidate) { return candidate && candidate.x === cell.x && candidate.y === cell.y; }); })(${input5(ctx, "cell")}, ${input5(ctx, "cells")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.walkable-cells",
+    label: "\u53EF\u884C\u8D70\u5730\u683C\u96C6\u5408",
+    description: "\u6309\u5730\u56FE\u987A\u5E8F\u8FD4\u56DE\u6240\u6709\u53EF\u884C\u8D70\u5730\u683C\u3002",
+    inputs: [],
+    outputs: [port7("cells", cellListType)],
+    effects: pure5(["position"]),
+    lower: (ctx) => `((${battle4(ctx)}.map && Array.isArray(${battle4(ctx)}.map.tiles) ? ${battle4(ctx)}.map.tiles : []).filter(function(tile) { return tile && tile.props && tile.props.walkable; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x,y:tile.y}; }))`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.formation-selection-valid",
+    label: "\u7F16\u961F\u9009\u62E9\u6709\u6548",
+    description: "\u9A8C\u8BC1\u7F16\u961F\u9009\u62E9\u6570\u91CF\u3001\u5B58\u6D3B\u3001\u53CB\u65B9\u5173\u7CFB\u548C\u6838\u5FC3\u6807\u8BB0\u3002",
+    inputs: [port7("source", pieceType5), port7("selected", pieceListType)],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["pieces", "players"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), selected = input5(ctx, "selected"), state = battle4(ctx), query = runtime2(ctx);
+      return `(function(sourceId, selectedIds) { if (!Array.isArray(selectedIds) || selectedIds.length < 1 || selectedIds.length > 3 || new Set(selectedIds.map(String)).size !== selectedIds.length) return false; var allies = ${query}.query.pieces({originId:sourceId, relation:"ally", includeDead:false}); return selectedIds.every(function(id) { var piece = (${state}.pieces || []).find(function(candidate) { return candidate && candidate.instanceId === id; }); return Boolean(piece && allies.indexOf(id) >= 0 && piece.isCore === true && piece.currentHp > 0); }); })(${source}, ${selected})`;
+    },
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "list.count-pieces",
+    label: "\u68CB\u5B50\u96C6\u5408\u6570\u91CF",
+    description: "\u8BFB\u53D6\u6709\u754C\u68CB\u5B50\u5217\u8868\u7684\u6570\u91CF\u3002",
+    inputs: [port7("items", pieceListType)],
+    outputs: [port7("value", numberType5)],
+    effects: pure5(),
+    lower: (ctx) => `Array.isArray(${input5(ctx, "items")}) ? ${input5(ctx, "items")}.length : 0`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "list.first-piece",
+    label: "\u68CB\u5B50\u96C6\u5408\u9996\u9879",
+    description: "\u8BFB\u53D6\u7A33\u5B9A\u6392\u5E8F\u68CB\u5B50\u96C6\u5408\u7684\u9996\u4E2A\u5B9E\u4F8B\uFF1B\u7A7A\u96C6\u5408\u8FD4\u56DE\u7A7A\u5F15\u7528\u3002",
+    inputs: [port7("items", pieceListType)],
+    outputs: [port7("piece", pieceType5, { nullable: true })],
+    effects: pure5(["pieces"]),
+    lower: (ctx) => `(Array.isArray(${input5(ctx, "items")}) && ${input5(ctx, "items")}.length > 0 ? ${input5(ctx, "items")}[0] : null)`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "list.count-cells",
+    label: "\u5730\u683C\u96C6\u5408\u6570\u91CF",
+    description: "\u8BFB\u53D6\u6709\u754C\u5730\u683C\u5217\u8868\u7684\u6570\u91CF\u3002",
+    inputs: [port7("items", cellListType)],
+    outputs: [port7("value", numberType5)],
+    effects: pure5(),
+    lower: (ctx) => `Array.isArray(${input5(ctx, "items")}) ? ${input5(ctx, "items")}.length : 0`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "list.count-choices",
+    label: "\u5019\u9009\u96C6\u5408\u6570\u91CF",
+    description: "\u8BFB\u53D6\u6709\u754C\u5019\u9009\u5217\u8868\u7684\u6570\u91CF\u3002",
+    inputs: [port7("items", choiceListType)],
+    outputs: [port7("value", numberType5)],
+    effects: pure5(),
+    lower: (ctx) => `Array.isArray(${input5(ctx, "items")}) ? ${input5(ctx, "items")}.length : 0`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "value.present-cell",
+    label: "\u5730\u683C\u5B58\u5728",
+    description: "\u5224\u65AD\u4E00\u4E2A\u5EF6\u8FDF\u9009\u62E9\u6216\u4F4D\u79FB\u7ED3\u679C\u4E2D\u7684\u53EF\u7A7A\u5730\u683C\u662F\u5426\u5B58\u5728\u3002",
+    inputs: [port7("value", cellType3, { nullable: true })],
+    outputs: [port7("present", booleanType5)],
+    effects: pure5(),
+    lower: (ctx) => `(${input5(ctx, "value")} !== null && ${input5(ctx, "value")} !== undefined)`,
+    ui: { category: "logic" }
+  }),
+  define10({
+    id: "compare.equal-string-nullable",
+    label: "\u53EF\u7A7A\u6587\u672C\u76F8\u7B49",
+    description: "\u6BD4\u8F83\u53EF\u7A7A\u4E8B\u4EF6\u6587\u672C\u4E0E\u7A33\u5B9A\u6587\u672C\u6807\u8BC6\u3002",
+    inputs: [port7("left", stringType5, { nullable: true }), port7("right", stringType5)],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(),
+    lower: (ctx) => `(${input5(ctx, "left")} === ${input5(ctx, "right")})`,
+    ui: { category: "logic" }
+  }),
+  define10({
+    id: "player.require",
+    label: "\u89E3\u6790\u53EF\u7A7A\u73A9\u5BB6",
+    description: "\u628A\u5EF6\u8FDF\u5BBF\u4E3B\u4E0A\u4E0B\u6587\u4E2D\u7684\u53EF\u7A7A\u73A9\u5BB6\u5F15\u7528\u89E3\u6790\u4E3A\u9009\u62E9\u534F\u8BAE\u9700\u8981\u7684\u73A9\u5BB6 ID\u3002",
+    inputs: [port7("player", "player", { nullable: true })],
+    outputs: [port7("player", "player")],
+    effects: pure5(["context"]),
+    lower: (ctx) => `(${input5(ctx, "player")} || ${host(ctx)}.playerId)`,
+    ui: { category: "context" }
+  }),
+  define10({
+    id: "query.random-item",
+    label: "\u786E\u5B9A\u6027\u968F\u673A\u68CB\u5B50",
+    description: "\u901A\u8FC7\u89C4\u5219\u968F\u673A\u6E90\u9009\u62E9\u4E00\u4E2A\u68CB\u5B50\u96C6\u5408\u9879\u3002",
+    inputs: [port7("items", pieceListType)],
+    outputs: [port7("item", pieceType5)],
+    effects: { ...pure5(["random"]), random: true },
+    lower: (ctx) => `${runtime2(ctx)}.query.random(${input5(ctx, "items")})`,
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "status.has-source-mark",
+    label: "\u6765\u6E90\u6807\u8BB0\u5B58\u5728",
+    description: "\u67E5\u8BE2\u76EE\u6807\u8EAB\u4E0A\u7531\u6307\u5B9A\u6765\u6E90\u65BD\u52A0\u7684\u72B6\u6001\u6807\u8BB0\u3002",
+    inputs: [port7("target", pieceType5, { nullable: true }), port7("source", pieceType5, { nullable: true })],
+    outputs: [port7("value", booleanType5)],
+    parameters: [parameter6("statusType", stringType5)],
+    effects: pure5(["statuses"]),
+    lower: (ctx) => `(function(targetId, sourceId) { if (!targetId || !sourceId) return false; return ((${runtime2(ctx)}.query.piece(targetId).statusTags || []).some(function(tag) { return tag && tag.type === ${stringLiteral3(ctx, "statusType")} && tag.sourceId === sourceId.toString() && (tag.stacks || 1) > 0; })); })(${input5(ctx, "target")}, ${input5(ctx, "source")})`,
+    ui: { category: "status" }
+  })
+];
+var CELL_PRIMITIVES = [
+  define10({
+    id: "spatial.cell-walkable-safe",
+    label: "\u5730\u683C\u53EF\u884C\u8D70\uFF08\u53EF\u7A7A\uFF09",
+    description: "\u6309\u5730\u56FE\u5730\u5F62\u8BFB\u53D6\u53EF\u884C\u8D70\u4E8B\u5B9E\uFF0C\u5E76\u5728\u5EF6\u8FDF\u76EE\u6807\u5931\u6548\u65F6\u8FD4\u56DE false\u3002",
+    inputs: [port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["position"]),
+    lower: (ctx) => `(function(cell) { if (!cell) return false; var tile = ${battle4(ctx)}.map && Array.isArray(${battle4(ctx)}.map.tiles) ? ${battle4(ctx)}.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; return Boolean(tile && tile.props && tile.props.walkable); })(${input5(ctx, "cell")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.cell-coordinates-safe",
+    label: "\u8BFB\u53D6\u53EF\u7A7A\u5730\u683C\u5750\u6807",
+    description: "\u8BFB\u53D6\u5EF6\u8FDF\u9009\u62E9\u4ECD\u53EF\u80FD\u5931\u6548\u7684\u5730\u683C\u5750\u6807\u3002",
+    inputs: [port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("x", numberType5), port7("y", numberType5)],
+    effects: pure5(),
+    lower: (ctx) => `({x: (${input5(ctx, "cell")}) ? (${input5(ctx, "cell")}).x : 0, y: (${input5(ctx, "cell")}) ? (${input5(ctx, "cell")}).y : 0})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.cell-require",
+    label: "\u89E3\u6790\u53EF\u7A7A\u5730\u683C",
+    description: "\u628A\u5DF2\u7ECF\u901A\u8FC7\u5408\u6CD5\u6027\u68C0\u67E5\u7684\u53EF\u7A7A\u5730\u683C\u89E3\u6790\u4E3A\u7EDF\u4E00\u5750\u6807\u8BB0\u5F55\u3002",
+    inputs: [port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("cell", cellType3)],
+    effects: pure5(["position"]),
+    lower: (ctx) => `(function(cell) { return cell && Number.isInteger(cell.x) && Number.isInteger(cell.y) ? {x:cell.x, y:cell.y} : null; })(${input5(ctx, "cell")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.cell-unoccupied",
+    label: "\u5730\u683C\u65E0\u5B58\u6D3B\u68CB\u5B50",
+    description: "\u8BFB\u53D6\u5730\u683C\u662F\u5426\u6CA1\u6709\u5B58\u6D3B\u5360\u4F4D\uFF0C\u53EF\u5FFD\u7565\u4E00\u4E2A\u68CB\u5B50\u3002",
+    inputs: [port7("cell", cellType3, { nullable: true }), port7("ignore", pieceType5, { nullable: true, optional: true })],
+    outputs: [port7("value", booleanType5)],
+    effects: pure5(["position", "pieces"]),
+    lower: (ctx) => `(function(cell, ignore) { if (!cell) return false; return !(${battle4(ctx)}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); })(${input5(ctx, "cell")}, ${input5(ctx, "ignore", "null")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.formation-candidates",
+    label: "\u7F16\u961F\u96C6\u7ED3\u70B9",
+    description: "\u6309\u4E2D\u5FC3\u53CA\u56DB\u4E2A\u6B63\u4EA4\u504F\u79FB\u8BA1\u7B97\u6EE1\u8DB3\u7F16\u961F\u5BB9\u91CF\u7684\u96C6\u7ED3\u70B9\u3002",
+    inputs: [port7("source", pieceType5), port7("selected", pieceListType)],
+    outputs: [port7("cells", cellListType)],
+    parameters: [parameter6("range", numberType5, { default: 6, minimum: 0 })],
+    effects: pure5(["position", "pieces"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), selected = input5(ctx, "selected"), radius = numberLiteral3(ctx, "range", 6), state = battle4(ctx);
+      return `(function(sourceId, selectedIds, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; var chosen = Array.isArray(selectedIds) ? selectedIds.map(String) : []; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; var slots = function(x, y) { var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; return offsets.map(function(offset) { return {x:x + offset[0], y:y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }); }; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { return tile && tile.props && tile.props.walkable && !livingAt(tile.x, tile.y) && Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) <= radius && slots(tile.x, tile.y).length >= chosen.length; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${source}, ${selected}, ${radius})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.formation-slots",
+    label: "\u7F16\u961F\u843D\u811A\u683C",
+    description: "\u6309\u56FA\u5B9A\u4E2D\u5FC3\u3001\u4E0A\u3001\u5DE6\u3001\u53F3\u3001\u4E0B\u987A\u5E8F\u8FD4\u56DE\u53EF\u7528\u7F16\u961F\u843D\u811A\u683C\u3002",
+    inputs: [port7("center", cellType3), port7("selected", pieceListType)],
+    outputs: [port7("cells", cellListType)],
+    effects: pure5(["position", "pieces"]),
+    lower: (ctx) => {
+      const center = input5(ctx, "center"), selected = input5(ctx, "selected"), state = battle4(ctx);
+      return `(function(center, selectedIds) { var chosen = (selectedIds || []).map(String); var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; return offsets.map(function(offset) { return {x:center.x + offset[0], y:center.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }).slice(0, chosen.length); })(${center}, ${selected})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "movement.adventure-destinations",
+    label: "\u8FDC\u5F81\u79FB\u52A8\u843D\u70B9",
+    description: "\u6CBF\u56DB\u4E2A\u6B63\u4EA4\u65B9\u5411\u8FFD\u8E2A\u53EF\u7ECF\u8FC7\u53CB\u519B\u7684\u8FDC\u5F81\u8DEF\u5F84\u5E76\u8BFB\u53D6\u5408\u6CD5\u843D\u70B9\u3002",
+    inputs: [port7("mover", pieceType5)],
+    outputs: [port7("cells", cellListType)],
+    effects: pure5(["position", "pieces"]),
+    lower: (ctx) => {
+      const mover = input5(ctx, "mover"), query = runtime2(ctx), state = battle4(ctx);
+      return `(function(moverId) { var mover = ${query}.query.piece(moverId); if (!mover) return []; var maxDistance = Math.min(((${state}.map && ${state}.map.width) || 0) + ((${state}.map && ${state}.map.height) || 0), Math.max(0, Math.floor((mover.moveRange || 0) + 2))); var directions = [{x:0,y:-1},{x:-1,y:0},{x:1,y:0},{x:0,y:1}]; var result = []; var seen = {}; directions.forEach(function(direction) { var trace = ${query}.query.tracePath(mover, direction, {excludePieceId:mover.instanceId, maxDistance:maxDistance, passAllies:true}); ${query}.query.landingCells(trace.cells, [mover.instanceId]).forEach(function(cell) { var key = cell.x + "," + cell.y; if (!seen[key]) { seen[key] = true; result.push({x:cell.x,y:cell.y}); } }); }); return result; })(${mover})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.nearest-adjacent-landing",
+    label: "\u6700\u8FD1\u76F8\u90BB\u843D\u70B9",
+    description: "\u6309\u65E2\u6709\u76F8\u90BB\u504F\u79FB\u987A\u5E8F\u8BFB\u53D6\u8DDD\u53C2\u8003\u5730\u683C\u6700\u8FD1\u7684\u5408\u6CD5\u843D\u70B9\u3002",
+    inputs: [port7("target", pieceType5), port7("reference", cellType3, { nullable: true }), port7("ignore", pieceType5, { nullable: true, optional: true })],
+    outputs: [port7("cell", cellType3, { nullable: true })],
+    parameters: [parameter6("diagonal", booleanType5, { default: true })],
+    effects: pure5(["position", "pieces"]),
+    lower: (ctx) => {
+      const target = input5(ctx, "target"), reference = input5(ctx, "reference"), ignore = input5(ctx, "ignore", "null"), state = battle4(ctx), diagonal = booleanLiteral2(ctx, "diagonal", true);
+      return `(function(targetId, reference, ignore, diagonal) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !reference) return null; var offsets = diagonal ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] : [[1,0],[-1,0],[0,1],[0,-1]]; var best = null; var bestDistance = Infinity; offsets.forEach(function(offset) { var cell = {x:target.x + offset[0], y:target.y + offset[1]}; var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return; var occupied = (${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); if (occupied) return; var distance = Math.abs(cell.x - reference.x) + Math.abs(cell.y - reference.y); if (distance < bestDistance) { bestDistance = distance; best = cell; } }); return best; })(${target}, ${reference}, ${ignore}, ${diagonal})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "spatial.random-adjacent-landing",
+    label: "\u968F\u673A\u76F8\u90BB\u843D\u70B9",
+    description: "\u6309\u6743\u5A01\u968F\u673A\u6E90\u4ECE\u76EE\u6807\u7684\u6B63\u4EA4\u5408\u6CD5\u843D\u70B9\u4E2D\u9009\u62E9\u4E00\u683C\u3002",
+    inputs: [port7("target", pieceType5), port7("ignore", pieceType5, { nullable: true, optional: true })],
+    outputs: [port7("cell", cellType3, { nullable: true })],
+    effects: { ...pure5(["position", "pieces", "random"]), random: true },
+    lower: (ctx) => {
+      const target = input5(ctx, "target"), ignore = input5(ctx, "ignore", "null"), state = battle4(ctx), query = runtime2(ctx), context5 = host(ctx);
+      return `(function(targetId, ignoreId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target) return null; var reserved = Array.isArray(${context5}.reservedCells) ? ${context5}.reservedCells : []; var offsets = [[1,0],[-1,0],[0,1],[0,-1]]; var cells = offsets.map(function(offset) { return {x:target.x + offset[0], y:target.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable || reserved.some(function(reservedCell) { return reservedCell && reservedCell.x === cell.x && reservedCell.y === cell.y; })) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && String(piece.instanceId) !== String(ignoreId || "") && piece.x === cell.x && piece.y === cell.y; }); }); return ${query}.query.random(cells); })(${target}, ${ignore})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "movement.adventure-move",
+    label: "\u8FDC\u5F81\u4F4D\u79FB",
+    description: "\u6309\u8FDC\u5F81\u52A8\u4F5C\u63D0\u4EA4\u4E00\u540D\u68CB\u5B50\u7684\u7EDF\u4E00\u4F4D\u79FB\u3002",
+    inputs: [port7("mover", pieceType5), port7("destination", cellType3, { nullable: true })],
+    outputs: [port7("success", booleanType5)],
+    effects: writes5(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
+    lower: (ctx) => `(function(destination) { return destination ? ${runtime2(ctx)}.effects.move([{pieceId:${input5(ctx, "mover")}, x:destination.x, y:destination.y}], "dash").success : false; })(${input5(ctx, "destination")})`,
+    ui: { category: "effect" }
+  })
+];
+var EFFECT_PRIMITIVES2 = [
+  define10({
+    id: "effect.displace-many",
+    label: "\u6279\u91CF\u4F4D\u79FB",
+    description: "\u628A\u4E00\u7EC4\u68CB\u5B50\u6309\u56FA\u5B9A\u987A\u5E8F\u63D0\u4EA4\u7ED9\u7EDF\u4E00\u4F4D\u79FB\u5165\u53E3\u3002",
+    inputs: [port7("pieces", pieceListType), port7("destinations", cellListType)],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("kind", stringType5, { enum: ["teleport", "dash"], default: "teleport" })],
+    effects: writes5(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
+    lower: (ctx) => {
+      const pieces2 = input5(ctx, "pieces"), destinations = input5(ctx, "destinations"), kind = literal3(ctx, "kind", "teleport"), query = runtime2(ctx);
+      return `(function(pieces, destinations) { if (!Array.isArray(pieces) || !Array.isArray(destinations) || pieces.length !== destinations.length || pieces.length === 0) return false; var changes = pieces.map(function(pieceId, index) { return {pieceId:pieceId, x:destinations[index].x, y:destinations[index].y}; }); return Boolean(${query}.effects.displace(changes, ${kind}).success); })(${pieces2}, ${destinations})`;
+    },
+    ui: { category: "effect" }
+  })
+];
+var MARKER_PRIMITIVES = [
+  define10({
+    id: "marker.anchor-cells",
+    label: "\u73B0\u6709\u951A\u70B9\u5730\u683C",
+    description: "\u8BFB\u53D6\u6307\u5B9A\u6765\u6E90\u4ECD\u5B58\u5728\u7684\u7A7A\u95F4\u951A\u70B9\u3002",
+    inputs: [port7("source", pieceType5)],
+    outputs: [port7("cells", cellListType)],
+    parameters: [parameter6("storageKey", stringType5)],
+    effects: pure5(["extensions", "position"]),
+    lower: (ctx) => `(function(sourceId, storageKey) { var records = ${battle4(ctx)}.extensions && Array.isArray(${battle4(ctx)}.extensions[storageKey]) ? ${battle4(ctx)}.extensions[storageKey] : []; return records.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).map(function(anchor) { return {x:anchor.x, y:anchor.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }); })(${input5(ctx, "source")}, ${stringLiteral3(ctx, "storageKey")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "marker.anchor-exists",
+    label: "\u951A\u70B9\u5B58\u5728",
+    description: "\u67E5\u8BE2\u6307\u5B9A\u6765\u6E90\u5728\u6307\u5B9A\u5730\u683C\u662F\u5426\u6709\u7A7A\u95F4\u951A\u70B9\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true }), port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("value", booleanType5)],
+    parameters: [parameter6("storageKey", stringType5)],
+    effects: pure5(["extensions"]),
+    lower: (ctx) => `(function(sourceId, cell, storageKey) { return Boolean(cell) && (${battle4(ctx)}.extensions && Array.isArray(${battle4(ctx)}.extensions[storageKey]) ? ${battle4(ctx)}.extensions[storageKey] : []).some(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); })(${input5(ctx, "source")}, ${input5(ctx, "cell")}, ${stringLiteral3(ctx, "storageKey")})`,
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "marker.anchor-candidates",
+    label: "\u53EF\u6807\u8BB0\u951A\u70B9\u5730\u683C",
+    description: "\u8BFB\u53D6\u8303\u56F4\u5185\u3001\u53EF\u884C\u8D70\u4E14\u65E0\u5B58\u6D3B\u5360\u4F4D\u7684\u951A\u70B9\u5019\u9009\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true })],
+    outputs: [port7("cells", cellListType)],
+    parameters: [parameter6("range", numberType5, { default: 7, minimum: 0 })],
+    effects: pure5(["extensions", "position", "pieces"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), state = battle4(ctx), radius = numberLiteral3(ctx, "range", 7);
+      return `(function(sourceId, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { if (!tile || !tile.props || !tile.props.walkable || Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) > radius) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === tile.x && piece.y === tile.y; }); }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${source}, ${radius})`;
+    },
+    ui: { category: "position" }
+  }),
+  define10({
+    id: "marker.anchor-place",
+    label: "\u653E\u7F6E\u7A7A\u95F4\u951A\u70B9",
+    description: "\u5199\u5165\u65E2\u6709\u7A7A\u95F4\u951A\u70B9\u548C\u5BF9\u5E94\u5730\u683C\u8868\u73B0\uFF0C\u5E76\u6309\u6765\u6E90\u4FDD\u7559\u6700\u8FD1\u4E09\u4E2A\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true }), port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("storageKey", stringType5), parameter6("tileType", stringType5), parameter6("maxAnchors", numberType5, { default: 3, minimum: 1 })],
+    effects: writes5(["extensions", "tile-effects"], ["tileEffectAdded", "tileEffectRemoved"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), cell = input5(ctx, "cell"), state = battle4(ctx), storageKey = stringLiteral3(ctx, "storageKey"), tileType = stringLiteral3(ctx, "tileType"), max = numberLiteral3(ctx, "maxAnchors", 3);
+      return `(function(sourceId, cell, storageKey, tileType, maxAnchors) { var source = (${state}.pieces || []).concat(${state}.graveyard || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source || !cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return false; ${state}.extensions = ${state}.extensions || {}; var anchors = Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []; var tileEffects = Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []; var now = Date.now(); var existing = anchors.find(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); if (existing) existing.createdAt = now; else anchors.push({x:cell.x, y:cell.y, sourceId:sourceId, ownerPlayerId:source.ownerPlayerId, createdAt:now}); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); tileEffects.push({x:cell.x, y:cell.y, sourceId:sourceId, tileType:tileType, icon:"\u26A1", bgColor:"rgba(250, 204, 21, 0.14)", boxShadow:"inset 0 0 0 2px rgba(250, 204, 21, 0.75)", iconPosition:"top-left"}); while (anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).length > maxAnchors) { var own = anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); }); var oldest = own[0]; anchors = anchors.filter(function(anchor) { return anchor !== oldest; }); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === oldest.x && effect.y === oldest.y); }); } ${state}.extensions[storageKey] = anchors; ${state}.extensions.tileEffects = tileEffects; return true; })(${source}, ${cell}, ${storageKey}, ${tileType}, ${max})`;
+    },
+    ui: { category: "effect" }
+  }),
+  define10({
+    id: "marker.anchor-remove",
+    label: "\u79FB\u9664\u7A7A\u95F4\u951A\u70B9",
+    description: "\u79FB\u9664\u6307\u5B9A\u6765\u6E90\u548C\u5730\u683C\u7684\u951A\u70B9\u53CA\u5176\u5730\u683C\u8868\u73B0\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true }), port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("storageKey", stringType5), parameter6("tileType", stringType5)],
+    effects: writes5(["extensions", "tile-effects"], ["tileEffectRemoved"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), cell = input5(ctx, "cell"), state = battle4(ctx);
+      const storageKey = stringLiteral3(ctx, "storageKey"), tileType = stringLiteral3(ctx, "tileType");
+      return `(function(sourceId, cell, storageKey, tileType) { if (!sourceId || !cell || !${state}.extensions) return true; ${state}.extensions[storageKey] = (Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []).filter(function(anchor) { return !(anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y); }); ${state}.extensions.tileEffects = (Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []).filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); return true; })(${source}, ${cell}, ${storageKey}, ${tileType})`;
+    },
+    ui: { category: "effect" }
+  }),
+  define10({
+    id: "marker.nearby-enemies",
+    label: "\u951A\u70B9\u9644\u8FD1\u654C\u4EBA",
+    description: "\u6309\u951A\u70B9\u5730\u683C\u548C\u6765\u6E90\u68CB\u5B50\u7684\u654C\u6211\u5173\u7CFB\u8BFB\u53D6\u5BBF\u4E3B\u987A\u5E8F\u654C\u4EBA\u96C6\u5408\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true }), port7("cell", cellType3, { nullable: true })],
+    outputs: [port7("pieces", pieceListType)],
+    parameters: [parameter6("range", numberType5, { default: 3, minimum: 0 })],
+    effects: pure5(["pieces", "position"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), cell = input5(ctx, "cell"), radius = numberLiteral3(ctx, "range", 3), state = battle4(ctx);
+      return `(function(sourceId, cell, radius) { if (!cell) return []; var candidates = ${runtime2(ctx)}.query.pieces({originId: sourceId, relation: "enemy", includeDead: false}); return candidates.filter(function(id) { var piece = (${state}.pieces || []).find(function(item) { return item && item.instanceId === id; }); return piece && Math.abs(piece.x - cell.x) + Math.abs(piece.y - cell.y) <= radius; }); })(${source}, ${cell}, ${radius})`;
+    },
+    ui: { category: "query" }
+  }),
+  define10({
+    id: "marker.trigger-target",
+    label: "\u98DE\u96F7\u795E\u89E6\u53D1\u76EE\u6807",
+    description: "\u6309\u6807\u8BB0\u8005\u7684\u654C\u6211\u5173\u7CFB\u89E3\u6790\u65BD\u6CD5\u8005\u6216\u88AB\u6307\u5411\u76EE\u6807\u3002",
+    inputs: [port7("source", pieceType5, { nullable: true }), port7("marked", pieceType5, { nullable: true }), port7("origin", pieceType5, { nullable: true })],
+    outputs: [port7("target", pieceType5, { nullable: true })],
+    effects: pure5(["pieces", "players"]),
+    lower: (ctx) => {
+      const source = input5(ctx, "source"), marked = input5(ctx, "marked"), origin = input5(ctx, "origin"), query = runtime2(ctx);
+      return `(function(sourceId, markedId, originId) { if (!sourceId || !markedId || !originId) return null; var allies = ${query}.query.pieces({originId:originId, relation:"ally", includeDead:false}); var enemies = ${query}.query.pieces({originId:originId, relation:"enemy", includeDead:false}); if (allies.indexOf(markedId) >= 0) return enemies.indexOf(sourceId) >= 0 ? sourceId : null; return enemies.indexOf(markedId) >= 0 ? markedId : null; })(${source}, ${marked}, ${origin})`;
+    },
+    ui: { category: "query" }
+  })
+];
+var MARK_PRIMITIVES = [
+  define10({
+    id: "status.mark-apply",
+    label: "\u5E94\u7528\u6765\u6E90\u6807\u8BB0",
+    description: "\u9012\u589E\u5DF2\u6709\u6765\u6E90\u6807\u8BB0\uFF0C\u6216\u7ECF status lifecycle \u5B89\u88C5\u65B0\u7684\u6765\u6E90\u6807\u8BB0\u3002",
+    inputs: [port7("target", pieceType5, { nullable: true }), port7("source", pieceType5, { nullable: true })],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("statusType", stringType5), parameter6("statusName", stringType5), parameter6("statusIdPrefix", stringType5)],
+    effects: writes5(["status", "events"], ["afterStatusApplied"]),
+    lower: (ctx) => {
+      const target = input5(ctx, "target"), source = input5(ctx, "source"), query = runtime2(ctx), state = battle4(ctx);
+      const type = stringLiteral3(ctx, "statusType"), name = stringLiteral3(ctx, "statusName"), prefix = stringLiteral3(ctx, "statusIdPrefix");
+      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = Array.isArray(target.statusTags) ? target.statusTags : []; var existing = target.statusTags.find(function(tag) { return tag && tag.type === ${type} && tag.sourceId === sourceId; }); if (existing) { existing.stacks = (existing.stacks || 1) + 1; existing.currentDuration = -1; return true; } var id = ${prefix} + "-" + sourceId + "-" + targetId + "-" + Date.now(); return Boolean(${query}.status.add(targetId, {id:id, type:${type}, name:${name}, visible:true, currentDuration:-1, currentUses:-1, intensity:1, stacks:1, sourceId:sourceId}, "piece", "host")); })(${target}, ${source})`;
+    },
+    ui: { category: "status" }
+  }),
+  define10({
+    id: "status.mark-remove",
+    label: "\u79FB\u9664\u6765\u6E90\u6807\u8BB0",
+    description: "\u79FB\u9664\u76EE\u6807\u8EAB\u4E0A\u6307\u5B9A\u6765\u6E90\u7684\u6807\u8BB0\u3002",
+    inputs: [port7("target", pieceType5, { nullable: true }), port7("source", pieceType5, { nullable: true })],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("statusType", stringType5)],
+    effects: writes5(["status"], ["afterStatusRemoved"]),
+    lower: (ctx) => {
+      const target = input5(ctx, "target"), source = input5(ctx, "source"), state = battle4(ctx), type = stringLiteral3(ctx, "statusType");
+      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = (target.statusTags || []).filter(function(tag) { return !(tag && tag.type === ${type} && tag.sourceId === sourceId); }); return true; })(${target}, ${source})`;
+    },
+    ui: { category: "status" }
+  })
+];
+var TURN_PRIMITIVES = [
+  define10({
+    id: "turn.once-read",
+    label: "\u56DE\u5408\u65D7\u6807\u67E5\u8BE2",
+    description: "\u8BFB\u53D6\u6307\u5B9A\u68CB\u5B50\u5728\u5F53\u524D\u56DE\u5408\u662F\u5426\u5DF2\u7ECF\u4F7F\u7528\u8FC7\u4E00\u6B21\u6027\u4E8B\u4EF6\u3002",
+    inputs: [port7("source", pieceType5), port7("turn", numberType5)],
+    outputs: [port7("used", booleanType5)],
+    parameters: [parameter6("storageKey", stringType5)],
+    effects: pure5(["extensions", "turn"]),
+    lower: (ctx) => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; return Boolean(${battle4(ctx)}.extensions && ${battle4(ctx)}.extensions[storageKey] && ${battle4(ctx)}.extensions[storageKey][sourceId] === turn); })(${input5(ctx, "source")}, ${input5(ctx, "turn")}, ${stringLiteral3(ctx, "storageKey")})`,
+    ui: { category: "state" }
+  }),
+  define10({
+    id: "turn.once-mark",
+    label: "\u8BB0\u5F55\u56DE\u5408\u65D7\u6807",
+    description: "\u8BB0\u5F55\u6307\u5B9A\u68CB\u5B50\u5728\u5F53\u524D\u56DE\u5408\u7684\u4E00\u6B21\u6027\u4E8B\u4EF6\u3002",
+    inputs: [port7("source", pieceType5), port7("turn", numberType5)],
+    outputs: [port7("success", booleanType5)],
+    parameters: [parameter6("storageKey", stringType5)],
+    effects: writes5(["extensions", "turn"]),
+    lower: (ctx) => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; ${battle4(ctx)}.extensions = ${battle4(ctx)}.extensions || {}; ${battle4(ctx)}.extensions[storageKey] = ${battle4(ctx)}.extensions[storageKey] || {}; ${battle4(ctx)}.extensions[storageKey][sourceId] = turn; return true; })(${input5(ctx, "source")}, ${input5(ctx, "turn")}, ${stringLiteral3(ctx, "storageKey")})`,
+    ui: { category: "state" }
+  })
+];
+var PENDING_SPATIAL_GAMEPLAY_MODULES = Object.freeze([
+  ...CONTEXT_PRIMITIVES,
+  ...CHOICE_PRIMITIVES2,
+  ...QUERY_PRIMITIVES,
+  ...CELL_PRIMITIVES,
+  ...EFFECT_PRIMITIVES2,
+  ...MARKER_PRIMITIVES,
+  ...MARK_PRIMITIVES,
+  ...TURN_PRIMITIVES
+]);
+
+// lib/skill-graph/module-registry-card-operations.ts
+var input6 = (ctx, name) => ctx.inputs[name];
+var port8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var active2 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var read2 = (domains) => ({ pure: true, previewSafe: false, reads: domains });
+var write = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+function define11(value, surfaces7 = active2) {
+  return { version: "1", allowedSurfaces: surfaces7, ...value };
+}
+var runtime3 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle5 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var ownerPieceList = (ctx, owner, relation) => `(${owner} == null ? [] : ${runtime3(ctx)}.query.pieces({ ownerId: ${owner}, relation: ${relation}, includeDead: false }))`;
+var CARD_OPERATION_GAMEPLAY_MODULES = [
+  define11({
+    id: "query.players",
+    label: "\u6309\u5BF9\u5C40\u987A\u5E8F\u67E5\u8BE2\u73A9\u5BB6",
+    inputs: [],
+    outputs: [port8("players", { kind: "list", element: "player" })],
+    effects: read2(["players"]),
+    lower: (ctx) => `${runtime3(ctx)}.query.players()`
+  }),
+  define11({
+    id: "query.random-string",
+    label: "\u6309\u79CD\u5B50\u968F\u673A\u9009\u62E9\u6807\u8BC6",
+    inputs: [port8("items", { kind: "list", element: "string" })],
+    outputs: [port8("value", "string")],
+    effects: { ...read2(["random"]), random: true },
+    lower: (ctx) => `(function(items) { if (!items.length) throw new Error('query.random-string requires a nonempty list'); return ${runtime3(ctx)}.query.random(items); })(${input6(ctx, "items")})`
+  }),
+  define11({
+    id: "player.set-buff-record",
+    label: "\u8BBE\u7F6E\u73A9\u5BB6\u589E\u76CA\u8BB0\u5F55",
+    inputs: [port8("player", "player"), port8("record", "record")],
+    outputs: [port8("success", "boolean")],
+    parameters: [port8("buffId", "string")],
+    effects: write(["player-buffs"]),
+    lower: (ctx) => `${runtime3(ctx)}.cards.setPlayerBuff(${input6(ctx, "player")}, ${ctx.emitLiteral(ctx.parameters.buffId)}, ${input6(ctx, "record")})`
+  }),
+  define11({
+    id: "source.capture-event-piece",
+    label: "\u4FDD\u7559\u5F53\u524D\u4E8B\u4EF6\u68CB\u5B50",
+    inputs: [],
+    outputs: [port8("source", "record", { nullable: true })],
+    parameters: [{ name: "field", type: "string", enum: ["sourcePiece", "targetPiece", "piece", "rulePiece"] }],
+    effects: write(["execution-context"]),
+    lower: (ctx) => `${runtime3(ctx)}.effects.captureEventPiece(${ctx.emitLiteral(ctx.parameters.field)})`
+  }),
+  define11({
+    id: "source.is-present",
+    label: "\u4E8B\u4EF6\u6765\u6E90\u5B58\u5728",
+    inputs: [port8("source", "record", { nullable: true })],
+    outputs: [port8("value", "boolean")],
+    effects: read2(["execution-context"]),
+    lower: (ctx) => `(${input6(ctx, "source")} != null)`
+  }),
+  define11({
+    id: "source.require-present",
+    label: "\u89E3\u6790\u5DF2\u786E\u8BA4\u4E8B\u4EF6\u6765\u6E90",
+    inputs: [port8("source", "record", { nullable: true })],
+    outputs: [port8("source", "record")],
+    effects: read2(["execution-context"]),
+    lower: (ctx) => `(function(source) { ${runtime3(ctx)}.effects.capturedOwner(source); return source; })(${input6(ctx, "source")})`
+  }),
+  define11({
+    id: "source.captured-owner",
+    label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u6765\u6E90\u5F52\u5C5E",
+    inputs: [port8("source", "record")],
+    outputs: [port8("player", "player")],
+    effects: read2(["execution-context"]),
+    lower: (ctx) => `${runtime3(ctx)}.effects.capturedOwner(${input6(ctx, "source")})`
+  }),
+  define11({
+    id: "effect.damage-captured",
+    label: "\u7ED3\u7B97\u5DF2\u4FDD\u7559\u4E8B\u4EF6\u5BF9\u8C61\u4F24\u5BB3",
+    inputs: [port8("source", "record"), port8("target", "record"), port8("amount", "number")],
+    outputs: [port8("result", "record")],
+    parameters: [{ name: "damageType", type: "string", enum: ["physical", "magical", "true"] }, { name: "skillId", type: "string" }],
+    effects: write(["damage", "events"]),
+    lower: (ctx) => `${runtime3(ctx)}.effects.damageCaptured(${input6(ctx, "source")}, ${input6(ctx, "target")}, ${input6(ctx, "amount")}, ${ctx.emitLiteral(ctx.parameters.damageType)}, ${ctx.emitLiteral(ctx.parameters.skillId)})`
+  }),
+  define11({
+    id: "card.bound-living-template",
+    label: "\u89E3\u6790\u7ED1\u5B9A\u7684\u5B58\u6D3B\u68CB\u5B50",
+    inputs: [port8("owner", "player", { nullable: true })],
+    outputs: [port8("piece", "piece", { nullable: true })],
+    parameters: [port8("templateId", "string"), port8("cardId", "string")],
+    effects: read2(["pieces", "card"]),
+    lower: (ctx) => {
+      const owner = input6(ctx, "owner");
+      const templateId = ctx.emitLiteral(ctx.parameters.templateId);
+      const cardId = ctx.emitLiteral(ctx.parameters.cardId);
+      const board = battle5(ctx);
+      return `(function(owner, templateId, cardId) {
+        var pieces = (${board}.pieces || []);
+        var player = (${board}.players || []).find(function(item) { return item && item.playerId === owner; });
+        var hand = player && Array.isArray(player.hand) ? player.hand : [];
+        var card = hand.find(function(item) { return item && item.cardId === cardId && item.boundPieceInstanceId; });
+        var boundId = card && card.boundPieceInstanceId;
+        if (boundId) {
+          var bound = pieces.find(function(piece) {
+            return piece && piece.instanceId === boundId && Number(piece.currentHp || 0) > 0;
+          });
+          return bound ? bound.instanceId : null;
+        }
+        var fallback = pieces.find(function(piece) {
+          return piece && piece.ownerPlayerId === owner && piece.templateId === templateId && Number(piece.currentHp || 0) > 0;
+        });
+        return fallback ? fallback.instanceId : null;
+      })(${owner}, ${templateId}, ${cardId})`;
+    }
+  }),
+  define11({
+    id: "query.living-template",
+    label: "\u67E5\u8BE2\u73A9\u5BB6\u62E5\u6709\u7684\u5B58\u6D3B\u6A21\u677F\u68CB\u5B50",
+    inputs: [port8("owner", "player", { nullable: true })],
+    outputs: [port8("piece", "piece", { nullable: true })],
+    parameters: [port8("templateId", "string")],
+    effects: read2(["pieces"]),
+    lower: (ctx) => {
+      const owner = input6(ctx, "owner");
+      const templateId = ctx.emitLiteral(ctx.parameters.templateId);
+      const pieces2 = ownerPieceList(ctx, owner, ctx.emitLiteral("ally"));
+      return `(function(owner, templateId) {
+        var ids = ${pieces2} || [];
+        for (var index = 0; index < ids.length; index += 1) {
+          var piece = ${runtime3(ctx)}.query.piece(ids[index]);
+          if (piece && piece.ownerPlayerId === owner && piece.templateId === templateId && Number(piece.currentHp || 0) > 0) return piece.instanceId;
+        }
+        return null;
+      })(${owner}, ${templateId})`;
+    }
+  }),
+  define11({
+    id: "query.affectable-pieces",
+    label: "\u67E5\u8BE2\u5361\u724C\u53EF\u5F71\u54CD\u7684\u5B58\u6D3B\u68CB\u5B50",
+    inputs: [port8("owner", "player", { nullable: true })],
+    outputs: [port8("pieces", { kind: "list", element: "piece" })],
+    parameters: [{ name: "relation", type: "string", enum: ["ally", "enemy"] }],
+    effects: read2(["pieces", "target-policy"]),
+    lower: (ctx) => {
+      const owner = input6(ctx, "owner");
+      const relation = ctx.emitLiteral(ctx.parameters.relation);
+      const ids2 = ownerPieceList(ctx, owner, relation);
+      return `((${ids2}) || []).filter(function(pieceId) {
+        var piece = ${runtime3(ctx)}.query.piece(pieceId);
+        return piece && canAffectAdventureTarget(${battle5(ctx)}, ${owner}, piece);
+      })`;
+    }
+  }),
+  define11({
+    id: "query.lowest-hp",
+    label: "\u9009\u62E9\u751F\u547D\u503C\u6700\u4F4E\u7684\u68CB\u5B50",
+    inputs: [port8("pieces", { kind: "list", element: "piece" })],
+    outputs: [port8("piece", "piece", { nullable: true })],
+    effects: read2(["pieces"]),
+    lower: (ctx) => {
+      const pieces2 = input6(ctx, "pieces");
+      return `(function(ids) {
+        var selected = null;
+        (ids || []).forEach(function(pieceId) {
+          var piece = ${runtime3(ctx)}.query.piece(pieceId);
+          if (piece && (!selected || Number(piece.currentHp || 0) < Number(selected.currentHp || 0))) selected = piece;
+        });
+        return selected ? selected.instanceId : null;
+      })(${pieces2})`;
+    }
+  }),
+  define11({
+    id: "piece.display-name",
+    label: "\u8BFB\u53D6\u5361\u724C\u6D88\u606F\u4E2D\u7684\u68CB\u5B50\u540D\u79F0",
+    inputs: [port8("piece", "piece", { nullable: true })],
+    outputs: [port8("value", "string")],
+    parameters: [{ name: "fallback", type: "string", enum: ["none", "templateId"], default: "none" }],
+    effects: read2(["pieces"]),
+    lower: (ctx) => {
+      const pieceId = input6(ctx, "piece");
+      const flow12 = runtime3(ctx);
+      const fallback = ctx.parameters.fallback === "templateId" ? "piece.name || piece.templateId" : "piece.name";
+      return `(function(id) {
+        var piece = id == null ? null : ${flow12}.query.piece(id);
+        return String(piece == null ? undefined : ${fallback});
+      })(${pieceId})`;
+    }
+  }),
+  define11({
+    id: "piece.captured-name",
+    label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u68CB\u5B50\u540D\u79F0",
+    description: "\u8BFB\u53D6\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\uFF1B\u5373\u4F7F\u68CB\u5B50\u968F\u540E\u79BB\u573A\uFF0C\u5F53\u524D\u6548\u679C\u4ECD\u53EF\u751F\u6210\u7A33\u5B9A\u6D88\u606F\u3002",
+    inputs: [port8("source", "record")],
+    outputs: [port8("value", "string")],
+    parameters: [{ name: "fallback", type: "string", enum: ["none", "templateId"], default: "none" }],
+    effects: read2(["execution-context"]),
+    lower: (ctx) => `${runtime3(ctx)}.effects.capturedName(${input6(ctx, "source")}, ${ctx.emitLiteral(ctx.parameters.fallback ?? "none")})`
+  }),
+  define11({
+    id: "attribute.adjust-captured",
+    label: "\u8C03\u6574\u5DF2\u4FDD\u7559\u68CB\u5B50\u5C5E\u6027",
+    description: "\u5BF9\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\u8C03\u6574\u5C5E\u6027\uFF1B\u68CB\u5B50\u79BB\u573A\u540E\u4ECD\u5B8C\u6210\u5DF2\u7ECF\u5F00\u59CB\u7684\u6548\u679C\u3002",
+    inputs: [port8("source", "record"), port8("amount", "number")],
+    outputs: [port8("value", "number")],
+    parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange"] }],
+    effects: write(["pieces", "execution-context"]),
+    lower: (ctx) => `${runtime3(ctx)}.effects.capturedAttribute(${input6(ctx, "source")}, ${ctx.emitLiteral(ctx.parameters.attribute)}, ${input6(ctx, "amount")})`
+  }),
+  define11({
+    id: "effect.damage-from-player",
+    label: "\u4EE5\u73A9\u5BB6\u6765\u6E90\u9020\u6210\u4F24\u5BB3",
+    inputs: [port8("owner", "player"), port8("target", "piece"), port8("amount", "number")],
+    outputs: [port8("result", "record"), port8("success", "boolean"), port8("damage", "number")],
+    parameters: [
+      { name: "kind", type: "string", enum: ["player", "environment"] },
+      port8("instanceId", "string"),
+      port8("name", "string"),
+      { name: "damageType", type: "string", enum: ["normal", "true", "toxin"], default: "normal" },
+      { name: "legacyNormalSpelling", type: "string", enum: ["physical", "magical"], optional: true },
+      { name: "skillId", type: "string", optional: true },
+      { name: "inputPolicy", type: "string", enum: ["floor", "host"], optional: true }
+    ],
+    effects: write(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
+    lower: (ctx) => {
+      const owner = input6(ctx, "owner");
+      const target = input6(ctx, "target");
+      const amount = input6(ctx, "amount");
+      const damageType = ctx.parameters.damageType ?? "normal";
+      const kind = ctx.emitLiteral(damageType);
+      const engineKind = damageType === "normal" ? ctx.emitLiteral(ctx.parameters.legacyNormalSpelling ?? "physical") : kind;
+      const skillId = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? ctx.emitLiteral(ctx.parameters.skillId) : `${ctx.surface === "pending" ? "ctx" : "context"}.skill?.id || ${ctx.surface === "pending" ? "ctx" : "context"}.ruleId || "flow"`;
+      const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, "inputPolicy") ? `, ${ctx.emitLiteral(ctx.parameters.inputPolicy)}` : "";
+      const source = `{ kind: ${ctx.emitLiteral(ctx.parameters.kind)}, instanceId: ${ctx.emitLiteral(ctx.parameters.instanceId)}, ownerPlayerId: ${owner}, name: ${ctx.emitLiteral(ctx.parameters.name)} }`;
+      const call = `${runtime3(ctx)}.effects.damage(${source}, ${target}, ${amount}, ${engineKind}, ${skillId}${policy})`;
+      return `(function(value) { return { result: value, success: value.success, damage: value.damage }; })(${call})`;
+    }
+  }),
+  define11({
+    id: "effect.damage-from-piece",
+    label: "\u4EE5\u68CB\u5B50\u6765\u6E90\u9020\u6210\u5361\u724C\u4F24\u5BB3",
+    inputs: [port8("source", "piece"), port8("target", "piece"), port8("amount", "number")],
+    outputs: [port8("result", "record"), port8("success", "boolean"), port8("damage", "number")],
+    parameters: [
+      { name: "damageType", type: "string", enum: ["normal", "true", "toxin"], default: "normal" },
+      { name: "legacyNormalSpelling", type: "string", enum: ["physical", "magical"], optional: true },
+      { name: "skillId", type: "string", optional: true }
+    ],
+    effects: write(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
+    lower: (ctx) => {
+      const damageType = ctx.parameters.damageType ?? "normal";
+      const kind = ctx.emitLiteral(damageType);
+      const engineKind = damageType === "normal" ? ctx.emitLiteral(ctx.parameters.legacyNormalSpelling ?? "physical") : kind;
+      const skillId = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? ctx.emitLiteral(ctx.parameters.skillId) : 'context.card?.id || "flow"';
+      const flow12 = runtime3(ctx);
+      const source = `${flow12}.query.piece(${input6(ctx, "source")})`;
+      const target = `${flow12}.query.piece(${input6(ctx, "target")})`;
+      const call = `dealDamage(${source}, ${target}, ${input6(ctx, "amount")}, ${engineKind}, battle, ${skillId})`;
+      return `(function(value) { return { result: value, success: value.success, damage: value.damage }; })(${call})`;
+    }
+  }, ["card"]),
+  define11({
+    id: "player.consume-buff",
+    label: "\u6D88\u8017\u73A9\u5BB6\u589E\u76CA\u5E76\u8FD4\u56DE\u500D\u7387",
+    inputs: [port8("player", "player")],
+    outputs: [port8("applied", "boolean"), port8("multiplier", "number")],
+    parameters: [port8("buffId", "string")],
+    effects: write(["player-buffs"]),
+    lower: (ctx) => {
+      const player = input6(ctx, "player");
+      const flow12 = runtime3(ctx);
+      return `(function(playerId, buffId) {
+        var player = playerId == null ? null : ${flow12}.query.player(playerId);
+        var buff = player && player.buffs && player.buffs[buffId];
+        if (!buff || Number(buff.uses || 0) <= 0) return { applied: false, multiplier: 1 };
+        buff.uses = Number(buff.uses || 0) - 1;
+        return { applied: true, multiplier: Number(buff.multiplier) };
+      })(${player}, ${ctx.emitLiteral(ctx.parameters.buffId)})`;
+    }
+  }),
+  define11({
+    id: "effect.status-record",
+    label: "\u901A\u8FC7\u5361\u724C\u72B6\u6001\u751F\u547D\u5468\u671F\u5E94\u7528\u72B6\u6001\u8BB0\u5F55",
+    inputs: [port8("target", "piece"), port8("record", "record")],
+    outputs: [port8("success", "boolean")],
+    parameters: [{ name: "inputPolicy", type: "string", enum: ["flow", "host"], default: "flow" }],
+    effects: write(["status"], ["status-applied"]),
+    lower: (ctx) => {
+      const target = input6(ctx, "target");
+      const record3 = input6(ctx, "record");
+      if (ctx.surface === "card" && ctx.parameters.inputPolicy === "host") {
+        return `(function(target, record) {
+          if (!target) return false;
+          addStatusEffectById(target, record);
+          return true;
+        })(${target}, ${record3})`;
+      }
+      const policy = ctx.parameters.inputPolicy === "host" ? "host" : "flow";
+      return `${runtime3(ctx)}.status.add(${target}, ${record3}, 'piece', ${ctx.emitLiteral(policy)})`;
+    }
+  }),
+  define11({
+    id: "summon.unique-template-available",
+    label: "\u68C0\u67E5\u552F\u4E00\u50A8\u5B58\u53EC\u5524\u662F\u5426\u5C1A\u672A\u4E0A\u573A",
+    inputs: [port8("owner", "player", { nullable: true })],
+    outputs: [port8("available", "boolean")],
+    parameters: [port8("templateId", "string"), port8("storageExtensionKey", "string"), port8("ownerScopedStorageExtensionKey", "string")],
+    effects: read2(["pieces", "extensions"]),
+    lower: (ctx) => {
+      const owner = input6(ctx, "owner");
+      const board = battle5(ctx);
+      return `(function(owner, templateId, storageKey, ownerStorageKey) {
+        var extensions = ${board}.extensions || {};
+        var ownerKey = String(owner || '').trim().toLowerCase();
+        var scoped = extensions[ownerStorageKey];
+        var stored = scoped && scoped[ownerKey] ? scoped[ownerKey] : null;
+        if (!stored) {
+          var legacy = extensions[storageKey];
+          stored = legacy && String(legacy.ownerPlayerId || '').trim().toLowerCase() === ownerKey ? legacy : null;
+        }
+        if (stored) return true;
+        return !((${board}.pieces || []).some(function(piece) {
+          return piece && Number(piece.currentHp || 0) > 0 && String(piece.ownerPlayerId || '').trim().toLowerCase() === ownerKey && (piece.templateId === templateId || piece.instanceId === templateId);
+        }));
+      })(${owner}, ${ctx.emitLiteral(ctx.parameters.templateId)}, ${ctx.emitLiteral(ctx.parameters.storageExtensionKey)}, ${ctx.emitLiteral(ctx.parameters.ownerScopedStorageExtensionKey)})`;
+    }
+  }),
+  define11({
+    id: "card.cell-unoccupied",
+    label: "\u68C0\u67E5\u5361\u724C\u53EC\u5524\u5730\u683C\u4E3A\u7A7A",
+    inputs: [port8("cell", "cell", { nullable: true })],
+    outputs: [port8("value", "boolean")],
+    effects: read2(["position", "pieces"]),
+    lower: (ctx) => {
+      const cell = input6(ctx, "cell");
+      const state = battle5(ctx);
+      return `(function(cell) {
+        if (!cell) return false;
+        return !((${state}.pieces || []).some(function(piece) {
+          return piece && Number(piece.currentHp || 0) > 0 && piece.x === cell.x && piece.y === cell.y;
+        }));
+      })(${cell})`;
+    }
+  }),
+  define11({
+    id: "card.piece-present",
+    label: "\u68C0\u67E5\u68CB\u5B50\u5F15\u7528\u5B58\u5728",
+    inputs: [port8("value", "piece", { nullable: true })],
+    outputs: [port8("present", "boolean")],
+    effects: read2([]),
+    lower: (ctx) => `(${input6(ctx, "value")} !== null && ${input6(ctx, "value")} !== undefined && ${input6(ctx, "value")} !== __gameplayInvalid)`
+  }),
+  define11({
+    id: "card.string-present",
+    label: "\u68C0\u67E5\u6587\u672C\u5F15\u7528\u5B58\u5728",
+    inputs: [port8("value", "string", { nullable: true })],
+    outputs: [port8("present", "boolean")],
+    effects: read2([]),
+    lower: (ctx) => `(${input6(ctx, "value")} !== null && ${input6(ctx, "value")} !== undefined && ${input6(ctx, "value")} !== __gameplayInvalid)`
+  }),
+  define11({
+    id: "lifecycle.queue-stored-summon",
+    label: "\u5728\u5DF2\u9A8C\u8BC1\u5730\u683C\u6392\u961F\u50A8\u5B58\u53EC\u5524",
+    inputs: [port8("source", "piece"), port8("cell", "cell")],
+    outputs: [port8("queued", "number")],
+    effects: write(["summon"], ["summon-queued"]),
+    lower: (ctx) => {
+      const source = input6(ctx, "source");
+      const cell = input6(ctx, "cell");
+      return `${runtime3(ctx)}.lifecycle.summon({ sourceId: ${source}, summons: [{ x: ${cell}.x, y: ${cell}.y }] })`;
+    }
+  }),
+  define11({
+    id: "lifecycle.summon-captured",
+    label: "\u6392\u961F\u53EC\u5524\u5DF2\u4FDD\u7559\u68CB\u5B50",
+    description: "\u4F7F\u7528\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\u6392\u961F\u53EC\u5524\uFF1B\u6765\u6E90\u968F\u540E\u79BB\u573A\u4E5F\u4E0D\u4F1A\u4E22\u5931\u53EC\u5524\u3002",
+    inputs: [port8("source", "record"), port8("cell", "cell")],
+    outputs: [port8("queued", "number")],
+    effects: write(["summon", "execution-context"], ["summon-queued"]),
+    lower: (ctx) => `${runtime3(ctx)}.lifecycle.summonCaptured(${input6(ctx, "source")}, ${input6(ctx, "cell")})`
+  }),
+  define11({
+    id: "effect.result-killed",
+    label: "\u8BFB\u53D6\u4F24\u5BB3\u7ED3\u679C\u7684\u51FB\u6740\u6807\u8BB0",
+    inputs: [port8("result", "record")],
+    outputs: [port8("killed", "boolean")],
+    effects: read2(["damage"]),
+    lower: (ctx) => {
+      const result = input6(ctx, "result");
+      return `Boolean(${result} && ${result}.isKilled)`;
+    }
+  })
+];
+
+// lib/skill-graph/module-registry-projectiles.ts
+var ACTIVE3 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var numberType6 = "number";
+var booleanType6 = "boolean";
+var stringType6 = "string";
+var pieceType6 = "piece";
+var cellType4 = "cell";
+var eventType = "event";
+var recordType3 = "record";
+var pieceListType2 = { kind: "list", element: pieceType6 };
+var cellListType2 = { kind: "list", element: cellType4 };
+var eventListType = { kind: "list", element: eventType };
+var numberListType = { kind: "list", element: numberType6 };
+var stringListType2 = { kind: "list", element: stringType6 };
+var port9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var input7 = (ctx, name) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  return value;
+};
+var flow8 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle6 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var literal4 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (value === void 0) throw new Error(`module ${ctx.moduleId}: missing parameter ${name}`);
+  return ctx.emitLiteral(value);
+};
+var numberLiteral4 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
+  return ctx.emitLiteral(value);
+};
+var booleanLiteral3 = (ctx, name, fallback) => {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "boolean") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be boolean`);
+  return ctx.emitLiteral(value);
+};
+var pure6 = (reads = []) => ({ pure: true, previewSafe: false, reads });
+var writes6 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define12 = (value) => ({ version: "1", allowedSurfaces: value.allowedSurfaces ?? ACTIVE3, ...value });
+var PROJECTILE_FACTS = [
+  define12({
+    id: "event.skill-cast-count",
+    label: "\u8BFB\u53D6\u672C\u56DE\u5408\u6280\u80FD\u91CA\u653E\u6B21\u6570",
+    description: "\u6309\u6743\u5A01\u52A8\u4F5C\u8BB0\u5F55\u7EDF\u8BA1\u5F53\u524D\u56DE\u5408\u3001\u5F53\u524D\u68CB\u5B50\u548C\u6307\u5B9A\u6280\u80FD\u7684\u672A\u4E2D\u65AD\u91CA\u653E\u6B21\u6570\u3002",
+    inputs: [port9("piece", pieceType6)],
+    outputs: [port9("count", numberType6)],
+    parameters: [parameter7("skillId", stringType6)],
+    effects: pure6(["actions", "turn"]),
+    lower: (ctx) => {
+      const skillId = literal4(ctx, "skillId");
+      const state = battle6(ctx);
+      return `(function(pieceId,skillId){var turn=${state}.turn&&${state}.turn.turnNumber;return(Array.isArray(${state}.actions)?${state}.actions:[]).filter(function(action){var payload=action&&action.payload;return action&&action.type==="useBasicSkill"&&Number(action.turn)===Number(turn)&&payload&&payload.pieceId===pieceId&&payload.skillId===skillId&&payload.interrupted!==true;}).length;})(${input7(ctx, "piece")},${skillId})`;
+    },
+    ui: { category: "event" }
+  }),
+  define12({
+    id: "status.read-turn-number",
+    label: "\u8BFB\u53D6\u72B6\u6001\u56DE\u5408\u7F16\u53F7",
+    description: "\u8BFB\u53D6\u8FC1\u79FB\u767B\u8BB0\u72B6\u6001\u4E2D\u7684\u56FA\u5B9A turnNumber \u5B57\u6BB5\uFF0C\u4E0D\u5F00\u653E\u4EFB\u610F\u72B6\u6001\u8DEF\u5F84\u3002",
+    inputs: [port9("piece", pieceType6), port9("statusId", stringType6, { nullable: true }), port9("fallback", numberType6)],
+    outputs: [port9("value", numberType6)],
+    effects: pure6(["statuses"]),
+    lower: (ctx) => `(function(pieceId,statusId,fallback){if(statusId==null||!${flow8(ctx)}.query.hasPiece(pieceId))return fallback;var tags=${flow8(ctx)}.query.piece(pieceId).statusTags||[],tag=tags.find(function(item){return item&&item.id===statusId;}),value=tag&&tag.turnNumber;return value==null?fallback:Number(value);})(${input7(ctx, "piece")},${input7(ctx, "statusId")},${input7(ctx, "fallback")})`,
+    ui: { category: "status" }
+  }),
+  define12({
+    id: "projectile.line-cells",
+    label: "\u751F\u6210\u6B63\u5411\u5730\u683C\u7EBF",
+    description: "\u7531\u6765\u6E90\u68CB\u5B50\u4E0E\u5DF2\u9009\u5730\u683C\u8BA1\u7B97\u6B63\u4EA4\u65B9\u5411\uFF0C\u5E76\u6309\u56FA\u5B9A\u8DDD\u79BB\u751F\u6210\u5730\u683C\u5B9E\u4F8B\uFF1B\u53EF\u9009\u62E9\u5728\u5730\u56FE\u8FB9\u754C\u505C\u6B62\u3002",
+    inputs: [port9("source", pieceType6), port9("target", cellType4)],
+    outputs: [port9("cells", cellListType2), port9("dx", numberType6), port9("dy", numberType6), port9("valid", booleanType6), port9("sameCell", booleanType6), port9("distance", numberType6)],
+    parameters: [parameter7("maxDistance", numberType6, { default: 6, minimum: 0, maximum: 128 }), parameter7("clipToBoard", booleanType6, { default: false })],
+    effects: pure6(["pieces", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source");
+      const target = input7(ctx, "target");
+      const state = battle6(ctx);
+      const query = flow8(ctx);
+      const maxDistance = numberLiteral4(ctx, "maxDistance", 6);
+      const clipToBoard = booleanLiteral3(ctx, "clipToBoard", false);
+      return `(function(sourceId,targetCell,maxDistance,clipToBoard){if(sourceId==null||!targetCell||!Number.isInteger(targetCell.x)||!Number.isInteger(targetCell.y)||!${query}.query.hasPiece(sourceId))return {cells:[],dx:0,dy:0,valid:false,sameCell:false,distance:0};var source=${query}.query.piece(sourceId),dx=targetCell.x-source.x,dy=targetCell.y-source.y,sameCell=dx===0&&dy===0,valid=(dx===0)!==(dy===0),sx=dx===0?0:(dx>0?1:-1),sy=dy===0?0:(dy>0?1:-1),cells=[];if(valid){for(var i=1;i<=Math.floor(maxDistance);i+=1){var cell={x:source.x+sx*i,y:source.y+sy*i};if(clipToBoard&&!(${state}.map&&Array.isArray(${state}.map.tiles)&&${state}.map.tiles.some(function(tile){return tile&&tile.x===cell.x&&tile.y===cell.y;})))break;cells.push(cell);}}return {cells:cells,dx:sx,dy:sy,valid:valid,sameCell:sameCell,distance:Math.max(Math.abs(dx),Math.abs(dy))};})(${source},${target},${maxDistance},${clipToBoard})`;
+    },
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.trace",
+    label: "\u8BB0\u5F55\u6B63\u5411\u5F39\u9053",
+    description: "\u6CBF\u6B63\u4EA4\u65B9\u5411\u8C03\u7528\u73B0\u6709\u5F39\u9053\u89C2\u5BDF\u5165\u53E3\uFF1B\u4E8B\u4EF6\u4E2D\u7684\u68CB\u5B50\u3001\u5730\u683C\u548C\u963B\u6321\u4E8B\u5B9E\u7531\u540E\u7EED\u6A21\u5757\u8BFB\u53D6\u3002",
+    inputs: [port9("source", pieceType6), port9("target", cellType4)],
+    outputs: [port9("events", eventListType), port9("dx", numberType6), port9("dy", numberType6), port9("valid", booleanType6), port9("sameCell", booleanType6), port9("distance", numberType6)],
+    parameters: [parameter7("maxDistance", numberType6, { default: 99, minimum: 0, maximum: 128 })],
+    effects: pure6(["pieces", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source");
+      const target = input7(ctx, "target");
+      const query = flow8(ctx);
+      const maxDistance = numberLiteral4(ctx, "maxDistance", 99);
+      return `(function(sourceId,targetCell,maxDistance){if(sourceId==null||!targetCell||!Number.isInteger(targetCell.x)||!Number.isInteger(targetCell.y)||!${query}.query.hasPiece(sourceId))return {events:[],dx:0,dy:0,valid:false,sameCell:false,distance:0};var source=${query}.query.piece(sourceId),dx=targetCell.x-source.x,dy=targetCell.y-source.y,sameCell=dx===0&&dy===0,valid=(dx===0)!==(dy===0),sx=dx===0?0:(dx>0?1:-1),sy=dy===0?0:(dy>0?1:-1);return {events:valid?${query}.query.path({x:source.x,y:source.y},{x:sx,y:sy},{maxDistance:Math.floor(maxDistance),excludePieceId:sourceId}):[],dx:sx,dy:sy,valid:valid,sameCell:sameCell,distance:Math.max(Math.abs(dx),Math.abs(dy))};})(${source},${target},${maxDistance})`;
+    },
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.trace-enemies",
+    label: "\u8BB0\u5F55\u53EF\u7A7F\u8D8A\u5F39\u9053\u654C\u4EBA",
+    description: "\u6CBF\u6B63\u4EA4\u65B9\u5411\u4EE5\u53EF\u7A7F\u8D8A\u53CB\u519B\u3001\u654C\u4EBA\u548C\u5730\u5F62\u7684\u8DEF\u5F84\u8BFB\u53D6\u654C\u4EBA\u5B9E\u4F8B\uFF0C\u4FDD\u7559\u8DEF\u5F84\u4E8B\u4EF6\u987A\u5E8F\u3002",
+    inputs: [port9("source", pieceType6), port9("target", cellType4)],
+    outputs: [port9("pieces", pieceListType2), port9("valid", booleanType6), port9("sameCell", booleanType6), port9("distance", numberType6)],
+    parameters: [parameter7("maxDistance", numberType6, { default: 6, minimum: 0, maximum: 128 })],
+    effects: pure6(["pieces", "players", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source");
+      const target = input7(ctx, "target");
+      const query = flow8(ctx);
+      const maxDistance = numberLiteral4(ctx, "maxDistance", 6);
+      return `(function(sourceId,targetCell,maxDistance){if(sourceId==null||!targetCell||!Number.isInteger(targetCell.x)||!Number.isInteger(targetCell.y)||!${query}.query.hasPiece(sourceId))return {pieces:[],valid:false,sameCell:false,distance:0};var source=${query}.query.piece(sourceId),dx=targetCell.x-source.x,dy=targetCell.y-source.y,sameCell=dx===0&&dy===0,valid=(dx===0)!==(dy===0),sx=dx===0?0:(dx>0?1:-1),sy=dy===0?0:(dy>0?1:-1),trace=valid?${query}.query.tracePath({x:source.x,y:source.y},{x:sx,y:sy},{excludePieceId:sourceId,maxDistance:Math.floor(maxDistance),passAllies:true,passEnemies:true,terrain:"any"}):{encounters:[]},enemyIds=valid?${query}.query.pieces({originId:sourceId,relation:"enemy",includeDead:false}):[];return {pieces:(trace.encounters||[]).filter(function(encounter){return encounter&&encounter.type==="piece"&&enemyIds.indexOf(encounter.pieceId)>=0;}).map(function(encounter){return encounter.pieceId;}),valid:valid,sameCell:sameCell,distance:Math.max(Math.abs(dx),Math.abs(dy))};})(${source},${target},${maxDistance})`;
+    },
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.event-kind",
+    label: "\u8BFB\u53D6\u5F39\u9053\u4E8B\u4EF6\u7C7B\u578B",
+    description: "\u8BFB\u53D6\u89C2\u5BDF\u4E8B\u4EF6\u7684\u5C01\u95ED\u7C7B\u578B\u6807\u8BC6\u3002",
+    inputs: [port9("event", eventType)],
+    outputs: [port9("kind", stringType6)],
+    effects: pure6(["position"]),
+    lower: (ctx) => `String((${input7(ctx, "event")}&&${input7(ctx, "event")}.type)||'')`,
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.event-piece",
+    label: "\u8BFB\u53D6\u547D\u4E2D\u68CB\u5B50",
+    description: "\u5C06\u547D\u4E2D\u4E8B\u4EF6\u4E2D\u7684\u68CB\u5B50\u8F6C\u6362\u4E3A\u4E0D\u900F\u660E\u5B9E\u4F8B ID\uFF1B\u8C03\u7528\u65B9\u5E94\u5148\u5224\u65AD\u4E8B\u4EF6\u7C7B\u578B\u3002",
+    inputs: [port9("event", eventType)],
+    outputs: [port9("piece", pieceType6)],
+    effects: pure6(["pieces"]),
+    lower: (ctx) => `(${input7(ctx, "event")}&&${input7(ctx, "event")}.piece?${input7(ctx, "event")}.piece.instanceId:null)`,
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.event-distance",
+    label: "\u8BFB\u53D6\u5F39\u9053\u8DDD\u79BB",
+    description: "\u8BFB\u53D6\u547D\u4E2D\u6216\u5730\u5F62\u4E8B\u4EF6\u8DDD\u6765\u6E90\u7684\u6574\u6570\u8DDD\u79BB\u3002",
+    inputs: [port9("event", eventType)],
+    outputs: [port9("distance", numberType6)],
+    effects: pure6(["position"]),
+    lower: (ctx) => `Number((${input7(ctx, "event")}&&${input7(ctx, "event")}.distance)||0)`,
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.event-cell",
+    label: "\u8BFB\u53D6\u5F39\u9053\u5730\u683C",
+    description: "\u8BFB\u53D6\u89C2\u5BDF\u4E8B\u4EF6\u7684\u5750\u6807\u5730\u683C\u8BB0\u5F55\u3002",
+    inputs: [port9("event", eventType)],
+    outputs: [port9("cell", cellType4)],
+    effects: pure6(["position"]),
+    lower: (ctx) => `({x:Number(${input7(ctx, "event")}.x),y:Number(${input7(ctx, "event")}.y)})`,
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "projectile.event-blocks",
+    label: "\u8BFB\u53D6\u5F39\u9053\u963B\u6321\u4E8B\u5B9E",
+    description: "\u8BFB\u53D6\u5730\u5F62\u4E8B\u4EF6\u662F\u5426\u963B\u6321\u5F39\u9053\u3002",
+    inputs: [port9("event", eventType)],
+    outputs: [port9("blocks", booleanType6)],
+    effects: pure6(["position"]),
+    lower: (ctx) => `Boolean(${input7(ctx, "event")}&&${input7(ctx, "event")}.blocksProjectile)`,
+    ui: { category: "projectile" }
+  }),
+  define12({
+    id: "query.pieces-in-square",
+    label: "\u67E5\u8BE2\u65B9\u5F62\u8303\u56F4\u68CB\u5B50",
+    description: "\u5728\u6765\u6E90\u68CB\u5B50\u5468\u56F4\u7684\u65B9\u5F62\u8303\u56F4\u5185\u67E5\u8BE2\u5B58\u6D3B\u68CB\u5B50\uFF0C\u5E76\u6309\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u4FDD\u7559\u5B9E\u4F8B ID\u3002",
+    inputs: [port9("origin", pieceType6)],
+    outputs: [port9("pieces", pieceListType2)],
+    parameters: [parameter7("relation", stringType6, { enum: ["all", "ally", "enemy"], default: "enemy" }), parameter7("halfExtent", numberType6, { default: 2, minimum: 0, maximum: 32 })],
+    effects: pure6(["pieces", "players", "position"]),
+    lower: (ctx) => {
+      const origin = input7(ctx, "origin");
+      const query = flow8(ctx);
+      const relation = ctx.parameters.relation === void 0 ? "enemy" : ctx.parameters.relation;
+      if (!["all", "ally", "enemy"].includes(String(relation))) throw new Error(`module ${ctx.moduleId}: invalid relation`);
+      const relationCode = ctx.emitLiteral(relation);
+      const halfExtent = numberLiteral4(ctx, "halfExtent", 2);
+      return `(function(originId,halfExtent){if(originId==null||!${query}.query.hasPiece(originId))return [];var origin=${query}.query.piece(originId),ids=${query}.query.pieces({originId:originId,relation:${relationCode}==='all'?undefined:${relationCode},includeDead:false});return ids.filter(function(id){var piece=${query}.query.piece(id);return Math.max(Math.abs(piece.x-origin.x),Math.abs(piece.y-origin.y))<=halfExtent;});})(${origin},${halfExtent})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.same-relation",
+    label: "\u5224\u65AD\u68CB\u5B50\u654C\u6211\u5173\u7CFB",
+    description: "\u4F7F\u7528\u73B0\u6709\u654C\u6211\u5173\u7CFB\u67E5\u8BE2\u5224\u65AD\u4E24\u4E2A\u68CB\u5B50\u662F\u5426\u5C5E\u4E8E\u6307\u5B9A\u5173\u7CFB\uFF0C\u517C\u5BB9\u961F\u4F0D\u6620\u5C04\u800C\u975E\u6BD4\u8F83\u73A9\u5BB6\u5B57\u7B26\u4E32\u3002",
+    inputs: [port9("source", pieceType6), port9("target", pieceType6)],
+    outputs: [port9("value", booleanType6)],
+    parameters: [parameter7("relation", stringType6, { enum: ["ally", "enemy"], default: "enemy" })],
+    effects: pure6(["pieces", "players"]),
+    lower: (ctx) => {
+      const relation = ctx.parameters.relation === void 0 ? "enemy" : ctx.parameters.relation;
+      if (relation !== "ally" && relation !== "enemy") throw new Error(`module ${ctx.moduleId}: invalid relation`);
+      return `(function(sourceId,targetId){if(sourceId==null||targetId==null||!${flow8(ctx)}.query.hasPiece(sourceId)||!${flow8(ctx)}.query.hasPiece(targetId))return false;return ${flow8(ctx)}.query.pieces({originId:sourceId,relation:${ctx.emitLiteral(relation)},includeDead:true}).indexOf(targetId)>=0;})(${input7(ctx, "source")},${input7(ctx, "target")})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.enemies-on-cells",
+    label: "\u67E5\u8BE2\u5730\u683C\u7EBF\u654C\u4EBA",
+    description: "\u6309\u6765\u6E90\u654C\u6211\u5173\u7CFB\u7B5B\u9009\u5360\u636E\u7ED9\u5B9A\u5730\u683C\u96C6\u5408\u7684\u5B58\u6D3B\u654C\u4EBA\uFF0C\u4FDD\u6301\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u3002",
+    inputs: [port9("source", pieceType6), port9("cells", cellListType2)],
+    outputs: [port9("pieces", pieceListType2)],
+    effects: pure6(["pieces", "players", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source"), cells = input7(ctx, "cells"), query = flow8(ctx);
+      return `(function(sourceId,cells){if(sourceId==null||!Array.isArray(cells)||!${query}.query.hasPiece(sourceId))return [];return ${query}.query.pieces({originId:sourceId,relation:"enemy",includeDead:false}).filter(function(id){var piece=${query}.query.piece(id);return cells.some(function(cell){return cell&&piece.x===cell.x&&piece.y===cell.y;});});})(${source},${cells})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.faction-enemies-on-cells",
+    label: "\u6309\u9635\u8425\u67E5\u8BE2\u5730\u683C\u7EBF\u654C\u4EBA",
+    description: "\u4FDD\u7559\u65E7\u5F39\u9053\u6309 faction \u4E0D\u76F8\u7B49\u5224\u5B9A\u654C\u4EBA\u7684\u8BED\u4E49\uFF0C\u5E76\u6309\u6218\u6597\u68CB\u5B50\u987A\u5E8F\u8FD4\u56DE\u5B58\u6D3B\u76EE\u6807\u3002",
+    inputs: [port9("source", pieceType6), port9("cells", cellListType2)],
+    outputs: [port9("pieces", pieceListType2)],
+    effects: pure6(["pieces", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source"), cells = input7(ctx, "cells"), state = battle6(ctx), query = flow8(ctx);
+      return `(function(sourceId,cells){if(sourceId==null||!Array.isArray(cells)||!${query}.query.hasPiece(sourceId))return [];var source=${query}.query.piece(sourceId);return (${state}.pieces||[]).filter(function(piece){return piece&&piece.currentHp>0&&piece.faction!==source.faction&&cells.some(function(cell){return cell&&piece.x===cell.x&&piece.y===cell.y;});}).map(function(piece){return piece.instanceId;});})(${source},${cells})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.enemies-on-cell",
+    label: "\u67E5\u8BE2\u5355\u683C\u654C\u4EBA",
+    description: "\u6309\u6765\u6E90\u654C\u6211\u5173\u7CFB\u7B5B\u9009\u5360\u636E\u5355\u4E2A\u5730\u683C\u7684\u5B58\u6D3B\u654C\u4EBA\uFF0C\u4FDD\u6301\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u3002",
+    inputs: [port9("source", pieceType6), port9("cell", cellType4)],
+    outputs: [port9("pieces", pieceListType2)],
+    effects: pure6(["pieces", "players", "position"]),
+    lower: (ctx) => {
+      const source = input7(ctx, "source"), cell = input7(ctx, "cell"), query = flow8(ctx);
+      return `(function(sourceId,cell){if(sourceId==null||!cell||!${query}.query.hasPiece(sourceId))return [];return ${query}.query.pieces({originId:sourceId,relation:"enemy",includeDead:false}).filter(function(id){var piece=${query}.query.piece(id);return piece.x===cell.x&&piece.y===cell.y;});})(${source},${cell})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.enemies-on-index",
+    label: "\u67E5\u8BE2\u5730\u683C\u7EBF\u5E8F\u53F7\u654C\u4EBA",
+    description: "\u8BFB\u53D6\u6709\u9650\u5730\u683C\u7EBF\u6307\u5B9A\u5E8F\u53F7\u4E0A\u7684\u5B58\u6D3B\u654C\u4EBA\uFF1B\u8D8A\u8FC7\u5730\u56FE\u8FB9\u754C\u65F6\u8FD4\u56DE\u7A7A\u96C6\u5408\u3002",
+    inputs: [port9("source", pieceType6, { nullable: true, optional: true }), port9("owner", "player", { nullable: true, optional: true }), port9("cells", cellListType2), port9("index", numberType6)],
+    outputs: [port9("pieces", pieceListType2)],
+    effects: pure6(["pieces", "players", "position"]),
+    lower: (ctx) => {
+      const source = ctx.inputs.source ?? "null", owner = ctx.inputs.owner ?? "null", cells = input7(ctx, "cells"), index = input7(ctx, "index"), query = flow8(ctx);
+      return `(function(sourceId,ownerId,cells,index){if(!Array.isArray(cells)||!Number.isInteger(index)||index<0||index>=cells.length||sourceId==null&&ownerId==null||sourceId!=null&&!${query}.query.hasPiece(sourceId)&&ownerId==null)return [];var cell=cells[index],ids=ownerId!=null?${query}.query.pieces({ownerId:ownerId,relation:"enemy",includeDead:false}):${query}.query.pieces({originId:sourceId,relation:"enemy",includeDead:false});return ids.filter(function(id){var piece=${query}.query.piece(id);return piece.x===cell.x&&piece.y===cell.y;});})(${source},${owner},${cells},${index})`;
+    },
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.piece-names",
+    label: "\u8BFB\u53D6\u68CB\u5B50\u540D\u79F0\u96C6\u5408",
+    description: "\u6309\u7ED9\u5B9A\u68CB\u5B50\u5B9E\u4F8B\u987A\u5E8F\u8BFB\u53D6\u540D\u79F0\u6587\u672C\uFF0C\u4F9B\u5F39\u9053\u7ED3\u679C\u6D88\u606F\u4FDD\u7559\u65E7\u547D\u4E2D\u987A\u5E8F\u3002",
+    inputs: [port9("pieces", pieceListType2)],
+    outputs: [port9("names", stringListType2)],
+    effects: pure6(["pieces"]),
+    lower: (ctx) => `(Array.isArray(${input7(ctx, "pieces")}) ? ${input7(ctx, "pieces")} : []).map(function(pieceId) { var piece = ${flow8(ctx)}.query.piece(pieceId); return piece ? String(piece.name) : ''; })`,
+    ui: { category: "query" }
+  }),
+  define12({
+    id: "query.hand-card-instances",
+    label: "\u67E5\u8BE2\u624B\u724C\u5B9E\u4F8B",
+    description: "\u6309\u73A9\u5BB6\u624B\u724C\u987A\u5E8F\u8BFB\u53D6\u6307\u5B9A\u5361\u724C\u7684\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\uFF0C\u4E0D\u628A\u53EF\u53D8\u5361\u724C\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002",
+    inputs: [port9("player", "player")],
+    outputs: [port9("cards", stringListType2)],
+    parameters: [parameter7("cardId", stringType6)],
+    effects: pure6(["hand", "players"]),
+    lower: (ctx) => `(function(playerId,cardId){var hand = ${flow8(ctx)}.cards.hand(playerId); return (Array.isArray(hand) ? hand : []).filter(function(card) { return card && card.cardId === cardId; }).map(function(card) { return card.instanceId; });})(${input7(ctx, "player")},${literal4(ctx, "cardId")})`,
+    ui: { category: "card" }
+  }),
+  define12({
+    id: "projectile.distance-multiplier",
+    label: "\u6309\u8DDD\u79BB\u8BFB\u53D6\u500D\u7387",
+    description: "\u4ECE\u4F5C\u8005\u63D0\u4F9B\u7684\u6709\u9650\u8DDD\u79BB\u500D\u7387\u8868\u8BFB\u53D6\u5F53\u524D\u8DDD\u79BB\u503C\uFF1B\u7528\u4E8E\u4FDD\u7559\u4E0D\u540C\u5F39\u9053\u7684\u8DDD\u79BB\u8870\u51CF\u3002",
+    inputs: [port9("distance", numberType6)],
+    outputs: [port9("value", numberType6)],
+    parameters: [parameter7("values", numberListType)],
+    effects: pure6(),
+    lower: (ctx) => {
+      const values = ctx.parameters.values;
+      if (!Array.isArray(values) || values.some((value) => typeof value !== "number" || !Number.isFinite(value))) throw new Error(`module ${ctx.moduleId}: values must be finite numbers`);
+      const table = ctx.emitLiteral(values);
+      return `(function(distance,values){var index=Math.floor(distance)-1;return index>=0&&index<values.length&&Number.isFinite(values[index])?values[index]:0;})(${input7(ctx, "distance")},${table})`;
+    },
+    ui: { category: "math" }
+  })
+];
+var PROJECTILE_EFFECTS = [
+  define12({
+    id: "effect.displace",
+    label: "\u6309\u8DEF\u5F84\u4F4D\u79FB\u68CB\u5B50",
+    description: "\u901A\u8FC7\u7EDF\u4E00\u4F4D\u79FB\u5165\u53E3\u63D0\u4EA4\u4E00\u4E2A\u68CB\u5B50\uFF0C\u5E76\u4FDD\u7559\u4F5C\u8005\u6307\u5B9A\u7684\u53EF\u7A7F\u8D8A\u8DEF\u5F84\u7B56\u7565\u3002",
+    inputs: [port9("piece", pieceType6), port9("destination", cellType4)],
+    outputs: [port9("result", recordType3), port9("success", booleanType6)],
+    parameters: [
+      parameter7("kind", stringType6, { enum: ["dash", "teleport"], default: "dash" }),
+      parameter7("passAllies", booleanType6, { default: true }),
+      parameter7("passEnemies", booleanType6, { default: true }),
+      parameter7("terrain", stringType6, { enum: ["walkable", "projectile", "any"], default: "any" })
+    ],
+    effects: writes6(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
+    lower: (ctx) => {
+      const kind = literal4(ctx, "kind", "dash");
+      const passAllies = booleanLiteral3(ctx, "passAllies", true);
+      const passEnemies = booleanLiteral3(ctx, "passEnemies", true);
+      const terrain = literal4(ctx, "terrain", "any");
+      const destination = input7(ctx, "destination");
+      const request = `[{pieceId:${input7(ctx, "piece")},x:(${destination}).x,y:(${destination}).y}]`;
+      return `(function(value){return {result:value,success:Boolean(value&&value.success)};})(${flow8(ctx)}.effects.displace(${request},${kind},{passAllies:${passAllies},passEnemies:${passEnemies},terrain:${terrain}}))`;
+    },
+    ui: { category: "effect" }
+  }),
+  define12({
+    id: "effect.damage-without-skill-id",
+    label: "\u9020\u6210\u65E0\u6280\u80FD\u6807\u8BC6\u4F24\u5BB3",
+    description: "\u6CBF\u7528\u65E7\u6280\u80FD\u76F4\u63A5\u8C03\u7528\u4F24\u5BB3\u5165\u53E3\u65F6\u7701\u7565 skillId \u7684\u4E8B\u4EF6\u8BED\u4E49\uFF1B\u4F24\u5BB3\u7C7B\u578B\u4ECD\u7531\u56FE\u663E\u5F0F\u58F0\u660E\u3002",
+    inputs: [port9("source", pieceType6), port9("target", pieceType6), port9("amount", numberType6)],
+    outputs: [port9("result", recordType3), port9("success", booleanType6), port9("damage", numberType6)],
+    parameters: [parameter7("damageType", stringType6, { enum: ["physical", "magical", "true"], default: "physical" })],
+    effects: writes6(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
+    lower: (ctx) => {
+      const damageType = ctx.parameters.damageType === void 0 ? "physical" : ctx.parameters.damageType;
+      if (damageType !== "physical" && damageType !== "magical" && damageType !== "true") throw new Error(`module ${ctx.moduleId}: invalid damageType`);
+      const source = `${flow8(ctx)}.query.piece(${input7(ctx, "source")})`;
+      const target = `${flow8(ctx)}.query.piece(${input7(ctx, "target")})`;
+      return `(function(value){return {result:value,success:Boolean(value&&value.success),damage:value&&value.damage};})(dealDamage(${source},${target},${input7(ctx, "amount")},${ctx.emitLiteral(damageType)},${battle6(ctx)}))`;
+    },
+    ui: { category: "effect" }
+  }),
+  define12({
+    id: "card.discard-instance",
+    label: "\u5F03\u7F6E\u624B\u724C\u5B9E\u4F8B",
+    description: "\u901A\u8FC7\u73B0\u6709\u5361\u724C\u751F\u547D\u5468\u671F\u6309\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\u5F03\u7F6E\u624B\u724C\u5E76\u5199\u5165\u5F03\u724C\u5806\u3002",
+    inputs: [port9("card", stringType6)],
+    outputs: [port9("success", booleanType6)],
+    effects: writes6(["hand", "events"], ["cardDiscarded"]),
+    lower: (ctx) => `Boolean(${flow8(ctx)}.cards.discard(${input7(ctx, "card")}))`,
+    ui: { category: "card" }
+  }),
+  define12({
+    id: "skill.reset-cooldown",
+    label: "\u91CD\u7F6E\u6280\u80FD\u51B7\u5374",
+    description: "\u6CBF\u7528\u73B0\u6709\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\uFF0C\u5C06\u6307\u5B9A\u68CB\u5B50\u6280\u80FD\u51B7\u5374\u91CD\u7F6E\u4E3A\u96F6\u3002",
+    inputs: [port9("piece", pieceType6), port9("skillId", stringType6, { nullable: true })],
+    outputs: [port9("success", booleanType6)],
+    effects: writes6(["skills"], ["skillCooldownChanged"]),
+    lower: (ctx) => `(function(pieceId,skillId){if(pieceId==null||skillId==null||!${flow8(ctx)}.query.hasPiece(pieceId))return false;${flow8(ctx)}.skills.resetCooldown(pieceId,[skillId]);return true;})(${input7(ctx, "piece")},${input7(ctx, "skillId")})`,
+    ui: { category: "skill" }
+  }),
+  define12({
+    id: "effect.destroy-walls",
+    label: "\u7834\u574F\u5730\u683C\u5899\u4F53",
+    description: "\u7ECF\u73B0\u6709 flow.effects.destroyWalls \u5165\u53E3\u7834\u574F\u7ED9\u5B9A\u5730\u683C\u4E2D\u7684\u5899\u548C\u53EF\u9009\u63A9\u4F53\uFF0C\u5E76\u8FD4\u56DE\u5B9E\u9645\u53D8\u5316\u6570\u91CF\u3002",
+    inputs: [port9("cells", cellListType2)],
+    outputs: [port9("result", recordType3), port9("changed", numberType6)],
+    parameters: [parameter7("includeCover", booleanType6, { default: true })],
+    effects: writes6(["terrain", "events"], ["terrainChanged"]),
+    lower: (ctx) => `(function(value){return {result:value,changed:Array.isArray(value&&value.changedCells)?value.changedCells.length:0};})(${flow8(ctx)}.effects.destroyWalls(${input7(ctx, "cells")},{includeCover:${booleanLiteral3(ctx, "includeCover", true)}}))`,
+    ui: { category: "effect" }
+  }),
+  define12({
+    id: "projectile.zone-set",
+    label: "\u5199\u5165\u5F39\u9053\u533A\u57DF\u8BB0\u5F55",
+    description: "\u5199\u5165\u73B0\u6709\u6218\u6597\u6269\u5C55\u4E2D\u7684\u7ED3\u6784\u5316\u5F39\u9053\u533A\u57DF\u8BB0\u5F55\uFF1B\u72B6\u6001\u751F\u547D\u5468\u671F\u4ECD\u7531\u540C\u4E00\u4F5C\u8005\u56FE\u663E\u5F0F\u8C03\u7528\u3002",
+    inputs: [port9("source", pieceType6), port9("dx", numberType6), port9("dy", numberType6)],
+    outputs: [port9("success", booleanType6)],
+    parameters: [parameter7("storageKey", stringType6, { default: "coltZones" }), parameter7("kind", stringType6, { default: "revolver" }), parameter7("turns", numberType6, { default: 2, minimum: 0, maximum: 32 })],
+    effects: writes6(["extensions"]),
+    lower: (ctx) => {
+      const state = battle6(ctx);
+      const storageKey = literal4(ctx, "storageKey", "coltZones");
+      const kind = literal4(ctx, "kind", "revolver");
+      const turns = numberLiteral4(ctx, "turns", 2);
+      return `(function(sourceId,dx,dy,storageKey,kind,turns){if(typeof sourceId!=="string"||typeof storageKey!=="string"||!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)||!Number.isInteger(dx)||!Number.isInteger(dy)||Math.abs(dx)+Math.abs(dy)!==1||!Number.isFinite(turns))return false;${state}.extensions=${state}.extensions||{};${state}.extensions[storageKey]=${state}.extensions[storageKey]||{};${state}.extensions[storageKey][sourceId]={sourceId:sourceId,kind:kind,dx:dx,dy:dy,turns:turns};return true;})(${input7(ctx, "source")},${input7(ctx, "dx")},${input7(ctx, "dy")},${storageKey},${kind},${turns})`;
+    },
+    ui: { category: "effect" }
+  })
+];
+var PROJECTILE_GAMEPLAY_MODULES = Object.freeze([
+  ...PROJECTILE_FACTS,
+  ...PROJECTILE_EFFECTS
+]);
+
+// lib/skill-graph/module-registry-counter-passives.ts
+var surfaces6 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var flow9 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var battle7 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
+var context3 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
+var define13 = (value) => ({
+  version: "1",
+  ...value,
+  allowedSurfaces: value.allowedSurfaces ?? surfaces6
+});
+var pieceType7 = "piece";
+var playerType3 = "player";
+var stringType7 = "string";
+var numberType7 = "number";
+var booleanType7 = "boolean";
+var recordType4 = "record";
+var pieceListType3 = { kind: "list", element: pieceType7 };
+var recordListType = { kind: "list", element: recordType4 };
+var input8 = (ctx, name) => ctx.inputs[name];
+var COUNTER_PASSIVE_GAMEPLAY_MODULES = [
+  define13({
+    id: "event.read-coordinate",
+    label: "\u8BFB\u53D6\u79FB\u52A8\u4E8B\u4EF6\u5750\u6807",
+    inputs: [{ name: "fallback", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["fromX", "fromY"] }],
+    effects: { pure: true, previewSafe: false, reads: ["event"] },
+    lower: (ctx) => `(function() { var value = ${context3(ctx)}[${ctx.emitLiteral(ctx.parameters.field)}]; return value == null ? ${input8(ctx, "fallback")} : Number(value); })()`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "event.last-move-distance",
+    label: "\u8BFB\u53D6\u6700\u8FD1\u79FB\u52A8\u8DDD\u79BB",
+    inputs: [{ name: "piece", type: pieceType7 }],
+    outputs: [{ name: "distance", type: numberType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["event", "actions"] },
+    lower: (ctx) => `(function() { var actions = Array.isArray(${battle7(ctx)}.actions) ? ${battle7(ctx)}.actions.slice().reverse() : []; var action = actions.find(function(item) { return item && item.type === 'move' && item.payload && item.payload.pieceId === ${input8(ctx, "piece")}; }); if (!action || !action.payload) return 0; return Math.abs(Number(action.payload.toX || 0) - Number(action.payload.fromX || 0)) + Math.abs(Number(action.payload.toY || 0) - Number(action.payload.fromY || 0)); })()`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "collection.contains-piece",
+    label: "\u68C0\u67E5\u68CB\u5B50\u662F\u5426\u5728\u96C6\u5408\u4E2D",
+    inputs: [{ name: "items", type: pieceListType3 }, { name: "value", type: pieceType7 }],
+    outputs: [{ name: "contains", type: booleanType7 }],
+    effects: { pure: true, previewSafe: true },
+    lower: (ctx) => `(${input8(ctx, "items")}.indexOf(${input8(ctx, "value")}) >= 0)`,
+    ui: { category: "collection" }
+  }),
+  define13({
+    id: "piece.reference-present",
+    label: "\u68C0\u67E5\u68CB\u5B50\u5F15\u7528\u5B58\u5728",
+    inputs: [{ name: "piece", type: pieceType7, nullable: true }],
+    outputs: [{ name: "value", type: booleanType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["event"] },
+    lower: (ctx) => `(${input8(ctx, "piece")} != null)`,
+    ui: { category: "condition" }
+  }),
+  define13({
+    id: "compare.equal-piece-nullable",
+    label: "\u6BD4\u8F83\u53EF\u7A7A\u68CB\u5B50\u5F15\u7528",
+    inputs: [{ name: "left", type: pieceType7, nullable: true }, { name: "right", type: pieceType7, nullable: true }],
+    outputs: [{ name: "value", type: booleanType7 }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `(${input8(ctx, "left")} === ${input8(ctx, "right")})`,
+    ui: { category: "condition" }
+  }),
+  define13({
+    id: "piece.name-by-id",
+    label: "\u8BFB\u53D6\u68CB\u5B50\u540D\u79F0",
+    inputs: [{ name: "piece", type: pieceType7, nullable: true }, { name: "fallback", type: stringType7 }],
+    outputs: [{ name: "text", type: stringType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["pieces"] },
+    lower: (ctx) => `(function() { var id = ${input8(ctx, "piece")}; var all = (${battle7(ctx)}.pieces || []).concat(${battle7(ctx)}.graveyard || []); var item = all.find(function(candidate) { return candidate && candidate.instanceId === id; }); return item ? String(item.name || item.templateId || ${input8(ctx, "fallback")}) : ${input8(ctx, "fallback")}; })()`,
+    ui: { category: "query" }
+  }),
+  define13({
+    id: "status.has-id",
+    label: "\u68C0\u67E5\u72B6\u6001\u6807\u8BC6",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }],
+    outputs: [{ name: "value", type: booleanType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => `((${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).some(function(tag) { return tag && tag.id === ${input8(ctx, "statusId")}; }))`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "status.read-record-number",
+    label: "\u8BFB\u53D6\u767B\u8BB0\u72B6\u6001\u6570\u503C",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }, { name: "fallback", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["stacks", "intensity", "hitCount", "readyCharges"] }],
+    effects: { pure: true, previewSafe: false, reads: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).find(function(item) { return item && item.id === ${input8(ctx, "statusId")}; }); var value = tag && tag[${ctx.emitLiteral(ctx.parameters.field)}]; return value == null ? ${input8(ctx, "fallback")} : Number(value); })()`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "status.set-record-number",
+    label: "\u517C\u5BB9\u6027\u66F4\u65B0\u72B6\u6001\u6570\u503C\u5B57\u6BB5",
+    description: "\u66F4\u65B0\u8FC1\u79FB\u767B\u8BB0\u7684\u6709\u9650\u72B6\u6001\u6570\u503C\u5B57\u6BB5\uFF1B\u4E0D\u89E6\u53D1\u72B6\u6001\u751F\u547D\u5468\u671F\u4E8B\u4EF6\uFF0C\u4E0D\u63A5\u53D7\u4EFB\u610F\u5BF9\u8C61\u8DEF\u5F84\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }, { name: "value", type: numberType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["currentDuration", "remainingDuration", "lastDamageTurn", "stacks", "intensity", "hitCount", "readyCharges"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).find(function(item) { return item && item.id === ${input8(ctx, "statusId")}; }); if (!tag) return false; tag[${ctx.emitLiteral(ctx.parameters.field)}] = ${input8(ctx, "value")}; return true; })()`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "status.set-record-text",
+    label: "\u517C\u5BB9\u6027\u66F4\u65B0\u72B6\u6001\u6587\u672C\u5B57\u6BB5",
+    description: "\u66F4\u65B0\u8FC1\u79FB\u767B\u8BB0\u7684\u6709\u9650\u72B6\u6001\u6587\u672C\u5B57\u6BB5\uFF1B\u4E0D\u89E6\u53D1\u72B6\u6001\u751F\u547D\u5468\u671F\u4E8B\u4EF6\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }, { name: "value", type: stringType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["type", "sourceId", "name", "stacking"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).find(function(item) { return item && item.id === ${input8(ctx, "statusId")}; }); if (!tag) return false; tag[${ctx.emitLiteral(ctx.parameters.field)}] = ${input8(ctx, "value")}; return true; })()`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "status.set-record-boolean",
+    label: "\u517C\u5BB9\u6027\u66F4\u65B0\u72B6\u6001\u5E03\u5C14\u5B57\u6BB5",
+    description: "\u66F4\u65B0\u8FC1\u79FB\u767B\u8BB0\u7684\u6709\u9650\u72B6\u6001\u5E03\u5C14\u5B57\u6BB5\uFF1B\u4E0D\u89E6\u53D1\u72B6\u6001\u751F\u547D\u5468\u671F\u4E8B\u4EF6\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }, { name: "value", type: booleanType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["visible"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).find(function(item) { return item && item.id === ${input8(ctx, "statusId")}; }); if (!tag) return false; tag[${ctx.emitLiteral(ctx.parameters.field)}] = ${input8(ctx, "value")}; return true; })()`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "status.clear-record-field",
+    label: "\u6E05\u7A7A\u517C\u5BB9\u6027\u72B6\u6001\u5B57\u6BB5",
+    description: "\u6E05\u7A7A\u8FC1\u79FB\u767B\u8BB0\u7684\u6709\u9650\u53EF\u7A7A\u72B6\u6001\u5B57\u6BB5\uFF1B\u4E0D\u89E6\u53D1\u72B6\u6001\u751F\u547D\u5468\u671F\u4E8B\u4EF6\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "statusId", type: stringType7, nullable: true }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["expiresAfterTurn"] }],
+    effects: { pure: false, previewSafe: false, writes: ["statuses"] },
+    lower: (ctx) => `(function() { var tag = (${flow9(ctx)}.query.piece(${input8(ctx, "piece")}).statusTags || []).find(function(item) { return item && item.id === ${input8(ctx, "statusId")}; }); if (!tag) return false; tag[${ctx.emitLiteral(ctx.parameters.field)}] = null; return true; })()`,
+    ui: { category: "status" }
+  }),
+  define13({
+    id: "attribute.set-momentum",
+    label: "\u8BBE\u5B9A\u52A8\u80FD",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "value", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    effects: { pure: false, previewSafe: false, writes: ["attributes"] },
+    lower: (ctx) => `(function() { var piece = ${flow9(ctx)}.query.piece(${input8(ctx, "piece")}); piece.momentum = ${input8(ctx, "value")}; return piece.momentum; })()`,
+    ui: { category: "effect" }
+  }),
+  define13({
+    id: "skill.adjust-all-cooldowns",
+    label: "\u8C03\u6574\u5168\u90E8\u6280\u80FD\u51B7\u5374",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "amount", type: numberType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "mode", type: stringType7, enum: ["add", "atLeast"], default: "atLeast" }],
+    effects: { pure: false, previewSafe: false, writes: ["skills"] },
+    lower: (ctx) => `(function() { var piece = ${flow9(ctx)}.query.piece(${input8(ctx, "piece")}); var skills = Array.isArray(piece.skills) ? piece.skills : []; if (!skills.length) return false; skills.forEach(function(skill) { var current = Number(skill.currentCooldown || 0); skill.currentCooldown = ${ctx.emitLiteral(ctx.parameters.mode)} === 'add' ? current + ${input8(ctx, "amount")} : Math.max(current, ${input8(ctx, "amount")}); }); return true; })()`,
+    ui: { category: "skill" }
+  }),
+  define13({
+    id: "event.battle-turn-number",
+    label: "\u8BFB\u53D6\u6218\u6597\u56DE\u5408\u7F16\u53F7",
+    inputs: [],
+    outputs: [{ name: "value", type: numberType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["turn"] },
+    lower: (ctx) => `Number(${battle7(ctx)}.turn && ${battle7(ctx)}.turn.turnNumber)`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "value.is-finite",
+    label: "\u68C0\u67E5\u6709\u9650\u6570\u503C",
+    inputs: [{ name: "value", type: numberType7 }],
+    outputs: [{ name: "value", type: booleanType7 }],
+    effects: { pure: true, previewSafe: true },
+    lower: (ctx) => `Number.isFinite(${input8(ctx, "value")})`,
+    ui: { category: "condition" }
+  }),
+  define13({
+    id: "event.actions",
+    label: "\u8BFB\u53D6\u6218\u6597\u52A8\u4F5C\u8BB0\u5F55",
+    inputs: [],
+    outputs: [{ name: "actions", type: recordListType }],
+    effects: { pure: true, previewSafe: false, reads: ["actions"] },
+    lower: (ctx) => `(Array.isArray(${battle7(ctx)}.actions) ? ${battle7(ctx)}.actions : [])`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "event.action-text",
+    label: "\u8BFB\u53D6\u52A8\u4F5C\u6587\u672C\u5B57\u6BB5",
+    inputs: [{ name: "action", type: recordType4 }, { name: "fallback", type: stringType7 }],
+    outputs: [{ name: "value", type: stringType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["type"] }],
+    effects: { pure: true, previewSafe: false, reads: ["actions"] },
+    lower: (ctx) => `(function(action) { var value = action && action[${ctx.emitLiteral(ctx.parameters.field)}]; return value == null ? ${input8(ctx, "fallback")} : String(value); })(${input8(ctx, "action")})`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "event.action-number",
+    label: "\u8BFB\u53D6\u52A8\u4F5C\u6570\u503C\u5B57\u6BB5",
+    inputs: [{ name: "action", type: recordType4 }, { name: "fallback", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    parameters: [{ name: "field", type: stringType7, enum: ["turn", "payload.finalDamage"] }],
+    effects: { pure: true, previewSafe: false, reads: ["actions"] },
+    lower: (ctx) => `(function(action) { var value = ${ctx.emitLiteral(ctx.parameters.field)} === 'turn' ? action && action.turn : action && action.payload && action.payload.finalDamage; return value == null ? ${input8(ctx, "fallback")} : Number(value); })(${input8(ctx, "action")})`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "event.action-piece",
+    label: "\u8BFB\u53D6\u52A8\u4F5C\u68CB\u5B50\u5B57\u6BB5",
+    inputs: [{ name: "action", type: recordType4 }, { name: "fallback", type: pieceType7, nullable: true }],
+    outputs: [{ name: "value", type: pieceType7, nullable: true }],
+    parameters: [{ name: "field", type: stringType7, enum: ["payload.targetId"] }],
+    effects: { pure: true, previewSafe: false, reads: ["actions"] },
+    lower: (ctx) => `(function(action) { var value = action && action.payload && action.payload.targetId; return typeof value === 'string' ? value : ${input8(ctx, "fallback")}; })(${input8(ctx, "action")})`,
+    ui: { category: "event" }
+  }),
+  define13({
+    id: "state.read-piece-number",
+    label: "\u8BFB\u53D6\u68CB\u5B50\u517C\u5BB9\u8BA1\u6570",
+    description: "\u6309\u5C01\u95ED\u7684\u5185\u5BB9\u72B6\u6001\u5B57\u6BB5\u8BFB\u53D6\u68CB\u5B50\u8BA1\u6570\uFF1B\u4E0D\u63A5\u53D7\u4EFB\u610F\u547D\u540D\u7A7A\u95F4\u6216\u5B57\u6BB5\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "fallback", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    parameters: [{ name: "namespace", type: stringType7, enum: ["muzan-flesh-regeneration"] }, { name: "name", type: stringType7, enum: ["lastDamageTurn", "lastCheckTurn", "successfulHeals"] }],
+    effects: { pure: true, previewSafe: false, reads: ["state"] },
+    lower: (ctx) => `(function() { var value = ${flow9(ctx)}.state.get('piece', ${input8(ctx, "piece")}, ${ctx.emitLiteral(ctx.parameters.namespace)}, ${ctx.emitLiteral(ctx.parameters.name)}); return value == null ? ${input8(ctx, "fallback")} : Number(value); })()`,
+    ui: { category: "state" }
+  }),
+  define13({
+    id: "state.write-piece-number",
+    label: "\u5199\u5165\u68CB\u5B50\u517C\u5BB9\u8BA1\u6570",
+    description: "\u6309\u5C01\u95ED\u7684\u5185\u5BB9\u72B6\u6001\u5B57\u6BB5\u5199\u5165\u68CB\u5B50\u8BA1\u6570\uFF1B\u4E0D\u63A5\u53D7\u4EFB\u610F\u547D\u540D\u7A7A\u95F4\u6216\u5B57\u6BB5\u3002",
+    inputs: [{ name: "piece", type: pieceType7 }, { name: "value", type: numberType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "namespace", type: stringType7, enum: ["muzan-flesh-regeneration"] }, { name: "name", type: stringType7, enum: ["lastDamageTurn", "lastCheckTurn", "successfulHeals"] }],
+    effects: { pure: false, previewSafe: false, writes: ["state"] },
+    lower: (ctx) => `(function() { ${flow9(ctx)}.state.set('piece', ${input8(ctx, "piece")}, ${ctx.emitLiteral(ctx.parameters.namespace)}, ${ctx.emitLiteral(ctx.parameters.name)}, ${input8(ctx, "value")}, 'battle'); return true; })()`,
+    ui: { category: "state" }
+  }),
+  define13({
+    id: "state.read-player-number",
+    label: "\u8BFB\u53D6\u73A9\u5BB6\u517C\u5BB9\u8BA1\u6570",
+    description: "\u6309\u53D7\u9650\u7684\u517C\u5BB9\u8DEF\u5F84\u8BFB\u53D6\u73A9\u5BB6\u7F16\u53F7\u8BA1\u6570\uFF1B\u5BBF\u4E3B\u8D1F\u8D23\u8DEF\u5F84\u6821\u9A8C\u4E0E\u72B6\u6001\u955C\u50CF\u3002",
+    inputs: [{ name: "player", type: playerType3 }, { name: "fallback", type: numberType7 }],
+    outputs: [{ name: "value", type: numberType7 }],
+    parameters: [{ name: "path", type: stringType7 }],
+    effects: { pure: true, previewSafe: false, reads: ["state"] },
+    lower: (ctx) => `Number(${flow9(ctx)}.state.getPlayerNumber(${ctx.emitLiteral(ctx.parameters.path)}, ${input8(ctx, "player")}) || ${input8(ctx, "fallback")})`,
+    ui: { category: "state" }
+  }),
+  define13({
+    id: "state.write-player-number",
+    label: "\u5199\u5165\u73A9\u5BB6\u517C\u5BB9\u8BA1\u6570",
+    description: "\u6309\u53D7\u9650\u7684\u517C\u5BB9\u8DEF\u5F84\u5199\u5165\u73A9\u5BB6\u7F16\u53F7\u8BA1\u6570\uFF1B\u5BBF\u4E3B\u8D1F\u8D23\u8DEF\u5F84\u6821\u9A8C\u4E0E\u72B6\u6001\u955C\u50CF\u3002",
+    inputs: [{ name: "player", type: playerType3 }, { name: "value", type: numberType7 }],
+    outputs: [{ name: "success", type: booleanType7 }],
+    parameters: [{ name: "path", type: stringType7 }],
+    effects: { pure: false, previewSafe: false, writes: ["state"] },
+    lower: (ctx) => `${flow9(ctx)}.state.setPlayerNumber(${ctx.emitLiteral(ctx.parameters.path)}, ${input8(ctx, "player")}, ${input8(ctx, "value")})`,
+    ui: { category: "state" }
+  }),
+  define13({
+    id: "effect.queue-damage",
+    label: "\u6392\u961F\u4F24\u5BB3",
+    description: "\u5728\u5F53\u524D\u89C4\u5219\u4E8B\u4EF6\u7684\u83B7\u51C6 damageQueue \u4E2D\u52A0\u5165\u4E00\u4E2A\u7ED3\u6784\u5316\u4F24\u5BB3\u8BF7\u6C42\uFF1B\u4E0D\u63D0\u524D\u6539\u53D8\u751F\u547D\u503C\u3002",
+    inputs: [{ name: "attacker", type: pieceType7 }, { name: "target", type: pieceType7 }, { name: "amount", type: numberType7 }],
+    outputs: [{ name: "queued", type: booleanType7 }],
+    parameters: [{ name: "damageType", type: stringType7, enum: ["physical", "magical", "true", "toxin"], default: "physical" }, { name: "skillId", type: stringType7 }],
+    allowedSurfaces: ["rule"],
+    effects: { pure: false, previewSafe: false, writes: ["damage-queue"], events: ["beforeDamageDealt", "afterDamageDealt"] },
+    lower: (ctx) => `(function() { if (!${context3(ctx)}.damageQueue || typeof ${context3(ctx)}.damageQueue.push !== 'function') throw new Error('effect.queue-damage requires context.damageQueue'); ${context3(ctx)}.damageQueue.push({attacker: ${flow9(ctx)}.query.piece(${input8(ctx, "attacker")}), target: ${flow9(ctx)}.query.piece(${input8(ctx, "target")}), damage: ${input8(ctx, "amount")}, damageType: ${ctx.emitLiteral(ctx.parameters.damageType)}, skillId: ${ctx.emitLiteral(ctx.parameters.skillId)}}); return true; })()`,
+    ui: { category: "effect" }
+  })
+];
+
+// lib/skill-graph/module-registry-execution-locals.ts
+var flow10 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var EXECUTION_LOCAL_GAMEPLAY_MODULES = [
+  {
+    id: "source.captured-no-kill-charge",
+    version: "1",
+    label: "\u8BFB\u53D6\u6765\u6E90\u51FB\u6740\u5145\u80FD\u8C41\u514D",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context", "pieces"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedNoKillCharge(${ctx.inputs.source})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "source.captured-max-hp",
+    version: "1",
+    label: "\u8BFB\u53D6\u6765\u6E90\u751F\u547D\u4E0A\u9650\u53CA\u57FA\u7840\u503C\u56DE\u9000",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }, { name: "fallback", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context", "pieces"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedMaxHp(${ctx.inputs.source}, ${ctx.inputs.fallback})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "rule.remove-captured",
+    version: "1",
+    label: "\u79FB\u9664\u5DF2\u4FDD\u7559\u6765\u6E90\u7684\u89C4\u5219",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    parameters: [{ name: "ruleId", type: "string" }],
+    effects: { pure: false, previewSafe: false, writes: ["rules"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.removeCapturedRule(${ctx.inputs.source}, ${ctx.emitLiteral(ctx.parameters.ruleId)})`,
+    ui: { category: "rule" }
+  },
+  {
+    id: "effect.queue-damage-captured",
+    version: "1",
+    label: "\u5C06\u5DF2\u4FDD\u7559\u6765\u6E90\u4F24\u5BB3\u52A0\u5165\u961F\u5217",
+    allowedSurfaces: ["rule"],
+    inputs: [{ name: "source", type: "record" }, { name: "target", type: "record" }, { name: "amount", type: "number" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    parameters: [{ name: "damageType", type: "string", enum: ["physical", "magical", "true"] }, { name: "skillId", type: "string" }],
+    effects: { pure: false, previewSafe: false, writes: ["damage-queue"], events: ["beforeDamageDealt", "afterDamageDealt"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.queueDamageCaptured(${ctx.inputs.source}, ${ctx.inputs.target}, ${ctx.inputs.amount}, ${ctx.emitLiteral(ctx.parameters.damageType)}, ${ctx.emitLiteral(ctx.parameters.skillId)})`,
+    ui: { category: "effect" }
+  },
+  {
+    id: "source.captured-piece-reference",
+    version: "1",
+    label: "\u5DF2\u4FDD\u7559\u6765\u6E90\u7684\u68CB\u5B50\u5F15\u7528",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "piece", type: "piece" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedIdentifier(${ctx.inputs.source})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "source.captured-identifier",
+    version: "1",
+    label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u6765\u6E90\u6807\u8BC6",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "value", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedIdentifier(${ctx.inputs.source})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "source.captured-has-status",
+    version: "1",
+    label: "\u5DF2\u4FDD\u7559\u6765\u6E90\u662F\u5426\u5177\u6709\u72B6\u6001",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "value", type: "boolean" }],
+    parameters: [{ name: "statusType", type: "string" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context", "statuses"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedHasStatus(${ctx.inputs.source}, ${ctx.emitLiteral(ctx.parameters.statusType)})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "log.trigger-effect",
+    version: "1",
+    label: "\u8BB0\u5F55\u89C4\u5219\u89E6\u53D1\u6D88\u606F",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "player", type: "player" }, { name: "message", type: "string" }],
+    outputs: [{ name: "success", type: "boolean" }],
+    effects: { pure: false, previewSafe: false, writes: ["actions"] },
+    lower: (ctx) => `${flow10(ctx)}.log.triggerEffect(${ctx.inputs.player}, ${ctx.inputs.message})`,
+    ui: { category: "log" }
+  },
+  {
+    id: "source.captured-number",
+    version: "1",
+    label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u6765\u6E90\u6570\u503C",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "source", type: "record" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "field", type: "string", enum: ["attack", "defense", "moveRange", "currentHp", "maxHp"] }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context", "pieces"] },
+    lower: (ctx) => `${flow10(ctx)}.effects.capturedNumber(${ctx.inputs.source}, ${ctx.emitLiteral(ctx.parameters.field)})`,
+    ui: { category: "query" }
+  },
+  {
+    id: "effect.result-number",
+    version: "1",
+    label: "\u8BFB\u53D6\u6743\u5A01\u6548\u679C\u7ED3\u679C\u6570\u503C",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "result", type: "record" }],
+    outputs: [{ name: "value", type: "number" }],
+    parameters: [{ name: "field", type: "string", enum: ["damage", "heal", "totalDamage", "totalHeal"] }],
+    effects: { pure: true, previewSafe: false },
+    lower: (ctx) => `Number((${ctx.inputs.result} && ${ctx.inputs.result}[${ctx.emitLiteral(ctx.parameters.field)}]) || 0)`,
+    ui: { category: "query" }
+  },
+  {
+    id: "local.counter-create",
+    version: "1",
+    label: "\u521B\u5EFA\u672C\u6B21\u6267\u884C\u8BA1\u6570\u5668",
+    description: "\u4EC5\u5F53\u524D\u56FE\u6267\u884C\u6709\u6548\u7684\u5C40\u90E8\u7D2F\u8BA1\u503C\uFF0C\u4E0D\u5199\u5165\u5BF9\u5C40\uFF0C\u4E0D\u53EF\u4FDD\u5B58\u6216\u8DE8\u7EED\u63A5\u4F7F\u7528\u3002",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "initial", type: "number" }],
+    outputs: [{ name: "counter", type: "record" }],
+    effects: { pure: false, previewSafe: false, writes: ["execution-context"] },
+    lower: (ctx) => `${flow10(ctx)}.execution.counter(${ctx.inputs.initial})`,
+    ui: { category: "flow" }
+  },
+  {
+    id: "local.counter-add",
+    version: "1",
+    label: "\u7D2F\u52A0\u672C\u6B21\u6267\u884C\u8BA1\u6570",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "counter", type: "record" }, { name: "amount", type: "number" }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: false, previewSafe: false, writes: ["execution-context"] },
+    lower: (ctx) => `${flow10(ctx)}.execution.addCounter(${ctx.inputs.counter}, ${ctx.inputs.amount})`,
+    ui: { category: "flow" }
+  },
+  {
+    id: "local.counter-read",
+    version: "1",
+    label: "\u8BFB\u53D6\u672C\u6B21\u6267\u884C\u8BA1\u6570",
+    allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+    inputs: [{ name: "counter", type: "record" }],
+    outputs: [{ name: "value", type: "number" }],
+    effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
+    lower: (ctx) => `${flow10(ctx)}.execution.readCounter(${ctx.inputs.counter})`,
+    ui: { category: "flow" }
+  }
+];
+
+// lib/skill-graph/module-registry-movement-family.ts
+var ACTIVE4 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var pieceType8 = "piece";
+var cellType5 = "cell";
+var stringType8 = "string";
+var numberType8 = "number";
+var booleanType8 = "boolean";
+var recordType5 = "record";
+var port10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var flow11 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
+var input9 = (ctx, name) => {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  return value;
+};
+var stringLiteral4 = (ctx, name) => {
+  const value = ctx.parameters[name];
+  if (typeof value !== "string") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be text`);
+  return ctx.emitLiteral(value);
+};
+var numberLiteral5 = (ctx, name) => {
+  const value = ctx.parameters[name];
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
+  return ctx.emitLiteral(value);
+};
+var writes7 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
+var define14 = (value) => ({ version: "1", allowedSurfaces: value.allowedSurfaces ?? ACTIVE4, ...value });
+var MOVEMENT_FAMILY_PRIMITIVES = [
+  define14({
+    id: "status.refresh-position",
+    label: "\u5237\u65B0\u4F4D\u7F6E\u72B6\u6001",
+    description: "\u901A\u8FC7\u72B6\u6001\u5BBF\u4E3B\u66F4\u65B0\u5DF2\u6709\u4F4D\u7F6E\u8F7D\u8377\u548C\u5269\u4F59\u6301\u7EED\u65F6\u95F4\uFF0C\u4E0D\u521B\u5EFA\u7B2C\u4E8C\u4EFD\u72B6\u6001\u8BB0\u5F55\u3002",
+    inputs: [port10("target", pieceType8), port10("x", numberType8), port10("y", numberType8)],
+    outputs: [port10("success", booleanType8)],
+    parameters: [parameter8("statusType", stringType8), parameter8("duration", numberType8)],
+    effects: writes7(["status"]),
+    lower: (ctx) => `${flow11(ctx)}.status.refreshPosition(${input9(ctx, "target")}, ${stringLiteral4(ctx, "statusType")}, ${input9(ctx, "x")}, ${input9(ctx, "y")}, ${numberLiteral5(ctx, "duration")})`,
+    ui: { category: "status" }
+  }),
+  define14({
+    id: "tile.add-marker",
+    label: "\u6DFB\u52A0\u5730\u683C\u6807\u8BB0",
+    description: "\u901A\u8FC7\u65E2\u6709 tileBatch \u5165\u53E3\u6DFB\u52A0\u4E0D\u963B\u6321\u8FDB\u5165\u7684\u6765\u6E90\u5730\u683C\u8868\u73B0\uFF0C\u5E76\u4FDD\u7559\u65E7\u8BB0\u5F55\u5B57\u6BB5\u3002",
+    inputs: [port10("cell", cellType5), port10("sourceId", stringType8)],
+    outputs: [port10("success", booleanType8)],
+    parameters: [
+      parameter8("effectType", stringType8),
+      parameter8("icon", stringType8),
+      parameter8("bgColor", stringType8),
+      parameter8("boxShadow", stringType8),
+      parameter8("iconPosition", stringType8)
+    ],
+    effects: writes7(["tile-effects"]),
+    lower: (ctx) => {
+      const cell = input9(ctx, "cell"), sourceId = input9(ctx, "sourceId");
+      const effect = `{x: (${cell}).x, y: (${cell}).y, sourceId: ${sourceId}, tileType: ${stringLiteral4(ctx, "effectType")}, icon: ${stringLiteral4(ctx, "icon")}, bgColor: ${stringLiteral4(ctx, "bgColor")}, boxShadow: ${stringLiteral4(ctx, "boxShadow")}, iconPosition: ${stringLiteral4(ctx, "iconPosition")}}`;
+      return `(function(effect) { var committed = ${flow11(ctx)}.effects.tileBatch([effect]); if (!committed.length) return false; var keys = Object.keys(effect); Object.keys(committed[0]).forEach(function(key) { if (keys.indexOf(key) < 0) delete committed[0][key]; }); return true; })(${effect})`;
+    },
+    ui: { category: "position" }
+  }),
+  define14({
+    id: "tile.clear-marker",
+    label: "\u6E05\u7406\u6765\u6E90\u5730\u683C\u6807\u8BB0",
+    description: "\u6309\u5730\u683C\u7C7B\u578B\u548C\u4E0D\u900F\u660E\u6765\u6E90\u6807\u8BC6\u6E05\u7406\u65E2\u6709\u5730\u683C\u8868\u73B0\u3002",
+    inputs: [port10("sourceId", stringType8)],
+    outputs: [port10("success", booleanType8)],
+    parameters: [parameter8("effectType", stringType8)],
+    effects: writes7(["tile-effects"]),
+    lower: (ctx) => `${flow11(ctx)}.effects.clearTileMarkers(${stringLiteral4(ctx, "effectType")}, ${input9(ctx, "sourceId")})`,
+    ui: { category: "position" }
+  }),
+  define14({
+    id: "effect.teleport-with-change",
+    label: "\u8BFB\u53D6\u4F20\u9001\u5B9E\u9645\u4F4D\u79FB",
+    description: "\u6CBF\u7528\u6743\u5A01\u4F20\u9001\u63D0\u4EA4\u5668\uFF0C\u5E76\u66B4\u9732\u662F\u5426\u63D0\u4EA4\u4E86\u5B9E\u9645\u5750\u6807\u53D8\u5316\u4EE5\u4FDD\u7559\u65E7\u5185\u5BB9\u7684\u65E0\u4F4D\u79FB\u5206\u652F\u3002",
+    inputs: [port10("piece", pieceType8), port10("destination", cellType5)],
+    outputs: [port10("result", recordType5), port10("success", booleanType8), port10("changed", booleanType8)],
+    parameters: [parameter8("kind", stringType8, { enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
+    effects: writes7(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
+    lower: (ctx) => {
+      const destination = input9(ctx, "destination");
+      const kind = stringLiteral4(ctx, "kind");
+      const move = `${flow11(ctx)}.effects.move([{pieceId: ${input9(ctx, "piece")}, x: (${destination}).x, y: (${destination}).y}], ${kind})`;
+      return `(function(value){return {result: value, success: value.success, changed: Boolean(value.changes && value.changes.length)}})(${move})`;
+    },
+    ui: { category: "position" }
+  }),
+  define14({
+    id: "lifecycle.remove-enemy",
+    label: "\u5F3A\u5236\u79FB\u9664\u654C\u65B9\u68CB\u5B50",
+    description: "\u901A\u8FC7\u4E3B\u52A8\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\u79FB\u9664\u4ECD\u5B58\u5728\u7684\u76EE\u6807\uFF0C\u4E0D\u76F4\u63A5\u7F16\u8F91\u68CB\u5B50\u96C6\u5408\u3002",
+    inputs: [port10("target", pieceType8, { nullable: true })],
+    outputs: [port10("success", booleanType8)],
+    inspectReferences: ["target"],
+    effects: writes7(["pieces", "events"]),
+    lower: (ctx) => `(function(targetId) { if (targetId == null || !${flow11(ctx)}.query.hasPiece(targetId)) return false; return Boolean(${flow11(ctx)}.lifecycle.removeEnemy(targetId)); })(${input9(ctx, "target")})`,
+    ui: { category: "lifecycle" }
+  })
+];
+var MOVEMENT_FAMILY_GAMEPLAY_MODULES = Object.freeze(MOVEMENT_FAMILY_PRIMITIVES);
+
+// lib/skill-graph/module-registry.ts
+var GAMEPLAY_MODULE_VERSION = "1";
+var ACTIVE_SURFACES4 = ["skill", "card", "rule", "triggerSkill", "pending"];
+var EFFECT_SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
+var QUERY_SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
+var PURE_SURFACES2 = [...ACTIVE_SURFACES4, "preview"];
+var pieceType9 = "piece";
+var playerType4 = "player";
+var cellType6 = "cell";
+var numberType9 = "number";
+var booleanType9 = "boolean";
+var stringType9 = "string";
+var recordType6 = "record";
+var choiceType5 = "choice";
+var pieceListType4 = { kind: "list", element: pieceType9 };
+var stringListType3 = { kind: "list", element: stringType9 };
+var port11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var pure7 = (reads = []) => ({
+  pure: true,
+  previewSafe: true,
+  reads
+});
+var writes8 = (domains, extra = {}) => ({
+  ...extra,
+  pure: false,
+  previewSafe: false,
+  writes: domains
+});
+function runtime4(surface) {
+  return surface === "pending" ? "ctx.flow" : "flow";
+}
+function context4(surface) {
+  return surface === "pending" ? "ctx" : "context";
+}
+function input10(ctx, name) {
+  const value = ctx.inputs[name];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
+  return value;
+}
+function literal5(ctx, name, fallback) {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (value === void 0) throw new Error(`module ${ctx.moduleId}: missing parameter ${name}`);
+  return ctx.emitLiteral(value);
+}
+function stringLiteral5(ctx, name, fallback) {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "string") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be text`);
+  return ctx.emitLiteral(value);
+}
+function enumLiteral2(ctx, name, values, fallback) {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "string" || !values.includes(value)) {
+    throw new Error(`module ${ctx.moduleId}: parameter ${name} has an unsupported value`);
+  }
+  return ctx.emitLiteral(value);
+}
+function numberLiteral6(ctx, name, fallback) {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`module ${ctx.moduleId}: parameter ${name} must be finite`);
+  return ctx.emitLiteral(value);
+}
+function booleanLiteral4(ctx, name, fallback) {
+  const value = Object.prototype.hasOwnProperty.call(ctx.parameters, name) ? ctx.parameters[name] : fallback;
+  if (typeof value !== "boolean") throw new Error(`module ${ctx.moduleId}: parameter ${name} must be boolean`);
+  return ctx.emitLiteral(value);
+}
 function expression(expression2) {
   return { expression: expression2 };
 }
 function flowCall(ctx, member, args) {
-  return expression(`${runtime(ctx.surface)}.${member}(${args.join(", ")})`);
+  return expression(`${runtime4(ctx.surface)}.${member}(${args.join(", ")})`);
 }
-function wrappedEffectResult(call, fields2) {
-  const entries = ["result: value", ...fields2.map((field) => `${field}: value.${field}`)];
+function wrappedEffectResult(call, fields3) {
+  const entries = ["result: value", ...fields3.map((field) => `${field}: value.${field}`)];
   return expression(`(function(value){return {${entries.join(", ")}}})(${call})`);
 }
 function freezePort(value) {
@@ -1136,10 +5305,10 @@ var allRefs = [
     label: "\u6301\u6709\u8005",
     description: "\u8BFB\u53D6\u5F53\u524D\u6280\u80FD\u6216\u89C4\u5219\u7684\u6301\u6709\u68CB\u5B50\u5F15\u7528\u3002",
     inputs: [],
-    outputs: [port2("piece", pieceType, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+    outputs: [port11("piece", pieceType9, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["context"]),
-    lower: (ctx) => expression(`${runtime(ctx.surface)}.refs.holder()`),
+    effects: pure7(["context"]),
+    lower: (ctx) => expression(`${runtime4(ctx.surface)}.refs.holder()`),
     ui: { category: "context" }
   }),
   descriptor2({
@@ -1147,10 +5316,10 @@ var allRefs = [
     label: "\u6765\u6E90\u68CB\u5B50",
     description: "\u8BFB\u53D6\u5F53\u524D\u4E8B\u4EF6\u6216\u6548\u679C\u7684\u6765\u6E90\u68CB\u5B50\u5F15\u7528\u3002",
     inputs: [],
-    outputs: [port2("piece", pieceType, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+    outputs: [port11("piece", pieceType9, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["context"]),
-    lower: (ctx) => expression(`${runtime(ctx.surface)}.refs.source()`),
+    effects: pure7(["context"]),
+    lower: (ctx) => expression(`${runtime4(ctx.surface)}.refs.source()`),
     ui: { category: "context" }
   }),
   descriptor2({
@@ -1158,10 +5327,10 @@ var allRefs = [
     label: "\u5F53\u524D\u76EE\u6807",
     description: "\u8BFB\u53D6\u5F53\u524D\u4E8B\u4EF6\u6216\u9009\u62E9\u6D41\u7A0B\u7684\u76EE\u6807\u68CB\u5B50\u5F15\u7528\u3002",
     inputs: [],
-    outputs: [port2("piece", pieceType, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+    outputs: [port11("piece", pieceType9, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["context"]),
-    lower: (ctx) => expression(`${runtime(ctx.surface)}.refs.target()`),
+    effects: pure7(["context"]),
+    lower: (ctx) => expression(`${runtime4(ctx.surface)}.refs.target()`),
     ui: { category: "context" }
   }),
   descriptor2({
@@ -1169,10 +5338,10 @@ var allRefs = [
     label: "\u6240\u5C5E\u73A9\u5BB6",
     description: "\u8BFB\u53D6\u6301\u6709\u8005\u6216\u5F53\u524D\u5185\u5BB9\u6240\u5C5E\u73A9\u5BB6\u7684\u4E0D\u53EF\u53D8\u73A9\u5BB6 ID\u3002",
     inputs: [],
-    outputs: [port2("player", playerType, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
+    outputs: [port11("player", playerType4, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["context"]),
-    lower: (ctx) => expression(`${runtime(ctx.surface)}.refs.player()`),
+    effects: pure7(["context"]),
+    lower: (ctx) => expression(`${runtime4(ctx.surface)}.refs.player()`),
     ui: { category: "context" }
   }),
   descriptor2({
@@ -1180,10 +5349,10 @@ var allRefs = [
     label: "\u4E8B\u4EF6\u73A9\u5BB6",
     description: "\u8BFB\u53D6\u89E6\u53D1\u5F53\u524D\u4E8B\u4EF6\u7684\u73A9\u5BB6\u5F15\u7528\u3002",
     inputs: [],
-    outputs: [port2("player", playerType, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
+    outputs: [port11("player", playerType4, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
     allowedSurfaces: ["rule", "triggerSkill", "pending"],
-    effects: pure(["event"]),
-    lower: (ctx) => expression(`${runtime(ctx.surface)}.refs.eventPlayer()`),
+    effects: pure7(["event"]),
+    lower: (ctx) => expression(`${runtime4(ctx.surface)}.refs.eventPlayer()`),
     ui: { category: "context" }
   })
 ];
@@ -1192,13 +5361,13 @@ var queries = [
     id: "query.piece",
     label: "\u9A8C\u8BC1\u68CB\u5B50\u5F15\u7528",
     description: "\u6309\u4E0D\u900F\u660E\u68CB\u5B50 ID \u9A8C\u8BC1\u5E76\u8FD4\u56DE\u540C\u4E00\u4E2A\u4E0D\u900F\u660E\u5F15\u7528\u3002",
-    inputs: [port2("pieceId", pieceType, { nullable: true, description: "\u53EF\u7A7A\u68CB\u5B50 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
-    outputs: [port2("piece", pieceType)],
+    inputs: [port11("pieceId", pieceType9, { nullable: true, description: "\u53EF\u7A7A\u68CB\u5B50 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
+    outputs: [port11("piece", pieceType9)],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces"]),
+    effects: pure7(["pieces"]),
     lower: (ctx) => {
-      const pieceId = input(ctx, "pieceId");
-      return expression(`${runtime(ctx.surface)}.query.hasPiece(${pieceId}) ? ${runtime(ctx.surface)}.query.piece(${pieceId}).instanceId : null`);
+      const pieceId = input10(ctx, "pieceId");
+      return expression(`${runtime4(ctx.surface)}.query.hasPiece(${pieceId}) ? ${runtime4(ctx.surface)}.query.piece(${pieceId}).instanceId : null`);
     },
     ui: { category: "query" }
   }),
@@ -1206,13 +5375,13 @@ var queries = [
     id: "query.player",
     label: "\u9A8C\u8BC1\u73A9\u5BB6\u5F15\u7528",
     description: "\u6309\u4E0D\u900F\u660E\u73A9\u5BB6 ID \u9A8C\u8BC1\u5E76\u8FD4\u56DE\u540C\u4E00\u4E2A\u4E0D\u900F\u660E\u5F15\u7528\u3002",
-    inputs: [port2("playerId", playerType, { nullable: true, description: "\u53EF\u7A7A\u73A9\u5BB6 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
-    outputs: [port2("player", playerType)],
+    inputs: [port11("playerId", playerType4, { nullable: true, description: "\u53EF\u7A7A\u73A9\u5BB6 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
+    outputs: [port11("player", playerType4)],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["players"]),
+    effects: pure7(["players"]),
     lower: (ctx) => {
-      const playerId = input(ctx, "playerId");
-      return expression(`${runtime(ctx.surface)}.query.hasPlayer(${playerId}) ? ${runtime(ctx.surface)}.query.player(${playerId}).playerId : null`);
+      const playerId = input10(ctx, "playerId");
+      return expression(`${runtime4(ctx.surface)}.query.hasPlayer(${playerId}) ? ${runtime4(ctx.surface)}.query.player(${playerId}).playerId : null`);
     },
     ui: { category: "query" }
   }),
@@ -1220,24 +5389,24 @@ var queries = [
     id: "query.has-piece",
     label: "\u5224\u65AD\u68CB\u5B50\u662F\u5426\u5B58\u5728",
     description: "\u67E5\u8BE2\u4E0D\u900F\u660E\u68CB\u5B50 ID \u662F\u5426\u4ECD\u7531\u6743\u5A01\u6218\u6597\u72B6\u6001\u6301\u6709\u3002",
-    inputs: [port2("pieceId", pieceType, { nullable: true })],
-    outputs: [port2("exists", booleanType)],
+    inputs: [port11("pieceId", pieceType9, { nullable: true })],
+    outputs: [port11("exists", booleanType9)],
     inspectReferences: ["pieceId"],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces"]),
-    lower: (ctx) => flowCall(ctx, "query.hasPiece", [input(ctx, "pieceId")]),
+    effects: pure7(["pieces"]),
+    lower: (ctx) => flowCall(ctx, "query.hasPiece", [input10(ctx, "pieceId")]),
     ui: { category: "query" }
   }),
   descriptor2({
     id: "query.has-player",
     label: "\u5224\u65AD\u73A9\u5BB6\u662F\u5426\u5B58\u5728",
     description: "\u67E5\u8BE2\u4E0D\u900F\u660E\u73A9\u5BB6 ID \u662F\u5426\u4ECD\u7531\u6743\u5A01\u6218\u6597\u72B6\u6001\u6301\u6709\u3002",
-    inputs: [port2("playerId", playerType, { nullable: true })],
-    outputs: [port2("exists", booleanType)],
+    inputs: [port11("playerId", playerType4, { nullable: true })],
+    outputs: [port11("exists", booleanType9)],
     inspectReferences: ["playerId"],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["players"]),
-    lower: (ctx) => flowCall(ctx, "query.hasPlayer", [input(ctx, "playerId")]),
+    effects: pure7(["players"]),
+    lower: (ctx) => flowCall(ctx, "query.hasPlayer", [input10(ctx, "playerId")]),
     ui: { category: "query" }
   }),
   descriptor2({
@@ -1245,21 +5414,21 @@ var queries = [
     label: "\u67E5\u8BE2\u68CB\u5B50\u96C6\u5408",
     description: "\u6309\u6240\u5C5E\u73A9\u5BB6\u3001\u654C\u6211\u5173\u7CFB\u3001\u6765\u6E90\u8303\u56F4\u548C\u5B58\u6D3B\u6761\u4EF6\u67E5\u8BE2\u6709\u5E8F\u68CB\u5B50 ID \u96C6\u5408\u3002",
     inputs: [
-      port2("originId", pieceType, { optional: true, nullable: true }),
-      port2("ownerId", playerType, { optional: true, nullable: true })
+      port11("originId", pieceType9, { optional: true, nullable: true }),
+      port11("ownerId", playerType4, { optional: true, nullable: true })
     ],
-    outputs: [port2("pieces", pieceListType)],
+    outputs: [port11("pieces", pieceListType4)],
     parameters: [
-      parameter2("relation", stringType, { enum: ["ally", "enemy", "all"], default: "all" }),
-      parameter2("range", numberType, { optional: true, minimum: 0 }),
-      parameter2("includeDead", booleanType, { default: false })
+      parameter9("relation", stringType9, { enum: ["ally", "enemy", "all"], default: "all" }),
+      parameter9("range", numberType9, { optional: true, minimum: 0 }),
+      parameter9("includeDead", booleanType9, { default: false })
     ],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces", "players", "position"]),
+    effects: pure7(["pieces", "players", "position"]),
     lower: (ctx) => {
-      const relation = enumLiteral(ctx, "relation", ["ally", "enemy", "all"], "all");
-      const range = Object.prototype.hasOwnProperty.call(ctx.parameters, "range") ? numberLiteral(ctx, "range") : "undefined";
-      const includeDead = booleanLiteral(ctx, "includeDead", false);
+      const relation = enumLiteral2(ctx, "relation", ["ally", "enemy", "all"], "all");
+      const range = Object.prototype.hasOwnProperty.call(ctx.parameters, "range") ? numberLiteral6(ctx, "range") : "undefined";
+      const includeDead = booleanLiteral4(ctx, "includeDead", false);
       const options2 = [
         `originId: ${ctx.inputs.originId ?? "undefined"}`,
         `ownerId: ${ctx.inputs.ownerId ?? "undefined"}`,
@@ -1267,7 +5436,7 @@ var queries = [
         `range: ${range}`,
         `includeDead: ${includeDead}`
       ];
-      return expression(`${runtime(ctx.surface)}.query.pieces({${options2.join(", ")}})`);
+      return expression(`${runtime4(ctx.surface)}.query.pieces({${options2.join(", ")}})`);
     },
     ui: { category: "query" }
   }),
@@ -1275,29 +5444,29 @@ var queries = [
     id: "query.distance",
     label: "\u68CB\u5B50\u8DDD\u79BB",
     description: "\u8BFB\u53D6\u4E24\u4E2A\u68CB\u5B50\u4E4B\u95F4\u7684\u66FC\u54C8\u987F\u8DDD\u79BB\u3002",
-    inputs: [port2("from", pieceType), port2("to", pieceType)],
-    outputs: [port2("distance", numberType)],
+    inputs: [port11("from", pieceType9), port11("to", pieceType9)],
+    outputs: [port11("distance", numberType9)],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces", "position"]),
-    lower: (ctx) => flowCall(ctx, "query.distance", [input(ctx, "from"), input(ctx, "to")]),
+    effects: pure7(["pieces", "position"]),
+    lower: (ctx) => flowCall(ctx, "query.distance", [input10(ctx, "from"), input10(ctx, "to")]),
     ui: { category: "query" }
   }),
   descriptor2({
     id: "attribute.read",
     label: "\u8BFB\u53D6\u68CB\u5B50\u5C5E\u6027",
     description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u68CB\u5B50\u5C5E\u6027\uFF1B\u5C5E\u6027\u540D\u662F\u5C01\u95ED\u679A\u4E3E\u3002",
-    inputs: [port2("piece", pieceType)],
-    outputs: [port2("value", numberType)],
-    parameters: [parameter2("attribute", stringType, {
+    inputs: [port11("piece", pieceType9)],
+    outputs: [port11("value", numberType9)],
+    parameters: [parameter9("attribute", stringType9, {
       enum: ["attack", "defense", "moveRange", "currentHp", "maxHp", "x", "y"]
     })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces"]),
+    effects: pure7(["pieces"]),
     lower: (ctx) => {
       const attr = Object.prototype.hasOwnProperty.call(ctx.parameters, "attribute") ? ctx.parameters.attribute : void 0;
       const allowed2 = /* @__PURE__ */ new Set(["attack", "defense", "moveRange", "currentHp", "maxHp", "x", "y"]);
       if (typeof attr !== "string" || !allowed2.has(attr)) throw new Error(`module ${ctx.moduleId}: invalid attribute`);
-      return expression(`${runtime(ctx.surface)}.query.piece(${input(ctx, "piece")})[${ctx.emitLiteral(attr)}]`);
+      return expression(`${runtime4(ctx.surface)}.query.piece(${input10(ctx, "piece")})[${ctx.emitLiteral(attr)}]`);
     },
     ui: { category: "query" }
   }),
@@ -1305,14 +5474,14 @@ var queries = [
     id: "attribute.text",
     label: "\u8BFB\u53D6\u68CB\u5B50\u6587\u672C\u5C5E\u6027",
     description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u68CB\u5B50\u6587\u672C\u5C5E\u6027\uFF1B\u5C5E\u6027\u540D\u662F\u5C01\u95ED\u679A\u4E3E\u3002",
-    inputs: [port2("piece", pieceType)],
-    outputs: [port2("text", stringType)],
-    parameters: [parameter2("attribute", stringType, { enum: ["name"] })],
+    inputs: [port11("piece", pieceType9)],
+    outputs: [port11("text", stringType9)],
+    parameters: [parameter9("attribute", stringType9, { enum: ["name"] })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["pieces"]),
+    effects: pure7(["pieces"]),
     lower: (ctx) => {
-      const attr = enumLiteral(ctx, "attribute", ["name"]);
-      return expression(`String(${runtime(ctx.surface)}.query.piece(${input(ctx, "piece")})[${attr}])`);
+      const attr = enumLiteral2(ctx, "attribute", ["name"]);
+      return expression(`String(${runtime4(ctx.surface)}.query.piece(${input10(ctx, "piece")})[${attr}])`);
     },
     ui: { category: "query" }
   }),
@@ -1320,14 +5489,14 @@ var queries = [
     id: "resource.read",
     label: "\u8BFB\u53D6\u73A9\u5BB6\u8D44\u6E90",
     description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u884C\u52A8\u70B9\u6216\u5145\u80FD\u70B9\u3002",
-    inputs: [port2("player", playerType)],
-    outputs: [port2("value", numberType)],
-    parameters: [parameter2("resource", stringType, { enum: ["actionPoints", "chargePoints"] })],
+    inputs: [port11("player", playerType4)],
+    outputs: [port11("value", numberType9)],
+    parameters: [parameter9("resource", stringType9, { enum: ["actionPoints", "chargePoints"] })],
     allowedSurfaces: QUERY_SURFACES,
-    effects: pure(["players", "resources"]),
+    effects: pure7(["players", "resources"]),
     lower: (ctx) => {
-      const resource = enumLiteral(ctx, "resource", ["actionPoints", "chargePoints"]);
-      return expression(`${runtime(ctx.surface)}.query.player(${input(ctx, "player")})[${resource}]`);
+      const resource = enumLiteral2(ctx, "resource", ["actionPoints", "chargePoints"]);
+      return expression(`${runtime4(ctx.surface)}.query.player(${input10(ctx, "player")})[${resource}]`);
     },
     ui: { category: "query" }
   })
@@ -1337,103 +5506,103 @@ function binaryDescriptor(id, label, operator, inputType, outputType) {
     id,
     label,
     description: `\u6309\u56FA\u5B9A\u987A\u5E8F\u6267\u884C ${operator} \u8FD0\u7B97\u3002`,
-    inputs: [port2("left", inputType), port2("right", inputType)],
-    outputs: [port2("value", outputType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`(${input(ctx, "left")} ${operator} ${input(ctx, "right")})`),
+    inputs: [port11("left", inputType), port11("right", inputType)],
+    outputs: [port11("value", outputType)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`(${input10(ctx, "left")} ${operator} ${input10(ctx, "right")})`),
     ui: { category: operator === "&&" || operator === "||" ? "logic" : "math" }
   });
 }
 var arithmetic = [
-  binaryDescriptor("math.add", "\u52A0\u6CD5", "+", numberType, numberType),
-  binaryDescriptor("math.subtract", "\u51CF\u6CD5", "-", numberType, numberType),
-  binaryDescriptor("math.multiply", "\u4E58\u6CD5", "*", numberType, numberType),
-  binaryDescriptor("math.divide", "\u9664\u6CD5", "/", numberType, numberType),
-  binaryDescriptor("math.modulo", "\u53D6\u4F59", "%", numberType, numberType),
-  binaryDescriptor("math.power", "\u4E58\u65B9", "**", numberType, numberType),
-  binaryDescriptor("compare.equal", "\u6570\u503C\u76F8\u7B49", "===", numberType, booleanType),
-  binaryDescriptor("compare.not-equal", "\u6570\u503C\u4E0D\u76F8\u7B49", "!==", numberType, booleanType),
-  binaryDescriptor("compare.equal-string", "\u6587\u672C\u76F8\u7B49", "===", stringType, booleanType),
-  binaryDescriptor("compare.not-equal-string", "\u6587\u672C\u4E0D\u76F8\u7B49", "!==", stringType, booleanType),
-  binaryDescriptor("compare.equal-boolean", "\u5E03\u5C14\u76F8\u7B49", "===", booleanType, booleanType),
-  binaryDescriptor("compare.not-equal-boolean", "\u5E03\u5C14\u4E0D\u76F8\u7B49", "!==", booleanType, booleanType),
-  binaryDescriptor("compare.equal-piece", "\u68CB\u5B50\u76F8\u7B49", "===", pieceType, booleanType),
-  binaryDescriptor("compare.not-equal-piece", "\u68CB\u5B50\u4E0D\u76F8\u7B49", "!==", pieceType, booleanType),
-  binaryDescriptor("compare.equal-player", "\u73A9\u5BB6\u76F8\u7B49", "===", playerType, booleanType),
-  binaryDescriptor("compare.not-equal-player", "\u73A9\u5BB6\u4E0D\u76F8\u7B49", "!==", playerType, booleanType),
-  binaryDescriptor("compare.less-than", "\u5C0F\u4E8E", "<", numberType, booleanType),
-  binaryDescriptor("compare.less-or-equal", "\u5C0F\u4E8E\u7B49\u4E8E", "<=", numberType, booleanType),
-  binaryDescriptor("compare.greater-than", "\u5927\u4E8E", ">", numberType, booleanType),
-  binaryDescriptor("compare.greater-or-equal", "\u5927\u4E8E\u7B49\u4E8E", ">=", numberType, booleanType),
-  binaryDescriptor("logic.and", "\u5E76\u4E14", "&&", booleanType, booleanType),
-  binaryDescriptor("logic.or", "\u6216\u8005", "||", booleanType, booleanType)
+  binaryDescriptor("math.add", "\u52A0\u6CD5", "+", numberType9, numberType9),
+  binaryDescriptor("math.subtract", "\u51CF\u6CD5", "-", numberType9, numberType9),
+  binaryDescriptor("math.multiply", "\u4E58\u6CD5", "*", numberType9, numberType9),
+  binaryDescriptor("math.divide", "\u9664\u6CD5", "/", numberType9, numberType9),
+  binaryDescriptor("math.modulo", "\u53D6\u4F59", "%", numberType9, numberType9),
+  binaryDescriptor("math.power", "\u4E58\u65B9", "**", numberType9, numberType9),
+  binaryDescriptor("compare.equal", "\u6570\u503C\u76F8\u7B49", "===", numberType9, booleanType9),
+  binaryDescriptor("compare.not-equal", "\u6570\u503C\u4E0D\u76F8\u7B49", "!==", numberType9, booleanType9),
+  binaryDescriptor("compare.equal-string", "\u6587\u672C\u76F8\u7B49", "===", stringType9, booleanType9),
+  binaryDescriptor("compare.not-equal-string", "\u6587\u672C\u4E0D\u76F8\u7B49", "!==", stringType9, booleanType9),
+  binaryDescriptor("compare.equal-boolean", "\u5E03\u5C14\u76F8\u7B49", "===", booleanType9, booleanType9),
+  binaryDescriptor("compare.not-equal-boolean", "\u5E03\u5C14\u4E0D\u76F8\u7B49", "!==", booleanType9, booleanType9),
+  binaryDescriptor("compare.equal-piece", "\u68CB\u5B50\u76F8\u7B49", "===", pieceType9, booleanType9),
+  binaryDescriptor("compare.not-equal-piece", "\u68CB\u5B50\u4E0D\u76F8\u7B49", "!==", pieceType9, booleanType9),
+  binaryDescriptor("compare.equal-player", "\u73A9\u5BB6\u76F8\u7B49", "===", playerType4, booleanType9),
+  binaryDescriptor("compare.not-equal-player", "\u73A9\u5BB6\u4E0D\u76F8\u7B49", "!==", playerType4, booleanType9),
+  binaryDescriptor("compare.less-than", "\u5C0F\u4E8E", "<", numberType9, booleanType9),
+  binaryDescriptor("compare.less-or-equal", "\u5C0F\u4E8E\u7B49\u4E8E", "<=", numberType9, booleanType9),
+  binaryDescriptor("compare.greater-than", "\u5927\u4E8E", ">", numberType9, booleanType9),
+  binaryDescriptor("compare.greater-or-equal", "\u5927\u4E8E\u7B49\u4E8E", ">=", numberType9, booleanType9),
+  binaryDescriptor("logic.and", "\u5E76\u4E14", "&&", booleanType9, booleanType9),
+  binaryDescriptor("logic.or", "\u6216\u8005", "||", booleanType9, booleanType9)
 ];
 var unary = [
   descriptor2({
     id: "math.floor",
     label: "\u5411\u4E0B\u53D6\u6574",
     description: "\u5411\u8D1F\u65E0\u7A77\u53D6\u6574\u3002",
-    inputs: [port2("value", numberType)],
-    outputs: [port2("value", numberType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`Math.floor(${input(ctx, "value")})`),
+    inputs: [port11("value", numberType9)],
+    outputs: [port11("value", numberType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`Math.floor(${input10(ctx, "value")})`),
     ui: { category: "math" }
   }),
   descriptor2({
     id: "math.abs",
     label: "\u7EDD\u5BF9\u503C",
     description: "\u8BFB\u53D6\u6570\u503C\u7EDD\u5BF9\u503C\u3002",
-    inputs: [port2("value", numberType)],
-    outputs: [port2("value", numberType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`Math.abs(${input(ctx, "value")})`),
+    inputs: [port11("value", numberType9)],
+    outputs: [port11("value", numberType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`Math.abs(${input10(ctx, "value")})`),
     ui: { category: "math" }
   }),
   descriptor2({
     id: "logic.not",
     label: "\u975E",
     description: "\u5BF9\u5E03\u5C14\u503C\u53D6\u53CD\u3002",
-    inputs: [port2("value", booleanType)],
-    outputs: [port2("value", booleanType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`!(${input(ctx, "value")})`),
+    inputs: [port11("value", booleanType9)],
+    outputs: [port11("value", booleanType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`!(${input10(ctx, "value")})`),
     ui: { category: "logic" }
   }),
   descriptor2({
     id: "text.concat",
     label: "\u62FC\u63A5\u6587\u672C",
     description: "\u6309\u8F93\u5165\u987A\u5E8F\u62FC\u63A5\u4E24\u4E2A\u6587\u672C\u503C\u3002",
-    inputs: [port2("left", stringType), port2("right", stringType)],
-    outputs: [port2("text", stringType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`(${input(ctx, "left")} + ${input(ctx, "right")})`),
+    inputs: [port11("left", stringType9), port11("right", stringType9)],
+    outputs: [port11("text", stringType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`(${input10(ctx, "left")} + ${input10(ctx, "right")})`),
     ui: { category: "text" }
   }),
   descriptor2({
     id: "text.from-number",
     label: "\u6570\u5B57\u8F6C\u6587\u672C",
     description: "\u6309\u5BBF\u4E3B JavaScript \u6570\u503C\u6587\u672C\u89C4\u5219\u8FD4\u56DE\u5B57\u7B26\u4E32\u3002",
-    inputs: [port2("value", numberType)],
-    outputs: [port2("text", stringType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`String(${input(ctx, "value")})`),
+    inputs: [port11("value", numberType9)],
+    outputs: [port11("text", stringType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`String(${input10(ctx, "value")})`),
     ui: { category: "text" }
   }),
   descriptor2({
     id: "value.number-or-zero",
     label: "\u6570\u503C\u4E0B\u9650\u4E3A\u96F6",
     description: "\u5C06\u53EF\u7A7A\u6570\u503C\u7F3A\u7701\u4E3A\u96F6\uFF0C\u5E76\u5F52\u4E00\u4E3A\u4E0D\u5C0F\u4E8E\u96F6\u7684\u6570\u503C\u3002",
-    inputs: [port2("value", numberType, { nullable: true })],
-    outputs: [port2("value", numberType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: pure(),
-    lower: (ctx) => expression(`Math.max(0, ${input(ctx, "value")} ?? 0)`),
+    inputs: [port11("value", numberType9, { nullable: true })],
+    outputs: [port11("value", numberType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: pure7(),
+    lower: (ctx) => expression(`Math.max(0, ${input10(ctx, "value")} ?? 0)`),
     ui: { category: "math" }
   })
 ];
@@ -1443,22 +5612,22 @@ var choices = [
     label: "\u9009\u62E9\u68CB\u5B50\u76EE\u6807",
     description: "\u4F7F\u7528\u73B0\u6709 selectTarget \u534F\u8BAE\u9009\u62E9\u4E00\u540D\u68CB\u5B50\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u5019\u9009\u6821\u9A8C\u7531\u6743\u5A01\u5BBF\u4E3B\u5904\u7406\u3002",
     inputs: [],
-    outputs: [port2("choice", choiceType)],
+    outputs: [port11("choice", choiceType5)],
     parameters: [
-      parameter2("range", numberType, { default: 5, minimum: 0 }),
-      parameter2("filter", stringType, { enum: ["enemy", "ally", "all"], default: "enemy" }),
-      parameter2("title", stringType, { default: "\u8BF7\u9009\u62E9\u76EE\u6807" }),
-      parameter2("canCancel", booleanType, { default: true })
+      parameter9("range", numberType9, { default: 5, minimum: 0 }),
+      parameter9("filter", stringType9, { enum: ["enemy", "ally", "all"], default: "enemy" }),
+      parameter9("title", stringType9, { optional: true }),
+      parameter9("canCancel", booleanType9, { optional: true })
     ],
     allowedSurfaces: ["skill", "card", "pending"],
-    effects: writes(["pending"], { pending: true }),
+    effects: writes8(["pending"], { pending: true }),
     lower: (ctx) => {
-      const range = numberLiteral(ctx, "range", 5);
-      const filter = enumLiteral(ctx, "filter", ["enemy", "ally", "all"], "enemy");
-      const title = stringLiteral(ctx, "title", "\u8BF7\u9009\u62E9\u76EE\u6807");
-      const canCancel = booleanLiteral(ctx, "canCancel", true);
-      if (ctx.surface === "pending") return expression(`ctx.flow.choice.target({type: "piece", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`);
-      return expression(`selectTarget({type: "piece", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`);
+      const range = numberLiteral6(ctx, "range", 5);
+      const filter = enumLiteral2(ctx, "filter", ["enemy", "ally", "all"], "enemy");
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, "title") ? ", title: " + stringLiteral5(ctx, "title") : "";
+      const canCancel = Object.prototype.hasOwnProperty.call(ctx.parameters, "canCancel") ? ", canCancel: " + booleanLiteral4(ctx, "canCancel") : "";
+      if (ctx.surface === "pending") return expression(`ctx.flow.choice.target({type: "piece", range: ${range}, filter: ${filter}${title}${canCancel}})`);
+      return expression(`selectTarget({type: "piece", range: ${range}, filter: ${filter}${title}${canCancel}})`);
     },
     ui: { category: "choice" }
   }),
@@ -1467,22 +5636,22 @@ var choices = [
     label: "\u9009\u62E9\u5730\u683C\u76EE\u6807",
     description: "\u4F7F\u7528\u73B0\u6709 grid \u76EE\u6807\u534F\u8BAE\u9009\u62E9\u4E00\u5757\u5730\u683C\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u5019\u9009\u6821\u9A8C\u7531\u6743\u5A01\u5BBF\u4E3B\u5904\u7406\u3002",
     inputs: [],
-    outputs: [port2("choice", choiceType)],
+    outputs: [port11("choice", choiceType5)],
     parameters: [
-      parameter2("range", numberType, { default: 5, minimum: 0 }),
-      parameter2("filter", stringType, { enum: ["enemy", "ally", "all"], default: "all" }),
-      parameter2("title", stringType, { default: "\u8BF7\u9009\u62E9\u5730\u683C" }),
-      parameter2("canCancel", booleanType, { default: true })
+      parameter9("range", numberType9, { default: 5, minimum: 0 }),
+      parameter9("filter", stringType9, { enum: ["enemy", "ally", "all"], default: "all" }),
+      parameter9("title", stringType9, { optional: true }),
+      parameter9("canCancel", booleanType9, { optional: true })
     ],
     allowedSurfaces: ["skill", "card", "pending"],
-    effects: writes(["pending"], { pending: true }),
+    effects: writes8(["pending"], { pending: true }),
     lower: (ctx) => {
-      const range = numberLiteral(ctx, "range", 5);
-      const filter = enumLiteral(ctx, "filter", ["enemy", "ally", "all"], "all");
-      const title = stringLiteral(ctx, "title", "\u8BF7\u9009\u62E9\u5730\u683C");
-      const canCancel = booleanLiteral(ctx, "canCancel", true);
-      if (ctx.surface === "pending") return expression(`ctx.flow.choice.target({type: "grid", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`);
-      return expression(`selectTarget({type: "grid", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`);
+      const range = numberLiteral6(ctx, "range", 5);
+      const filter = enumLiteral2(ctx, "filter", ["enemy", "ally", "all"], "all");
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, "title") ? ", title: " + stringLiteral5(ctx, "title") : "";
+      const canCancel = Object.prototype.hasOwnProperty.call(ctx.parameters, "canCancel") ? ", canCancel: " + booleanLiteral4(ctx, "canCancel") : "";
+      if (ctx.surface === "pending") return expression(`ctx.flow.choice.target({type: "grid", range: ${range}, filter: ${filter}${title}${canCancel}})`);
+      return expression(`selectTarget({type: "grid", range: ${range}, filter: ${filter}${title}${canCancel}})`);
     },
     ui: { category: "choice" }
   }),
@@ -1490,25 +5659,25 @@ var choices = [
     id: "choice.is-pending",
     label: "\u68C0\u67E5\u9009\u62E9\u662F\u5426\u6302\u8D77",
     description: "\u8BFB\u53D6\u6743\u5A01\u76EE\u6807\u9009\u62E9\u8FD4\u56DE\u503C\u4E2D\u7684\u6302\u8D77\u6807\u8BB0\uFF0C\u4F9B\u663E\u5F0F\u5206\u652F\u5904\u7406\u7B49\u5F85\u3002",
-    inputs: [port2("choice", choiceType)],
-    outputs: [port2("pending", booleanType)],
+    inputs: [port11("choice", choiceType5)],
+    outputs: [port11("pending", booleanType9)],
     allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
-    effects: pure(),
-    lower: (ctx) => expression(`Boolean(${input(ctx, "choice")} && ${input(ctx, "choice")}.needsTargetSelection)`),
+    effects: pure7(),
+    lower: (ctx) => expression(`Boolean(${input10(ctx, "choice")} && ${input10(ctx, "choice")}.needsTargetSelection)`),
     ui: { category: "choice" }
   }),
   descriptor2({
     id: "choice.piece",
     label: "\u8BFB\u53D6\u5DF2\u9009\u68CB\u5B50",
     description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u68CB\u5B50\u9009\u62E9\u89E3\u6790\u4E3A\u4E0D\u900F\u660E\u68CB\u5B50 ID\uFF1B\u6302\u8D77\u503C\u5E94\u5148\u7531 choice.is-pending \u5206\u652F\u62E6\u622A\u3002",
-    inputs: [port2("choice", choiceType)],
-    outputs: [port2("piece", pieceType)],
+    inputs: [port11("choice", choiceType5)],
+    outputs: [port11("piece", pieceType9)],
     allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
-    effects: pure(["pieces"]),
+    effects: pure7(["pieces"]),
     lower: (ctx) => {
-      const choice = input(ctx, "choice");
+      const choice = input10(ctx, "choice");
       const id = `(${choice} && ${choice}.instanceId)`;
-      return expression(`(${runtime(ctx.surface)}.query.hasPiece(${id}) ? ${runtime(ctx.surface)}.query.piece(${id}).instanceId : null)`);
+      return expression(`(${runtime4(ctx.surface)}.query.hasPiece(${id}) ? ${runtime4(ctx.surface)}.query.piece(${id}).instanceId : null)`);
     },
     ui: { category: "choice" }
   }),
@@ -1516,11 +5685,11 @@ var choices = [
     id: "choice.cell",
     label: "\u8BFB\u53D6\u5DF2\u9009\u5730\u683C",
     description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u5730\u683C\u9009\u62E9\u89E3\u6790\u4E3A\u53D7\u4FE1\u5730\u683C\u8BB0\u5F55\uFF1B\u6302\u8D77\u503C\u5E94\u5148\u7531 choice.is-pending \u5206\u652F\u62E6\u622A\u3002",
-    inputs: [port2("choice", choiceType)],
-    outputs: [port2("cell", cellType)],
+    inputs: [port11("choice", choiceType5)],
+    outputs: [port11("cell", cellType6)],
     allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
-    effects: pure(),
-    lower: (ctx) => expression(`({x: (${input(ctx, "choice")}).x, y: (${input(ctx, "choice")}).y})`),
+    effects: pure7(),
+    lower: (ctx) => expression(`({x: (${input10(ctx, "choice")}).x, y: (${input10(ctx, "choice")}).y})`),
     ui: { category: "choice" }
   })
 ];
@@ -1529,19 +5698,25 @@ var effects = [
     id: "effect.damage",
     label: "\u9020\u6210\u4F24\u5BB3",
     description: "\u901A\u8FC7\u73B0\u6709 DamageBatch/queue \u5165\u53E3\u9020\u6210\u4F24\u5BB3\u5E76\u8FD4\u56DE\u6743\u5A01\u7ED3\u679C\u3002",
-    inputs: [port2("source", pieceType), port2("target", pieceType), port2("amount", numberType)],
-    outputs: [port2("result", recordType), port2("success", booleanType), port2("damage", numberType)],
+    inputs: [port11("source", pieceType9), port11("target", pieceType9), port11("amount", numberType9)],
+    outputs: [port11("result", recordType6), port11("success", booleanType9), port11("damage", numberType9)],
     // Author content has one ordinary damage kind.  The legacy host still
-    // receives its frozen `physical` spelling through this trusted adapter;
-    // authors do not choose the obsolete physical/magical split.
-    parameters: [parameter2("damageType", stringType, { enum: ["normal", "true", "toxin"], default: "normal" }), parameter2("skillId", stringType, { optional: true })],
+    // receives its frozen spelling for event/log compatibility. Both legacy
+    // spellings use the same normal-damage defense calculation.
+    parameters: [
+      parameter9("damageType", stringType9, { enum: ["normal", "true", "toxin"], default: "normal" }),
+      parameter9("skillId", stringType9, { optional: true }),
+      parameter9("legacyNormalSpelling", stringType9, { enum: ["physical", "magical"], optional: true, label: "\u65E7\u5185\u5BB9\u666E\u901A\u4F24\u5BB3\u65E5\u5FD7\u517C\u5BB9", description: "\u4EC5\u4FDD\u7559\u8FC1\u79FB\u524D\u65E5\u5FD7\u548C\u4E8B\u4EF6\u4E2D\u7684\u65E7\u79F0\u547C\uFF0C\u4E0D\u65B0\u589E\u4F24\u5BB3\u5206\u7C7B\u3002" }),
+      parameter9("inputPolicy", stringType9, { enum: ["floor", "host"], optional: true, label: "\u4F24\u5BB3\u8F93\u5165\u65F6\u673A", description: "host \u5C06\u539F\u59CB\u6570\u503C\u4EA4\u7ED9\u6743\u5A01\u4F24\u5BB3\u6D41\u7A0B\uFF0C\u4FDD\u7559\u65E7\u5185\u5BB9\u89E6\u53D1\u540E\u53D6\u6574\u7684\u987A\u5E8F\u3002" })
+    ],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["damage", "events"], { events: ["beforeDamageDealt", "afterDamageDealt"] }),
+    effects: writes8(["damage", "events"], { events: ["beforeDamageDealt", "afterDamageDealt"] }),
     lower: (ctx) => {
-      const kind = enumLiteral(ctx, "damageType", ["normal", "true", "toxin"], "normal");
-      const engineKind = kind === '"normal"' ? '"physical"' : kind;
-      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral(ctx, "skillId") : `${context(ctx.surface)}.skill?.id || ${context(ctx.surface)}.ruleId || "flow"`;
-      const call = `${runtime(ctx.surface)}.effects.damage(${input(ctx, "source")}, ${input(ctx, "target")}, ${input(ctx, "amount")}, ${engineKind}, ${id})`;
+      const kind = enumLiteral2(ctx, "damageType", ["normal", "true", "toxin"], "normal");
+      const engineKind = kind === '"normal"' ? enumLiteral2(ctx, "legacyNormalSpelling", ["physical", "magical"], "physical") : kind;
+      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral5(ctx, "skillId") : `${context4(ctx.surface)}.skill?.id || ${context4(ctx.surface)}.ruleId || "flow"`;
+      const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, "inputPolicy") ? ", " + enumLiteral2(ctx, "inputPolicy", ["floor", "host"]) : "";
+      const call = `${runtime4(ctx.surface)}.effects.damage(${input10(ctx, "source")}, ${input10(ctx, "target")}, ${input10(ctx, "amount")}, ${engineKind}, ${id}${policy})`;
       return wrappedEffectResult(call, ["success", "damage"]);
     },
     ui: { category: "effect" }
@@ -1550,14 +5725,14 @@ var effects = [
     id: "effect.heal",
     label: "\u6CBB\u7597",
     description: "\u901A\u8FC7\u73B0\u6709 HealBatch/queue \u5165\u53E3\u6CBB\u7597\u5E76\u8FD4\u56DE\u6743\u5A01\u7ED3\u679C\u3002",
-    inputs: [port2("source", pieceType), port2("target", pieceType), port2("amount", numberType)],
-    outputs: [port2("result", recordType), port2("success", booleanType), port2("heal", numberType)],
-    parameters: [parameter2("skillId", stringType, { optional: true })],
+    inputs: [port11("source", pieceType9), port11("target", pieceType9), port11("amount", numberType9)],
+    outputs: [port11("result", recordType6), port11("success", booleanType9), port11("heal", numberType9)],
+    parameters: [parameter9("skillId", stringType9, { optional: true })],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["heal", "events"], { events: ["beforeHealDealt", "afterHealDealt"] }),
+    effects: writes8(["heal", "events"], { events: ["beforeHealDealt", "afterHealDealt"] }),
     lower: (ctx) => {
-      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral(ctx, "skillId") : `${context(ctx.surface)}.skill?.id || ${context(ctx.surface)}.ruleId || "flow"`;
-      return wrappedEffectResult(`${runtime(ctx.surface)}.effects.heal(${input(ctx, "source")}, ${input(ctx, "target")}, ${input(ctx, "amount")}, ${id})`, ["success", "heal"]);
+      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral5(ctx, "skillId") : `${context4(ctx.surface)}.skill?.id || ${context4(ctx.surface)}.ruleId || "flow"`;
+      return wrappedEffectResult(`${runtime4(ctx.surface)}.effects.heal(${input10(ctx, "source")}, ${input10(ctx, "target")}, ${input10(ctx, "amount")}, ${id})`, ["success", "heal"]);
     },
     ui: { category: "effect" }
   }),
@@ -1565,15 +5740,15 @@ var effects = [
     id: "effect.queue-heal",
     label: "\u6392\u961F\u6CBB\u7597",
     description: "\u5728\u89C4\u5219\u4E8B\u4EF6\u7684\u83B7\u51C6 healQueue \u4E2D\u52A0\u5165\u4E00\u4E2A\u6CBB\u7597\u8BF7\u6C42\uFF1B\u4E0D\u63D0\u524D\u6539\u53D8 HP\u3002",
-    inputs: [port2("healer", pieceType), port2("target", pieceType), port2("amount", numberType)],
-    outputs: [port2("queued", numberType)],
-    parameters: [parameter2("skillId", stringType, { optional: true })],
+    inputs: [port11("healer", pieceType9), port11("target", pieceType9), port11("amount", numberType9)],
+    outputs: [port11("queued", numberType9)],
+    parameters: [parameter9("skillId", stringType9, { optional: true })],
     allowedSurfaces: ["rule"],
-    effects: writes(["heal", "queue"], { events: ["afterHealDealt"] }),
+    effects: writes8(["heal", "queue"], { events: ["afterHealDealt"] }),
     lower: (ctx) => {
-      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral(ctx, "skillId") : 'context.skillId || context.ruleId || "flow"';
-      const host = runtime(ctx.surface);
-      return expression(`context.healQueue.push({healer: ${host}.query.piece(${input(ctx, "healer")}), target: ${host}.query.piece(${input(ctx, "target")}), heal: ${input(ctx, "amount")}, skillId: ${id}})`);
+      const id = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral5(ctx, "skillId") : 'context.skillId || context.ruleId || "flow"';
+      const host2 = runtime4(ctx.surface);
+      return expression(`context.healQueue.push({healer: ${host2}.query.piece(${input10(ctx, "healer")}), target: ${host2}.query.piece(${input10(ctx, "target")}), heal: ${input10(ctx, "amount")}, skillId: ${id}})`);
     },
     ui: { category: "effect" }
   }),
@@ -1581,15 +5756,15 @@ var effects = [
     id: "effect.teleport",
     label: "\u6743\u5A01\u4F4D\u79FB",
     description: "\u901A\u8FC7\u7EDF\u4E00\u4F4D\u7F6E\u63D0\u4EA4\u5668\u4F20\u9001\u4E00\u540D\u68CB\u5B50\u5230\u5730\u683C\u3002",
-    inputs: [port2("piece", pieceType), port2("destination", cellType)],
-    outputs: [port2("result", recordType), port2("success", booleanType)],
-    parameters: [parameter2("kind", stringType, { enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
+    inputs: [port11("piece", pieceType9), port11("destination", cellType6)],
+    outputs: [port11("result", recordType6), port11("success", booleanType9)],
+    parameters: [parameter9("kind", stringType9, { enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["position", "events"], { events: ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"] }),
+    effects: writes8(["position", "events"], { events: ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"] }),
     lower: (ctx) => {
-      const kind = enumLiteral(ctx, "kind", ["teleport", "dash", "walk", "push", "pull", "swap"], "teleport");
-      const destination = input(ctx, "destination");
-      return wrappedEffectResult(`${runtime(ctx.surface)}.effects.move([{pieceId: ${input(ctx, "piece")}, x: (${destination}).x, y: (${destination}).y}], ${kind})`, ["success"]);
+      const kind = enumLiteral2(ctx, "kind", ["teleport", "dash", "walk", "push", "pull", "swap"], "teleport");
+      const destination = input10(ctx, "destination");
+      return wrappedEffectResult(`${runtime4(ctx.surface)}.effects.move([{pieceId: ${input10(ctx, "piece")}, x: (${destination}).x, y: (${destination}).y}], ${kind})`, ["success"]);
     },
     ui: { category: "effect" }
   }),
@@ -1597,24 +5772,24 @@ var effects = [
     id: "resource.adjust",
     label: "\u8C03\u6574\u8D44\u6E90",
     description: "\u901A\u8FC7\u8D44\u6E90\u8FB9\u754C\u6821\u9A8C\u8C03\u6574\u884C\u52A8\u70B9\u6216\u5145\u80FD\u70B9\u3002",
-    inputs: [port2("player", playerType), port2("amount", numberType)],
-    outputs: [port2("value", numberType)],
-    parameters: [parameter2("resource", stringType, { enum: ["actionPoints", "chargePoints"] })],
+    inputs: [port11("player", playerType4), port11("amount", numberType9)],
+    outputs: [port11("value", numberType9)],
+    parameters: [parameter9("resource", stringType9, { enum: ["actionPoints", "chargePoints"] })],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["resources"], { events: ["resourceChanged"] }),
-    lower: (ctx) => flowCall(ctx, "resources.add", [input(ctx, "player"), enumLiteral(ctx, "resource", ["actionPoints", "chargePoints"]), input(ctx, "amount")]),
+    effects: writes8(["resources"], { events: ["resourceChanged"] }),
+    lower: (ctx) => flowCall(ctx, "resources.add", [input10(ctx, "player"), enumLiteral2(ctx, "resource", ["actionPoints", "chargePoints"]), input10(ctx, "amount")]),
     ui: { category: "effect" }
   }),
   descriptor2({
     id: "card.hand-add",
     label: "\u52A0\u5165\u624B\u724C",
     description: "\u6CBF\u7528\u5361\u724C\u5B9E\u4F8B\u5316\u3001\u5BB9\u91CF\u548C\u4E8B\u4EF6\u5904\u7406\u52A0\u5165\u6307\u5B9A\u73A9\u5BB6\u624B\u724C\u3002",
-    inputs: [port2("player", playerType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("cardId", stringType)],
+    inputs: [port11("player", playerType4)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("cardId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["hand", "events"], { events: ["cardAdded"] }),
-    lower: (ctx) => flowCall(ctx, "cards.add", [input(ctx, "player"), stringLiteral(ctx, "cardId")]),
+    effects: writes8(["hand", "events"], { events: ["cardAdded"] }),
+    lower: (ctx) => flowCall(ctx, "cards.add", [input10(ctx, "player"), stringLiteral5(ctx, "cardId")]),
     ui: { category: "card" }
   })
 ];
@@ -1623,26 +5798,26 @@ var statusAndRules = [
     id: "status.apply-piece",
     label: "\u9644\u52A0\u68CB\u5B50\u72B6\u6001",
     description: "\u6309\u56FA\u5B9A\u5B57\u6BB5\u6784\u9020\u72B6\u6001\uFF0C\u5E76\u7ECF\u73B0\u6709 status lifecycle \u5B89\u88C5\u5173\u8054\u89C4\u5219\u3002",
-    inputs: [port2("target", pieceType)],
-    outputs: [port2("success", booleanType)],
+    inputs: [port11("target", pieceType9)],
+    outputs: [port11("success", booleanType9)],
     parameters: [
-      parameter2("statusId", stringType),
-      parameter2("statusType", stringType),
-      parameter2("duration", numberType, { default: -1 }),
-      parameter2("uses", numberType, { default: -1 }),
-      parameter2("intensity", numberType, { default: 1 }),
-      parameter2("stacks", numberType, { default: 1 }),
-      parameter2("maxStacks", numberType, { optional: true }),
-      parameter2("visible", booleanType, { default: true }),
-      parameter2("relatedRules", stringListType, { default: [] })
+      parameter9("statusId", stringType9),
+      parameter9("statusType", stringType9),
+      parameter9("duration", numberType9, { default: -1 }),
+      parameter9("uses", numberType9, { default: -1 }),
+      parameter9("intensity", numberType9, { default: 1 }),
+      parameter9("stacks", numberType9, { default: 1 }),
+      parameter9("maxStacks", numberType9, { optional: true }),
+      parameter9("visible", booleanType9, { default: true }),
+      parameter9("relatedRules", stringListType3, { default: [] })
     ],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
+    effects: writes8(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
     lower: (ctx) => {
-      const rules = literal(ctx, "relatedRules", []);
-      const maxStacks = Object.prototype.hasOwnProperty.call(ctx.parameters, "maxStacks") ? `, maxStacks: ${numberLiteral(ctx, "maxStacks")}` : "";
-      const object = `{id: ${stringLiteral(ctx, "statusId")}, type: ${stringLiteral(ctx, "statusType")}, currentDuration: ${numberLiteral(ctx, "duration", -1)}, remainingDuration: ${numberLiteral(ctx, "duration", -1)}, currentUses: ${numberLiteral(ctx, "uses", -1)}, remainingUses: ${numberLiteral(ctx, "uses", -1)}, intensity: ${numberLiteral(ctx, "intensity", 1)}, stacks: ${numberLiteral(ctx, "stacks", 1)}${maxStacks}, visible: ${booleanLiteral(ctx, "visible", true)}, relatedRules: ${rules}}`;
-      return expression(`${runtime(ctx.surface)}.status.add(${input(ctx, "target")}, ${object}, 'piece')`);
+      const rules = literal5(ctx, "relatedRules", []);
+      const maxStacks = Object.prototype.hasOwnProperty.call(ctx.parameters, "maxStacks") ? `, maxStacks: ${numberLiteral6(ctx, "maxStacks")}` : "";
+      const object2 = `{id: ${stringLiteral5(ctx, "statusId")}, type: ${stringLiteral5(ctx, "statusType")}, currentDuration: ${numberLiteral6(ctx, "duration", -1)}, remainingDuration: ${numberLiteral6(ctx, "duration", -1)}, currentUses: ${numberLiteral6(ctx, "uses", -1)}, remainingUses: ${numberLiteral6(ctx, "uses", -1)}, intensity: ${numberLiteral6(ctx, "intensity", 1)}, stacks: ${numberLiteral6(ctx, "stacks", 1)}${maxStacks}, visible: ${booleanLiteral4(ctx, "visible", true)}, relatedRules: ${rules}}`;
+      return expression(`${runtime4(ctx.surface)}.status.add(${input10(ctx, "target")}, ${object2}, 'piece')`);
     },
     ui: { category: "status" }
   }),
@@ -1650,26 +5825,26 @@ var statusAndRules = [
     id: "status.apply-player",
     label: "\u9644\u52A0\u73A9\u5BB6\u72B6\u6001",
     description: "\u6309\u56FA\u5B9A\u5B57\u6BB5\u6784\u9020\u73A9\u5BB6\u72B6\u6001\uFF0C\u5E76\u7ECF\u73B0\u6709 status lifecycle \u5B89\u88C5\u5173\u8054\u89C4\u5219\u3002",
-    inputs: [port2("target", playerType)],
-    outputs: [port2("success", booleanType)],
+    inputs: [port11("target", playerType4)],
+    outputs: [port11("success", booleanType9)],
     parameters: [
-      parameter2("statusId", stringType),
-      parameter2("statusType", stringType),
-      parameter2("duration", numberType, { default: -1 }),
-      parameter2("uses", numberType, { default: -1 }),
-      parameter2("intensity", numberType, { default: 1 }),
-      parameter2("stacks", numberType, { default: 1 }),
-      parameter2("maxStacks", numberType, { optional: true }),
-      parameter2("visible", booleanType, { default: true }),
-      parameter2("relatedRules", stringListType, { default: [] })
+      parameter9("statusId", stringType9),
+      parameter9("statusType", stringType9),
+      parameter9("duration", numberType9, { default: -1 }),
+      parameter9("uses", numberType9, { default: -1 }),
+      parameter9("intensity", numberType9, { default: 1 }),
+      parameter9("stacks", numberType9, { default: 1 }),
+      parameter9("maxStacks", numberType9, { optional: true }),
+      parameter9("visible", booleanType9, { default: true }),
+      parameter9("relatedRules", stringListType3, { default: [] })
     ],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
+    effects: writes8(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
     lower: (ctx) => {
-      const rules = literal(ctx, "relatedRules", []);
-      const maxStacks = Object.prototype.hasOwnProperty.call(ctx.parameters, "maxStacks") ? `, maxStacks: ${numberLiteral(ctx, "maxStacks")}` : "";
-      const object = `{id: ${stringLiteral(ctx, "statusId")}, type: ${stringLiteral(ctx, "statusType")}, currentDuration: ${numberLiteral(ctx, "duration", -1)}, remainingDuration: ${numberLiteral(ctx, "duration", -1)}, currentUses: ${numberLiteral(ctx, "uses", -1)}, remainingUses: ${numberLiteral(ctx, "uses", -1)}, intensity: ${numberLiteral(ctx, "intensity", 1)}, stacks: ${numberLiteral(ctx, "stacks", 1)}${maxStacks}, visible: ${booleanLiteral(ctx, "visible", true)}, relatedRules: ${rules}}`;
-      return expression(`${runtime(ctx.surface)}.status.add(${input(ctx, "target")}, ${object}, 'player')`);
+      const rules = literal5(ctx, "relatedRules", []);
+      const maxStacks = Object.prototype.hasOwnProperty.call(ctx.parameters, "maxStacks") ? `, maxStacks: ${numberLiteral6(ctx, "maxStacks")}` : "";
+      const object2 = `{id: ${stringLiteral5(ctx, "statusId")}, type: ${stringLiteral5(ctx, "statusType")}, currentDuration: ${numberLiteral6(ctx, "duration", -1)}, remainingDuration: ${numberLiteral6(ctx, "duration", -1)}, currentUses: ${numberLiteral6(ctx, "uses", -1)}, remainingUses: ${numberLiteral6(ctx, "uses", -1)}, intensity: ${numberLiteral6(ctx, "intensity", 1)}, stacks: ${numberLiteral6(ctx, "stacks", 1)}${maxStacks}, visible: ${booleanLiteral4(ctx, "visible", true)}, relatedRules: ${rules}}`;
+      return expression(`${runtime4(ctx.surface)}.status.add(${input10(ctx, "target")}, ${object2}, 'player')`);
     },
     ui: { category: "status" }
   }),
@@ -1677,72 +5852,72 @@ var statusAndRules = [
     id: "status.remove-piece",
     label: "\u79FB\u9664\u68CB\u5B50\u72B6\u6001",
     description: "\u901A\u8FC7\u73B0\u6709 status lifecycle \u79FB\u9664\u68CB\u5B50\u72B6\u6001\u3002",
-    inputs: [port2("target", pieceType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("statusId", stringType)],
+    inputs: [port11("target", pieceType9)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("statusId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
-    lower: (ctx) => flowCall(ctx, "status.remove", [input(ctx, "target"), stringLiteral(ctx, "statusId"), '"piece"']),
+    effects: writes8(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
+    lower: (ctx) => flowCall(ctx, "status.remove", [input10(ctx, "target"), stringLiteral5(ctx, "statusId"), '"piece"']),
     ui: { category: "status" }
   }),
   descriptor2({
     id: "status.remove-player",
     label: "\u79FB\u9664\u73A9\u5BB6\u72B6\u6001",
     description: "\u901A\u8FC7\u73B0\u6709 status lifecycle \u79FB\u9664\u73A9\u5BB6\u72B6\u6001\u3002",
-    inputs: [port2("target", playerType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("statusId", stringType)],
+    inputs: [port11("target", playerType4)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("statusId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
-    lower: (ctx) => flowCall(ctx, "status.remove", [input(ctx, "target"), stringLiteral(ctx, "statusId"), '"player"']),
+    effects: writes8(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
+    lower: (ctx) => flowCall(ctx, "status.remove", [input10(ctx, "target"), stringLiteral5(ctx, "statusId"), '"player"']),
     ui: { category: "status" }
   }),
   descriptor2({
     id: "rule.apply-piece",
     label: "\u9644\u52A0\u68CB\u5B50\u89C4\u5219",
     description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u5B89\u88C5\u5DF2\u767B\u8BB0\u89C4\u5219\u5B9A\u4E49\u3002",
-    inputs: [port2("target", pieceType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("ruleId", stringType)],
+    inputs: [port11("target", pieceType9)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("ruleId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["rule", "events"], { events: ["ruleAdded"] }),
-    lower: (ctx) => flowCall(ctx, "rules.add", [input(ctx, "target"), stringLiteral(ctx, "ruleId"), '"piece"']),
+    effects: writes8(["rule", "events"], { events: ["ruleAdded"] }),
+    lower: (ctx) => flowCall(ctx, "rules.add", [input10(ctx, "target"), stringLiteral5(ctx, "ruleId"), '"piece"']),
     ui: { category: "rule" }
   }),
   descriptor2({
     id: "rule.apply-player",
     label: "\u9644\u52A0\u73A9\u5BB6\u89C4\u5219",
     description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u5B89\u88C5\u5DF2\u767B\u8BB0\u73A9\u5BB6\u89C4\u5219\u5B9A\u4E49\u3002",
-    inputs: [port2("target", playerType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("ruleId", stringType)],
+    inputs: [port11("target", playerType4)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("ruleId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["rule", "events"], { events: ["ruleAdded"] }),
-    lower: (ctx) => flowCall(ctx, "rules.add", [input(ctx, "target"), stringLiteral(ctx, "ruleId"), '"player"']),
+    effects: writes8(["rule", "events"], { events: ["ruleAdded"] }),
+    lower: (ctx) => flowCall(ctx, "rules.add", [input10(ctx, "target"), stringLiteral5(ctx, "ruleId"), '"player"']),
     ui: { category: "rule" }
   }),
   descriptor2({
     id: "rule.remove-piece",
     label: "\u79FB\u9664\u68CB\u5B50\u89C4\u5219",
     description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u79FB\u9664\u5DF2\u767B\u8BB0\u68CB\u5B50\u89C4\u5219\u3002",
-    inputs: [port2("target", pieceType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("ruleId", stringType)],
+    inputs: [port11("target", pieceType9)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("ruleId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["rule", "events"], { events: ["ruleRemoved"] }),
-    lower: (ctx) => flowCall(ctx, "rules.remove", [input(ctx, "target"), stringLiteral(ctx, "ruleId"), '"piece"']),
+    effects: writes8(["rule", "events"], { events: ["ruleRemoved"] }),
+    lower: (ctx) => flowCall(ctx, "rules.remove", [input10(ctx, "target"), stringLiteral5(ctx, "ruleId"), '"piece"']),
     ui: { category: "rule" }
   }),
   descriptor2({
     id: "rule.remove-player",
     label: "\u79FB\u9664\u73A9\u5BB6\u89C4\u5219",
     description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u79FB\u9664\u5DF2\u767B\u8BB0\u73A9\u5BB6\u89C4\u5219\u3002",
-    inputs: [port2("target", playerType)],
-    outputs: [port2("success", booleanType)],
-    parameters: [parameter2("ruleId", stringType)],
+    inputs: [port11("target", playerType4)],
+    outputs: [port11("success", booleanType9)],
+    parameters: [parameter9("ruleId", stringType9)],
     allowedSurfaces: EFFECT_SURFACES,
-    effects: writes(["rule", "events"], { events: ["ruleRemoved"] }),
-    lower: (ctx) => flowCall(ctx, "rules.remove", [input(ctx, "target"), stringLiteral(ctx, "ruleId"), '"player"']),
+    effects: writes8(["rule", "events"], { events: ["ruleRemoved"] }),
+    lower: (ctx) => flowCall(ctx, "rules.remove", [input10(ctx, "target"), stringLiteral5(ctx, "ruleId"), '"player"']),
     ui: { category: "rule" }
   })
 ];
@@ -1752,34 +5927,34 @@ var eventFacts = [
     label: "\u8BFB\u53D6\u4E8B\u4EF6\u4E8B\u5B9E",
     description: "\u8BFB\u53D6\u7531\u5BBF\u4E3B\u767D\u540D\u5355\u5316\u7684\u4E0D\u53EF\u53D8\u4E8B\u4EF6\u4E8B\u5B9E\u8BB0\u5F55\u3002",
     inputs: [],
-    outputs: [port2("event", recordType)],
+    outputs: [port11("event", recordType6)],
     allowedSurfaces: ["rule", "triggerSkill", "pending"],
-    effects: pure(["event"]),
+    effects: pure7(["event"]),
     lower: (ctx) => flowCall(ctx, "event.read", []),
     ui: { category: "event" }
   }),
   ...[
-    ["event.type", "\u4E8B\u4EF6\u7C7B\u578B", "type", stringType],
-    ["event.player", "\u4E8B\u4EF6\u73A9\u5BB6 ID", "playerId", playerType],
-    ["event.damage", "\u4E8B\u4EF6\u4F24\u5BB3", "damage", numberType],
-    ["event.actual-damage", "\u5B9E\u9645\u4F24\u5BB3", "actualDamage", numberType],
-    ["event.heal", "\u4E8B\u4EF6\u6CBB\u7597", "heal", numberType],
-    ["event.amount", "\u4E8B\u4EF6\u6570\u91CF", "amount", numberType],
-    ["event.turn-number", "\u4E8B\u4EF6\u56DE\u5408", "turnNumber", numberType],
-    ["event.target-x", "\u76EE\u6807 X", "targetX", numberType],
-    ["event.target-y", "\u76EE\u6807 Y", "targetY", numberType],
-    ["event.movement-kind", "\u4F4D\u79FB\u7C7B\u578B", "movementKind", stringType],
-    ["event.from-x", "\u8D77\u70B9 X", "fromX", numberType],
-    ["event.from-y", "\u8D77\u70B9 Y", "fromY", numberType]
+    ["event.type", "\u4E8B\u4EF6\u7C7B\u578B", "type", stringType9],
+    ["event.player", "\u4E8B\u4EF6\u73A9\u5BB6 ID", "playerId", playerType4],
+    ["event.damage", "\u4E8B\u4EF6\u4F24\u5BB3", "damage", numberType9],
+    ["event.actual-damage", "\u5B9E\u9645\u4F24\u5BB3", "actualDamage", numberType9],
+    ["event.heal", "\u4E8B\u4EF6\u6CBB\u7597", "heal", numberType9],
+    ["event.amount", "\u4E8B\u4EF6\u6570\u91CF", "amount", numberType9],
+    ["event.turn-number", "\u4E8B\u4EF6\u56DE\u5408", "turnNumber", numberType9],
+    ["event.target-x", "\u76EE\u6807 X", "targetX", numberType9],
+    ["event.target-y", "\u76EE\u6807 Y", "targetY", numberType9],
+    ["event.movement-kind", "\u4F4D\u79FB\u7C7B\u578B", "movementKind", stringType9],
+    ["event.from-x", "\u8D77\u70B9 X", "fromX", numberType9],
+    ["event.from-y", "\u8D77\u70B9 Y", "fromY", numberType9]
   ].map(([id, label, field, type]) => descriptor2({
     id,
     label,
     description: `\u8BFB\u53D6\u4E8B\u4EF6\u4E8B\u5B9E ${field}\uFF1B\u4E8B\u4EF6\u4E0D\u5B58\u5728\u8BE5\u5B57\u6BB5\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002`,
     inputs: [],
-    outputs: [port2("value", type, { nullable: true })],
+    outputs: [port11("value", type, { nullable: true })],
     allowedSurfaces: ["rule", "triggerSkill", "pending"],
-    effects: pure(["event"]),
-    lower: (ctx) => expression(`(${runtime(ctx.surface)}.event.read())[${ctx.emitLiteral(field)}]`),
+    effects: pure7(["event"]),
+    lower: (ctx) => expression(`(${runtime4(ctx.surface)}.event.read())[${ctx.emitLiteral(field)}]`),
     ui: { category: "event" }
   }))
 ];
@@ -1788,49 +5963,65 @@ var results = [
     id: "result.message",
     label: "\u8FD4\u56DE\u6D88\u606F",
     description: "\u6784\u9020\u539F\u6709 success/message \u7ED3\u679C\uFF0C\u4E0D\u5F15\u5165\u53EF\u6267\u884C\u5B57\u6BB5\u3002",
-    inputs: [port2("message", stringType)],
-    outputs: [port2("success", booleanType), port2("message", stringType)],
-    parameters: [parameter2("success", booleanType, { default: true })],
-    allowedSurfaces: PURE_SURFACES,
-    effects: { ...pure(), description: "\u8FD4\u56DE\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
-    lower: (ctx) => expression(`{success: ${booleanLiteral(ctx, "success", true)}, message: ${input(ctx, "message")}}`),
+    inputs: [port11("message", stringType9)],
+    outputs: [port11("success", booleanType9), port11("message", stringType9)],
+    parameters: [parameter9("success", booleanType9, { default: true })],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: { ...pure7(), description: "\u8FD4\u56DE\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
+    lower: (ctx) => expression(`{success: ${booleanLiteral4(ctx, "success", true)}, message: ${input10(ctx, "message")}}`),
     ui: { category: "result" }
   }),
   descriptor2({
     id: "result.text",
     label: "\u8FD4\u56DE\u6587\u672C",
     description: "\u8FD4\u56DE\u4E00\u4E2A\u7C7B\u578B\u660E\u786E\u7684\u6587\u672C\u7ED3\u679C\u3002",
-    inputs: [port2("text", stringType)],
-    outputs: [port2("text", stringType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: { ...pure(), description: "\u8FD4\u56DE\u6587\u672C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
-    lower: (ctx) => expression(input(ctx, "text")),
+    inputs: [port11("text", stringType9)],
+    outputs: [port11("text", stringType9)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: { ...pure7(), description: "\u8FD4\u56DE\u6587\u672C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
+    lower: (ctx) => expression(input10(ctx, "text")),
     ui: { category: "result" }
   }),
   descriptor2({
     id: "result.structured",
     label: "\u8FD4\u56DE\u7ED3\u6784\u5316\u7ED3\u679C",
     description: "\u6784\u9020\u56FA\u5B9A success/message/value \u7ED3\u679C\uFF1Bvalue \u5FC5\u987B\u662F\u5DF2\u7C7B\u578B\u5316\u8BB0\u5F55\u3002",
-    inputs: [port2("success", booleanType), port2("message", stringType), port2("value", recordType)],
-    outputs: [port2("success", booleanType), port2("message", stringType), port2("value", recordType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: { ...pure(), description: "\u8FD4\u56DE\u7ED3\u6784\u5316\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
-    lower: (ctx) => expression(`{success: ${input(ctx, "success")}, message: ${input(ctx, "message")}, value: ${input(ctx, "value")}}`),
+    inputs: [port11("success", booleanType9), port11("message", stringType9), port11("value", recordType6)],
+    outputs: [port11("success", booleanType9), port11("message", stringType9), port11("value", recordType6)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: { ...pure7(), description: "\u8FD4\u56DE\u7ED3\u6784\u5316\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
+    lower: (ctx) => expression(`{success: ${input10(ctx, "success")}, message: ${input10(ctx, "message")}, value: ${input10(ctx, "value")}}`),
     ui: { category: "result" }
   }),
   descriptor2({
     id: "result.value",
     label: "\u8FD4\u56DE\u7ED3\u6784\u5316\u503C",
     description: "\u5C06\u5DF2\u7C7B\u578B\u5316\u7684\u503C\u4F5C\u4E3A\u7ED3\u679C\u5B57\u6BB5\u8FD4\u56DE\uFF1B\u4E0D\u63A5\u53D7\u4F5C\u8005\u5BF9\u8C61\u6216\u6E90\u7801\u3002",
-    inputs: [port2("value", recordType)],
-    outputs: [port2("value", recordType)],
-    allowedSurfaces: PURE_SURFACES,
-    effects: { ...pure(), description: "\u8FD4\u56DE\u7C7B\u578B\u5316\u503C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
-    lower: (ctx) => expression(`{success: true, value: ${input(ctx, "value")}}`),
+    inputs: [port11("value", recordType6)],
+    outputs: [port11("value", recordType6)],
+    allowedSurfaces: PURE_SURFACES2,
+    effects: { ...pure7(), description: "\u8FD4\u56DE\u7C7B\u578B\u5316\u503C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
+    lower: (ctx) => expression(`{success: true, value: ${input10(ctx, "value")}}`),
     ui: { category: "result" }
   })
 ];
 var ALL_DESCRIPTORS = [
+  ...QUERY_GAMEPLAY_MODULES.map(descriptor2),
+  ...PREVIEW_GAMEPLAY_MODULES.map(descriptor2),
+  ...FLIGHT_GAMEPLAY_MODULES.map(descriptor2),
+  ...SUMMON_GAMEPLAY_MODULES.map(descriptor2),
+  ...ABILITY_GAMEPLAY_MODULES.map(descriptor2),
+  ...STATUS_EVENT_GAMEPLAY_MODULES.map(descriptor2),
+  ...PREVIEW_VALUE_GAMEPLAY_MODULES.map(descriptor2),
+  ...AREA_EFFECT_GAMEPLAY_MODULES.map(descriptor2),
+  ...STATUS_TIMER_GAMEPLAY_MODULES.map(descriptor2),
+  ...CONTENT_GENERATION_GAMEPLAY_MODULES.map(descriptor2),
+  ...PENDING_SPATIAL_GAMEPLAY_MODULES.map(descriptor2),
+  ...CARD_OPERATION_GAMEPLAY_MODULES.map(descriptor2),
+  ...PROJECTILE_GAMEPLAY_MODULES.map(descriptor2),
+  ...COUNTER_PASSIVE_GAMEPLAY_MODULES.map(descriptor2),
+  ...EXECUTION_LOCAL_GAMEPLAY_MODULES.map(descriptor2),
+  ...MOVEMENT_FAMILY_GAMEPLAY_MODULES.map(descriptor2),
   ...allRefs,
   ...queries,
   ...arithmetic,
@@ -1895,12 +6086,843 @@ function getGameplayModule(id, version) {
 }
 var gameplayModuleDescriptors = ALL_DESCRIPTORS;
 
-// lib/skill-graph/module-document.ts
-var GAMEPLAY_MODULE_DOCUMENT_VERSION = "rvb-gameplay-module-document/v1";
-var record = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+// lib/skill-graph/module-text.ts
+var object = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 var own2 = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+function fail2(message) {
+  throw new Error("Gameplay module text: " + message);
+}
+function renderGameplayModuleText(entries, bindings) {
+  if (!object(bindings)) fail2("bindings must be an object");
+  const rendered = {};
+  for (const [field, raw] of Object.entries(bindings)) {
+    if (!["description", "targetText"].includes(field)) fail2("unsupported text field " + field);
+    if (!object(raw) || Object.keys(raw).some((key) => !["template", "values"].includes(key)) || typeof raw.template !== "string" || !object(raw.values)) fail2("invalid binding for " + field);
+    const values = /* @__PURE__ */ Object.create(null);
+    for (const [token, source] of Object.entries(raw.values)) {
+      if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(token) || ["constructor", "prototype", "__proto__"].includes(token)) fail2("invalid placeholder " + token);
+      if (!object(source) || Object.keys(source).some((key) => !["entry", "input"].includes(key)) || typeof source.entry !== "string" || typeof source.input !== "string") fail2("invalid source for " + token);
+      const entry = own2(entries, source.entry) ? entries[source.entry] : void 0;
+      const graph2 = object(entry) ? entry.graph : void 0;
+      if (!object(graph2) || !Array.isArray(graph2.inputs) || !object(graph2.inputBindings) || !own2(graph2.inputBindings, source.input)) fail2("missing bound input for " + token);
+      const port12 = graph2.inputs.find((item) => object(item) && item.name === source.input);
+      const value = graph2.inputBindings[source.input];
+      if (!object(port12) || !["number", "string", "boolean"].includes(String(port12.type)) || typeof value !== port12.type || typeof value === "number" && !Number.isFinite(value)) fail2("text requires a primitive declared input: " + token);
+      values[token] = String(value);
+    }
+    const used = /* @__PURE__ */ new Set();
+    rendered[field] = raw.template.replace(/\{\{([^{}]+)\}\}/g, (_match, token) => {
+      if (!own2(values, token)) fail2("unbound placeholder " + token);
+      used.add(token);
+      return values[token];
+    });
+    if (Object.keys(values).some((token) => !used.has(token))) fail2("unused text binding for " + field);
+  }
+  return rendered;
+}
+
+// lib/skill-graph/module-cluster.ts
+var SKILL_CLUSTER_DEFINITION_VERSION = "rvb-skill-cluster/v1";
+var SKILL_CLUSTER_VERSION = SKILL_CLUSTER_DEFINITION_VERSION;
+var GAMEPLAY_MODULE_DOCUMENT_VERSION = "rvb-gameplay-module-document/v1";
+var GAMEPLAY_MODULE_GRAPH_VERSION2 = "rvb-gameplay-modules/v1";
+var GAMEPLAY_MODULE_COMPILER_VERSION2 = "rvb-gameplay-module-compiler/v1";
+var own3 = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+var record = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var collections = ["skills", "pieces", "rules", "cards"];
+function cloneJson(value, seen = /* @__PURE__ */ new WeakMap()) {
+  if (value === null || typeof value !== "object") return value;
+  if (seen.has(value)) return seen.get(value);
+  if (Array.isArray(value)) {
+    const output2 = [];
+    seen.set(value, output2);
+    for (const item of value) output2.push(cloneJson(item, seen));
+    return output2;
+  }
+  const output = {};
+  seen.set(value, output);
+  for (const key of Object.keys(value)) {
+    Object.defineProperty(output, key, {
+      value: cloneJson(value[key], seen),
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  }
+  return output;
+}
+function cloneRecord(value) {
+  const cloned = cloneJson(value);
+  return record(cloned) ? cloned : {};
+}
+function pathSegments(path) {
+  if (typeof path !== "string" || !path.length || path.length > 240) return void 0;
+  const segments = path.split(".");
+  if (segments.some((segment) => !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment) || segment === "__proto__" || segment === "prototype" || segment === "constructor")) return void 0;
+  return segments;
+}
+function readPath(value, path) {
+  const segments = pathSegments(path);
+  if (!segments) return { found: false };
+  let current = value;
+  for (const segment of segments) {
+    if (!record(current) && !Array.isArray(current)) return { found: false };
+    if (!own3(current, segment)) return { found: false };
+    current = current[segment];
+  }
+  return { found: true, value: current };
+}
+function diagnostic(code, message, path, source, reference, severity = code === "cycle" || code === "legacy-source" ? "warning" : "error") {
+  return { code, severity, message, ...path ? { path } : {}, ...source ? { source } : {}, ...reference ? { reference } : {} };
+}
+function asString(value) {
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function asStringList(value) {
+  if (typeof value === "string") return value.length ? [value] : [];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => typeof item === "string" && item.length > 0);
+}
+function memberBucket(kind) {
+  if (kind === "skill") return "skills";
+  if (kind === "piece") return "pieces";
+  if (kind === "rule") return "rules";
+  if (kind === "status") return "statuses";
+  if (kind === "card") return "cards";
+  if (kind === "continuation") return "continuations";
+  return "presentations";
+}
+function catalogCollection(catalog, collection) {
+  const value = catalog?.[collection];
+  return record(value) ? value : void 0;
+}
+function indexCollection(catalog, collection) {
+  const entries = catalogCollection(catalog, collection);
+  if (!entries) {
+    if (collection === "cards" && catalog.cards === void 0) return { entries: {}, byId: /* @__PURE__ */ new Map(), diagnostics: [] };
+    return {
+      entries: {},
+      byId: /* @__PURE__ */ new Map(),
+      diagnostics: [diagnostic("invalid-catalog", `catalog.${collection} must be a record`, `catalog.${collection}`)]
+    };
+  }
+  const byId = /* @__PURE__ */ new Map();
+  const diagnostics = [];
+  for (const [key, value] of Object.entries(entries)) {
+    if (!record(value)) {
+      diagnostics.push(diagnostic("invalid-catalog", `${collection}.${key} must be a record`, `catalog.${collection}.${key}`));
+      continue;
+    }
+    const declaredId = asString(value.id);
+    const id = declaredId ?? key;
+    if (declaredId && declaredId !== key) {
+      diagnostics.push(diagnostic(
+        "key-mismatch",
+        `${collection}.${key} declares id "${declaredId}"`,
+        `catalog.${collection}.${key}.id`,
+        void 0,
+        declaredId
+      ));
+    }
+    const prior = byId.get(id);
+    if (prior && prior !== key) {
+      diagnostics.push(diagnostic(
+        "duplicate-id",
+        `${collection} contains duplicate id "${id}" at ${prior} and ${key}`,
+        `catalog.${collection}`,
+        void 0,
+        id
+      ));
+    } else {
+      byId.set(id, key);
+    }
+  }
+  return { entries, byId, diagnostics };
+}
+function makeLocation(collection, id, field, path) {
+  return { collection, id, field, path };
+}
+function memberKey(kind, id, scope) {
+  if (kind === "status" && scope) return `${kind}:${id}:${scope.collection}:${scope.id}`;
+  return `${kind}:${id}`;
+}
+function evidenceRank(evidence) {
+  if (evidence === "semantic") return 5;
+  if (evidence === "explicit") return 4;
+  if (evidence === "inline" || evidence === "declarative") return 3;
+  if (evidence === "compatibility") return 2;
+  return 1;
+}
+function createMembers() {
+  return /* @__PURE__ */ new Map();
+}
+function addMember(members, diagnostics, input11) {
+  const provenance = Array.isArray(input11.provenance) ? [...input11.provenance] : [input11.provenance];
+  const key = memberKey(input11.kind, input11.id, provenance[0]);
+  const existing = members.get(key);
+  if (!existing) {
+    const next = {
+      kind: input11.kind,
+      id: input11.id,
+      role: input11.role,
+      ...input11.relation ? { relation: input11.relation } : {},
+      provenance,
+      evidence: input11.evidence,
+      editable: input11.editable,
+      definition: cloneRecord(input11.definition)
+    };
+    members.set(key, next);
+    return next;
+  }
+  for (const location of provenance) {
+    if (!existing.provenance.some((item) => item.collection === location.collection && item.id === location.id && item.field === location.field && item.path === location.path)) existing.provenance.push(location);
+  }
+  if (existing.role !== "root" && input11.role === "root") existing.role = "root";
+  if (!existing.relation && input11.relation) existing.relation = input11.relation;
+  const nextEvidence = evidenceRank(input11.evidence) > evidenceRank(existing.evidence) ? input11.evidence : existing.evidence;
+  const nextEditable = existing.editable || input11.editable;
+  if (existing.definition.id !== void 0 && input11.definition.id !== void 0 && existing.definition.id !== input11.definition.id) {
+    diagnostics.push(diagnostic("conflicting-member", `conflicting definitions for ${input11.kind} "${input11.id}"`, void 0, provenance[0]));
+  }
+  existing.evidence = nextEvidence;
+  existing.editable = nextEditable && nextEvidence !== "generated" && nextEvidence !== "compatibility";
+  return existing;
+}
+function literalString(value) {
+  if (!record(value) || value.kind !== "literal") return void 0;
+  return asString(value.value);
+}
+function graphObject(value) {
+  if (!record(value) || value.kind !== "object" || !Array.isArray(value.entries)) return void 0;
+  const output = {};
+  for (const entry of value.entries) {
+    if (!record(entry) || typeof entry.key !== "string") continue;
+    const literal6 = record(entry.value) && entry.value.kind === "literal" ? entry.value.value : void 0;
+    output[entry.key] = literal6 === void 0 ? cloneJson(entry.value) : cloneJson(literal6);
+  }
+  return output;
+}
+function collectLegacyGraphEvidence(value, path = "contentGraph") {
+  const rules = [];
+  const statuses = [];
+  const visit = (node, nodePath) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(item, `${nodePath}[${index}]`));
+      return;
+    }
+    if (!record(node)) return;
+    if (node.kind === "call") {
+      const capability = asString(node.capability);
+      const moduleId = asString(node.module);
+      const name = capability ?? moduleId;
+      if (name === "addRuleById" || name === "rule.apply-piece" || name === "rule.apply-player") {
+        const args = Array.isArray(node.args) ? node.args : [];
+        const id = literalString(args[1]) ?? literalString(args[0]);
+        const parameterId = record(node.parameters) ? asString(node.parameters.ruleId) : void 0;
+        if (id ?? parameterId) rules.push({ id: id ?? parameterId, path: `${nodePath}.args` });
+      }
+      if (name === "addStatusEffectById" || name === "status.apply-piece" || name === "status.apply-player") {
+        const args = Array.isArray(node.args) ? node.args : [];
+        const object2 = args.map(graphObject).find((item) => !!item);
+        const parameters2 = record(node.parameters) ? node.parameters : void 0;
+        const definition = object2 ?? (parameters2 ? cloneRecord(parameters2) : {});
+        const id = asString(definition.id) ?? asString(definition.type) ?? (parameters2 ? asString(parameters2.statusId) : void 0);
+        const type = asString(definition.type) ?? (parameters2 ? asString(parameters2.statusType) : void 0);
+        if (id || type) {
+          const relatedRules = asStringList(definition.relatedRules);
+          statuses.push({
+            id: id ?? type,
+            definition: { ...definition, ...type && !definition.type ? { type } : {} },
+            path: nodePath,
+            relatedRules
+          });
+        }
+      }
+    }
+    for (const [key, child] of Object.entries(node)) {
+      if (key === "code" || key === "skillCode" || key === "effectCode" || key === "source") continue;
+      if (key === "kind" || key === "capability" || key === "module" || key === "parameters" || key === "args") {
+      }
+      visit(child, `${nodePath}.${key}`);
+    }
+  };
+  visit(value, path);
+  return { rules, statuses };
+}
+function collectSemanticGraphEvidence(value, path) {
+  const rules = [];
+  const statuses = [];
+  const inspectGraph = (graph2, graphPath) => {
+    const composites = /* @__PURE__ */ new Map();
+    if (Array.isArray(graph2.composites)) graph2.composites.forEach((entry, index) => {
+      if (record(entry)) composites.set(`${entry.id}@${entry.version}`, { value: entry, path: `${graphPath}.composites[${index}]` });
+    });
+    const usedContinuations = /* @__PURE__ */ new Set();
+    const inspectBody = (body, bodyPath, stack = /* @__PURE__ */ new Set()) => {
+      const base = collectLegacyGraphEvidence(body, bodyPath);
+      rules.push(...base.rules);
+      statuses.push(...base.statuses);
+      const records = /* @__PURE__ */ new Map();
+      const calls = [];
+      const walk = (node, nodePath) => {
+        if (Array.isArray(node)) {
+          node.forEach((child, index) => walk(child, `${nodePath}[${index}]`));
+          return;
+        }
+        if (!record(node)) return;
+        if (node.kind === "record.create" && typeof node.id === "string" && record(node.fields)) records.set(node.id, node.fields);
+        if (node.kind === "call") calls.push({ node, path: nodePath });
+        if (node.kind === "defer-choice" && typeof node.graph === "string") usedContinuations.add(node.graph);
+        for (const [key, child] of Object.entries(node)) walk(child, `${nodePath}.${key}`);
+      };
+      walk(body, bodyPath);
+      for (const call of calls) {
+        const compositeKey = `${call.node.module}@${call.node.version}`;
+        const composite2 = composites.get(compositeKey);
+        if (composite2 && !stack.has(compositeKey)) {
+          const inputs = record(call.node.inputs) ? call.node.inputs : {};
+          const bindLiterals = (value2) => {
+            if (Array.isArray(value2)) return value2.map(bindLiterals);
+            if (!record(value2)) return value2;
+            if (value2.kind === "input" && typeof value2.name === "string") {
+              const bound = inputs[value2.name];
+              if (record(bound) && bound.kind === "literal") return cloneJson(bound);
+            }
+            return Object.fromEntries(Object.entries(value2).map(([key, child]) => [key, bindLiterals(child)]));
+          };
+          inspectBody(bindLiterals(composite2.value.body), `${composite2.path}.body`, /* @__PURE__ */ new Set([...stack, compositeKey]));
+        }
+        if (!["status.apply-record", "status.apply-player-record"].includes(String(call.node.module))) continue;
+        const input11 = record(call.node.inputs) ? call.node.inputs.record : void 0;
+        if (!record(input11) || input11.kind !== "output" || input11.port !== "value" || typeof input11.node !== "string") continue;
+        const fields3 = records.get(input11.node);
+        if (!fields3) continue;
+        const definition = {};
+        for (const [key, field] of Object.entries(fields3)) if (record(field) && field.kind === "literal") definition[key] = cloneJson(field.value);
+        const id = asString(definition.id) ?? asString(definition.type);
+        if (!id) continue;
+        statuses.push({ id, definition, path: call.path, relatedRules: asStringList(definition.relatedRules) });
+      }
+    };
+    inspectBody(graph2.body, `${graphPath}.body`);
+    if (Array.isArray(graph2.continuations)) graph2.continuations.forEach((continuation, index) => {
+      if (record(continuation) && typeof continuation.id === "string" && (usedContinuations.has(continuation.id) || usedContinuations.has(`${continuation.id}@${continuation.version}`)) && record(continuation.graph)) inspectGraph(continuation.graph, `${graphPath}.continuations[${index}].graph`);
+    });
+  };
+  if (record(value) && record(value.entries)) for (const [field, entry] of Object.entries(value.entries)) {
+    if (record(entry) && record(entry.graph) && field !== "previewCode") inspectGraph(entry.graph, `${path}.entries.${field}.graph`);
+  }
+  return { rules, statuses };
+}
+function explicitRuleValues(value, basePath) {
+  const output = [];
+  const add = (candidate, path) => asStringList(candidate).forEach((id) => output.push({ id, path }));
+  if (record(value)) {
+    for (const field of ["relatedRules", "rules", "playerRules"]) {
+      if (own3(value, field)) add(value[field], `${basePath}.${field}`);
+    }
+    if (record(value.statusTag)) {
+      add(value.statusTag.rule, `${basePath}.statusTag.rule`);
+      add(value.statusTag.relatedRules, `${basePath}.statusTag.relatedRules`);
+    }
+    if (record(value.summonCapability)) {
+      add(value.summonCapability.rules, `${basePath}.summonCapability.rules`);
+      if (record(value.summonCapability.status)) add(value.summonCapability.status.relatedRules, `${basePath}.summonCapability.status.relatedRules`);
+      if (record(value.summonCapability.fallback)) add(value.summonCapability.fallback.rules, `${basePath}.summonCapability.fallback.rules`);
+    }
+  }
+  return output;
+}
+function explicitClusterLinks(value, basePath) {
+  if (!record(value)) return [];
+  const cluster = record(value.cluster) ? value.cluster : void 0;
+  const linksValue = cluster && Array.isArray(cluster.links) ? cluster.links : Array.isArray(value.clusterLinks) ? value.clusterLinks : [];
+  const output = [];
+  linksValue.forEach((candidate, index) => {
+    if (!record(candidate)) return;
+    const collection = candidate.collection;
+    const id = asString(candidate.id);
+    const relation = candidate.relation;
+    if (collection !== "skills" && collection !== "pieces" && collection !== "rules" && collection !== "cards" || !id || relation !== "owned" && relation !== "shared" && relation !== "related") return;
+    output.push({
+      link: {
+        collection,
+        id,
+        relation,
+        ...typeof candidate.source === "string" ? { source: candidate.source } : {}
+      },
+      path: `${basePath}.${cluster && Array.isArray(cluster.links) ? "cluster.links" : "clusterLinks"}[${index}]`
+    });
+  });
+  return output;
+}
+function persistedClusterDiagnostics(value, expectedId, path) {
+  if (value === void 0) return [];
+  if (!record(value)) return [diagnostic("invalid-definition", "persisted cluster metadata must be an object", path)];
+  const output = [];
+  if (value.version !== SKILL_CLUSTER_DEFINITION_VERSION) output.push(diagnostic("invalid-definition", "unsupported persisted cluster version", `${path}.version`));
+  if (value.id !== expectedId) output.push(diagnostic("invalid-definition", `persisted cluster id must be "${expectedId}"`, `${path}.id`));
+  if (!Array.isArray(value.links)) {
+    output.push(diagnostic("invalid-reference", "persisted cluster links must be an array", `${path}.links`));
+    return output;
+  }
+  value.links.forEach((candidate, index) => {
+    const linkPath = `${path}.links[${index}]`;
+    if (!record(candidate)) {
+      output.push(diagnostic("invalid-reference", "Cluster link must be an object", linkPath));
+      return;
+    }
+    if (candidate.collection !== "skills" && candidate.collection !== "pieces" && candidate.collection !== "rules" && candidate.collection !== "cards") output.push(diagnostic("invalid-reference", "Cluster link has an invalid collection", `${linkPath}.collection`));
+    if (!asString(candidate.id)) output.push(diagnostic("invalid-reference", "Cluster link needs an id", `${linkPath}.id`));
+    if (candidate.relation !== "owned" && candidate.relation !== "shared" && candidate.relation !== "related") output.push(diagnostic("invalid-reference", "Cluster link has an invalid relation", `${linkPath}.relation`));
+    if (candidate.source !== void 0 && typeof candidate.source !== "string") output.push(diagnostic("invalid-reference", "Cluster link source must be text", `${linkPath}.source`));
+  });
+  return output;
+}
+function explicitSkillValues(value, basePath) {
+  const output = [];
+  if (!record(value)) return output;
+  if (record(value.effect) && value.effect.type === "triggerSkill" && asString(value.effect.skillId)) {
+    output.push({ id: value.effect.skillId, path: `${basePath}.effect.skillId` });
+  }
+  for (const field of ["skills", "skillIds"]) {
+    if (own3(value, field)) {
+      const raw = value[field];
+      if (Array.isArray(raw)) raw.forEach((entry, index) => {
+        const id = typeof entry === "string" ? entry : record(entry) ? asString(entry.skillId) : void 0;
+        if (id) output.push({ id, path: `${basePath}.${field}[${index}]` });
+      });
+    }
+  }
+  const summonCapability = record(value.summonCapability) ? value.summonCapability : void 0;
+  const fallback = summonCapability && record(summonCapability.fallback) ? summonCapability.fallback : void 0;
+  if (fallback) {
+    if (Array.isArray(fallback.skills)) fallback.skills.forEach((entry, index) => {
+      const id = typeof entry === "string" ? entry : record(entry) ? asString(entry.skillId) : void 0;
+      if (id) output.push({ id, path: `${basePath}.summonCapability.fallback.skills[${index}]` });
+    });
+  }
+  return output;
+}
+function explicitCardValues(value, basePath) {
+  if (!record(value)) return [];
+  const output = [];
+  for (const field of ["relatedCards", "cardIds"]) {
+    if (!own3(value, field)) continue;
+    asStringList(value[field]).forEach((id) => output.push({ id, path: `${basePath}.${field}` }));
+  }
+  return output;
+}
+function hasValidatedSemanticRuntime(value, collection) {
+  const document = value.gameplayModules;
+  if (!record(document) || document.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION || !record(document.entries)) return false;
+  const runtimeFields = (collection === "rules" ? ["skillCode", "code"] : ["code", "skillCode"]).filter((field) => typeof value[field] === "string" && value[field] !== "");
+  if (!runtimeFields.length) return false;
+  const fields3 = [...runtimeFields, ...["previewCode", "effectCode"].filter((field) => typeof value[field] === "string" && value[field] !== "")];
+  for (const field of fields3) {
+    const entry = document.entries[field];
+    if (!record(entry) || entry.compilerVersion !== GAMEPLAY_MODULE_COMPILER_VERSION2 || !record(entry.graph)) return false;
+    const graph2 = entry.graph;
+    if (graph2.version !== GAMEPLAY_MODULE_GRAPH_VERSION2 || !Array.isArray(graph2.body)) return false;
+    try {
+      const compiled = compileGameplayModuleGraph(graph2, GAMEPLAY_MODULE_REGISTRY);
+      if (compiled.code !== value[field]) return false;
+      if (field === "previewCode" ? compiled.surface !== "preview" : field === "effectCode" ? compiled.surface !== "pending" : collection === "rules" ? compiled.surface !== "rule" : !["skill", "triggerSkill"].includes(compiled.surface)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+function inlineStatuses(value, basePath) {
+  if (!record(value)) return [];
+  const output = [];
+  if (record(value.statusTag)) output.push({ definition: cloneRecord(value.statusTag), path: `${basePath}.statusTag`, evidence: "inline" });
+  const summonCapability = record(value.summonCapability) ? value.summonCapability : void 0;
+  if (summonCapability && record(summonCapability.status)) output.push({ definition: cloneRecord(summonCapability.status), path: `${basePath}.summonCapability.status`, evidence: "inline" });
+  if (own3(value, "initialStatusTags")) {
+    const tags = Array.isArray(value.initialStatusTags) ? value.initialStatusTags : [value.initialStatusTags];
+    tags.forEach((tag, index) => {
+      if (record(tag)) output.push({ definition: cloneRecord(tag), path: `${basePath}.initialStatusTags${Array.isArray(value.initialStatusTags) ? `[${index}]` : ""}`, evidence: "inline" });
+    });
+  }
+  return output;
+}
+function memberId(definition, path, diagnostics) {
+  const id = asString(definition.id) ?? asString(definition.type);
+  if (!id) diagnostics.push(diagnostic("invalid-reference", "status evidence requires an id or type", path));
+  return id;
+}
+function statusMember(members, diagnostics, status, sourceCollection, sourceId, sourceField, role, editable) {
+  const id = memberId(status.definition, status.path, diagnostics);
+  if (!id) return;
+  addMember(members, diagnostics, {
+    kind: "status",
+    id,
+    role,
+    provenance: makeLocation(sourceCollection, sourceId, sourceField, status.path),
+    evidence: status.evidence,
+    editable: editable && status.evidence !== "generated" && status.evidence !== "compatibility",
+    definition: status.definition
+  });
+}
+function mapOverrides(options2, skillId) {
+  const output = [];
+  const mappingOverrides = options2?.mappingOverrides;
+  if (Array.isArray(mappingOverrides)) {
+    for (const item of mappingOverrides) if (item.skillId === skillId) output.push(item);
+  } else if (mappingOverrides && record(mappingOverrides)) {
+    const entries = mappingOverrides[skillId];
+    const values = Array.isArray(entries) ? entries : entries ? [entries] : [];
+    for (const item of values) output.push(item.skillId === skillId ? item : { ...item, skillId });
+  }
+  for (const item of options2?.skillRuleMappings?.[skillId] ?? []) {
+    if (item.skillId === skillId) output.push(item);
+    else output.push({ ...item, skillId });
+  }
+  return output;
+}
+function coverageFor(members, source, rootCovered, hasErrors) {
+  const eligible = members.filter((member) => {
+    if (source === "semantic") return member.evidence === "semantic";
+    if (source === "compatibility") return member.evidence === "compatibility" || member.evidence === "generated";
+    return member.evidence === "explicit" || member.evidence === "inline" || member.evidence === "declarative";
+  });
+  const generated = members.filter((member) => member.evidence === "generated").length;
+  const editable = members.filter((member) => member.editable).length;
+  const total = members.length;
+  const complete = eligible.length;
+  const partial = source === "compatibility" ? generated : Math.max(0, eligible.length - (rootCovered ? eligible.length : 0));
+  const missing = Math.max(0, total - eligible.length);
+  const status = !rootCovered && !eligible.length ? "missing" : rootCovered && !hasErrors && (total === 0 || eligible.length === total) ? "complete" : "partial";
+  return { status, total, covered: eligible.length, complete, partial, missing, generated, editable };
+}
+function validateCatalogShape(catalog) {
+  const diagnostics = [];
+  const indexes = {};
+  for (const collection of collections) {
+    indexes[collection] = indexCollection(catalog, collection);
+    diagnostics.push(...indexes[collection].diagnostics);
+  }
+  return { indexes, diagnostics };
+}
+function buildDefinition(catalog, root, options2) {
+  const shape = validateCatalogShape(catalog);
+  const diagnostics = [...shape.diagnostics];
+  const rootField = root?.field;
+  if (!root || root.collection !== "skills" && root.collection !== "pieces" || !asString(root.id)) {
+    diagnostics.push(diagnostic("invalid-root", "Cluster root must contain collection and id"));
+  }
+  if (rootField !== void 0 && !pathSegments(rootField)) diagnostics.push(diagnostic("unsafe-field-path", "Cluster root field must be a safe dot path", "root.field"));
+  const normalizedRoot = {
+    collection: root?.collection === "pieces" ? "pieces" : "skills",
+    id: asString(root?.id) ?? "",
+    ...rootField !== void 0 ? { field: rootField } : {}
+  };
+  const rootCollection = normalizedRoot.collection;
+  const rootIndex = shape.indexes[rootCollection];
+  const rootKey = rootIndex?.byId.get(normalizedRoot.id);
+  const rootEntry = rootKey ? rootIndex.entries[rootKey] : void 0;
+  if (!rootEntry) diagnostics.push(diagnostic("missing-root", `missing ${rootCollection} root "${normalizedRoot.id}"`, "root.id", void 0, normalizedRoot.id));
+  if (rootCollection === "skills" && rootEntry && rootEntry.kind !== "active" && rootEntry.kind !== "passive") {
+    diagnostics.push(diagnostic("invalid-definition", `skill "${normalizedRoot.id}" must declare kind active or passive`, `skills.${rootKey ?? normalizedRoot.id}.kind`));
+  }
+  const members = createMembers();
+  const active3 = rootCollection === "skills" && rootEntry?.kind === "active";
+  const kind = rootCollection === "pieces" ? "passive" : active3 ? "active" : "passive";
+  let semanticRoot = false;
+  let compatibilityRoot = false;
+  let declarativeRoot = !!rootEntry;
+  const visiting = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  const addDefinitionMember = (memberKind, id, role, sourceCollection, sourceId, sourceField, path, definition, evidence, editable, relation) => {
+    const target = makeLocation(sourceCollection, sourceId, sourceField, `${sourceCollection}.${sourceId}`);
+    const origin = makeLocation(sourceCollection, sourceId, sourceField, path);
+    const provenance = target.path === origin.path ? target : [target, origin];
+    return addMember(members, diagnostics, {
+      kind: memberKind,
+      id,
+      role,
+      provenance,
+      evidence,
+      editable,
+      ...relation ? { relation } : {},
+      definition
+    });
+  };
+  const addRule = (ruleId, source, role, evidence, editable, relation) => {
+    const index = shape.indexes.rules;
+    const key = index.byId.get(ruleId);
+    const definition = key ? index.entries[key] : void 0;
+    if (!definition || !key) {
+      diagnostics.push(diagnostic("missing-reference", `missing rule "${ruleId}"`, source.path, source, ruleId));
+      return;
+    }
+    const resolvedKey = key;
+    diagnostics.push(...persistedClusterDiagnostics(definition.cluster, `rules:${ruleId}`, `rules.${resolvedKey}.cluster`));
+    const existing = addDefinitionMember("rule", ruleId, role, "rules", resolvedKey, "rule", source.path, definition, evidence, editable, relation);
+    const keyForVisit = memberKey("rule", ruleId);
+    if (visiting.has(keyForVisit)) {
+      diagnostics.push(diagnostic("cycle", `cycle while resolving rule "${ruleId}"`, source.path, source, ruleId));
+      return;
+    }
+    if (visited.has(keyForVisit)) return;
+    visiting.add(keyForVisit);
+    const fieldPathRoot = `rules.${resolvedKey}`;
+    for (const ref of explicitSkillValues(definition, fieldPathRoot)) addSkill(ref.id, makeLocation("rules", resolvedKey, "rule", ref.path), "dependency", "explicit", true);
+    for (const ref of explicitRuleValues(definition, fieldPathRoot)) {
+      addRule(ref.id, makeLocation("rules", resolvedKey, "rule", ref.path), "dependency", "explicit", true);
+    }
+    for (const status of inlineStatuses(definition, fieldPathRoot)) {
+      statusMember(members, diagnostics, status, "rules", resolvedKey, "rule", "dependency", true);
+      const related = asStringList(status.definition.relatedRules);
+      related.forEach((id) => addRule(id, makeLocation("rules", resolvedKey, "rule", status.path), "dependency", "explicit", true));
+    }
+    if (hasValidatedSemanticRuntime(definition, "rules")) {
+      const modules = collectSemanticGraphEvidence(definition.gameplayModules, `${fieldPathRoot}.gameplayModules`);
+      for (const ref of modules.rules) addRule(ref.id, makeLocation("rules", resolvedKey, "rule", ref.path), "dependency", "semantic", true);
+      for (const status of modules.statuses) {
+        statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: "semantic" }, "rules", resolvedKey, "rule", "dependency", false);
+        status.relatedRules.forEach((id) => addRule(id, makeLocation("rules", resolvedKey, "rule", status.path), "dependency", "semantic", true));
+      }
+    }
+    const legacy = collectLegacyGraphEvidence(definition.contentGraph, `${fieldPathRoot}.contentGraph`);
+    if (legacy.rules.length || legacy.statuses.length || definition.skillCode) compatibilityRoot = true;
+    for (const ref of legacy.rules) addRule(ref.id, makeLocation("rules", resolvedKey, "rule", ref.path), "related", "generated", false);
+    for (const status of legacy.statuses) {
+      statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: "generated" }, "rules", resolvedKey, "rule", "related", false);
+      status.relatedRules.forEach((id) => addRule(id, makeLocation("rules", resolvedKey, "rule", status.path), "related", "generated", false));
+    }
+    visited.add(keyForVisit);
+    visiting.delete(keyForVisit);
+    void existing;
+  };
+  const addSkill = (skillId, source, role, evidence, editable, relation) => {
+    const index = shape.indexes.skills;
+    const key = index.byId.get(skillId);
+    const definition = key ? index.entries[key] : void 0;
+    if (!definition || !key) {
+      diagnostics.push(diagnostic("missing-reference", `missing skill "${skillId}"`, source.path, source, skillId));
+      return;
+    }
+    const resolvedKey = key;
+    diagnostics.push(...persistedClusterDiagnostics(definition.cluster, `skills:${skillId}`, `skills.${resolvedKey}.cluster`));
+    addDefinitionMember("skill", skillId, role, "skills", resolvedKey, "skill", source.path, definition, evidence, editable, relation);
+    const keyForVisit = memberKey("skill", skillId);
+    if (visiting.has(keyForVisit)) {
+      diagnostics.push(diagnostic("cycle", `cycle while resolving skill "${skillId}"`, source.path, source, skillId));
+      return;
+    }
+    if (visited.has(keyForVisit)) return;
+    visiting.add(keyForVisit);
+    const fieldPathRoot = `skills.${resolvedKey}`;
+    const semantic2 = hasValidatedSemanticRuntime(definition, "skills");
+    if (semantic2) semanticRoot = true;
+    if (typeof definition.code === "string" || typeof definition.skillCode === "string" || record(definition.contentGraph)) compatibilityRoot = true;
+    for (const ref of explicitRuleValues(definition, fieldPathRoot)) {
+      addRule(ref.id, makeLocation("skills", resolvedKey, "skill", ref.path), "dependency", "explicit", true);
+    }
+    for (const { link, path } of explicitClusterLinks(definition, fieldPathRoot)) {
+      const location = makeLocation("skills", resolvedKey, "skill", link.source ? `${path}.source:${link.source}` : path);
+      const role2 = link.relation === "related" ? "related" : "dependency";
+      if (link.collection === "rules") addRule(link.id, location, role2, "explicit", true, link.relation);
+      else if (link.collection === "skills") addSkill(link.id, location, role2, "explicit", true, link.relation);
+      else if (link.collection === "pieces") addPiece(link.id, location, role2, "explicit", true, link.relation);
+      else {
+        const cardKey = shape.indexes.cards.byId.get(link.id);
+        if (!cardKey) diagnostics.push(diagnostic("missing-reference", `missing card "${link.id}"`, path, location, link.id));
+        else addDefinitionMember("card", link.id, role2, "cards", cardKey, "card", path, shape.indexes.cards.entries[cardKey], "explicit", true, link.relation);
+      }
+    }
+    for (const status of inlineStatuses(definition, fieldPathRoot)) {
+      statusMember(members, diagnostics, status, "skills", resolvedKey, "skill", "dependency", true);
+      asStringList(status.definition.relatedRules).forEach((id) => addRule(id, makeLocation("skills", resolvedKey, "skill", status.path), "dependency", "explicit", true));
+    }
+    for (const ref of explicitSkillValues(definition, fieldPathRoot)) addSkill(ref.id, makeLocation("skills", resolvedKey, "skill", ref.path), "dependency", "explicit", true);
+    for (const ref of explicitCardValues(definition, fieldPathRoot)) {
+      const cardIndex = shape.indexes.cards;
+      const cardKey = cardIndex.byId.get(ref.id);
+      if (!cardKey) diagnostics.push(diagnostic("missing-reference", `missing card "${ref.id}"`, ref.path, makeLocation("skills", resolvedKey, "skill", ref.path), ref.id));
+      else addDefinitionMember("card", ref.id, "dependency", "cards", cardKey, "card", ref.path, cardIndex.entries[cardKey], "explicit", true);
+    }
+    if (hasValidatedSemanticRuntime(definition, "skills")) {
+      const modules = collectSemanticGraphEvidence(definition.gameplayModules, `${fieldPathRoot}.gameplayModules`);
+      for (const ref of modules.rules) addRule(ref.id, makeLocation("skills", resolvedKey, "skill", ref.path), "dependency", "semantic", true);
+      for (const status of modules.statuses) {
+        statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: "semantic" }, "skills", resolvedKey, "skill", "dependency", false);
+        status.relatedRules.forEach((id) => addRule(id, makeLocation("skills", resolvedKey, "skill", status.path), "dependency", "semantic", true));
+      }
+    }
+    const legacy = collectLegacyGraphEvidence(definition.contentGraph, `${fieldPathRoot}.contentGraph`);
+    if (legacy.rules.length || legacy.statuses.length) compatibilityRoot = true;
+    for (const ref of legacy.rules) addRule(ref.id, makeLocation("skills", resolvedKey, "skill", ref.path), "related", "generated", false);
+    for (const status of legacy.statuses) {
+      statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: "generated" }, "skills", resolvedKey, "skill", "related", false);
+      status.relatedRules.forEach((id) => addRule(id, makeLocation("skills", resolvedKey, "skill", status.path), "related", "generated", false));
+    }
+    visited.add(keyForVisit);
+    visiting.delete(keyForVisit);
+  };
+  const addPiece = (pieceId, source, role, evidence, editable, relation) => {
+    const index = shape.indexes.pieces;
+    const key = index.byId.get(pieceId);
+    const definition = key ? index.entries[key] : void 0;
+    if (!definition || !key) {
+      diagnostics.push(diagnostic("missing-reference", `missing piece "${pieceId}"`, source.path, source, pieceId));
+      return;
+    }
+    const resolvedKey = key;
+    diagnostics.push(...persistedClusterDiagnostics(definition.cluster, `pieces:${pieceId}`, `pieces.${resolvedKey}.cluster`));
+    addDefinitionMember("piece", pieceId, role, "pieces", resolvedKey, "piece", source.path, definition, evidence, editable, relation);
+    const keyForVisit = memberKey("piece", pieceId);
+    if (visiting.has(keyForVisit)) {
+      diagnostics.push(diagnostic("cycle", `cycle while resolving piece "${pieceId}"`, source.path, source, pieceId));
+      return;
+    }
+    if (visited.has(keyForVisit)) return;
+    visiting.add(keyForVisit);
+    const fieldPathRoot = `pieces.${resolvedKey}`;
+    if (typeof definition.rules === "string" || Array.isArray(definition.rules) || definition.playerRules !== void 0 || definition.initialStatusTags !== void 0) declarativeRoot = true;
+    for (const ref of explicitRuleValues(definition, fieldPathRoot)) addRule(ref.id, makeLocation("pieces", resolvedKey, "piece", ref.path), "dependency", "explicit", true);
+    for (const { link, path } of explicitClusterLinks(definition, fieldPathRoot)) {
+      const location = makeLocation("pieces", resolvedKey, "piece", link.source ? `${path}.source:${link.source}` : path);
+      const linkedRole = link.relation === "related" ? "related" : "dependency";
+      if (link.collection === "rules") addRule(link.id, location, linkedRole, "explicit", true, link.relation);
+      else if (link.collection === "skills") addSkill(link.id, location, linkedRole, "explicit", true, link.relation);
+      else if (link.collection === "pieces") addPiece(link.id, location, linkedRole, "explicit", true, link.relation);
+      else {
+        const cardKey = shape.indexes.cards.byId.get(link.id);
+        if (!cardKey) diagnostics.push(diagnostic("missing-reference", `missing card "${link.id}"`, path, location, link.id));
+        else addDefinitionMember("card", link.id, linkedRole, "cards", cardKey, "card", path, shape.indexes.cards.entries[cardKey], "explicit", true, link.relation);
+      }
+    }
+    for (const status of inlineStatuses(definition, fieldPathRoot)) {
+      statusMember(members, diagnostics, status, "pieces", resolvedKey, "piece", "dependency", true);
+      asStringList(status.definition.relatedRules).forEach((id) => addRule(id, makeLocation("pieces", resolvedKey, "piece", status.path), "dependency", "explicit", true));
+    }
+    for (const ref of explicitSkillValues(definition, fieldPathRoot)) addSkill(ref.id, makeLocation("pieces", resolvedKey, "piece", ref.path), "related", "explicit", true);
+    for (const ref of explicitCardValues(definition, fieldPathRoot)) {
+      const cardIndex = shape.indexes.cards;
+      const cardKey = cardIndex.byId.get(ref.id);
+      if (!cardKey) diagnostics.push(diagnostic("missing-reference", `missing card "${ref.id}"`, ref.path, makeLocation("pieces", resolvedKey, "piece", ref.path), ref.id));
+      else addDefinitionMember("card", ref.id, "dependency", "cards", cardKey, "card", ref.path, cardIndex.entries[cardKey], "explicit", true);
+    }
+    visited.add(keyForVisit);
+    visiting.delete(keyForVisit);
+  };
+  if (rootEntry) {
+    const rootLocation = makeLocation(rootCollection, rootKey ?? normalizedRoot.id, rootCollection === "skills" ? "skill" : "piece", rootField ? `root.${rootField}` : "root");
+    if (rootCollection === "skills") addSkill(normalizedRoot.id, rootLocation, "root", hasValidatedSemanticRuntime(rootEntry, "skills") ? "semantic" : "declarative", true);
+    else addPiece(normalizedRoot.id, rootLocation, "root", "declarative", true);
+    if (rootField) {
+      const selected = readPath(rootEntry, rootField);
+      if (!selected.found) diagnostics.push(diagnostic("missing-field", `missing root field "${rootField}"`, `root.field`));
+    }
+  }
+  if (rootCollection === "skills") {
+    for (const override of mapOverrides(options2, normalizedRoot.id)) {
+      const pieceKey = shape.indexes.pieces.byId.get(override.pieceId);
+      if (!pieceKey) {
+        diagnostics.push(diagnostic("missing-reference", `mapping override references missing piece "${override.pieceId}"`, "options.mappingOverrides", void 0, override.pieceId));
+        continue;
+      }
+      addDefinitionMember("piece", override.pieceId, "related", "pieces", pieceKey, "piece", `options.mappingOverrides.${override.skillId}.${override.pieceId}`, shape.indexes.pieces.entries[pieceKey], "explicit", false);
+      const piece = shape.indexes.pieces.entries[pieceKey];
+      const declared = asStringList(piece.rules);
+      const requested = override.ruleIds ?? override.rules;
+      const ids2 = requested ? [...requested] : declared;
+      for (const id of ids2) addRule(id, makeLocation("pieces", pieceKey, "piece", `options.mappingOverrides.${override.skillId}.${override.pieceId}.ruleIds`), "related", "explicit", false);
+      if (requested) {
+        const declaredSet = new Set(declared);
+        for (const id of requested) if (!declaredSet.has(id)) diagnostics.push(diagnostic("invalid-reference", `mapping override rule "${id}" is not declared by piece "${override.pieceId}"`, "options.mappingOverrides", void 0, id));
+      }
+    }
+  }
+  const allMembers = [...members.values()].map((item) => ({
+    kind: item.kind,
+    id: item.id,
+    role: item.role,
+    ...item.relation ? { relation: item.relation } : {},
+    provenance: item.provenance.map((location) => ({ ...location })),
+    ...item.provenance[0] ? { source: { ...item.provenance[0] } } : {},
+    evidence: item.evidence,
+    editable: item.editable && item.evidence !== "compatibility" && item.evidence !== "generated",
+    definition: cloneRecord(item.definition),
+    execution: "reference-only"
+  }));
+  const buckets = {};
+  for (const bucket of ["skills", "pieces", "rules", "statuses", "cards", "continuations", "presentations"]) buckets[bucket] = allMembers.filter((item) => memberBucket(item.kind) === bucket);
+  const grouped = { ...buckets, statusTags: buckets.statuses, all: allMembers };
+  const hasErrors = diagnostics.some((item) => item.severity === "error");
+  const semantic = coverageFor(allMembers, "semantic", semanticRoot, hasErrors);
+  const compatibility = coverageFor(allMembers, "compatibility", compatibilityRoot, hasErrors);
+  const declarative = coverageFor(allMembers, "declarative", declarativeRoot, hasErrors);
+  const metadata = options2?.metadata === void 0 ? void 0 : cloneRecord(options2.metadata);
+  return {
+    version: SKILL_CLUSTER_DEFINITION_VERSION,
+    id: normalizedRoot.id,
+    clusterId: `${normalizedRoot.collection}:${normalizedRoot.id}`,
+    kind,
+    root: normalizedRoot,
+    members: grouped,
+    diagnostics,
+    coverage: { semantic, compatibility, declarative },
+    semanticCoverage: semantic,
+    compatibilityCoverage: compatibility,
+    declarativeCoverage: declarative,
+    execution: "reference-only",
+    ...metadata ? { metadata } : {}
+  };
+}
+function buildSkillCluster(catalog, root, options2) {
+  return buildDefinition(catalog, root, options2);
+}
+function buildSkillClusterCatalog(catalog, options2) {
+  const shape = validateCatalogShape(catalog);
+  const roots = [];
+  for (const id of Object.keys(shape.indexes.skills.entries)) roots.push({ collection: "skills", id });
+  for (const id of Object.keys(shape.indexes.pieces.entries)) roots.push({ collection: "pieces", id });
+  const clusters = roots.map((root) => buildDefinition(catalog, root, options2));
+  const diagnostics = [...shape.diagnostics, ...clusters.flatMap((cluster) => cluster.diagnostics.filter((item) => item.code !== "key-mismatch" && item.code !== "duplicate-id" && item.code !== "invalid-catalog"))];
+  return { version: SKILL_CLUSTER_DEFINITION_VERSION, clusters, definitions: clusters, diagnostics };
+}
+function validateSkillClusterDefinition(value) {
+  const diagnostics = [];
+  if (!record(value)) return [diagnostic("invalid-definition", "Cluster definition must be an object")];
+  if (value.version !== SKILL_CLUSTER_DEFINITION_VERSION) diagnostics.push(diagnostic("invalid-definition", "unsupported Cluster definition version", "version"));
+  if (!asString(value.id) || !asString(value.clusterId)) diagnostics.push(diagnostic("invalid-definition", "Cluster definition needs id and clusterId", "id"));
+  if (!record(value.root) || value.root.collection !== "skills" && value.root.collection !== "pieces" || !asString(value.root.id)) diagnostics.push(diagnostic("invalid-definition", "Cluster definition has an invalid root", "root"));
+  else if (value.root.field !== void 0 && !pathSegments(value.root.field)) diagnostics.push(diagnostic("unsafe-field-path", "Cluster root field must be a safe dot path", "root.field"));
+  if (!record(value.members)) diagnostics.push(diagnostic("invalid-definition", "Cluster definition needs members", "members"));
+  if (!record(value.coverage)) diagnostics.push(diagnostic("invalid-definition", "Cluster definition needs coverage", "coverage"));
+  return diagnostics;
+}
+function validateSkillClusterMetadata(value, root) {
+  const expectedId = root ? `${root.collection}:${root.id}` : record(value) && typeof value.id === "string" ? value.id : "";
+  return persistedClusterDiagnostics(value, expectedId, "cluster");
+}
+function assertSkillClusterMetadata(content) {
+  if (!record(content) || content.cluster === void 0) return;
+  const contentId = asString(content.id);
+  if (!contentId) throw new Error("Skill cluster metadata: content needs an id");
+  const metadata = content.cluster;
+  const clusterId = record(metadata) ? asString(metadata.id) : void 0;
+  const expected = clusterId && /^(skills|pieces):[^:]+$/.test(clusterId) ? clusterId.split(":", 2)[0] : void 0;
+  if (!expected || clusterId !== `${expected}:${contentId}`) throw new Error(`Skill cluster metadata: id must be skills:${contentId} or pieces:${contentId}`);
+  const diagnostics = persistedClusterDiagnostics(metadata, clusterId, "cluster");
+  const error = diagnostics.find((item) => item.severity === "error");
+  if (error) throw new Error(`Skill cluster metadata: ${error.message}${error.path ? ` (${error.path})` : ""}`);
+}
+function cloneSkillClusterDefinition(value) {
+  return cloneJson(value);
+}
+
+// lib/skill-graph/module-document.ts
+var GAMEPLAY_MODULE_DOCUMENT_VERSION2 = "rvb-gameplay-module-document/v1";
+var record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var own4 = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 var defaults = { skill: "code", card: "code", rule: "skillCode", triggerSkill: "code", pending: "effectCode", preview: "previewCode" };
-var fields = {
+var fields2 = {
   skill: ["code", "skillCode"],
   card: ["code"],
   rule: ["code", "skillCode"],
@@ -1908,66 +6930,71 @@ var fields = {
   pending: ["code", "effectCode"],
   preview: ["code", "previewCode"]
 };
-function fail2(message) {
+function fail3(message) {
   throw new Error(`Gameplay module document: ${message}`);
 }
 function primaryField(content) {
-  if (!record(content.contentGraph)) return "";
+  if (!record2(content.contentGraph)) return "";
   return typeof content.contentGraphField === "string" ? content.contentGraphField : defaults[String(content.contentGraph.surface)] ?? "";
 }
 function artifact(content) {
-  if (!own2(content, "gameplayModules")) return void 0;
+  if (!own4(content, "gameplayModules")) return void 0;
   const value = content.gameplayModules;
-  if (!record(value) || value.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION || !record(value.entries)) fail2("invalid gameplayModules version or entries");
-  if (Object.keys(value).some((key) => key !== "version" && key !== "entries")) fail2("unknown gameplayModules metadata");
-  if (!Object.keys(value.entries).length) fail2("gameplayModules needs at least one entry");
+  if (!record2(value) || value.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION2 || !record2(value.entries)) fail3("invalid gameplayModules version or entries");
+  if (Object.keys(value).some((key) => !["version", "entries", "textBindings"].includes(key))) fail3("unknown gameplayModules metadata");
+  if (!Object.keys(value.entries).length) fail3("gameplayModules needs at least one entry");
   return value;
 }
-function assertGameplayModuleDocument(input2) {
-  if (!record(input2)) fail2("content must be an object");
-  const modules = artifact(input2);
+function assertGameplayModuleDocument(input11) {
+  if (!record2(input11)) fail3("content must be an object");
+  const modules = artifact(input11);
   if (!modules) return;
-  if (input2.skillGraph !== void 0) fail2("legacy skillGraph cannot coexist with gameplay modules");
+  if (input11.skillGraph !== void 0) fail3("legacy skillGraph cannot coexist with gameplay modules");
   for (const [field, entry] of Object.entries(modules.entries)) {
-    if (!record(entry) || Object.keys(entry).some((key) => key !== "graph" && key !== "compilerVersion")) fail2(`invalid entry ${field}`);
-    if (entry.compilerVersion !== GAMEPLAY_MODULE_COMPILER_VERSION) fail2(`unsupported compiler version for ${field}`);
+    if (!record2(entry) || Object.keys(entry).some((key) => key !== "graph" && key !== "compilerVersion")) fail3(`invalid entry ${field}`);
+    if (entry.compilerVersion !== GAMEPLAY_MODULE_COMPILER_VERSION) fail3(`unsupported compiler version for ${field}`);
     const compiled = compileGameplayModuleGraph(entry.graph, GAMEPLAY_MODULE_REGISTRY);
-    if (!fields[compiled.surface]?.includes(field)) fail2(`field ${field} is incompatible with ${compiled.surface}`);
-    if (primaryField(input2) === field || record(input2.contentGraphEntries) && own2(input2.contentGraphEntries, field)) fail2(`multiple authoring sources for ${field}`);
-    if (input2[field] !== compiled.code) fail2(`generated ${field} does not match its module graph`);
+    if (!fields2[compiled.surface]?.includes(field)) fail3(`field ${field} is incompatible with ${compiled.surface}`);
+    if (primaryField(input11) === field || record2(input11.contentGraphEntries) && own4(input11.contentGraphEntries, field)) fail3(`multiple authoring sources for ${field}`);
+    if (input11[field] !== compiled.code) fail3(`generated ${field} does not match its module graph`);
+  }
+  if (modules.textBindings !== void 0) {
+    for (const [field, text] of Object.entries(renderGameplayModuleText(modules.entries, modules.textBindings))) {
+      if (input11[field] !== text) fail3(`generated ${field} does not match its text binding`);
+    }
   }
 }
 function assertGameplayModuleTransition(previous, next) {
   assertGameplayModuleDocument(next);
-  if (!record(previous) || !own2(previous, "gameplayModules")) return;
+  if (!record2(previous) || !own4(previous, "gameplayModules")) return;
   const before = artifact(previous);
-  const after = record(next) ? artifact(next) : void 0;
+  const after = record2(next) ? artifact(next) : void 0;
   for (const field of Object.keys(before.entries)) {
-    if (!after || !own2(after.entries, field)) fail2(`cannot detach module-owned field ${field}`);
+    if (!after || !own4(after.entries, field)) fail3(`cannot detach module-owned field ${field}`);
   }
 }
-function getGameplayModuleGraph(input2, field) {
-  if (!record(input2) || !record(input2.gameplayModules) || !record(input2.gameplayModules.entries)) return null;
-  const entry = input2.gameplayModules.entries[field];
-  return record(entry) ? entry.graph ?? null : null;
+function getGameplayModuleGraph(input11, field) {
+  if (!record2(input11) || !record2(input11.gameplayModules) || !record2(input11.gameplayModules.entries)) return null;
+  const entry = input11.gameplayModules.entries[field];
+  return record2(entry) ? entry.graph ?? null : null;
 }
-function applyGameplayModuleGraph(input2, graph2, field) {
-  if (!record(input2)) fail2("content must be an object");
+function applyGameplayModuleGraph(input11, graph2, field) {
+  if (!record2(input11)) fail3("content must be an object");
   const compiled = compileGameplayModuleGraph(graph2, GAMEPLAY_MODULE_REGISTRY);
   const target = field ?? defaults[compiled.surface];
-  if (!fields[compiled.surface]?.includes(target)) fail2(`field ${target} is incompatible with ${compiled.surface}`);
-  if (input2.skillGraph !== void 0) fail2("legacy skillGraph must be explicitly migrated first");
-  const prior = artifact(input2);
-  const next = { ...input2 };
-  const additional = record(input2.contentGraphEntries) ? { ...input2.contentGraphEntries } : {};
-  if (primaryField(input2) === target) {
+  if (!fields2[compiled.surface]?.includes(target)) fail3(`field ${target} is incompatible with ${compiled.surface}`);
+  if (input11.skillGraph !== void 0) fail3("legacy skillGraph must be explicitly migrated first");
+  const prior = artifact(input11);
+  const next = { ...input11 };
+  const additional = record2(input11.contentGraphEntries) ? { ...input11.contentGraphEntries } : {};
+  if (primaryField(input11) === target) {
     delete next.contentGraph;
     delete next.contentGraphField;
     delete next.contentGraphCompilerVersion;
     const first = Object.keys(additional).sort()[0];
     if (first) {
       const entry = additional[first];
-      if (!record(entry)) fail2(`invalid legacy graph entry ${first}`);
+      if (!record2(entry)) fail3(`invalid legacy graph entry ${first}`);
       next.contentGraph = entry.graph;
       next.contentGraphField = first;
       next.contentGraphCompilerVersion = entry.compilerVersion;
@@ -1980,9 +7007,21 @@ function applyGameplayModuleGraph(input2, graph2, field) {
   else delete next.contentGraphEntries;
   next[target] = compiled.code;
   next.gameplayModules = {
-    version: GAMEPLAY_MODULE_DOCUMENT_VERSION,
+    ...prior?.textBindings === void 0 ? {} : { textBindings: prior.textBindings },
+    version: GAMEPLAY_MODULE_DOCUMENT_VERSION2,
     entries: { ...prior?.entries, [target]: { graph: JSON.parse(JSON.stringify(graph2)), compilerVersion: GAMEPLAY_MODULE_COMPILER_VERSION } }
   };
+  const updated = next.gameplayModules;
+  if (updated.textBindings !== void 0) Object.assign(next, renderGameplayModuleText(updated.entries, updated.textBindings));
+  assertGameplayModuleDocument(next);
+  return next;
+}
+function applyGameplayModuleTextBindings(input11, bindings) {
+  assertGameplayModuleDocument(input11);
+  const modules = artifact(input11);
+  if (!modules) fail3("text bindings require a module document");
+  const snapshot = JSON.parse(JSON.stringify(bindings));
+  const next = { ...input11, ...renderGameplayModuleText(modules.entries, snapshot), gameplayModules: { ...modules, textBindings: snapshot } };
   assertGameplayModuleDocument(next);
   return next;
 }

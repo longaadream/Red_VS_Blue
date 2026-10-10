@@ -39,5 +39,10 @@
       "intensity": 1,
       "stacks": 1
     }
-  ]
+  ],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:blue-watcher",
+    "links": []
+  }
 }

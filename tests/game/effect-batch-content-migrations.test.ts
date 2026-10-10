@@ -494,6 +494,9 @@ describe('RED-139 approved content migrations', () => {
       + mutateCode
       + " context.summonQueue.push({ summons: [{ x: 2, y: 1, variant: 'summon' }], sourceId: caster.instanceId });"
       + " return { success: true, message: 'corrupt source probe' }; }"
+    // This intentional corruption probe replaces the executable; do not keep
+    // the production graph that would reject it before the summon boundary.
+    delete definition.gameplayModules
     const beforeHash = hashBattleState(fixture.state)
     const beforeJson = JSON.stringify(fixture.state)
     const triggerBefore = globalTriggerSystem.snapshotTransactionState()

@@ -1,7 +1,7 @@
 {
   "id": "tails-twin-flight",
   "name": "双尾飞行",
-  "description": "选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记为双方落点。标记格可被进入。双方获得免疫[2]与不可操作[2]。此后的第2个己方回合结束时传送至标记格。任一落点被占或无法落脚时取消双方传送。结束飞行状态。",
+  "description": "选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记为双方落点。标记格可被进入。双方获得免疫[2]与不可操作[2]。此后的第2个己方回合结束时分别传送至标记格。落点被占或无法落脚时，仅取消对应棋子的传送。结束飞行状态。",
   "effectTags": [
     "搬运"
   ],
@@ -46,1947 +46,1600 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, a, ally, b, c, cells, d, flightId, i, tile; var _pc = \"n45\"; for (var _step = 0; _step <= 31; _step++) { switch (_pc) { case \"n45\": c = (context)[\"piece\"]; _pc = \"n44\"; break; case \"n44\": b = (context)[\"battle\"]; _pc = \"n43\"; break; case \"n43\": ally = selectTarget({type: \"piece\", range: 4, filter: \"ally\"}); _pc = \"n42\"; break; case \"n42\": _pc = (! (! ((! ally) || (ally)[\"needsTargetSelection\"]))) ? \"n41\" : \"n40\"; break; case \"n40\": _pc = (! (! ((ally)[\"instanceId\"] === (c)[\"instanceId\"]))) ? \"n39\" : \"n38\"; break; case \"n38\": a = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n37\"; break; case \"n37\": _pc = (! (! ((! a) || (a)[\"needsTargetSelection\"]))) ? \"n36\" : \"n35\"; break; case \"n35\": d = selectTarget({type: \"grid\", range: 7, filter: \"all\"}); _pc = \"n34\"; break; case \"n34\": _pc = (! (! ((! d) || (d)[\"needsTargetSelection\"]))) ? \"n33\" : \"n32\"; break; case \"n32\": _pc = (! (! ((Math.abs(((a)[\"x\"] - (d)[\"x\"])) + Math.abs(((a)[\"y\"] - (d)[\"y\"]))) !== 1))) ? \"n31\" : \"n30\"; break; case \"n30\": cells = [a, d]; _pc = \"n29\"; break; case \"n29\": i = 0; _pc = \"n28\"; break; case \"n28\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (cells)[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n25\"; while (__rvb_content_graph_region_pc_2 !== \"n22\") { switch (__rvb_content_graph_region_pc_2) { case \"n25\": tile = (((b)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"x\"]) && ((t)[\"y\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"y\"])); }); __rvb_content_graph_region_pc_2 = \"n24\"; break; case \"n24\": __rvb_content_graph_region_pc_2 = (! (! ((((! tile) || (! ((tile)[\"props\"])[\"walkable\"])) || ((((tile)[\"props\"])[\"type\"] !== \"floor\") && (((tile)[\"props\"])[\"type\"] !== \"cover\"))) || ((b)[\"pieces\"])[\"some\"](function (p) { return ((((p)[\"currentHp\"] > 0) && ((p)[\"x\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"x\"])) && ((p)[\"y\"] === ((cells)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)])[\"y\"])); })))) ? \"n23\" : \"n22\"; break; case \"n22\": __rvb_content_graph_region_pc_2 = \"n22\"; break; case \"n23\": return {success: false, message: \"落点必须是未被占据的空地或掩体\"}; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n27\"; while (__rvb_content_graph_region_pc_3 !== \"n26\") { switch (__rvb_content_graph_region_pc_3) { case \"n27\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n26\"; break; case \"n26\": __rvb_content_graph_region_pc_3 = \"n26\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n21\"; break; case \"n21\": _pc = (! (! (! (b)[\"extensions\"]))) ? \"n20\" : \"n19\"; break; case \"n20\": (b)[\"extensions\"] = {}; _pc = \"n19\"; break; case \"n19\": ((b)[\"extensions\"])[\"tileEffects\"] = (((b)[\"extensions\"])[\"tileEffects\"] || []); _pc = \"n18\"; break; case \"n18\": _pc = (! (! (((b)[\"extensions\"])[\"tileEffects\"])[\"some\"](function (e) { return (((e)[\"type\"] === \"tails-flight-reservation\") && ((((e)[\"x\"] === (a)[\"x\"]) && ((e)[\"y\"] === (a)[\"y\"])) || (((e)[\"x\"] === (d)[\"x\"]) && ((e)[\"y\"] === (d)[\"y\"])))); }))) ? \"n17\" : \"n16\"; break; case \"n16\": flightId = (((((((((((\"tails-flight-\" + (c)[\"instanceId\"]) + \"-\") + ((b)[\"turn\"])[\"turnNumber\"]) + \"-\") + (a)[\"x\"]) + \"-\") + (a)[\"y\"]) + \"-\") + (d)[\"x\"]) + \"-\") + (d)[\"y\"]); _pc = \"n15\"; break; case \"n15\": (((b)[\"extensions\"])[\"tileEffects\"]).push({id: (flightId + \"-a\"), type: \"tails-flight-reservation\", x: (a)[\"x\"], y: (a)[\"y\"], flightId: flightId}, {id: (flightId + \"-b\"), type: \"tails-flight-reservation\", x: (d)[\"x\"], y: (d)[\"y\"], flightId: flightId}); _pc = \"n14\"; break; case \"n14\": (c)[\"statusTags\"] = ((c)[\"statusTags\"] || []); _pc = \"n13\"; break; case \"n13\": addStatusEffectById((c)[\"instanceId\"], {id: flightId, type: \"tails-flight-reservation\", name: \"双尾飞行预留\", turns: 2, ownerId: (c)[\"instanceId\"], allyId: (ally)[\"instanceId\"], x: (a)[\"x\"], y: (a)[\"y\"], allyX: (d)[\"x\"], allyY: (d)[\"y\"], flightId: flightId, currentDuration: 2, relatedRules: [\"rule-tails-flight-resolve\"]}); _pc = \"n12\"; break; case \"n12\": addRuleById((c)[\"instanceId\"], \"rule-tails-flight-resolve\"); _pc = \"n11\"; break; case \"n11\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"forEach\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })([c, ally]); _pc = \"n2\"; break; case \"n2\": (__rvb_import_bound_method_0)(function (p) { { var __rvb_content_graph_region_pc_4 = \"n10\"; while (__rvb_content_graph_region_pc_4 !== \"n3\") { switch (__rvb_content_graph_region_pc_4) { case \"n10\": (p)[\"statusTags\"] = ((p)[\"statusTags\"] || []); __rvb_content_graph_region_pc_4 = \"n9\"; break; case \"n9\": addStatusEffectById((p)[\"instanceId\"], {id: ((flightId + \"-immune-\") + (p)[\"instanceId\"]), type: \"immune\", name: \"免疫\", flightId: flightId, stacks: 1, currentDuration: 2, remainingDuration: 2, relatedRules: [\"rule-tails-flight-immune\", \"rule-tails-flight-immune-target\"]}); __rvb_content_graph_region_pc_4 = \"n8\"; break; case \"n8\": addStatusEffectById((p)[\"instanceId\"], {id: ((flightId + \"-inoperable-\") + (p)[\"instanceId\"]), type: \"inoperable\", name: \"不可操作\", flightId: flightId, stacks: 1, currentDuration: 2, remainingDuration: 2, relatedRules: [\"rule-tails-flight-inoperable\", \"rule-tails-flight-inoperable-skill\"]}); __rvb_content_graph_region_pc_4 = \"n7\"; break; case \"n7\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-immune\"); __rvb_content_graph_region_pc_4 = \"n6\"; break; case \"n6\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-immune-target\"); __rvb_content_graph_region_pc_4 = \"n5\"; break; case \"n5\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-inoperable\"); __rvb_content_graph_region_pc_4 = \"n4\"; break; case \"n4\": addRuleById((p)[\"instanceId\"], \"rule-tails-flight-inoperable-skill\"); __rvb_content_graph_region_pc_4 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_4 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: \"已预留双尾飞行落点\"}; case \"n17\": return {success: false, message: \"落点已被预留\"}; case \"n31\": return {success: false, message: \"两个落点必须上下左右相邻\"}; case \"n33\": return d; case \"n36\": return a; case \"n39\": return {success: false, message: \"双尾飞行必须选择另一名友军\"}; case \"n41\": return ally; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } var _module2 = (selectTarget({type: \"piece\", range: 4, filter: \"ally\"})); if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module3 = __gameplayInvalid; } else { var _module3 = ((!((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsTargetSelection) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsOptionSelection))); } var _condition5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3); if (_condition5 !== __gameplayInvalid && _condition5) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module4 = __gameplayInvalid; } else { var _module4 = (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)); } if (!((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4) === __gameplayInvalid))) { return ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4); } } else if (_condition5 !== __gameplayInvalid) {  } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = ((flow.query.hasPiece((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) && ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).instanceId)) ? flow.query.piece((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) && ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).instanceId)).instanceId : null)); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6))) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))); } var _condition76 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7); if (_condition76 !== __gameplayInvalid && _condition76) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"双尾飞行必须选择另一名友军\" === __gameplayInvalid) || (\"双尾飞行必须选择另一名友军\" === null)) { _module8 = __gameplayInvalid; } else { var _module8 = (({success: false, message: \"双尾飞行必须选择另一名友军\"})); } if (!((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"result\")) ? _module8[\"result\"] : _module8) === __gameplayInvalid))) { return ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"result\")) ? _module8[\"result\"] : _module8); } } else if (_condition76 !== __gameplayInvalid) { var _module9 = (selectTarget({type: \"grid\", range: 7, filter: \"all\"})); if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) === __gameplayInvalid)) { _module10 = __gameplayInvalid; } else { var _module10 = ((!((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) || Boolean(((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9).needsTargetSelection) || Boolean(((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9).needsOptionSelection))); } var _condition12 = ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10); if (_condition12 !== __gameplayInvalid && _condition12) { if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) === __gameplayInvalid)) { _module11 = __gameplayInvalid; } else { var _module11 = (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9)); } if (!((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"result\")) ? _module11[\"result\"] : _module11) === __gameplayInvalid))) { return ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"result\")) ? _module11[\"result\"] : _module11); } } else if (_condition12 !== __gameplayInvalid) {  } if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9) === null)) { _module13 = __gameplayInvalid; } else { var _module13 = (({x: (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9)).x, y: (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"choice\")) ? _module9[\"choice\"] : _module9)).y})); } var _module14 = (selectTarget({type: \"grid\", range: 7, filter: \"all\"})); if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) === __gameplayInvalid)) { _module15 = __gameplayInvalid; } else { var _module15 = ((!((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) || Boolean(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14).needsTargetSelection) || Boolean(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14).needsOptionSelection))); } var _condition17 = ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15); if (_condition17 !== __gameplayInvalid && _condition17) { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) === __gameplayInvalid)) { _module16 = __gameplayInvalid; } else { var _module16 = (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14)); } if (!((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"result\")) ? _module16[\"result\"] : _module16) === __gameplayInvalid))) { return ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"result\")) ? _module16[\"result\"] : _module16); } } else if (_condition17 !== __gameplayInvalid) {  } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = (({x: (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14)).x, y: (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"choice\")) ? _module14[\"choice\"] : _module14)).y})); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === null) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === null)) { _module19 = __gameplayInvalid; } else { var _module19 = ((Math.abs((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).x - (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).x) + Math.abs((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).y - (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).y) === 1)); } var _condition75 = ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19); if (_condition75 !== __gameplayInvalid && _condition75) { if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === null)) { _module20 = __gameplayInvalid; } else { var _module20 = ((function(cell, ignoreA, ignoreB, terrainPolicy) { var tile = battle.map && Array.isArray(battle.map.tiles) ? battle.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; if (!tile || !tile.props || !tile.props.walkable || (terrainPolicy === \"floor-or-cover\" && tile.props.type !== \"floor\" && tile.props.type !== \"cover\")) return false; var ignored = []; if (ignoreA != null) ignored.push(String(ignoreA)); if (ignoreB != null) ignored.push(String(ignoreB)); return !(Array.isArray(battle.pieces) && battle.pieces.some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && ignored.indexOf(String(piece.instanceId)) < 0; })); })(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13), null, null, \"floor-or-cover\")); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === null)) { _module21 = __gameplayInvalid; } else { var _module21 = ((function(cell, ignoreA, ignoreB, terrainPolicy) { var tile = battle.map && Array.isArray(battle.map.tiles) ? battle.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; if (!tile || !tile.props || !tile.props.walkable || (terrainPolicy === \"floor-or-cover\" && tile.props.type !== \"floor\" && tile.props.type !== \"cover\")) return false; var ignored = []; if (ignoreA != null) ignored.push(String(ignoreA)); if (ignoreB != null) ignored.push(String(ignoreB)); return !(Array.isArray(battle.pieces) && battle.pieces.some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && ignored.indexOf(String(piece.instanceId)) < 0; })); })(((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18), null, null, \"floor-or-cover\")); } if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"legal\")) ? _module20[\"legal\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"legal\")) ? _module20[\"legal\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"legal\")) ? _module20[\"legal\"] : _module20) === null) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"legal\")) ? _module21[\"legal\"] : _module21) === __gameplayInvalid) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"legal\")) ? _module21[\"legal\"] : _module21) === undefined) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"legal\")) ? _module21[\"legal\"] : _module21) === null)) { _module22 = __gameplayInvalid; } else { var _module22 = ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"legal\")) ? _module20[\"legal\"] : _module20) && ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"legal\")) ? _module21[\"legal\"] : _module21))); } var _condition73 = ((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22); if (_condition73 !== __gameplayInvalid && _condition73) { if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((Array.isArray(battle.extensions && battle.extensions.tileEffects) && battle.extensions.tileEffects.some(function(effect) { return effect && effect.type === \"tails-flight-reservation\" && effect.x === (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).x && effect.y === (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).y; }))); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = ((Array.isArray(battle.extensions && battle.extensions.tileEffects) && battle.extensions.tileEffects.some(function(effect) { return effect && effect.type === \"tails-flight-reservation\" && effect.x === (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).x && effect.y === (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).y; }))); } if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"exists\")) ? _module23[\"exists\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"exists\")) ? _module23[\"exists\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"exists\")) ? _module23[\"exists\"] : _module23) === null) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"exists\")) ? _module24[\"exists\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"exists\")) ? _module24[\"exists\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"exists\")) ? _module24[\"exists\"] : _module24) === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"exists\")) ? _module23[\"exists\"] : _module23) || ((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"exists\")) ? _module24[\"exists\"] : _module24))); } var _condition71 = ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25); if (_condition71 !== __gameplayInvalid && _condition71) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"落点已被预留\" === __gameplayInvalid) || (\"落点已被预留\" === null)) { _module26 = __gameplayInvalid; } else { var _module26 = (({success: false, message: \"落点已被预留\"})); } if (!((((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26) === __gameplayInvalid))) { return ((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26); } } else if (_condition71 !== __gameplayInvalid) { var _module27 = (battle.turn.turnNumber); if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module28 = __gameplayInvalid; } else { var _module28 = ((flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).instanceId)); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6)))) { _module29 = __gameplayInvalid; } else { var _module29 = ((flow.query.piece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6)).instanceId)); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === null)) { _module30 = { \"x\": __gameplayInvalid, \"y\": __gameplayInvalid }; } else { var _module30 = (({x: (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).x, y: (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).y})); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === null)) { _module31 = { \"x\": __gameplayInvalid, \"y\": __gameplayInvalid }; } else { var _module31 = (({x: (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).x, y: (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).y})); } if ((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === undefined) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === null)) { _module32 = __gameplayInvalid; } else { var _module32 = (String(((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27))); } if (((_module30[\"x\"]) === __gameplayInvalid) || ((_module30[\"x\"]) === undefined) || ((_module30[\"x\"]) === null)) { _module33 = __gameplayInvalid; } else { var _module33 = (String((_module30[\"x\"]))); } if (((_module30[\"y\"]) === __gameplayInvalid) || ((_module30[\"y\"]) === undefined) || ((_module30[\"y\"]) === null)) { _module34 = __gameplayInvalid; } else { var _module34 = (String((_module30[\"y\"]))); } if (((_module31[\"x\"]) === __gameplayInvalid) || ((_module31[\"x\"]) === undefined) || ((_module31[\"x\"]) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = (String((_module31[\"x\"]))); } if (((_module31[\"y\"]) === __gameplayInvalid) || ((_module31[\"y\"]) === undefined) || ((_module31[\"y\"]) === null)) { _module36 = __gameplayInvalid; } else { var _module36 = (String((_module31[\"y\"]))); } if ((\"tails-flight-\" === __gameplayInvalid) || (\"tails-flight-\" === undefined) || (\"tails-flight-\" === null) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === null)) { _module37 = __gameplayInvalid; } else { var _module37 = ((\"tails-flight-\" + ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28))); } if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === null) || (\"-\" === __gameplayInvalid) || (\"-\" === undefined) || (\"-\" === null)) { _module38 = __gameplayInvalid; } else { var _module38 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) + \"-\")); } if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === undefined) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === null) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === __gameplayInvalid) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === undefined) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === null)) { _module39 = __gameplayInvalid; } else { var _module39 = ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) + ((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32))); } if ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === null) || (\"-\" === __gameplayInvalid) || (\"-\" === undefined) || (\"-\" === null)) { _module40 = __gameplayInvalid; } else { var _module40 = ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) + \"-\")); } if ((((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === __gameplayInvalid) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === undefined) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === null) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === __gameplayInvalid) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === undefined) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === null)) { _module41 = __gameplayInvalid; } else { var _module41 = ((((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) + ((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33))); } if ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === __gameplayInvalid) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === undefined) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === null) || (\"-\" === __gameplayInvalid) || (\"-\" === undefined) || (\"-\" === null)) { _module42 = __gameplayInvalid; } else { var _module42 = ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) + \"-\")); } if ((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === __gameplayInvalid) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === undefined) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === null) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === undefined) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === null)) { _module43 = __gameplayInvalid; } else { var _module43 = ((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) + ((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34))); } if ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === __gameplayInvalid) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === undefined) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === null) || (\"-\" === __gameplayInvalid) || (\"-\" === undefined) || (\"-\" === null)) { _module44 = __gameplayInvalid; } else { var _module44 = ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) + \"-\")); } if ((((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === __gameplayInvalid) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === undefined) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === null) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === __gameplayInvalid) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === undefined) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === null)) { _module45 = __gameplayInvalid; } else { var _module45 = ((((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) + ((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35))); } if ((((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === __gameplayInvalid) || (((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === undefined) || (((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === null) || (\"-\" === __gameplayInvalid) || (\"-\" === undefined) || (\"-\" === null)) { _module46 = __gameplayInvalid; } else { var _module46 = ((((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) + \"-\")); } if ((((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) === __gameplayInvalid) || (((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) === undefined) || (((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) === null) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === undefined) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === null)) { _module47 = __gameplayInvalid; } else { var _module47 = ((((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) + ((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36))); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-immune-\" === __gameplayInvalid) || (\"-immune-\" === undefined) || (\"-immune-\" === null)) { _module48 = __gameplayInvalid; } else { var _module48 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-immune-\")); } if ((((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === __gameplayInvalid) || (((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === undefined) || (((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === null) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === null)) { _module49 = __gameplayInvalid; } else { var _module49 = ((((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) + ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28))); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-inoperable-\" === __gameplayInvalid) || (\"-inoperable-\" === undefined) || (\"-inoperable-\" === null)) { _module50 = __gameplayInvalid; } else { var _module50 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-inoperable-\")); } if ((((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) === __gameplayInvalid) || (((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) === undefined) || (((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) === null) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28) === null)) { _module51 = __gameplayInvalid; } else { var _module51 = ((((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) + ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28))); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-immune-\" === __gameplayInvalid) || (\"-immune-\" === undefined) || (\"-immune-\" === null)) { _module52 = __gameplayInvalid; } else { var _module52 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-immune-\")); } if ((((_module52 !== null && typeof _module52 === \"object\" && Object.prototype.hasOwnProperty.call(_module52, \"text\")) ? _module52[\"text\"] : _module52) === __gameplayInvalid) || (((_module52 !== null && typeof _module52 === \"object\" && Object.prototype.hasOwnProperty.call(_module52, \"text\")) ? _module52[\"text\"] : _module52) === undefined) || (((_module52 !== null && typeof _module52 === \"object\" && Object.prototype.hasOwnProperty.call(_module52, \"text\")) ? _module52[\"text\"] : _module52) === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === null)) { _module53 = __gameplayInvalid; } else { var _module53 = ((((_module52 !== null && typeof _module52 === \"object\" && Object.prototype.hasOwnProperty.call(_module52, \"text\")) ? _module52[\"text\"] : _module52) + ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29))); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-inoperable-\" === __gameplayInvalid) || (\"-inoperable-\" === undefined) || (\"-inoperable-\" === null)) { _module54 = __gameplayInvalid; } else { var _module54 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-inoperable-\")); } if ((((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"text\")) ? _module54[\"text\"] : _module54) === __gameplayInvalid) || (((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"text\")) ? _module54[\"text\"] : _module54) === undefined) || (((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"text\")) ? _module54[\"text\"] : _module54) === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29) === null)) { _module55 = __gameplayInvalid; } else { var _module55 = ((((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"text\")) ? _module54[\"text\"] : _module54) + ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29))); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-a\" === __gameplayInvalid) || (\"-a\" === undefined) || (\"-a\" === null)) { _module56 = __gameplayInvalid; } else { var _module56 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-a\")); } if ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null) || (\"-b\" === __gameplayInvalid) || (\"-b\" === undefined) || (\"-b\" === null)) { _module57 = __gameplayInvalid; } else { var _module57 = ((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) + \"-b\")); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13) === null) || (((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"text\")) ? _module56[\"text\"] : _module56) === __gameplayInvalid) || (((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"text\")) ? _module56[\"text\"] : _module56) === undefined) || (((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"text\")) ? _module56[\"text\"] : _module56) === null) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null)) { _module58 = __gameplayInvalid; } else { var _module58 = ((function(effect) { var committed = flow.effects.tileBatch([effect]); if (!committed.length) return false; var sourceKeys = Object.keys(effect); Object.keys(committed[0]).forEach(function(key) { if (sourceKeys.indexOf(key) < 0) delete committed[0][key]; }); return true; })({id: ((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"text\")) ? _module56[\"text\"] : _module56), type: \"tails-flight-reservation\", x: (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).x, y: (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"cell\")) ? _module13[\"cell\"] : _module13)).y, flightId: ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47)})); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18) === null) || (((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"text\")) ? _module57[\"text\"] : _module57) === __gameplayInvalid) || (((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"text\")) ? _module57[\"text\"] : _module57) === undefined) || (((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"text\")) ? _module57[\"text\"] : _module57) === null) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === __gameplayInvalid) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === undefined) || (((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47) === null)) { _module59 = __gameplayInvalid; } else { var _module59 = ((function(effect) { var committed = flow.effects.tileBatch([effect]); if (!committed.length) return false; var sourceKeys = Object.keys(effect); Object.keys(committed[0]).forEach(function(key) { if (sourceKeys.indexOf(key) < 0) delete committed[0][key]; }); return true; })({id: ((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"text\")) ? _module57[\"text\"] : _module57), type: \"tails-flight-reservation\", x: (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).x, y: (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"cell\")) ? _module18[\"cell\"] : _module18)).y, flightId: ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47)})); } var _record60 = ({\"id\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"type\": \"tails-flight-reservation\", \"name\": \"双尾飞行预留\", \"turns\": 2, \"ownerId\": ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"id\")) ? _module28[\"id\"] : _module28), \"allyId\": ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"id\")) ? _module29[\"id\"] : _module29), \"x\": (_module30[\"x\"]), \"y\": (_module30[\"y\"]), \"allyX\": (_module31[\"x\"]), \"allyY\": (_module31[\"y\"]), \"flightId\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"currentDuration\": 2, \"relatedRules\": JSON.parse(\"[\\\"rule-tails-flight-resolve\\\"]\")}); if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (_record60 === __gameplayInvalid) || (_record60 === undefined) || (_record60 === null)) { _module61 = __gameplayInvalid; } else { var _module61 = (flow.status.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), _record60, \"piece\")); } var _record62 = ({\"id\": ((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"text\")) ? _module49[\"text\"] : _module49), \"type\": \"immune\", \"name\": \"免疫\", \"flightId\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"stacks\": 1, \"currentDuration\": 2, \"relatedRules\": JSON.parse(\"[\\\"rule-tails-flight-immune\\\",\\\"rule-tails-flight-immune-target\\\"]\")}); if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (_record62 === __gameplayInvalid) || (_record62 === undefined) || (_record62 === null)) { _module63 = __gameplayInvalid; } else { var _module63 = (flow.status.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), _record62, \"piece\")); } var _record64 = ({\"id\": ((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"text\")) ? _module51[\"text\"] : _module51), \"type\": \"inoperable\", \"name\": \"不可操作\", \"flightId\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"stacks\": 1, \"currentDuration\": 2, \"relatedRules\": JSON.parse(\"[\\\"rule-tails-flight-inoperable\\\",\\\"rule-tails-flight-inoperable-skill\\\"]\")}); if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (_record64 === __gameplayInvalid) || (_record64 === undefined) || (_record64 === null)) { _module65 = __gameplayInvalid; } else { var _module65 = (flow.status.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), _record64, \"piece\")); } var _record66 = ({\"id\": ((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53), \"type\": \"immune\", \"name\": \"免疫\", \"flightId\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"stacks\": 1, \"currentDuration\": 2, \"relatedRules\": JSON.parse(\"[\\\"rule-tails-flight-immune\\\",\\\"rule-tails-flight-immune-target\\\"]\")}); if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6))) || (_record66 === __gameplayInvalid) || (_record66 === undefined) || (_record66 === null)) { _module67 = __gameplayInvalid; } else { var _module67 = (flow.status.add(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6), _record66, \"piece\")); } var _record68 = ({\"id\": ((_module55 !== null && typeof _module55 === \"object\" && Object.prototype.hasOwnProperty.call(_module55, \"text\")) ? _module55[\"text\"] : _module55), \"type\": \"inoperable\", \"name\": \"不可操作\", \"flightId\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"text\")) ? _module47[\"text\"] : _module47), \"stacks\": 1, \"currentDuration\": 2, \"relatedRules\": JSON.parse(\"[\\\"rule-tails-flight-inoperable\\\",\\\"rule-tails-flight-inoperable-skill\\\"]\")}); if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6))) || (_record68 === __gameplayInvalid) || (_record68 === undefined) || (_record68 === null)) { _module69 = __gameplayInvalid; } else { var _module69 = (flow.status.add(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6), _record68, \"piece\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (\"已预留双尾飞行落点\" === __gameplayInvalid) || (\"已预留双尾飞行落点\" === null)) { _module70 = __gameplayInvalid; } else { var _module70 = (({success: true, message: \"已预留双尾飞行落点\"})); } if (!((((_module70 !== null && typeof _module70 === \"object\" && Object.prototype.hasOwnProperty.call(_module70, \"result\")) ? _module70[\"result\"] : _module70) === __gameplayInvalid))) { return ((_module70 !== null && typeof _module70 === \"object\" && Object.prototype.hasOwnProperty.call(_module70, \"result\")) ? _module70[\"result\"] : _module70); } } } else if (_condition73 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"落点必须是未被占据的空地或掩体\" === __gameplayInvalid) || (\"落点必须是未被占据的空地或掩体\" === null)) { _module72 = __gameplayInvalid; } else { var _module72 = (({success: false, message: \"落点必须是未被占据的空地或掩体\"})); } if (!((((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"result\")) ? _module72[\"result\"] : _module72) === __gameplayInvalid))) { return ((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"result\")) ? _module72[\"result\"] : _module72); } } } else if (_condition75 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"两个落点必须上下左右相邻\" === __gameplayInvalid) || (\"两个落点必须上下左右相邻\" === null)) { _module74 = __gameplayInvalid; } else { var _module74 = (({success: false, message: \"两个落点必须上下左右相邻\"})); } if (!((((_module74 !== null && typeof _module74 === \"object\" && Object.prototype.hasOwnProperty.call(_module74, \"result\")) ? _module74[\"result\"] : _module74) === __gameplayInvalid))) { return ((_module74 !== null && typeof _module74 === \"object\" && Object.prototype.hasOwnProperty.call(_module74, \"result\")) ? _module74[\"result\"] : _module74); } } } }",
   "keywords": [
     "传送",
     "免疫",
     "休眠"
   ],
   "targetText": "其他友军（4）→相邻落点（7）",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "skill",
-    "entry": "n45",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "schemas": [
+            {
+              "id": "tails.flight-reservation",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "turns",
+                  "type": "number"
+                },
+                {
+                  "name": "ownerId",
+                  "type": "string"
+                },
+                {
+                  "name": "allyId",
+                  "type": "string"
+                },
+                {
+                  "name": "x",
+                  "type": "number"
+                },
+                {
+                  "name": "y",
+                  "type": "number"
+                },
+                {
+                  "name": "allyX",
+                  "type": "number"
+                },
+                {
+                  "name": "allyY",
+                  "type": "number"
+                },
+                {
+                  "name": "flightId",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  }
+                }
+              ]
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "已预留双尾飞行落点"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_bound_method_0"
-          }
-        },
-        "args": [
-          {
-            "kind": "function",
-            "parameters": [
-              "p"
-            ],
-            "body": {
-              "entry": "n10",
-              "end": "n3",
-              "nodes": [
+              "id": "tails.flight-status",
+              "version": "1",
+              "fields": [
                 {
-                  "id": "n3",
-                  "kind": "regionEnd"
+                  "name": "id",
+                  "type": "string"
                 },
                 {
-                  "id": "n4",
-                  "kind": "call",
-                  "capability": "addRuleById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "literal",
-                      "value": "rule-tails-flight-inoperable-skill"
-                    }
-                  ],
-                  "next": "n3"
+                  "name": "type",
+                  "type": "string"
                 },
                 {
-                  "id": "n5",
-                  "kind": "call",
-                  "capability": "addRuleById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "literal",
-                      "value": "rule-tails-flight-inoperable"
-                    }
-                  ],
-                  "next": "n4"
+                  "name": "name",
+                  "type": "string"
                 },
                 {
-                  "id": "n6",
-                  "kind": "call",
-                  "capability": "addRuleById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "literal",
-                      "value": "rule-tails-flight-immune-target"
-                    }
-                  ],
-                  "next": "n5"
+                  "name": "flightId",
+                  "type": "string"
                 },
                 {
-                  "id": "n7",
-                  "kind": "call",
-                  "capability": "addRuleById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "literal",
-                      "value": "rule-tails-flight-immune"
-                    }
-                  ],
-                  "next": "n6"
+                  "name": "stacks",
+                  "type": "number"
                 },
                 {
-                  "id": "n8",
-                  "kind": "call",
-                  "capability": "addStatusEffectById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "object",
-                      "entries": [
-                        {
-                          "key": "id",
-                          "value": {
-                            "kind": "binary",
-                            "op": "+",
-                            "left": {
-                              "kind": "binary",
-                              "op": "+",
-                              "left": {
-                                "kind": "ref",
-                                "name": "flightId"
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": "-inoperable-"
-                              }
-                            },
-                            "right": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "p"
-                              },
-                              "key": "instanceId"
-                            }
-                          }
-                        },
-                        {
-                          "key": "type",
-                          "value": {
-                            "kind": "literal",
-                            "value": "inoperable"
-                          }
-                        },
-                        {
-                          "key": "name",
-                          "value": {
-                            "kind": "literal",
-                            "value": "不可操作"
-                          }
-                        },
-                        {
-                          "key": "flightId",
-                          "value": {
-                            "kind": "ref",
-                            "name": "flightId"
-                          }
-                        },
-                        {
-                          "key": "stacks",
-                          "value": {
-                            "kind": "literal",
-                            "value": 1
-                          }
-                        },
-                        {
-                          "key": "currentDuration",
-                          "value": {
-                            "kind": "literal",
-                            "value": 2
-                          }
-                        },
-                        {
-                          "key": "remainingDuration",
-                          "value": {
-                            "kind": "literal",
-                            "value": 2
-                          }
-                        },
-                        {
-                          "key": "relatedRules",
-                          "value": {
-                            "kind": "array",
-                            "items": [
-                              {
-                                "kind": "literal",
-                                "value": "rule-tails-flight-inoperable"
-                              },
-                              {
-                                "kind": "literal",
-                                "value": "rule-tails-flight-inoperable-skill"
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  ],
-                  "next": "n7"
+                  "name": "currentDuration",
+                  "type": "number"
                 },
                 {
-                  "id": "n9",
-                  "kind": "call",
-                  "capability": "addStatusEffectById",
-                  "args": [
-                    {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "instanceId"
-                    },
-                    {
-                      "kind": "object",
-                      "entries": [
-                        {
-                          "key": "id",
-                          "value": {
-                            "kind": "binary",
-                            "op": "+",
-                            "left": {
-                              "kind": "binary",
-                              "op": "+",
-                              "left": {
-                                "kind": "ref",
-                                "name": "flightId"
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": "-immune-"
-                              }
-                            },
-                            "right": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "p"
-                              },
-                              "key": "instanceId"
-                            }
-                          }
-                        },
-                        {
-                          "key": "type",
-                          "value": {
-                            "kind": "literal",
-                            "value": "immune"
-                          }
-                        },
-                        {
-                          "key": "name",
-                          "value": {
-                            "kind": "literal",
-                            "value": "免疫"
-                          }
-                        },
-                        {
-                          "key": "flightId",
-                          "value": {
-                            "kind": "ref",
-                            "name": "flightId"
-                          }
-                        },
-                        {
-                          "key": "stacks",
-                          "value": {
-                            "kind": "literal",
-                            "value": 1
-                          }
-                        },
-                        {
-                          "key": "currentDuration",
-                          "value": {
-                            "kind": "literal",
-                            "value": 2
-                          }
-                        },
-                        {
-                          "key": "remainingDuration",
-                          "value": {
-                            "kind": "literal",
-                            "value": 2
-                          }
-                        },
-                        {
-                          "key": "relatedRules",
-                          "value": {
-                            "kind": "array",
-                            "items": [
-                              {
-                                "kind": "literal",
-                                "value": "rule-tails-flight-immune"
-                              },
-                              {
-                                "kind": "literal",
-                                "value": "rule-tails-flight-immune-target"
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  ],
-                  "next": "n8"
-                },
-                {
-                  "id": "n10",
-                  "kind": "set",
-                  "target": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "p"
-                    },
-                    "key": "statusTags"
-                  },
-                  "operator": "=",
-                  "value": {
-                    "kind": "binary",
-                    "op": "||",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "p"
-                      },
-                      "key": "statusTags"
-                    },
-                    "right": {
-                      "kind": "array",
-                      "items": []
-                    }
-                  },
-                  "next": "n9"
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  }
                 }
               ]
             }
-          }
-        ],
-        "next": "n1"
-      },
-      {
-        "id": "n11",
-        "kind": "bind",
-        "name": "__rvb_import_bound_method_0",
-        "expr": {
-          "kind": "boundMethod",
-          "object": {
-            "kind": "array",
-            "items": [
-              {
-                "kind": "ref",
-                "name": "c"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "source-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "source-ref",
+                  "port": "piece"
+                }
               },
-              {
-                "kind": "ref",
-                "name": "ally"
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "ally-choice",
+              "module": "choice.target-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "range": 4,
+                "filter": "ally"
               }
-            ]
-          },
-          "method": "forEach"
-        },
-        "next": "n2"
-      },
-      {
-        "id": "n12",
-        "kind": "call",
-        "capability": "addRuleById",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "c"
             },
-            "key": "instanceId"
-          },
-          {
-            "kind": "literal",
-            "value": "rule-tails-flight-resolve"
-          }
-        ],
-        "next": "n11"
-      },
-      {
-        "id": "n13",
-        "kind": "call",
-        "capability": "addStatusEffectById",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "c"
+            {
+              "kind": "call",
+              "id": "ally-unresolved",
+              "module": "choice.is-unresolved",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "ally-choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
             },
-            "key": "instanceId"
-          },
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "id",
-                "value": {
-                  "kind": "ref",
-                  "name": "flightId"
-                }
+            {
+              "kind": "if",
+              "id": "ally-wait-or-cancel",
+              "condition": {
+                "kind": "output",
+                "node": "ally-unresolved",
+                "port": "value"
               },
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "tails-flight-reservation"
-                }
-              },
-              {
-                "key": "name",
-                "value": {
-                  "kind": "literal",
-                  "value": "双尾飞行预留"
-                }
-              },
-              {
-                "key": "turns",
-                "value": {
-                  "kind": "literal",
-                  "value": 2
-                }
-              },
-              {
-                "key": "ownerId",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "c"
-                  },
-                  "key": "instanceId"
-                }
-              },
-              {
-                "key": "allyId",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "ally"
-                  },
-                  "key": "instanceId"
-                }
-              },
-              {
-                "key": "x",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "a"
-                  },
-                  "key": "x"
-                }
-              },
-              {
-                "key": "y",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "a"
-                  },
-                  "key": "y"
-                }
-              },
-              {
-                "key": "allyX",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "d"
-                  },
-                  "key": "x"
-                }
-              },
-              {
-                "key": "allyY",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "d"
-                  },
-                  "key": "y"
-                }
-              },
-              {
-                "key": "flightId",
-                "value": {
-                  "kind": "ref",
-                  "name": "flightId"
-                }
-              },
-              {
-                "key": "currentDuration",
-                "value": {
-                  "kind": "literal",
-                  "value": 2
-                }
-              },
-              {
-                "key": "relatedRules",
-                "value": {
-                  "kind": "array",
-                  "items": [
-                    {
-                      "kind": "literal",
-                      "value": "rule-tails-flight-resolve"
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "ally-pending-result",
+                  "module": "choice.as-result",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "ally-choice",
+                      "port": "choice"
                     }
-                  ]
-                }
-              }
-            ]
-          }
-        ],
-        "next": "n12"
-      },
-      {
-        "id": "n14",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "c"
-          },
-          "key": "statusTags"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "binary",
-          "op": "||",
-          "left": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "c"
-            },
-            "key": "statusTags"
-          },
-          "right": {
-            "kind": "array",
-            "items": []
-          }
-        },
-        "next": "n13"
-      },
-      {
-        "id": "n15",
-        "kind": "call",
-        "capability": "array.push",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "b"
-              },
-              "key": "extensions"
-            },
-            "key": "tileEffects"
-          },
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "id",
-                "value": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "ref",
-                    "name": "flightId"
                   },
-                  "right": {
-                    "kind": "literal",
-                    "value": "-a"
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "ally-pending-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "ally-pending-result",
+                    "port": "result"
                   }
                 }
-              },
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "tails-flight-reservation"
+              ],
+              "else": []
+            },
+            {
+              "kind": "call",
+              "id": "ally",
+              "module": "choice.piece",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "ally-choice",
+                  "port": "choice"
                 }
               },
-              {
-                "key": "x",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "a"
-                  },
-                  "key": "x"
-                }
-              },
-              {
-                "key": "y",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "a"
-                  },
-                  "key": "y"
-                }
-              },
-              {
-                "key": "flightId",
-                "value": {
-                  "kind": "ref",
-                  "name": "flightId"
-                }
-              }
-            ]
-          },
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "id",
-                "value": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "ref",
-                    "name": "flightId"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": "-b"
-                  }
-                }
-              },
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "tails-flight-reservation"
-                }
-              },
-              {
-                "key": "x",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "d"
-                  },
-                  "key": "x"
-                }
-              },
-              {
-                "key": "y",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "d"
-                  },
-                  "key": "y"
-                }
-              },
-              {
-                "key": "flightId",
-                "value": {
-                  "kind": "ref",
-                  "name": "flightId"
-                }
-              }
-            ]
-          }
-        ],
-        "next": "n14"
-      },
-      {
-        "id": "n16",
-        "kind": "bind",
-        "name": "flightId",
-        "expr": {
-          "kind": "binary",
-          "op": "+",
-          "left": {
-            "kind": "binary",
-            "op": "+",
-            "left": {
-              "kind": "binary",
-              "op": "+",
-              "left": {
-                "kind": "binary",
-                "op": "+",
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "same-self",
+              "module": "compare.equal-piece",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "binary",
-                    "op": "+",
-                    "left": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "binary",
-                        "op": "+",
-                        "left": {
-                          "kind": "binary",
-                          "op": "+",
-                          "left": {
-                            "kind": "binary",
-                            "op": "+",
-                            "left": {
-                              "kind": "binary",
-                              "op": "+",
-                              "left": {
-                                "kind": "literal",
-                                "value": "tails-flight-"
-                              },
-                              "right": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "c"
-                                },
-                                "key": "instanceId"
-                              }
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": "-"
-                            }
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "b"
-                              },
-                              "key": "turn"
-                            },
-                            "key": "turnNumber"
-                          }
-                        },
-                        "right": {
-                          "kind": "literal",
-                          "value": "-"
-                        }
-                      },
-                      "right": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "a"
-                        },
-                        "key": "x"
-                      }
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": "-"
-                    }
-                  },
-                  "right": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "a"
-                    },
-                    "key": "y"
-                  }
+                  "kind": "output",
+                  "node": "ally",
+                  "port": "piece"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": "-"
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
                 }
               },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "d"
-                },
-                "key": "x"
-              }
-            },
-            "right": {
-              "kind": "literal",
-              "value": "-"
-            }
-          },
-          "right": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "d"
-            },
-            "key": "y"
-          }
-        },
-        "next": "n15"
-      },
-      {
-        "id": "n17",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
+              "parameters": {}
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "落点已被预留"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n18",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "collection",
-              "object": {
-                "kind": "get",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "b"
-                  },
-                  "key": "extensions"
-                },
-                "key": "tileEffects"
+              "kind": "if",
+              "id": "same-self-guard",
+              "condition": {
+                "kind": "output",
+                "node": "same-self",
+                "port": "value"
               },
-              "method": "some",
-              "args": [
+              "then": [
                 {
-                  "kind": "lambda",
-                  "parameters": [
-                    "e"
-                  ],
-                  "body": {
-                    "kind": "binary",
-                    "op": "&&",
-                    "left": {
-                      "kind": "binary",
-                      "op": "===",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "e"
-                        },
-                        "key": "type"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "tails-flight-reservation"
-                      }
-                    },
-                    "right": {
-                      "kind": "binary",
-                      "op": "||",
-                      "left": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "e"
-                            },
-                            "key": "x"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "a"
-                            },
-                            "key": "x"
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "e"
-                            },
-                            "key": "y"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "a"
-                            },
-                            "key": "y"
-                          }
-                        }
-                      },
-                      "right": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "e"
-                            },
-                            "key": "x"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "d"
-                            },
-                            "key": "x"
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "e"
-                            },
-                            "key": "y"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "d"
-                            },
-                            "key": "y"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        },
-        "yes": "n17",
-        "no": "n16"
-      },
-      {
-        "id": "n19",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "b"
-            },
-            "key": "extensions"
-          },
-          "key": "tileEffects"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "binary",
-          "op": "||",
-          "left": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "b"
-              },
-              "key": "extensions"
-            },
-            "key": "tileEffects"
-          },
-          "right": {
-            "kind": "array",
-            "items": []
-          }
-        },
-        "next": "n18"
-      },
-      {
-        "id": "n20",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "b"
-          },
-          "key": "extensions"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "object",
-          "entries": []
-        },
-        "next": "n19"
-      },
-      {
-        "id": "n21",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "b"
-                },
-                "key": "extensions"
-              }
-            }
-          }
-        },
-        "yes": "n20",
-        "no": "n19"
-      },
-      {
-        "id": "n28",
-        "kind": "loop",
-        "loop": "for",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "<",
-              "left": {
-                "kind": "ref",
-                "name": "i"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "cells"
-                },
-                "key": "length"
-              }
-            }
-          }
-        },
-        "body": {
-          "entry": "n25",
-          "end": "n22",
-          "nodes": [
-            {
-              "id": "n22",
-              "kind": "regionEnd"
-            },
-            {
-              "id": "n23",
-              "kind": "return",
-              "value": {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "success",
-                    "value": {
+                  "kind": "call",
+                  "id": "same-self-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
                       "kind": "literal",
                       "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "双尾飞行必须选择另一名友军"
                     }
                   },
-                  {
-                    "key": "message",
-                    "value": {
-                      "kind": "literal",
-                      "value": "落点必须是未被占据的空地或掩体"
-                    }
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "same-self-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "same-self-result",
+                    "port": "result"
                   }
-                ]
-              }
-            },
-            {
-              "id": "n24",
-              "kind": "branch",
-              "condition": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "binary",
-                    "op": "||",
-                    "left": {
-                      "kind": "binary",
-                      "op": "||",
-                      "left": {
-                        "kind": "binary",
-                        "op": "||",
-                        "left": {
-                          "kind": "unary",
-                          "op": "!",
-                          "argument": {
-                            "kind": "ref",
-                            "name": "tile"
-                          }
-                        },
-                        "right": {
-                          "kind": "unary",
-                          "op": "!",
-                          "argument": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "tile"
-                              },
-                              "key": "props"
-                            },
-                            "key": "walkable"
-                          }
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "cell-a-choice",
+                  "module": "choice.target-cell",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {
+                    "range": 7,
+                    "filter": "all"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "cell-a-unresolved",
+                  "module": "choice.is-unresolved",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "cell-a-choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "cell-a-wait-or-cancel",
+                  "condition": {
+                    "kind": "output",
+                    "node": "cell-a-unresolved",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "cell-a-pending-result",
+                      "module": "choice.as-result",
+                      "version": "1",
+                      "inputs": {
+                        "choice": {
+                          "kind": "output",
+                          "node": "cell-a-choice",
+                          "port": "choice"
                         }
                       },
-                      "right": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": "!==",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "tile"
-                              },
-                              "key": "props"
-                            },
-                            "key": "type"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "floor"
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "!==",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "tile"
-                              },
-                              "key": "props"
-                            },
-                            "key": "type"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "cover"
-                          }
-                        }
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "cell-a-pending-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "cell-a-pending-result",
+                        "port": "result"
                       }
+                    }
+                  ],
+                  "else": []
+                },
+                {
+                  "kind": "call",
+                  "id": "cell-a",
+                  "module": "choice.cell",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "cell-a-choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "cell-b-choice",
+                  "module": "choice.target-cell",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {
+                    "range": 7,
+                    "filter": "all"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "cell-b-unresolved",
+                  "module": "choice.is-unresolved",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "cell-b-choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "cell-b-wait-or-cancel",
+                  "condition": {
+                    "kind": "output",
+                    "node": "cell-b-unresolved",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "cell-b-pending-result",
+                      "module": "choice.as-result",
+                      "version": "1",
+                      "inputs": {
+                        "choice": {
+                          "kind": "output",
+                          "node": "cell-b-choice",
+                          "port": "choice"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "cell-b-pending-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "cell-b-pending-result",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "else": []
+                },
+                {
+                  "kind": "call",
+                  "id": "cell-b",
+                  "module": "choice.cell",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "cell-b-choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "adjacent",
+                  "module": "spatial.cell-adjacent",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "cell-a",
+                      "port": "cell"
                     },
                     "right": {
-                      "kind": "collection",
-                      "object": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "b"
-                        },
-                        "key": "pieces"
+                      "kind": "output",
+                      "node": "cell-b",
+                      "port": "cell"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "adjacent-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "adjacent",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "landing-a",
+                      "module": "spatial.cell-landing-legal",
+                      "version": "1",
+                      "inputs": {
+                        "cell": {
+                          "kind": "output",
+                          "node": "cell-a",
+                          "port": "cell"
+                        }
                       },
-                      "method": "some",
-                      "args": [
+                      "parameters": {
+                        "terrainPolicy": "floor-or-cover"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "landing-b",
+                      "module": "spatial.cell-landing-legal",
+                      "version": "1",
+                      "inputs": {
+                        "cell": {
+                          "kind": "output",
+                          "node": "cell-b",
+                          "port": "cell"
+                        }
+                      },
+                      "parameters": {
+                        "terrainPolicy": "floor-or-cover"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "landing-both",
+                      "module": "logic.and",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "landing-a",
+                          "port": "legal"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "landing-b",
+                          "port": "legal"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "landing-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "landing-both",
+                        "port": "value"
+                      },
+                      "then": [
                         {
-                          "kind": "lambda",
-                          "parameters": [
-                            "p"
-                          ],
-                          "body": {
-                            "kind": "binary",
-                            "op": "&&",
+                          "kind": "call",
+                          "id": "reserved-a",
+                          "module": "tile.has-effect",
+                          "version": "1",
+                          "inputs": {
+                            "cell": {
+                              "kind": "output",
+                              "node": "cell-a",
+                              "port": "cell"
+                            }
+                          },
+                          "parameters": {
+                            "effectType": "tails-flight-reservation"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "reserved-b",
+                          "module": "tile.has-effect",
+                          "version": "1",
+                          "inputs": {
+                            "cell": {
+                              "kind": "output",
+                              "node": "cell-b",
+                              "port": "cell"
+                            }
+                          },
+                          "parameters": {
+                            "effectType": "tails-flight-reservation"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "reserved-any",
+                          "module": "logic.or",
+                          "version": "1",
+                          "inputs": {
                             "left": {
-                              "kind": "binary",
-                              "op": "&&",
-                              "left": {
-                                "kind": "binary",
-                                "op": ">",
+                              "kind": "output",
+                              "node": "reserved-a",
+                              "port": "exists"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "reserved-b",
+                              "port": "exists"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "if",
+                          "id": "reserved-guard",
+                          "condition": {
+                            "kind": "output",
+                            "node": "reserved-any",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "call",
+                              "id": "reserved-result",
+                              "module": "result.action",
+                              "version": "1",
+                              "inputs": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": false
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": "落点已被预留"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "return",
+                              "id": "reserved-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "reserved-result",
+                                "port": "result"
+                              }
+                            }
+                          ],
+                          "else": [
+                            {
+                              "kind": "call",
+                              "id": "turn-number",
+                              "module": "turn.number",
+                              "version": "1",
+                              "inputs": {},
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "source-id",
+                              "module": "piece.identifier",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "ally-id",
+                              "module": "piece.identifier",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "ally",
+                                  "port": "piece"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-a-coordinates",
+                              "module": "spatial.cell-coordinates",
+                              "version": "1",
+                              "inputs": {
+                                "cell": {
+                                  "kind": "output",
+                                  "node": "cell-a",
+                                  "port": "cell"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-b-coordinates",
+                              "module": "spatial.cell-coordinates",
+                              "version": "1",
+                              "inputs": {
+                                "cell": {
+                                  "kind": "output",
+                                  "node": "cell-b",
+                                  "port": "cell"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "turn-text",
+                              "module": "text.from-number",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "turn-number",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-a-x-text",
+                              "module": "text.from-number",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "cell-a-coordinates",
+                                  "port": "x"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-a-y-text",
+                              "module": "text.from-number",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "cell-a-coordinates",
+                                  "port": "y"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-b-x-text",
+                              "module": "text.from-number",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "cell-b-coordinates",
+                                  "port": "x"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "cell-b-y-text",
+                              "module": "text.from-number",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "cell-b-coordinates",
+                                  "port": "y"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-source",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
                                 "left": {
-                                  "kind": "get",
-                                  "object": {
-                                    "kind": "ref",
-                                    "name": "p"
-                                  },
-                                  "key": "currentHp"
+                                  "kind": "literal",
+                                  "value": "tails-flight-"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "source-id",
+                                  "port": "id"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-turn-separator",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-source",
+                                  "port": "text"
                                 },
                                 "right": {
                                   "kind": "literal",
-                                  "value": 0
+                                  "value": "-"
                                 }
                               },
-                              "right": {
-                                "kind": "binary",
-                                "op": "===",
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-turn",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
                                 "left": {
-                                  "kind": "get",
-                                  "object": {
-                                    "kind": "ref",
-                                    "name": "p"
-                                  },
-                                  "key": "x"
+                                  "kind": "output",
+                                  "node": "flight-id-turn-separator",
+                                  "port": "text"
                                 },
                                 "right": {
-                                  "kind": "get",
-                                  "object": {
-                                    "kind": "index",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "cells"
-                                    },
-                                    "index": {
-                                      "kind": "ref",
-                                      "name": "i"
-                                    }
-                                  },
-                                  "key": "x"
+                                  "kind": "output",
+                                  "node": "turn-text",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-a-x-separator",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-turn",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-a-x",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-a-x-separator",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "cell-a-x-text",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-a-y-separator",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-a-x",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-a-y",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-a-y-separator",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "cell-a-y-text",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-b-x-separator",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-a-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-b-x",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-x-separator",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "cell-b-x-text",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-b-y-separator",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-x",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-b-y",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y-separator",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "cell-b-y-text",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "immune-source-id-base",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-immune-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "immune-source-id",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "immune-source-id-base",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "source-id",
+                                  "port": "id"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "inoperable-source-id-base",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-inoperable-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "inoperable-source-id",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "inoperable-source-id-base",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "source-id",
+                                  "port": "id"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "immune-ally-id-base",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-immune-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "immune-ally-id",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "immune-ally-id-base",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "ally-id",
+                                  "port": "id"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "inoperable-ally-id-base",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-inoperable-"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "inoperable-ally-id",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "inoperable-ally-id-base",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "ally-id",
+                                  "port": "id"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-a-suffix",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-a"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "flight-id-b-suffix",
+                              "module": "text.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": "-b"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "add-tile-a",
+                              "module": "tile.add-reservation",
+                              "version": "1",
+                              "inputs": {
+                                "cell": {
+                                  "kind": "output",
+                                  "node": "cell-a",
+                                  "port": "cell"
+                                },
+                                "id": {
+                                  "kind": "output",
+                                  "node": "flight-id-a-suffix",
+                                  "port": "text"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {
+                                "effectType": "tails-flight-reservation"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "add-tile-b",
+                              "module": "tile.add-reservation",
+                              "version": "1",
+                              "inputs": {
+                                "cell": {
+                                  "kind": "output",
+                                  "node": "cell-b",
+                                  "port": "cell"
+                                },
+                                "id": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-suffix",
+                                  "port": "text"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {
+                                "effectType": "tails-flight-reservation"
+                              }
+                            },
+                            {
+                              "kind": "record.create",
+                              "id": "reservation-record",
+                              "schema": "tails.flight-reservation",
+                              "fields": {
+                                "id": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "type": {
+                                  "kind": "literal",
+                                  "value": "tails-flight-reservation"
+                                },
+                                "name": {
+                                  "kind": "literal",
+                                  "value": "双尾飞行预留"
+                                },
+                                "turns": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "ownerId": {
+                                  "kind": "output",
+                                  "node": "source-id",
+                                  "port": "id"
+                                },
+                                "allyId": {
+                                  "kind": "output",
+                                  "node": "ally-id",
+                                  "port": "id"
+                                },
+                                "x": {
+                                  "kind": "output",
+                                  "node": "cell-a-coordinates",
+                                  "port": "x"
+                                },
+                                "y": {
+                                  "kind": "output",
+                                  "node": "cell-a-coordinates",
+                                  "port": "y"
+                                },
+                                "allyX": {
+                                  "kind": "output",
+                                  "node": "cell-b-coordinates",
+                                  "port": "x"
+                                },
+                                "allyY": {
+                                  "kind": "output",
+                                  "node": "cell-b-coordinates",
+                                  "port": "y"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "currentDuration": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "relatedRules": {
+                                  "kind": "literal",
+                                  "value": [
+                                    "rule-tails-flight-resolve"
+                                  ]
                                 }
                               }
                             },
-                            "right": {
-                              "kind": "binary",
-                              "op": "===",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
+                            {
+                              "kind": "call",
+                              "id": "apply-reservation-record",
+                              "module": "status.apply-record",
+                              "version": "1",
+                              "inputs": {
+                                "target": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
                                 },
-                                "key": "y"
+                                "record": {
+                                  "kind": "output",
+                                  "node": "reservation-record",
+                                  "port": "value"
+                                }
                               },
-                              "right": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "index",
-                                  "object": {
-                                    "kind": "ref",
-                                    "name": "cells"
-                                  },
-                                  "index": {
-                                    "kind": "ref",
-                                    "name": "i"
-                                  }
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "record.create",
+                              "id": "immune-source-record",
+                              "schema": "tails.flight-status",
+                              "fields": {
+                                "id": {
+                                  "kind": "output",
+                                  "node": "immune-source-id",
+                                  "port": "text"
                                 },
-                                "key": "y"
+                                "type": {
+                                  "kind": "literal",
+                                  "value": "immune"
+                                },
+                                "name": {
+                                  "kind": "literal",
+                                  "value": "免疫"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "stacks": {
+                                  "kind": "literal",
+                                  "value": 1
+                                },
+                                "currentDuration": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "relatedRules": {
+                                  "kind": "literal",
+                                  "value": [
+                                    "rule-tails-flight-immune",
+                                    "rule-tails-flight-immune-target"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "apply-source-immune",
+                              "module": "status.apply-record",
+                              "version": "1",
+                              "inputs": {
+                                "target": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
+                                },
+                                "record": {
+                                  "kind": "output",
+                                  "node": "immune-source-record",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "record.create",
+                              "id": "inoperable-source-record",
+                              "schema": "tails.flight-status",
+                              "fields": {
+                                "id": {
+                                  "kind": "output",
+                                  "node": "inoperable-source-id",
+                                  "port": "text"
+                                },
+                                "type": {
+                                  "kind": "literal",
+                                  "value": "inoperable"
+                                },
+                                "name": {
+                                  "kind": "literal",
+                                  "value": "不可操作"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "stacks": {
+                                  "kind": "literal",
+                                  "value": 1
+                                },
+                                "currentDuration": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "relatedRules": {
+                                  "kind": "literal",
+                                  "value": [
+                                    "rule-tails-flight-inoperable",
+                                    "rule-tails-flight-inoperable-skill"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "apply-source-inoperable",
+                              "module": "status.apply-record",
+                              "version": "1",
+                              "inputs": {
+                                "target": {
+                                  "kind": "output",
+                                  "node": "source",
+                                  "port": "piece"
+                                },
+                                "record": {
+                                  "kind": "output",
+                                  "node": "inoperable-source-record",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "record.create",
+                              "id": "immune-ally-record",
+                              "schema": "tails.flight-status",
+                              "fields": {
+                                "id": {
+                                  "kind": "output",
+                                  "node": "immune-ally-id",
+                                  "port": "text"
+                                },
+                                "type": {
+                                  "kind": "literal",
+                                  "value": "immune"
+                                },
+                                "name": {
+                                  "kind": "literal",
+                                  "value": "免疫"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "stacks": {
+                                  "kind": "literal",
+                                  "value": 1
+                                },
+                                "currentDuration": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "relatedRules": {
+                                  "kind": "literal",
+                                  "value": [
+                                    "rule-tails-flight-immune",
+                                    "rule-tails-flight-immune-target"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "apply-ally-immune",
+                              "module": "status.apply-record",
+                              "version": "1",
+                              "inputs": {
+                                "target": {
+                                  "kind": "output",
+                                  "node": "ally",
+                                  "port": "piece"
+                                },
+                                "record": {
+                                  "kind": "output",
+                                  "node": "immune-ally-record",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "record.create",
+                              "id": "inoperable-ally-record",
+                              "schema": "tails.flight-status",
+                              "fields": {
+                                "id": {
+                                  "kind": "output",
+                                  "node": "inoperable-ally-id",
+                                  "port": "text"
+                                },
+                                "type": {
+                                  "kind": "literal",
+                                  "value": "inoperable"
+                                },
+                                "name": {
+                                  "kind": "literal",
+                                  "value": "不可操作"
+                                },
+                                "flightId": {
+                                  "kind": "output",
+                                  "node": "flight-id-b-y",
+                                  "port": "text"
+                                },
+                                "stacks": {
+                                  "kind": "literal",
+                                  "value": 1
+                                },
+                                "currentDuration": {
+                                  "kind": "literal",
+                                  "value": 2
+                                },
+                                "relatedRules": {
+                                  "kind": "literal",
+                                  "value": [
+                                    "rule-tails-flight-inoperable",
+                                    "rule-tails-flight-inoperable-skill"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "apply-ally-inoperable",
+                              "module": "status.apply-record",
+                              "version": "1",
+                              "inputs": {
+                                "target": {
+                                  "kind": "output",
+                                  "node": "ally",
+                                  "port": "piece"
+                                },
+                                "record": {
+                                  "kind": "output",
+                                  "node": "inoperable-ally-record",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "success-result",
+                              "module": "result.action",
+                              "version": "1",
+                              "inputs": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": true
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": "已预留双尾飞行落点"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "return",
+                              "id": "success-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "success-result",
+                                "port": "result"
                               }
                             }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "landing-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            },
+                            "message": {
+                              "kind": "literal",
+                              "value": "落点必须是未被占据的空地或掩体"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "landing-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "landing-result",
+                            "port": "result"
                           }
                         }
                       ]
                     }
-                  }
-                }
-              },
-              "yes": "n23",
-              "no": "n22"
-            },
-            {
-              "id": "n25",
-              "kind": "bind",
-              "name": "tile",
-              "expr": {
-                "kind": "collection",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "b"
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "adjacent-result",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        },
+                        "message": {
+                          "kind": "literal",
+                          "value": "两个落点必须上下左右相邻"
+                        }
+                      },
+                      "parameters": {}
                     },
-                    "key": "map"
-                  },
-                  "key": "tiles"
-                },
-                "method": "find",
-                "args": [
-                  {
-                    "kind": "lambda",
-                    "parameters": [
-                      "t"
-                    ],
-                    "body": {
-                      "kind": "binary",
-                      "op": "&&",
-                      "left": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "t"
-                          },
-                          "key": "x"
-                        },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "index",
-                            "object": {
-                              "kind": "ref",
-                              "name": "cells"
-                            },
-                            "index": {
-                              "kind": "ref",
-                              "name": "i"
-                            }
-                          },
-                          "key": "x"
-                        }
-                      },
-                      "right": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "t"
-                          },
-                          "key": "y"
-                        },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "index",
-                            "object": {
-                              "kind": "ref",
-                              "name": "cells"
-                            },
-                            "index": {
-                              "kind": "ref",
-                              "name": "i"
-                            }
-                          },
-                          "key": "y"
-                        }
-                      }
-                    }
-                  }
-                ]
-              },
-              "next": "n24"
-            }
-          ]
-        },
-        "update": {
-          "entry": "n27",
-          "end": "n26",
-          "nodes": [
-            {
-              "id": "n26",
-              "kind": "regionEnd"
-            },
-            {
-              "id": "n27",
-              "kind": "set",
-              "target": {
-                "kind": "ref",
-                "name": "i"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "unary",
-                  "op": "+",
-                  "argument": {
-                    "kind": "ref",
-                    "name": "i"
-                  }
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": 1
-                }
-              },
-              "next": "n26"
-            }
-          ]
-        },
-        "next": "n21"
-      },
-      {
-        "id": "n29",
-        "kind": "bind",
-        "name": "i",
-        "expr": {
-          "kind": "literal",
-          "value": 0
-        },
-        "next": "n28"
-      },
-      {
-        "id": "n30",
-        "kind": "bind",
-        "name": "cells",
-        "expr": {
-          "kind": "array",
-          "items": [
-            {
-              "kind": "ref",
-              "name": "a"
-            },
-            {
-              "kind": "ref",
-              "name": "d"
-            }
-          ]
-        },
-        "next": "n29"
-      },
-      {
-        "id": "n31",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "两个落点必须上下左右相邻"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n32",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "!==",
-              "left": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "call",
-                  "callee": "Math.abs",
-                  "args": [
                     {
-                      "kind": "binary",
-                      "op": "-",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "a"
-                        },
-                        "key": "x"
-                      },
-                      "right": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "d"
-                        },
-                        "key": "x"
-                      }
-                    }
-                  ]
-                },
-                "right": {
-                  "kind": "call",
-                  "callee": "Math.abs",
-                  "args": [
-                    {
-                      "kind": "binary",
-                      "op": "-",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "a"
-                        },
-                        "key": "y"
-                      },
-                      "right": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "d"
-                        },
-                        "key": "y"
+                      "kind": "return",
+                      "id": "adjacent-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "adjacent-result",
+                        "port": "result"
                       }
                     }
                   ]
                 }
-              },
-              "right": {
-                "kind": "literal",
-                "value": 1
-              }
-            }
-          }
-        },
-        "yes": "n31",
-        "no": "n30"
-      },
-      {
-        "id": "n33",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "d"
-        }
-      },
-      {
-        "id": "n34",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "d"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "d"
-                },
-                "key": "needsTargetSelection"
-              }
-            }
-          }
-        },
-        "yes": "n33",
-        "no": "n32"
-      },
-      {
-        "id": "n35",
-        "kind": "call",
-        "capability": "selectTarget",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "grid"
-                }
-              },
-              {
-                "key": "range",
-                "value": {
-                  "kind": "literal",
-                  "value": 7
-                }
-              },
-              {
-                "key": "filter",
-                "value": {
-                  "kind": "literal",
-                  "value": "all"
-                }
-              }
-            ]
-          }
-        ],
-        "result": "d",
-        "next": "n34"
-      },
-      {
-        "id": "n36",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "a"
-        }
-      },
-      {
-        "id": "n37",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "a"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "a"
-                },
-                "key": "needsTargetSelection"
-              }
-            }
-          }
-        },
-        "yes": "n36",
-        "no": "n35"
-      },
-      {
-        "id": "n38",
-        "kind": "call",
-        "capability": "selectTarget",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "grid"
-                }
-              },
-              {
-                "key": "range",
-                "value": {
-                  "kind": "literal",
-                  "value": 7
-                }
-              },
-              {
-                "key": "filter",
-                "value": {
-                  "kind": "literal",
-                  "value": "all"
-                }
-              }
-            ]
-          }
-        ],
-        "result": "a",
-        "next": "n37"
-      },
-      {
-        "id": "n39",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "双尾飞行必须选择另一名友军"
-              }
+              ]
             }
           ]
-        }
-      },
-      {
-        "id": "n40",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "===",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "ally"
-                },
-                "key": "instanceId"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "c"
-                },
-                "key": "instanceId"
-              }
-            }
-          }
         },
-        "yes": "n39",
-        "no": "n38"
-      },
-      {
-        "id": "n41",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "ally"
-        }
-      },
-      {
-        "id": "n42",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "ally"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "ally"
-                },
-                "key": "needsTargetSelection"
-              }
-            }
-          }
-        },
-        "yes": "n41",
-        "no": "n40"
-      },
-      {
-        "id": "n43",
-        "kind": "call",
-        "capability": "selectTarget",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "piece"
-                }
-              },
-              {
-                "key": "range",
-                "value": {
-                  "kind": "literal",
-                  "value": 4
-                }
-              },
-              {
-                "key": "filter",
-                "value": {
-                  "kind": "literal",
-                  "value": "ally"
-                }
-              }
-            ]
-          }
-        ],
-        "result": "ally",
-        "next": "n42"
-      },
-      {
-        "id": "n44",
-        "kind": "bind",
-        "name": "b",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "battle"
-        },
-        "next": "n43"
-      },
-      {
-        "id": "n45",
-        "kind": "bind",
-        "name": "c",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "piece"
-        },
-        "next": "n44"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
+    }
   },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:tails-twin-flight",
+    "links": []
+  }
 }

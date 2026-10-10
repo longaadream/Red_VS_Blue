@@ -8,445 +8,333 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var __rvb_import_bound_method_0, __rvb_lexical_0_hasFreezeTag, __rvb_lexical_1_actionType; var _pc = \"n25\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n25\": _pc = (! (! (! (context)[\"piece\"]))) ? \"n24\" : \"n23\"; break; case \"n23\": _pc = (! (! ((context)[\"piece\"])[\"statusTags\"])) ? \"n22\" : \"n1\"; break; case \"n22\": __rvb_import_bound_method_0 = (function (receiver) { var capturedMethod = receiver[\"some\"]; return function () { return Reflect.apply(capturedMethod, receiver, arguments); }; })(((context)[\"piece\"])[\"statusTags\"]); _pc = \"n15\"; break; case \"n15\": __rvb_lexical_0_hasFreezeTag = (__rvb_import_bound_method_0)(function (tag) { { var __rvb_content_graph_region_pc_0 = \"n21\"; while (__rvb_content_graph_region_pc_0 !== \"n16\") { switch (__rvb_content_graph_region_pc_0) { case \"n21\": __rvb_content_graph_region_pc_0 = (! (! ((typeof tag) === \"string\"))) ? \"n20\" : \"n19\"; break; case \"n19\": __rvb_content_graph_region_pc_0 = (! (! (((typeof tag) === \"object\") && (tag !== null)))) ? \"n18\" : \"n17\"; break; case \"n17\": return false; case \"n18\": return ((tag)[\"type\"] === \"freeze\"); case \"n20\": return (tag === \"freeze\"); default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n8\"; break; case \"n8\": _pc = (! (! __rvb_lexical_0_hasFreezeTag)) ? \"n7\" : \"n1\"; break; case \"n1\": return {success: true}; case \"n7\": __rvb_lexical_1_actionType = \"执行该操作\"; _pc = \"n6\"; break; case \"n6\": _pc = (! (! ((context)[\"type\"] === \"beforeMove\"))) ? \"n3\" : \"n5\"; break; case \"n5\": _pc = (! (! ((context)[\"type\"] === \"beforeSkillUse\"))) ? \"n4\" : \"n2\"; break; case \"n4\": __rvb_lexical_1_actionType = \"使用技能\"; _pc = \"n2\"; break; case \"n3\": __rvb_lexical_1_actionType = \"移动\"; _pc = \"n2\"; break; case \"n2\": return {message: ((((context)[\"piece\"])[\"name\"] + \"被冰冻，无法\") + __rvb_lexical_1_actionType), success: true, blocked: true}; case \"n24\": return {success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _module0 = ((context.piece ? context.piece.instanceId : null)); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1) === null)) { _module2 = __gameplayInvalid; } else { var _module2 = (!(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1))); } var _condition3 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2); if (_condition3 !== __gameplayInvalid && _condition3) { if (!((false === __gameplayInvalid))) { return { \"success\": false }; } } if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)))) { _module5 = __gameplayInvalid; } else { var _module5 = ((flow.query.piece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)).statusTags || []).some(function(tag) { return typeof tag === 'string' ? tag === \"freeze\" : Boolean(tag && tag.type === \"freeze\"); })); } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = (!(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5))); } var _condition7 = ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6); if (_condition7 !== __gameplayInvalid && _condition7) { if (!((true === __gameplayInvalid))) { return { \"success\": true }; } } if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)))) { _module8 = __gameplayInvalid; } else { var _module8 = (String(flow.query.piece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4))[\"name\"])); } var _module9 = ((flow.event.read())[\"type\"]); if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (\"beforeMove\" === __gameplayInvalid) || (\"beforeMove\" === undefined)) { _module10 = __gameplayInvalid; } else { var _module10 = ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === \"beforeMove\")); } if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (\"beforeSkillUse\" === __gameplayInvalid) || (\"beforeSkillUse\" === undefined)) { _module11 = __gameplayInvalid; } else { var _module11 = ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === \"beforeSkillUse\")); } if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === null) || (\"使用技能\" === __gameplayInvalid) || (\"使用技能\" === undefined) || (\"使用技能\" === null) || (\"执行该操作\" === __gameplayInvalid) || (\"执行该操作\" === undefined) || (\"执行该操作\" === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) ? \"使用技能\" : \"执行该操作\")); } if ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) === null) || (\"移动\" === __gameplayInvalid) || (\"移动\" === undefined) || (\"移动\" === null) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10) ? \"移动\" : ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12))); } if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === null) || (\"被冰冻，无法\" === __gameplayInvalid) || (\"被冰冻，无法\" === undefined) || (\"被冰冻，无法\" === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) + \"被冰冻，无法\")); } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === null) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) + ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13))); } if (!((true === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === __gameplayInvalid) || (true === __gameplayInvalid))) { return { \"success\": true, \"message\": ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15), \"blocked\": true }; } }",
   "showInUI": false,
   "keywords": [
     "冰冻"
   ],
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "triggerSkill",
-    "entry": "n25",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:freeze-prevent",
+    "links": []
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": true
+            },
+            {
+              "name": "blocked",
+              "type": "boolean",
+              "optional": true
+            },
+            {
+              "name": "showUIEffect",
+              "type": "boolean",
+              "optional": true
             }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+          ],
+          "body": [
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "context"
-                      },
-                      "key": "piece"
-                    },
-                    "key": "name"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": "被冰冻，无法"
-                  }
-                },
-                "right": {
-                  "kind": "ref",
-                  "name": "__rvb_lexical_1_actionType"
+              "kind": "call",
+              "id": "subject-ref",
+              "module": "ref.event-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "exists",
+              "module": "query.has-piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "subject-ref",
+                  "port": "piece"
                 }
-              }
+              },
+              "parameters": {}
             },
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
+              "kind": "call",
+              "id": "missing",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "exists",
+                  "port": "exists"
+                }
+              },
+              "parameters": {}
             },
             {
-              "key": "blocked",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n3",
-        "kind": "set",
-        "target": {
-          "kind": "ref",
-          "name": "__rvb_lexical_1_actionType"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "literal",
-          "value": "移动"
-        },
-        "next": "n2"
-      },
-      {
-        "id": "n4",
-        "kind": "set",
-        "target": {
-          "kind": "ref",
-          "name": "__rvb_lexical_1_actionType"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "literal",
-          "value": "使用技能"
-        },
-        "next": "n2"
-      },
-      {
-        "id": "n5",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "===",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "type"
+              "kind": "if",
+              "id": "missing-subject",
+              "condition": {
+                "kind": "output",
+                "node": "missing",
+                "port": "value"
               },
-              "right": {
-                "kind": "literal",
-                "value": "beforeSkillUse"
-              }
-            }
-          }
-        },
-        "yes": "n4",
-        "no": "n2"
-      },
-      {
-        "id": "n6",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "===",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "type"
-              },
-              "right": {
-                "kind": "literal",
-                "value": "beforeMove"
-              }
-            }
-          }
-        },
-        "yes": "n3",
-        "no": "n5"
-      },
-      {
-        "id": "n7",
-        "kind": "bind",
-        "name": "__rvb_lexical_1_actionType",
-        "expr": {
-          "kind": "literal",
-          "value": "执行该操作"
-        },
-        "next": "n6"
-      },
-      {
-        "id": "n8",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "ref",
-              "name": "__rvb_lexical_0_hasFreezeTag"
-            }
-          }
-        },
-        "yes": "n7",
-        "no": "n1"
-      },
-      {
-        "id": "n15",
-        "kind": "invoke",
-        "target": {
-          "kind": "function",
-          "value": {
-            "kind": "ref",
-            "name": "__rvb_import_bound_method_0"
-          }
-        },
-        "args": [
-          {
-            "kind": "function",
-            "parameters": [
-              "tag"
-            ],
-            "body": {
-              "entry": "n21",
-              "end": "n16",
-              "nodes": [
+              "then": [
                 {
-                  "id": "n17",
                   "kind": "return",
-                  "value": {
-                    "kind": "literal",
-                    "value": false
-                  }
-                },
-                {
-                  "id": "n18",
-                  "kind": "return",
-                  "value": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "tag"
-                      },
-                      "key": "type"
-                    },
-                    "right": {
+                  "id": "no-subject",
+                  "values": {
+                    "success": {
                       "kind": "literal",
-                      "value": "freeze"
+                      "value": false
                     }
                   }
-                },
-                {
-                  "id": "n19",
-                  "kind": "branch",
-                  "condition": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "unary",
-                      "op": "!",
-                      "argument": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "unary",
-                            "op": "typeof",
-                            "argument": {
-                              "kind": "ref",
-                              "name": "tag"
-                            }
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "object"
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "!==",
-                          "left": {
-                            "kind": "ref",
-                            "name": "tag"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": null
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "yes": "n18",
-                  "no": "n17"
-                },
-                {
-                  "id": "n20",
-                  "kind": "return",
-                  "value": {
-                    "kind": "binary",
-                    "op": "===",
-                    "left": {
-                      "kind": "ref",
-                      "name": "tag"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": "freeze"
-                    }
-                  }
-                },
-                {
-                  "id": "n21",
-                  "kind": "branch",
-                  "condition": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "unary",
-                      "op": "!",
-                      "argument": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "unary",
-                          "op": "typeof",
-                          "argument": {
-                            "kind": "ref",
-                            "name": "tag"
-                          }
-                        },
-                        "right": {
-                          "kind": "literal",
-                          "value": "string"
-                        }
-                      }
-                    }
-                  },
-                  "yes": "n20",
-                  "no": "n19"
-                },
-                {
-                  "id": "n16",
-                  "kind": "regionEnd"
                 }
               ]
-            }
-          }
-        ],
-        "result": "__rvb_lexical_0_hasFreezeTag",
-        "next": "n8"
-      },
-      {
-        "id": "n22",
-        "kind": "bind",
-        "name": "__rvb_import_bound_method_0",
-        "expr": {
-          "kind": "boundMethod",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "context"
-              },
-              "key": "piece"
             },
-            "key": "statusTags"
-          },
-          "method": "some"
-        },
-        "next": "n15"
-      },
-      {
-        "id": "n23",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "get",
-              "object": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "piece"
-              },
-              "key": "statusTags"
-            }
-          }
-        },
-        "yes": "n22",
-        "no": "n1"
-      },
-      {
-        "id": "n24",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
+              "kind": "call",
+              "id": "subject",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "subject-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "status",
+              "module": "status.matches-type",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "subject",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "statusType": "freeze",
+                "legacyStrings": "exact"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "absent",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "status",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "without-status",
+              "condition": {
+                "kind": "output",
+                "node": "absent",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "absent-result",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "name",
+              "module": "attribute.text",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "subject",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "name"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "event",
+              "module": "event.type",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "move",
+              "module": "compare.text",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "event",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "beforeMove"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "skill",
+              "module": "compare.text",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "event",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "beforeSkillUse"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "skill-text",
+              "module": "value.select-text",
+              "version": "1",
+              "inputs": {
+                "condition": {
+                  "kind": "output",
+                  "node": "skill",
+                  "port": "value"
+                },
+                "whenTrue": {
+                  "kind": "literal",
+                  "value": "使用技能"
+                },
+                "whenFalse": {
+                  "kind": "literal",
+                  "value": "执行该操作"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "action-text",
+              "module": "value.select-text",
+              "version": "1",
+              "inputs": {
+                "condition": {
+                  "kind": "output",
+                  "node": "move",
+                  "port": "value"
+                },
+                "whenTrue": {
+                  "kind": "literal",
+                  "value": "移动"
+                },
+                "whenFalse": {
+                  "kind": "output",
+                  "node": "skill-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "prefix",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "name",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "被冰冻，无法"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "message",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "prefix",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "action-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "blocked",
+              "values": {
+                "success": {
+                  "kind": "literal",
+                  "value": true
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "message",
+                  "port": "text"
+                },
+                "blocked": {
+                  "kind": "literal",
+                  "value": true
+                }
               }
             }
           ]
-        }
-      },
-      {
-        "id": "n25",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "context"
-                },
-                "key": "piece"
-              }
-            }
-          }
         },
-        "yes": "n24",
-        "no": "n23"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

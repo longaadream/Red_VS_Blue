@@ -17,6 +17,136 @@ function fixture() {
   return makeState({ pieces: [makePiece({ instanceId: 'self' }), makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, currentHp: 20 })] })
 }
 describe('trusted code-node runtime facade', () => {
+  it('isolates loop counters from battle state and other executions', () => {
+    const battle = fixture(), before = JSON.stringify(battle)
+    const first = createFlowRuntime(battle, {}, 'skill', {}), second = createFlowRuntime(battle, {}, 'skill', {})
+    const counter = first.execution.counter(0.5)
+    expect(first.execution.addCounter(counter, 2)).toBe(2.5)
+    expect(first.execution.readCounter(counter)).toBe(2.5)
+    expect(() => first.execution.addCounter(counter, Infinity)).toThrow('有限')
+    expect(() => second.execution.readCounter(counter)).toThrow('不属于当前执行')
+    expect(() => first.execution.readCounter({ ...counter })).toThrow('不属于当前执行')
+    expect(first.execution.readCounter(counter)).toBe(2.5)
+    expect(JSON.stringify(battle)).toBe(before)
+  })
+  it('preserves registered player counter storage and rejects arbitrary paths before mutation', () => {
+    const battle = fixture(), flow = createFlowRuntime(battle, {}, 'rule', {})
+    const owner = battle.players[0].playerId
+    expect(flow.state.getPlayerNumber('contentCounters', owner)).toBe(0)
+    flow.state.setPlayerNumber('contentCounters', owner, 2.5)
+    flow.state.setPlayerNumber('contentCounters.elPrimoChargeDiscount', owner, 1)
+    expect(battle.extensions?.contentCounters).toEqual({ [owner]: 2.5, elPrimoChargeDiscount: { [owner]: 1 } })
+    const before = JSON.stringify(battle)
+    expect(() => flow.state.setPlayerNumber('contentCounters.other', owner, 3)).toThrow('未注册')
+    expect(() => flow.state.setPlayerNumber('contentCounters', owner, NaN)).toThrow('有限')
+    expect(() => flow.state.setPlayerNumber('contentCounters', 'missing', 3)).toThrow('玩家不存在')
+    expect(JSON.stringify(battle)).toBe(before)
+  })
+  it('retains an in-progress source without accepting forged or cross-execution handles', () => {
+    const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
+    const handle = flow.effects.captureSource('self')
+    battle.pieces = battle.pieces.filter(piece => piece.instanceId !== 'self')
+    expect(flow.effects.damageManyCaptured(handle, ['enemy'], 2, 'true').success).toBe(true)
+    expect(battle.pieces[0].currentHp).toBe(18)
+    expect(() => flow.effects.damageManyCaptured({ ...handle }, ['enemy'], 2, 'true')).toThrow('不属于当前执行')
+    const another = createSkillCodeFlow(battle, {}, 'skill')
+    another.effects.captureSource('enemy')
+    expect(() => another.effects.damageManyCaptured(handle, ['enemy'], 2, 'true')).toThrow('不属于当前执行')
+    expect(battle.pieces[0].currentHp).toBe(18)
+  })
+  it('keeps ritual bookkeeping bound to its captured execution object', () => {
+    const battle = fixture(), source = battle.pieces[0], queue: any[] = []
+    source.name = '仪式来源'
+    const flow = createFlowRuntime(battle, { summonQueue: queue }, 'card', {})
+    const handle = flow.effects.captureSource(source.instanceId)
+    battle.pieces.splice(0, 1)
+    const attack = source.attack
+    expect(flow.effects.capturedAttribute(handle, 'attack', 1)).toBe(attack + 1)
+    expect(flow.effects.capturedName(handle)).toBe('仪式来源')
+    flow.lifecycle.summonCaptured(handle, { x: 2, y: 2 })
+    expect(queue).toEqual([{ sourceId: source.instanceId, summons: [{ x: 2, y: 2 }] }])
+    expect(() => flow.effects.capturedAttribute({ ...handle }, 'attack', 1)).toThrow('不属于当前执行')
+    expect(() => flow.effects.capturedAttribute(handle, 'currentHp' as never, 1)).toThrow('无效结算属性')
+    expect(() => flow.lifecycle.summonCaptured({ ...handle }, { x: 2, y: 2 })).toThrow('不属于当前执行')
+    expect(battle.pieces.some(piece => piece.instanceId === source.instanceId)).toBe(false)
+  })
+  it('limits numeric rewrites to the fields owned by the current event', () => {
+    for (const type of ['beforeTurnStart', 'beforeMove', 'beforeHealTaken']) {
+      const context: any = { type, damage: 4 }, flow = createFlowRuntime(fixture(), context, 'rule', {})
+      expect(() => flow.event.modify('damage', 2)).toThrow('当前事件')
+      expect(context.damage).toBe(4)
+    }
+    const context = { type: 'beforeHealTaken', heal: 4 }, flow = createFlowRuntime(fixture(), context, 'rule', {})
+    flow.event.modify('heal', 0)
+    expect(context.heal).toBe(0)
+    expect(() => flow.event.modify('targetX', 2)).toThrow('当前事件')
+  })
+  it('validates a complete target batch before dispatch and preserves explicit kill ownership', () => {
+    const battle = fixture(), calls: any[] = []
+    const flow = createFlowRuntime(battle, {}, 'rule', { dealDamage: (...args: any[]) => { calls.push(args); return { success: true } } })
+    expect(() => flow.effects.damageMany('self', ['enemy', 'missing'], 2, 'physical')).toThrow('棋子不存在')
+    expect(calls).toHaveLength(0)
+    flow.effects.damageWithKiller('self', 'enemy', 2.5, 'true', 'test', 'player-blue', 'host')
+    expect(calls[0][2]).toBe(2.5)
+    expect(calls[0].slice(5)).toEqual(['test', false, 'player-blue'])
+    expect(() => flow.effects.damageWithKiller('self', 'enemy', 2, 'true', 'test', 'missing')).toThrow('玩家不存在')
+    expect(calls).toHaveLength(1)
+  })
+  it('separates raw status edits from lifecycle counters and rejects raw death or revival', () => {
+    const battle = fixture(), flow = createFlowRuntime(battle, {}, 'rule', {})
+    battle.pieces[0].statusTags = [{ id: 'one', type: 'sleep', remainingTurns: 2 }, { id: 'two', type: 'sleep' }] as any
+    expect(flow.status.consumeCounter('self', 'one', 'remainingTurns')).toBe(1)
+    expect(() => flow.status.consumeCounter('self', 'one', 'currentDuration' as any)).toThrow('状态计数器')
+    expect(flow.status.removeRaw('self', 'type', 'sleep')).toBe(true)
+    expect(battle.pieces[0].statusTags.map(tag => tag.id)).toEqual(['two'])
+    expect(() => flow.attributes.setCurrentHp('self', 0)).toThrow('死亡或复活')
+    battle.pieces[1].currentHp = 0
+    expect(() => flow.attributes.setCurrentHp('enemy', 10)).toThrow('死亡或复活')
+    expect(battle.pieces[1].currentHp).toBe(0)
+  })
+  it('rejects non-module templates before creating dynamic content', () => {
+    const battle = fixture(), flow = createFlowRuntime(battle, {}, 'skill', { loadCardDefinition: () => ({ id: 'legacy', code: 'function executeCard(){}' }) })
+    expect(() => flow.content.materializeTemplate({ kind: 'card', templateId: 'legacy', cardId: 'copy', name: '复制', description: '' })).toThrow('已验证模块图')
+    expect(battle.customCards).toBeUndefined()
+  })
+  it('keeps fractional event writes explicit and rejects writes after settlement or to unrelated fields', () => {
+    const battle = fixture(), context: any = { type: 'beforeDamageTaken', damage: 5 }
+    const flow = createFlowRuntime(battle, context, 'rule', {})
+    flow.event.modify('damage', 1.5, 'host'); expect(context.damage).toBe(1.5)
+    flow.event.modify('damage', 1.5); expect(context.damage).toBe(1)
+    expect(() => flow.event.modify('damage', NaN, 'host')).toThrow('数值策略')
+    expect(() => flow.event.modify('damage', 2, 'invalid' as any)).toThrow('数值策略')
+    expect(() => flow.event.modify('playerId' as any, 2, 'host')).toThrow('结果字段')
+    context.type = 'afterDamageTaken'
+    expect(() => flow.event.modify('damage', 2, 'host')).toThrow('before')
+    expect(context.damage).toBe(1)
+  })
+  it('updates only the identified status and declared numeric fields without emitting removal events', () => {
+    const battle = fixture(), flow = createFlowRuntime(battle, {}, 'rule', {})
+    battle.pieces[0].statusTags = [{ id: 'one', type: 'shield', intensity: 4 }, { id: 'two', type: 'shield', intensity: 8 }] as any
+    expect(flow.status.setNumber('self', 'one', 'intensity', 2.5)).toBe(true)
+    expect(flow.status.setNumber('self', 'missing', 'intensity', 2)).toBe(false)
+    expect(() => flow.status.setNumber('self', 'one', 'ownerPlayerId', 2)).toThrow('状态数值字段')
+    for (const field of ['currentDuration', 'remainingDuration', 'currentUses', 'remainingUses']) expect(() => flow.status.setNumber('self', 'one', field, 0)).toThrow('状态数值字段')
+    expect(() => flow.status.setNumber('self', 'one', 'intensity', Infinity)).toThrow('状态数值字段')
+    expect(battle.pieces[0].statusTags.map(tag => tag.intensity)).toEqual([2.5, 8])
+  })
+  it('retains explicit status origins under host input policy and validates attribute sets', () => {
+    const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
+    flow.status.add('self', { id: 'explicit', type: 'custom', currentDuration: 2 }, 'piece', 'host')
+    expect(battle.pieces[0].statusTags.find(tag => tag.id === 'explicit')).not.toHaveProperty('sourceId')
+    flow.status.add('self', { id: 'inferred', type: 'another-custom', currentDuration: 2 })
+    expect(battle.pieces[0].statusTags.find(tag => tag.id === 'inferred')).toHaveProperty('sourceId', 'self')
+    expect(flow.attributes.set('self', 'defense', 0.5)).toBe(0.5)
+    expect(() => flow.attributes.set('self', 'defense', Infinity)).toThrow('属性无效')
+    expect(() => flow.attributes.set('self', 'x' as any, 5)).toThrow('无效属性')
+    expect(battle.pieces[0].defense).toBe(0.5)
+  })
+  it('preserves authoritative rejection of negative damage under the host input policy', () => {
+    const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
+    expect(() => flow.effects.damage('self', 'enemy', -0.5, 'true', 'negative-input', 'host')).toThrow(/finite non-negative/i)
+    expect(battle.pieces[1].currentHp).toBe(20)
+  })
   it('probes missing dependencies while preserving references during death settlement', () => {
     const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
     expect(flow.query.hasPiece('self')).toBe(true)
@@ -80,11 +210,11 @@ describe('trusted code-node runtime facade', () => {
       for (const type of ['rules','skills']) mkdirSync(join(root, 'data', type), { recursive: true })
       writeFileSync(join(root, 'data/skills/flow-triggered.json'), JSON.stringify(skill))
       for (const [id, extra] of [['flow-inline', { skillCode: code }], ['flow-rule-trigger', { effect: { type: 'triggerSkill', skillId: skill.id } }]] as const)
-        writeFileSync(join(root, 'data/rules', id + '.json'), JSON.stringify({ id, name: id, trigger: { type: 'beforeDamage' }, ...extra }))
+        writeFileSync(join(root, 'data/rules', id + '.json'), JSON.stringify({ id, name: id, trigger: { type: 'beforeDamageDealt' }, ...extra }))
       process.env.RVB_PROFILE_ROOT = root; clearRuleCache(); clearSkillDefinitionCache()
       const battle = fixture(); battle.skillsById = { [skill.id]: skill as any }
-      const context = (): any => ({ type: 'beforeDamage', rulePiece: battle.pieces[0], sourcePiece: battle.pieces[1], playerId: 'player-red', triggerPlayerId: 'player-blue', damage: 10 })
-      for (const rule of [loadRuleById('flow-inline', true)!, loadRuleById('flow-rule-trigger', true)!, convertToTriggerRule({ id: 'legacy-flow', name: 'legacy', trigger: { type: 'beforeDamage' }, effect: { type: 'triggerSkill', skillId: skill.id } } as any)]) {
+      const context = (): any => ({ type: 'beforeDamageDealt', rulePiece: battle.pieces[0], sourcePiece: battle.pieces[1], playerId: 'player-red', triggerPlayerId: 'player-blue', damage: 10 })
+      for (const rule of [loadRuleById('flow-inline', true)!, loadRuleById('flow-rule-trigger', true)!, convertToTriggerRule({ id: 'legacy-flow', name: 'legacy', trigger: { type: 'beforeDamageDealt' }, effect: { type: 'triggerSkill', skillId: skill.id } } as any)]) {
         const event = context(), result = rule.effect(battle, event)
         expect(result.success, rule.id).toBe(true); expect(event.damage, rule.id).toBe(8)
       }
@@ -120,7 +250,7 @@ describe('trusted code-node runtime facade', () => {
     expect(hashBattleState(first)).toBe(hashBattleState(second)); expect(hashBattleState(battle)).toBe(before)
   })
   it('requires formal death context for the existing revival result and declared summon writer', () => {
-    const battle = fixture(), context: any = { rulePiece: battle.pieces[0], sourcePiece: battle.pieces[0], type: 'beforeDamage' }
+    const battle = fixture(), context: any = { rulePiece: battle.pieces[0], sourcePiece: battle.pieces[0], type: 'beforeDamageDealt' }
     const flow = createFlowRuntime(battle, context, 'rule', {})
     expect(() => flow.lifecycle.reviveAfterDeath(.5)).toThrow('正式死亡')
     context.type = 'onPieceDied'; battle.pieces[0].currentHp = 0

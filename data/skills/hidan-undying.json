@@ -130,5 +130,23 @@
         "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:hidan-undying",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-hidan-undying",
+        "relation": "owned",
+        "source": "pieces/red-hidan.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-hidan-dying-immune",
+        "relation": "owned",
+        "source": "pieces/red-hidan.rules"
+      }
+    ]
   }
 }

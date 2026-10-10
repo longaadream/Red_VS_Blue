@@ -33,5 +33,10 @@
   "isDefault": false,
   "rules": [
     "rule-el-primo-injury-counter"
-  ]
+  ],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:el-primo",
+    "links": []
+  }
 }

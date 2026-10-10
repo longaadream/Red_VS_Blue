@@ -1,14 +1,17 @@
 import { compileGameplayModuleGraph, GAMEPLAY_MODULE_COMPILER_VERSION } from './module-compiler'
 import { GAMEPLAY_MODULE_REGISTRY } from './module-registry'
+import { renderGameplayModuleText, type GameplayTextBindings } from './module-text'
 
 export * from './module-types'
 export * from './module-compiler'
 export * from './module-registry'
+export * from './module-text'
+export * from './module-cluster'
 
 export const GAMEPLAY_MODULE_DOCUMENT_VERSION = 'rvb-gameplay-module-document/v1' as const
 type Document = Record<string, unknown>
 type Entry = { graph: unknown; compilerVersion: string }
-type Artifact = { version: typeof GAMEPLAY_MODULE_DOCUMENT_VERSION; entries: Record<string, Entry> }
+type Artifact = { version: typeof GAMEPLAY_MODULE_DOCUMENT_VERSION; entries: Record<string, Entry>; textBindings?: GameplayTextBindings }
 const record = (value: unknown): value is Document => !!value && typeof value === 'object' && !Array.isArray(value)
 const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
 const defaults: Record<string, string> = { skill: 'code', card: 'code', rule: 'skillCode', triggerSkill: 'code', pending: 'effectCode', preview: 'previewCode' }
@@ -25,7 +28,7 @@ function artifact(content: Document): Artifact | undefined {
   if (!own(content, 'gameplayModules')) return undefined
   const value = content.gameplayModules
   if (!record(value) || value.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION || !record(value.entries)) fail('invalid gameplayModules version or entries')
-  if (Object.keys(value).some(key => key !== 'version' && key !== 'entries')) fail('unknown gameplayModules metadata')
+  if (Object.keys(value).some(key => !['version', 'entries', 'textBindings'].includes(key))) fail('unknown gameplayModules metadata')
   if (!Object.keys(value.entries).length) fail('gameplayModules needs at least one entry')
   return value as Artifact
 }
@@ -43,6 +46,11 @@ export function assertGameplayModuleDocument(input: unknown): void {
     if (!fields[compiled.surface]?.includes(field)) fail(`field ${field} is incompatible with ${compiled.surface}`)
     if (primaryField(input) === field || (record(input.contentGraphEntries) && own(input.contentGraphEntries, field))) fail(`multiple authoring sources for ${field}`)
     if (input[field] !== compiled.code) fail(`generated ${field} does not match its module graph`)
+  }
+  if (modules.textBindings !== undefined) {
+    for (const [field, text] of Object.entries(renderGameplayModuleText(modules.entries, modules.textBindings))) {
+      if (input[field] !== text) fail(`generated ${field} does not match its text binding`)
+    }
   }
 }
 
@@ -95,9 +103,23 @@ export function applyGameplayModuleGraph(input: Document, graph: unknown, field?
   // Snapshot JSON-safe authoring data; retaining mutable caller objects would
   // let an editor change graph semantics after its generated source was checked.
   next.gameplayModules = {
+    ...(prior?.textBindings === undefined ? {} : { textBindings: prior.textBindings }),
     version: GAMEPLAY_MODULE_DOCUMENT_VERSION,
     entries: { ...prior?.entries, [target]: { graph: JSON.parse(JSON.stringify(graph)), compilerVersion: GAMEPLAY_MODULE_COMPILER_VERSION } },
   }
+  const updated = next.gameplayModules as Artifact
+  if (updated.textBindings !== undefined) Object.assign(next, renderGameplayModuleText(updated.entries, updated.textBindings))
+  assertGameplayModuleDocument(next)
+  return next
+}
+
+/** Bind original wording to the same typed inputs used by execution and UI. */
+export function applyGameplayModuleTextBindings(input: Document, bindings: GameplayTextBindings): Document {
+  assertGameplayModuleDocument(input)
+  const modules = artifact(input)
+  if (!modules) fail('text bindings require a module document')
+  const snapshot = JSON.parse(JSON.stringify(bindings)) as GameplayTextBindings
+  const next = { ...input, ...renderGameplayModuleText(modules.entries, snapshot), gameplayModules: { ...modules, textBindings: snapshot } }
   assertGameplayModuleDocument(next)
   return next
 }

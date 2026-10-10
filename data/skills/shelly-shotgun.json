@@ -31,1097 +31,1299 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var damage, direction, dx, dy, event, events, i, multiplier, multipliers, result, source, targetPosition; var _pc = \"n27\"; for (var _step = 0; _step <= 13; _step++) { switch (_pc) { case \"n27\": source = (context)[\"piece\"]; _pc = \"n26\"; break; case \"n26\": targetPosition = selectTarget({type: \"grid\", range: 4, filter: \"all\"}); _pc = \"n25\"; break; case \"n25\": _pc = (! (! ((! targetPosition) || (targetPosition)[\"needsTargetSelection\"]))) ? \"n24\" : \"n23\"; break; case \"n23\": dx = ((targetPosition)[\"x\"] - (source)[\"x\"]); _pc = \"n22\"; break; case \"n22\": dy = ((targetPosition)[\"y\"] - (source)[\"y\"]); _pc = \"n21\"; break; case \"n21\": _pc = (! (! (((dx !== 0) && (dy !== 0)) || ((dx === 0) && (dy === 0))))) ? \"n20\" : \"n19\"; break; case \"n19\": direction = {x: ((dx === 0) ? 0 : ((dx > 0) ? 1 : (- 1))), y: ((dy === 0) ? 0 : ((dy > 0) ? 1 : (- 1)))}; _pc = \"n18\"; break; case \"n18\": events = traceProjectile({x: (source)[\"x\"], y: (source)[\"y\"]}, direction, {excludePieceId: (source)[\"instanceId\"], maxDistance: 4}); _pc = \"n17\"; break; case \"n17\": i = 0; _pc = \"n16\"; break; case \"n16\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (i < (events)[\"length\"])))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n13\"; while (__rvb_content_graph_region_pc_2 !== \"n2\") { switch (__rvb_content_graph_region_pc_2) { case \"n13\": event = (events)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(i)]; __rvb_content_graph_region_pc_2 = \"n12\"; break; case \"n12\": __rvb_content_graph_region_pc_2 = (! (! ((event)[\"type\"] === \"piece\"))) ? \"n11\" : \"n4\"; break; case \"n4\": __rvb_content_graph_region_pc_2 = (! (! (((event)[\"type\"] === \"terrain\") && (event)[\"blocksProjectile\"]))) ? \"n3\" : \"n2\"; break; case \"n2\": __rvb_content_graph_region_pc_2 = \"n2\"; break; case \"n3\": return {success: true, message: ((source)[\"name\"] + \"的大口径霰弹枪被地形阻挡\")}; case \"n11\": __rvb_content_graph_region_pc_2 = (! (! arePlayersAllied(battle, ((event)[\"piece\"])[\"ownerPlayerId\"], (source)[\"ownerPlayerId\"]))) ? \"n10\" : \"n9\"; break; case \"n9\": multipliers = {\"1\": 2, \"2\": 1.5, \"3\": 1, \"4\": 0.5}; __rvb_content_graph_region_pc_2 = \"n8\"; break; case \"n8\": multiplier = ((multipliers)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((event)[\"distance\"])] || 0.5); __rvb_content_graph_region_pc_2 = \"n7\"; break; case \"n7\": damage = Math.floor(((source)[\"attack\"] * multiplier)); __rvb_content_graph_region_pc_2 = \"n6\"; break; case \"n6\": result = dealDamage(source, (event)[\"piece\"], damage, \"physical\", battle, ((context)[\"skill\"])[\"id\"]); __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": return {success: true, message: ((((((source)[\"name\"] + \"使用大口径霰弹枪命中\") + ((event)[\"piece\"])[\"name\"]) + \"，造成\") + ((result)[\"damage\"] || 0)) + \"点伤害\")}; case \"n10\": return {success: true, message: ((source)[\"name\"] + \"的大口径霰弹枪被友方棋子阻挡\")}; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; { var __rvb_content_graph_region_pc_3 = \"n15\"; while (__rvb_content_graph_region_pc_3 !== \"n14\") { switch (__rvb_content_graph_region_pc_3) { case \"n15\": i = ((+ i) + 1); __rvb_content_graph_region_pc_3 = \"n14\"; break; case \"n14\": __rvb_content_graph_region_pc_3 = \"n14\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((source)[\"name\"] + \"的大口径霰弹枪未命中敌人\")}; case \"n20\": return {success: false, message: \"请选择正方向\"}; case \"n24\": return targetPosition; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"弹射物。选择正方向，对首个敌人（4）造成伤害，对距离1/2/3/4格敌人造成2/1.5/1/0.5倍伤害。\", expectedValues: {damageByDistance: [Math.floor(((piece)[\"attack\"] * 2)), Math.floor(((piece)[\"attack\"] * 1.5)), (piece)[\"attack\"], Math.floor(((piece)[\"attack\"] * 0.5))]}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "skill",
-    "entry": "n27",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } var _module2 = (selectTarget({type: \"grid\", range: 4, filter: \"all\"})); if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module3 = __gameplayInvalid; } else { var _module3 = ((!((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsTargetSelection) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsOptionSelection))); } var _condition5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3); if (_condition5 !== __gameplayInvalid && _condition5) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module4 = __gameplayInvalid; } else { var _module4 = (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)); } if (!((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4) === __gameplayInvalid))) { return ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4); } } if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = (({x: (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)).x, y: (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)).y})); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === null)) { _module7 = { \"events\": __gameplayInvalid, \"dx\": __gameplayInvalid, \"dy\": __gameplayInvalid, \"valid\": __gameplayInvalid, \"sameCell\": __gameplayInvalid, \"distance\": __gameplayInvalid }; } else { var _module7 = ((function(sourceId,targetCell,maxDistance){if(sourceId==null||!targetCell||!Number.isInteger(targetCell.x)||!Number.isInteger(targetCell.y)||!flow.query.hasPiece(sourceId))return {events:[],dx:0,dy:0,valid:false,sameCell:false,distance:0};var source=flow.query.piece(sourceId),dx=targetCell.x-source.x,dy=targetCell.y-source.y,sameCell=dx===0&&dy===0,valid=(dx===0)!==(dy===0),sx=dx===0?0:(dx>0?1:-1),sy=dy===0?0:(dy>0?1:-1);return {events:valid?flow.query.path({x:source.x,y:source.y},{x:sx,y:sy},{maxDistance:Math.floor(maxDistance),excludePieceId:sourceId}):[],dx:sx,dy:sy,valid:valid,sameCell:sameCell,distance:Math.max(Math.abs(dx),Math.abs(dy))};})(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1),((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6),4)); } var _condition9 = (_module7[\"valid\"]); if (_condition9 !== __gameplayInvalid && _condition9) {  } else if (_condition9 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"请选择正方向\" === __gameplayInvalid) || (\"请选择正方向\" === null)) { _module8 = __gameplayInvalid; } else { var _module8 = (({success: false, message: \"请选择正方向\"})); } if (!((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"result\")) ? _module8[\"result\"] : _module8) === __gameplayInvalid))) { return ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"result\")) ? _module8[\"result\"] : _module8); } } for (var _index10 = 0, _items11 = (_module7[\"events\"]); _items11 !== __gameplayInvalid && _items11 != null && _index10 < _items11.length; _index10 += 1) { var _item12 = _items11[_index10]; if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_item12 === null)) { _module13 = __gameplayInvalid; } else { var _module13 = (String((_item12&&_item12.type)||'')); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === null) || (\"piece\" === __gameplayInvalid) || (\"piece\" === undefined) || (\"piece\" === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === \"piece\")); } var _condition39 = ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14); if (_condition39 !== __gameplayInvalid && _condition39) { if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_item12 === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((_item12&&_item12.piece?_item12.piece.instanceId:null)); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === null) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15)))) { _module16 = __gameplayInvalid; } else { var _module16 = ((function(sourceId,targetId){if(sourceId==null||targetId==null||!flow.query.hasPiece(sourceId)||!flow.query.hasPiece(targetId))return false;return flow.query.pieces({originId:sourceId,relation:\"ally\",includeDead:true}).indexOf(targetId)>=0;})(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1),((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15))); } var _condition21 = ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16); if (_condition21 !== __gameplayInvalid && _condition21) { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module17 = __gameplayInvalid; } else { var _module17 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((\"\" + ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17))); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === null) || (\"的大口径霰弹枪被友方棋子阻挡\" === __gameplayInvalid) || (\"的大口径霰弹枪被友方棋子阻挡\" === undefined) || (\"的大口径霰弹枪被友方棋子阻挡\" === null)) { _module19 = __gameplayInvalid; } else { var _module19 = ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) + \"的大口径霰弹枪被友方棋子阻挡\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19) === null)) { _module20 = __gameplayInvalid; } else { var _module20 = (({success: true, message: ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"text\")) ? _module19[\"text\"] : _module19)})); } if (!((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"result\")) ? _module20[\"result\"] : _module20) === __gameplayInvalid))) { return ((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"result\")) ? _module20[\"result\"] : _module20); } } if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_item12 === null)) { _module22 = __gameplayInvalid; } else { var _module22 = (Number((_item12&&_item12.distance)||0)); } if ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"distance\")) ? _module22[\"distance\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"distance\")) ? _module22[\"distance\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"distance\")) ? _module22[\"distance\"] : _module22) === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((function(distance,values){var index=Math.floor(distance)-1;return index>=0&&index<values.length&&Number.isFinite(values[index])?values[index]:0;})(((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"distance\")) ? _module22[\"distance\"] : _module22),JSON.parse(\"[2,1.5,1,0.5]\"))); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module24 = __gameplayInvalid; } else { var _module24 = (flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"attack\"]); } if ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) * ((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23))); } if ((((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25) === __gameplayInvalid) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25) === undefined) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25) === null)) { _module26 = __gameplayInvalid; } else { var _module26 = (Math.floor(((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25))); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module27 = __gameplayInvalid; } else { var _module27 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === null) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15)))) { _module28 = __gameplayInvalid; } else { var _module28 = (String(flow.query.piece(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15))[\"name\"])); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) === null) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15))) || (((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"value\")) ? _module26[\"value\"] : _module26) === __gameplayInvalid) || (((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"value\")) ? _module26[\"value\"] : _module26) === undefined) || (((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"value\")) ? _module26[\"value\"] : _module26) === null)) { _module29 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid, \"damage\": __gameplayInvalid }; } else { var _module29 = ((function(value){return {result: value, success: value.success, damage: value.damage}})(flow.effects.damage(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"piece\")) ? _module15[\"piece\"] : _module15), ((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"value\")) ? _module26[\"value\"] : _module26), \"physical\", \"shelly-shotgun\", \"host\"))); } if (((_module29[\"damage\"]) === __gameplayInvalid) || ((_module29[\"damage\"]) === undefined)) { _module30 = __gameplayInvalid; } else { var _module30 = (Math.max(0, (_module29[\"damage\"]) ?? 0)); } if ((((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === __gameplayInvalid) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === undefined) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === null)) { _module31 = __gameplayInvalid; } else { var _module31 = (String(((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30))); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === undefined) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27) === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((\"\" + ((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"text\")) ? _module27[\"text\"] : _module27))); } if ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === __gameplayInvalid) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === undefined) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === null) || (\"使用大口径霰弹枪命中\" === __gameplayInvalid) || (\"使用大口径霰弹枪命中\" === undefined) || (\"使用大口径霰弹枪命中\" === null)) { _module33 = __gameplayInvalid; } else { var _module33 = ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) + \"使用大口径霰弹枪命中\")); } if ((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === __gameplayInvalid) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === undefined) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) === null) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28) === null)) { _module34 = __gameplayInvalid; } else { var _module34 = ((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"text\")) ? _module33[\"text\"] : _module33) + ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"text\")) ? _module28[\"text\"] : _module28))); } if ((((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === undefined) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) === null) || (\"，造成\" === __gameplayInvalid) || (\"，造成\" === undefined) || (\"，造成\" === null)) { _module35 = __gameplayInvalid; } else { var _module35 = ((((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"text\")) ? _module34[\"text\"] : _module34) + \"，造成\")); } if ((((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === __gameplayInvalid) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === undefined) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === null) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31) === __gameplayInvalid) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31) === undefined) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31) === null)) { _module36 = __gameplayInvalid; } else { var _module36 = ((((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) + ((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"text\")) ? _module31[\"text\"] : _module31))); } if ((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === undefined) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === null) || (\"点伤害\" === __gameplayInvalid) || (\"点伤害\" === undefined) || (\"点伤害\" === null)) { _module37 = __gameplayInvalid; } else { var _module37 = ((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) + \"点伤害\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === null)) { _module38 = __gameplayInvalid; } else { var _module38 = (({success: true, message: ((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37)})); } if (!((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"result\")) ? _module38[\"result\"] : _module38) === __gameplayInvalid))) { return ((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"result\")) ? _module38[\"result\"] : _module38); } } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === null) || (\"terrain\" === __gameplayInvalid) || (\"terrain\" === undefined) || (\"terrain\" === null)) { _module40 = __gameplayInvalid; } else { var _module40 = ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"kind\")) ? _module13[\"kind\"] : _module13) === \"terrain\")); } var _condition47 = ((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40); if (_condition47 !== __gameplayInvalid && _condition47) { if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_item12 === null)) { _module41 = __gameplayInvalid; } else { var _module41 = (Boolean(_item12&&_item12.blocksProjectile)); } var _condition46 = ((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"blocks\")) ? _module41[\"blocks\"] : _module41); if (_condition46 !== __gameplayInvalid && _condition46) { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module42 = __gameplayInvalid; } else { var _module42 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === __gameplayInvalid) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === undefined) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42) === null)) { _module43 = __gameplayInvalid; } else { var _module43 = ((\"\" + ((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"text\")) ? _module42[\"text\"] : _module42))); } if ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === __gameplayInvalid) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === undefined) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) === null) || (\"的大口径霰弹枪被地形阻挡\" === __gameplayInvalid) || (\"的大口径霰弹枪被地形阻挡\" === undefined) || (\"的大口径霰弹枪被地形阻挡\" === null)) { _module44 = __gameplayInvalid; } else { var _module44 = ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"text\")) ? _module43[\"text\"] : _module43) + \"的大口径霰弹枪被地形阻挡\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === __gameplayInvalid) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === null)) { _module45 = __gameplayInvalid; } else { var _module45 = (({success: true, message: ((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44)})); } if (!((((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"result\")) ? _module45[\"result\"] : _module45) === __gameplayInvalid))) { return ((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"result\")) ? _module45[\"result\"] : _module45); } } } } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module48 = __gameplayInvalid; } else { var _module48 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === __gameplayInvalid) || (((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === undefined) || (((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48) === null)) { _module49 = __gameplayInvalid; } else { var _module49 = ((\"\" + ((_module48 !== null && typeof _module48 === \"object\" && Object.prototype.hasOwnProperty.call(_module48, \"text\")) ? _module48[\"text\"] : _module48))); } if ((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"text\")) ? _module49[\"text\"] : _module49) === __gameplayInvalid) || (((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"text\")) ? _module49[\"text\"] : _module49) === undefined) || (((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"text\")) ? _module49[\"text\"] : _module49) === null) || (\"的大口径霰弹枪未命中敌人\" === __gameplayInvalid) || (\"的大口径霰弹枪未命中敌人\" === undefined) || (\"的大口径霰弹枪未命中敌人\" === null)) { _module50 = __gameplayInvalid; } else { var _module50 = ((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"text\")) ? _module49[\"text\"] : _module49) + \"的大口径霰弹枪未命中敌人\")); } if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) === __gameplayInvalid) || (((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50) === null)) { _module51 = __gameplayInvalid; } else { var _module51 = (({success: true, message: ((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"text\")) ? _module50[\"text\"] : _module50)})); } if (!((((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"result\")) ? _module51[\"result\"] : _module51) === __gameplayInvalid))) { return ((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"result\")) ? _module51[\"result\"] : _module51); } }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if (((context[\"piece\"]) === __gameplayInvalid) || ((context[\"piece\"]) === undefined) || ((context[\"piece\"]) === null) || ((context[\"piece\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece((context[\"piece\"])))) { _module0 = __gameplayInvalid; } else { var _module0 = (Number(((context[\"piece\"]))[\"attack\"])); } if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"value\")) ? _module0[\"value\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"value\")) ? _module0[\"value\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"value\")) ? _module0[\"value\"] : _module0) === null) || (2 === __gameplayInvalid) || (2 === undefined) || (2 === null)) { _module1 = __gameplayInvalid; } else { var _module1 = ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"value\")) ? _module0[\"value\"] : _module0) * 2)); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === null)) { _module2 = __gameplayInvalid; } else { var _module2 = (Math.floor(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1))); } if (((context[\"piece\"]) === __gameplayInvalid) || ((context[\"piece\"]) === undefined) || ((context[\"piece\"]) === null) || ((context[\"piece\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece((context[\"piece\"])))) { _module3 = __gameplayInvalid; } else { var _module3 = (Number(((context[\"piece\"]))[\"attack\"])); } if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === null) || (1.5 === __gameplayInvalid) || (1.5 === undefined) || (1.5 === null)) { _module4 = __gameplayInvalid; } else { var _module4 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) * 1.5)); } if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4) === null)) { _module5 = __gameplayInvalid; } else { var _module5 = (Math.floor(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4))); } if (((context[\"piece\"]) === __gameplayInvalid) || ((context[\"piece\"]) === undefined) || ((context[\"piece\"]) === null) || ((context[\"piece\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece((context[\"piece\"])))) { _module6 = __gameplayInvalid; } else { var _module6 = (((context[\"piece\"]))[\"attack\"]); } if (((context[\"piece\"]) === __gameplayInvalid) || ((context[\"piece\"]) === undefined) || ((context[\"piece\"]) === null) || ((context[\"piece\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece((context[\"piece\"])))) { _module7 = __gameplayInvalid; } else { var _module7 = (Number(((context[\"piece\"]))[\"attack\"])); } if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === null) || (0.5 === __gameplayInvalid) || (0.5 === undefined) || (0.5 === null)) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) * 0.5)); } if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === null)) { _module9 = __gameplayInvalid; } else { var _module9 = (Math.floor(((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8))); } var _collection10 = __gameplayInvalid; var _items11 = JSON.parse(\"[0,1,2,3]\"); if (Array.isArray(_items11)) { if (_items11.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues22 = [];  for (var _index12 = 0; _index12 < _items11.length; _index12 += 1) { var _item13 = _items11[_index12]; var _collectionResult14 = __gameplayInvalid; _collectionDone15: { if ((_index12 === __gameplayInvalid) || (_index12 === undefined) || (_index12 === null) || (2 === __gameplayInvalid) || (2 === undefined) || (2 === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((_index12 === 2)); } if ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === __gameplayInvalid) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === undefined) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === null) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid)) { _module17 = __gameplayInvalid; } else { var _module17 = ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) ? ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) : ((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9))); } if ((_index12 === __gameplayInvalid) || (_index12 === undefined) || (_index12 === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((_index12 === 1)); } if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid)) { _module19 = __gameplayInvalid; } else { var _module19 = ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) ? ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) : ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17))); } if ((_index12 === __gameplayInvalid) || (_index12 === undefined) || (_index12 === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module20 = __gameplayInvalid; } else { var _module20 = ((_index12 === 0)); } if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === __gameplayInvalid)) { _module21 = __gameplayInvalid; } else { var _module21 = ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) ? ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) : ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19))); } if (!((((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === __gameplayInvalid))) { _collectionResult14 = { \"value\": ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) }; break _collectionDone15; } } if (_collectionResult14 !== __gameplayInvalid && _collectionResult14 != null) { _collectionValues22.push(_collectionResult14[\"value\"]); } } var _collection10 = _collectionValues22; } var _record23 = ({\"damageByDistance\": _collection10}); var _record24 = ({\"description\": \"弹射物。选择正方向，对首个敌人（4）造成伤害，对距离1/2/3/4格敌人造成2/1.5/1/0.5倍伤害。\", \"expectedValues\": _record23}); if (!((_record24 === __gameplayInvalid))) { return _record24; } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:shelly-shotgun",
+    "links": []
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "inputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
+              "name": "piece",
+              "type": "piece"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "result",
+              "type": {
+                "kind": "record",
+                "schema": "preview-result@1"
+              }
+            }
+          ],
+          "schemas": [
+            {
+              "id": "preview-expected-values",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "damageByDistance",
+                  "type": {
+                    "kind": "list",
+                    "element": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "preview-result",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "description",
+                  "type": "string"
+                },
+                {
+                  "name": "expectedValues",
+                  "type": {
+                    "kind": "record",
+                    "schema": "preview-expected-values@1"
+                  }
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "piece-number-nan-0",
+              "module": "preview.piece-number-nan",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "input",
+                  "name": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "attack"
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
+              "kind": "call",
+              "id": "binary-1",
+              "module": "math.multiply",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "source"
-                  },
-                  "key": "name"
+                  "kind": "output",
+                  "node": "piece-number-nan-0",
+                  "port": "value"
                 },
                 "right": {
                   "kind": "literal",
-                  "value": "的大口径霰弹枪未命中敌人"
-                }
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n16",
-        "kind": "loop",
-        "loop": "for",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "<",
-              "left": {
-                "kind": "ref",
-                "name": "i"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "events"
-                },
-                "key": "length"
-              }
-            }
-          }
-        },
-        "body": {
-          "entry": "n13",
-          "end": "n2",
-          "nodes": [
-            {
-              "id": "n2",
-              "kind": "regionEnd"
-            },
-            {
-              "id": "n3",
-              "kind": "return",
-              "value": {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "success",
-                    "value": {
-                      "kind": "literal",
-                      "value": true
-                    }
-                  },
-                  {
-                    "key": "message",
-                    "value": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "source"
-                        },
-                        "key": "name"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "的大口径霰弹枪被地形阻挡"
-                      }
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "id": "n4",
-              "kind": "branch",
-              "condition": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "binary",
-                    "op": "&&",
-                    "left": {
-                      "kind": "binary",
-                      "op": "===",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "event"
-                        },
-                        "key": "type"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "terrain"
-                      }
-                    },
-                    "right": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "event"
-                      },
-                      "key": "blocksProjectile"
-                    }
-                  }
+                  "value": 2
                 }
               },
-              "yes": "n3",
-              "no": "n2"
+              "parameters": {}
             },
             {
-              "id": "n5",
-              "kind": "return",
-              "value": {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "success",
-                    "value": {
-                      "kind": "literal",
-                      "value": true
-                    }
-                  },
-                  {
-                    "key": "message",
-                    "value": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "binary",
-                        "op": "+",
-                        "left": {
-                          "kind": "binary",
-                          "op": "+",
-                          "left": {
-                            "kind": "binary",
-                            "op": "+",
-                            "left": {
-                              "kind": "binary",
-                              "op": "+",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "source"
-                                },
-                                "key": "name"
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": "使用大口径霰弹枪命中"
-                              }
-                            },
-                            "right": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "event"
-                                },
-                                "key": "piece"
-                              },
-                              "key": "name"
-                            }
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "，造成"
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "||",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "result"
-                            },
-                            "key": "damage"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": 0
-                          }
-                        }
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "点伤害"
-                      }
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "id": "n6",
               "kind": "call",
-              "capability": "dealDamage",
-              "args": [
-                {
-                  "kind": "ref",
-                  "name": "source"
-                },
-                {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "event"
-                  },
-                  "key": "piece"
-                },
-                {
-                  "kind": "ref",
-                  "name": "damage"
-                },
-                {
-                  "kind": "literal",
-                  "value": "physical"
-                },
-                {
-                  "kind": "ref",
-                  "name": "battle"
-                },
-                {
-                  "kind": "get",
-                  "object": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "context"
-                    },
-                    "key": "skill"
-                  },
-                  "key": "id"
+              "id": "floor-2",
+              "module": "math.floor",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "binary-1",
+                  "port": "value"
                 }
-              ],
-              "result": "result",
-              "next": "n5"
-            },
-            {
-              "id": "n7",
-              "kind": "bind",
-              "name": "damage",
-              "expr": {
-                "kind": "call",
-                "callee": "Math.floor",
-                "args": [
-                  {
-                    "kind": "binary",
-                    "op": "*",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "source"
-                      },
-                      "key": "attack"
-                    },
-                    "right": {
-                      "kind": "ref",
-                      "name": "multiplier"
-                    }
-                  }
-                ]
               },
-              "next": "n6"
+              "parameters": {}
             },
             {
-              "id": "n8",
-              "kind": "bind",
-              "name": "multiplier",
-              "expr": {
-                "kind": "binary",
-                "op": "||",
+              "kind": "call",
+              "id": "piece-number-nan-3",
+              "module": "preview.piece-number-nan",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "input",
+                  "name": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "attack"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "binary-4",
+              "module": "math.multiply",
+              "version": "1",
+              "inputs": {
                 "left": {
-                  "kind": "index",
-                  "object": {
-                    "kind": "ref",
-                    "name": "multipliers"
-                  },
-                  "index": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "event"
-                    },
-                    "key": "distance"
-                  }
+                  "kind": "output",
+                  "node": "piece-number-nan-3",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1.5
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "floor-5",
+              "module": "math.floor",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "binary-4",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "piece-number-6",
+              "module": "preview.piece-number",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "input",
+                  "name": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "attack"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "piece-number-nan-7",
+              "module": "preview.piece-number-nan",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "input",
+                  "name": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "attack"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "binary-8",
+              "module": "math.multiply",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "piece-number-nan-7",
+                  "port": "value"
                 },
                 "right": {
                   "kind": "literal",
                   "value": 0.5
                 }
               },
-              "next": "n7"
+              "parameters": {}
             },
             {
-              "id": "n9",
-              "kind": "bind",
-              "name": "multipliers",
-              "expr": {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "1",
-                    "value": {
+              "kind": "call",
+              "id": "floor-9",
+              "module": "math.floor",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "binary-8",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "collection",
+              "id": "array-10",
+              "method": "map",
+              "items": {
+                "kind": "literal",
+                "value": [
+                  0,
+                  1,
+                  2,
+                  3
+                ]
+              },
+              "inputs": {
+                "value0": {
+                  "kind": "output",
+                  "node": "floor-2",
+                  "port": "value"
+                },
+                "value1": {
+                  "kind": "output",
+                  "node": "floor-5",
+                  "port": "value"
+                },
+                "value2": {
+                  "kind": "output",
+                  "node": "piece-number-6",
+                  "port": "value"
+                },
+                "value3": {
+                  "kind": "output",
+                  "node": "floor-9",
+                  "port": "value"
+                }
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "array-index-2",
+                  "module": "compare.equal",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "index"
+                    },
+                    "right": {
                       "kind": "literal",
                       "value": 2
                     }
                   },
-                  {
-                    "key": "2",
-                    "value": {
-                      "kind": "literal",
-                      "value": 1.5
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "array-select-2",
+                  "module": "logic.select-number",
+                  "version": "1",
+                  "inputs": {
+                    "condition": {
+                      "kind": "output",
+                      "node": "array-index-2",
+                      "port": "value"
+                    },
+                    "whenTrue": {
+                      "kind": "input",
+                      "name": "value2"
+                    },
+                    "whenFalse": {
+                      "kind": "input",
+                      "name": "value3"
                     }
                   },
-                  {
-                    "key": "3",
-                    "value": {
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "array-index-1",
+                  "module": "compare.equal",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "index"
+                    },
+                    "right": {
                       "kind": "literal",
                       "value": 1
                     }
                   },
-                  {
-                    "key": "4",
-                    "value": {
-                      "kind": "literal",
-                      "value": 0.5
-                    }
-                  }
-                ]
-              },
-              "next": "n8"
-            },
-            {
-              "id": "n10",
-              "kind": "return",
-              "value": {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "success",
-                    "value": {
-                      "kind": "literal",
-                      "value": true
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "array-select-1",
+                  "module": "logic.select-number",
+                  "version": "1",
+                  "inputs": {
+                    "condition": {
+                      "kind": "output",
+                      "node": "array-index-1",
+                      "port": "value"
+                    },
+                    "whenTrue": {
+                      "kind": "input",
+                      "name": "value1"
+                    },
+                    "whenFalse": {
+                      "kind": "output",
+                      "node": "array-select-2",
+                      "port": "value"
                     }
                   },
-                  {
-                    "key": "message",
-                    "value": {
-                      "kind": "binary",
-                      "op": "+",
-                      "left": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "source"
-                        },
-                        "key": "name"
-                      },
-                      "right": {
-                        "kind": "literal",
-                        "value": "的大口径霰弹枪被友方棋子阻挡"
-                      }
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "array-index-0",
+                  "module": "compare.equal",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "index"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
                     }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "array-select-0",
+                  "module": "logic.select-number",
+                  "version": "1",
+                  "inputs": {
+                    "condition": {
+                      "kind": "output",
+                      "node": "array-index-0",
+                      "port": "value"
+                    },
+                    "whenTrue": {
+                      "kind": "input",
+                      "name": "value0"
+                    },
+                    "whenFalse": {
+                      "kind": "output",
+                      "node": "array-select-1",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "array-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "array-select-0",
+                    "port": "value"
                   }
-                ]
+                }
+              ]
+            },
+            {
+              "kind": "record.create",
+              "id": "expected-values-11",
+              "schema": "preview-expected-values@1",
+              "fields": {
+                "damageByDistance": {
+                  "kind": "output",
+                  "node": "array-10",
+                  "port": "value"
+                }
               }
             },
             {
-              "id": "n11",
-              "kind": "branch",
-              "condition": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "call",
-                    "callee": "arePlayersAllied",
-                    "args": [
-                      {
-                        "kind": "ref",
-                        "name": "battle"
-                      },
-                      {
-                        "kind": "get",
-                        "object": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "event"
-                          },
-                          "key": "piece"
-                        },
-                        "key": "ownerPlayerId"
-                      },
-                      {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "source"
-                        },
-                        "key": "ownerPlayerId"
-                      }
-                    ]
-                  }
+              "kind": "record.create",
+              "id": "preview-result-12",
+              "schema": "preview-result@1",
+              "fields": {
+                "description": {
+                  "kind": "literal",
+                  "value": "弹射物。选择正方向，对首个敌人（4）造成伤害，对距离1/2/3/4格敌人造成2/1.5/1/0.5倍伤害。"
+                },
+                "expectedValues": {
+                  "kind": "output",
+                  "node": "expected-values-11",
+                  "port": "value"
                 }
-              },
-              "yes": "n10",
-              "no": "n9"
+              }
             },
             {
-              "id": "n12",
-              "kind": "branch",
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview-result-12",
+                "port": "value"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      },
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "source-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "source-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "choice",
+              "module": "choice.target-cell",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "range": 4,
+                "filter": "all"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "unresolved",
+              "module": "choice.is-unresolved",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "return-selection",
               "condition": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "binary",
-                    "op": "===",
+                "kind": "output",
+                "node": "unresolved",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "selection-result",
+                  "module": "choice.as-result",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "return-selection-result",
+                  "value": {
+                    "kind": "output",
+                    "node": "selection-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "target",
+              "module": "choice.cell",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "line",
+              "module": "projectile.trace",
+              "version": "1",
+              "inputs": {
+                "source": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                },
+                "target": {
+                  "kind": "output",
+                  "node": "target",
+                  "port": "cell"
+                }
+              },
+              "parameters": {
+                "maxDistance": 4
+              }
+            },
+            {
+              "kind": "if",
+              "id": "invalid-direction",
+              "condition": {
+                "kind": "output",
+                "node": "line",
+                "port": "valid"
+              },
+              "then": [],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "invalid-direction-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "请选择正方向"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "invalid-direction-result-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "invalid-direction-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "foreach",
+              "id": "events",
+              "items": {
+                "kind": "output",
+                "node": "line",
+                "port": "events"
+              },
+              "item": "event",
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "kind",
+                  "module": "projectile.event-kind",
+                  "version": "1",
+                  "inputs": {
+                    "event": {
+                      "kind": "input",
+                      "name": "event"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "is-piece",
+                  "module": "compare.equal-string",
+                  "version": "1",
+                  "inputs": {
                     "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "event"
-                      },
-                      "key": "type"
+                      "kind": "output",
+                      "node": "kind",
+                      "port": "kind"
                     },
                     "right": {
                       "kind": "literal",
                       "value": "piece"
                     }
-                  }
-                }
-              },
-              "yes": "n11",
-              "no": "n4"
-            },
-            {
-              "id": "n13",
-              "kind": "bind",
-              "name": "event",
-              "expr": {
-                "kind": "index",
-                "object": {
-                  "kind": "ref",
-                  "name": "events"
-                },
-                "index": {
-                  "kind": "ref",
-                  "name": "i"
-                }
-              },
-              "next": "n12"
-            }
-          ]
-        },
-        "update": {
-          "entry": "n15",
-          "end": "n14",
-          "nodes": [
-            {
-              "id": "n14",
-              "kind": "regionEnd"
-            },
-            {
-              "id": "n15",
-              "kind": "set",
-              "target": {
-                "kind": "ref",
-                "name": "i"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "unary",
-                  "op": "+",
-                  "argument": {
-                    "kind": "ref",
-                    "name": "i"
-                  }
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": 1
-                }
-              },
-              "next": "n14"
-            }
-          ]
-        },
-        "next": "n1"
-      },
-      {
-        "id": "n17",
-        "kind": "bind",
-        "name": "i",
-        "expr": {
-          "kind": "literal",
-          "value": 0
-        },
-        "next": "n16"
-      },
-      {
-        "id": "n18",
-        "kind": "call",
-        "capability": "traceProjectile",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "x",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "source"
                   },
-                  "key": "x"
-                }
-              },
-              {
-                "key": "y",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "source"
-                  },
-                  "key": "y"
-                }
-              }
-            ]
-          },
-          {
-            "kind": "ref",
-            "name": "direction"
-          },
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "excludePieceId",
-                "value": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "source"
-                  },
-                  "key": "instanceId"
-                }
-              },
-              {
-                "key": "maxDistance",
-                "value": {
-                  "kind": "literal",
-                  "value": 4
-                }
-              }
-            ]
-          }
-        ],
-        "result": "events",
-        "next": "n17"
-      },
-      {
-        "id": "n19",
-        "kind": "bind",
-        "name": "direction",
-        "expr": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "x",
-              "value": {
-                "kind": "conditional",
-                "test": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dx"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                },
-                "consequent": {
-                  "kind": "literal",
-                  "value": 0
-                },
-                "alternate": {
-                  "kind": "conditional",
-                  "test": {
-                    "kind": "binary",
-                    "op": ">",
-                    "left": {
-                      "kind": "ref",
-                      "name": "dx"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": 0
-                    }
-                  },
-                  "consequent": {
-                    "kind": "literal",
-                    "value": 1
-                  },
-                  "alternate": {
-                    "kind": "unary",
-                    "op": "-",
-                    "argument": {
-                      "kind": "literal",
-                      "value": 1
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "key": "y",
-              "value": {
-                "kind": "conditional",
-                "test": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dy"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                },
-                "consequent": {
-                  "kind": "literal",
-                  "value": 0
-                },
-                "alternate": {
-                  "kind": "conditional",
-                  "test": {
-                    "kind": "binary",
-                    "op": ">",
-                    "left": {
-                      "kind": "ref",
-                      "name": "dy"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": 0
-                    }
-                  },
-                  "consequent": {
-                    "kind": "literal",
-                    "value": 1
-                  },
-                  "alternate": {
-                    "kind": "unary",
-                    "op": "-",
-                    "argument": {
-                      "kind": "literal",
-                      "value": 1
-                    }
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n18"
-      },
-      {
-        "id": "n20",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "请选择正方向"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n21",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "!==",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dx"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "!==",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dy"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dx"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "ref",
-                    "name": "dy"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                }
-              }
-            }
-          }
-        },
-        "yes": "n20",
-        "no": "n19"
-      },
-      {
-        "id": "n22",
-        "kind": "bind",
-        "name": "dy",
-        "expr": {
-          "kind": "binary",
-          "op": "-",
-          "left": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "targetPosition"
-            },
-            "key": "y"
-          },
-          "right": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "source"
-            },
-            "key": "y"
-          }
-        },
-        "next": "n21"
-      },
-      {
-        "id": "n23",
-        "kind": "bind",
-        "name": "dx",
-        "expr": {
-          "kind": "binary",
-          "op": "-",
-          "left": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "targetPosition"
-            },
-            "key": "x"
-          },
-          "right": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "source"
-            },
-            "key": "x"
-          }
-        },
-        "next": "n22"
-      },
-      {
-        "id": "n24",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "targetPosition"
-        }
-      },
-      {
-        "id": "n25",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "targetPosition"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "targetPosition"
-                },
-                "key": "needsTargetSelection"
-              }
-            }
-          }
-        },
-        "yes": "n24",
-        "no": "n23"
-      },
-      {
-        "id": "n26",
-        "kind": "call",
-        "capability": "selectTarget",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "type",
-                "value": {
-                  "kind": "literal",
-                  "value": "grid"
-                }
-              },
-              {
-                "key": "range",
-                "value": {
-                  "kind": "literal",
-                  "value": 4
-                }
-              },
-              {
-                "key": "filter",
-                "value": {
-                  "kind": "literal",
-                  "value": "all"
-                }
-              }
-            ]
-          }
-        ],
-        "result": "targetPosition",
-        "next": "n25"
-      },
-      {
-        "id": "n27",
-        "kind": "bind",
-        "name": "source",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "piece"
-        },
-        "next": "n26"
-      }
-    ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "弹射物。选择正方向，对首个敌人（4）造成伤害，对距离1/2/3/4格敌人造成2/1.5/1/0.5倍伤害。"
-                  }
+                  "parameters": {}
                 },
                 {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": [
-                      {
-                        "key": "damageByDistance",
-                        "value": {
-                          "kind": "array",
-                          "items": [
-                            {
-                              "kind": "call",
-                              "callee": "Math.floor",
-                              "args": [
-                                {
-                                  "kind": "binary",
-                                  "op": "*",
-                                  "left": {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "piece"
-                                    },
-                                    "key": "attack"
-                                  },
-                                  "right": {
-                                    "kind": "literal",
-                                    "value": 2
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "kind": "call",
-                              "callee": "Math.floor",
-                              "args": [
-                                {
-                                  "kind": "binary",
-                                  "op": "*",
-                                  "left": {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "piece"
-                                    },
-                                    "key": "attack"
-                                  },
-                                  "right": {
-                                    "kind": "literal",
-                                    "value": 1.5
-                                  }
-                                }
-                              ]
-                            },
-                            {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "piece"
-                              },
-                              "key": "attack"
-                            },
-                            {
-                              "kind": "call",
-                              "callee": "Math.floor",
-                              "args": [
-                                {
-                                  "kind": "binary",
-                                  "op": "*",
-                                  "left": {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "piece"
-                                    },
-                                    "key": "attack"
-                                  },
-                                  "right": {
-                                    "kind": "literal",
-                                    "value": 0.5
-                                  }
-                                }
-                              ]
-                            }
-                          ]
+                  "kind": "if",
+                  "id": "piece-event",
+                  "condition": {
+                    "kind": "output",
+                    "node": "is-piece",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "hit-target",
+                      "module": "projectile.event-piece",
+                      "version": "1",
+                      "inputs": {
+                        "event": {
+                          "kind": "input",
+                          "name": "event"
                         }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "friendly",
+                      "module": "query.same-relation",
+                      "version": "1",
+                      "inputs": {
+                        "source": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "piece"
+                        },
+                        "target": {
+                          "kind": "output",
+                          "node": "hit-target",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "relation": "ally"
                       }
-                    ]
-                  }
+                    },
+                    {
+                      "kind": "if",
+                      "id": "friendly-block",
+                      "condition": {
+                        "kind": "output",
+                        "node": "friendly",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "source-name",
+                          "module": "attribute.text",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "source",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "attribute": "name"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "friendly-message-0",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "literal",
+                              "value": ""
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "source-name",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "friendly-message-1",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "friendly-message-0",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "的大口径霰弹枪被友方棋子阻挡"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "friendly-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": true
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "friendly-message-1",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "friendly-result-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "friendly-result",
+                            "port": "result"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "distance",
+                      "module": "projectile.event-distance",
+                      "version": "1",
+                      "inputs": {
+                        "event": {
+                          "kind": "input",
+                          "name": "event"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "multiplier",
+                      "module": "projectile.distance-multiplier",
+                      "version": "1",
+                      "inputs": {
+                        "distance": {
+                          "kind": "output",
+                          "node": "distance",
+                          "port": "distance"
+                        }
+                      },
+                      "parameters": {
+                        "values": [
+                          2,
+                          1.5,
+                          1,
+                          0.5
+                        ]
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "attack",
+                      "module": "attribute.read",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "attribute": "attack"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "scaled",
+                      "module": "math.multiply",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "attack",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "multiplier",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "damage-value",
+                      "module": "math.floor",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "scaled",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "source-name-before-hit",
+                      "module": "attribute.text",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "attribute": "name"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "target-name",
+                      "module": "attribute.text",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "hit-target",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "attribute": "name"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "applied",
+                      "module": "effect.damage",
+                      "version": "1",
+                      "inputs": {
+                        "source": {
+                          "kind": "output",
+                          "node": "source",
+                          "port": "piece"
+                        },
+                        "target": {
+                          "kind": "output",
+                          "node": "hit-target",
+                          "port": "piece"
+                        },
+                        "amount": {
+                          "kind": "output",
+                          "node": "damage-value",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "damageType": "normal",
+                        "legacyNormalSpelling": "physical",
+                        "skillId": "shelly-shotgun",
+                        "inputPolicy": "host"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "actual-damage",
+                      "module": "value.number-or-zero",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "applied",
+                          "port": "damage"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "damage-text",
+                      "module": "text.from-number",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "actual-damage",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-0",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "literal",
+                          "value": ""
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "source-name-before-hit",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-1",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "hit-message-0",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "使用大口径霰弹枪命中"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-2",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "hit-message-1",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "target-name",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-3",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "hit-message-2",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "，造成"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-4",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "hit-message-3",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "damage-text",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit-message-5",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "hit-message-4",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "点伤害"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "hit",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": true
+                        },
+                        "message": {
+                          "kind": "output",
+                          "node": "hit-message-5",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "hit-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "hit",
+                        "port": "result"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "is-terrain",
+                  "module": "compare.equal-string",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "kind",
+                      "port": "kind"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "terrain"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "terrain-event",
+                  "condition": {
+                    "kind": "output",
+                    "node": "is-terrain",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "blocked",
+                      "module": "projectile.event-blocks",
+                      "version": "1",
+                      "inputs": {
+                        "event": {
+                          "kind": "input",
+                          "name": "event"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "terrain-blocked",
+                      "condition": {
+                        "kind": "output",
+                        "node": "blocked",
+                        "port": "blocks"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "source-name-terrain",
+                          "module": "attribute.text",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "source",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "attribute": "name"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "terrain-message-0",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "literal",
+                              "value": ""
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "source-name-terrain",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "terrain-message-1",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "terrain-message-0",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "的大口径霰弹枪被地形阻挡"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "terrain-blocked-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": true
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "terrain-message-1",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "terrain-blocked-result-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "terrain-blocked-result",
+                            "port": "result"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
+            },
+            {
+              "kind": "call",
+              "id": "source-name-miss",
+              "module": "attribute.text",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "attribute": "name"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "miss-message-0",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": ""
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "source-name-miss",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "miss-message-1",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "miss-message-0",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "的大口径霰弹枪未命中敌人"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "miss",
+              "module": "result.action",
+              "version": "1",
+              "inputs": {
+                "success": {
+                  "kind": "literal",
+                  "value": true
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "miss-message-1",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "miss-return",
+              "value": {
+                "kind": "output",
+                "node": "miss",
+                "port": "result"
+              }
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
   }
 }

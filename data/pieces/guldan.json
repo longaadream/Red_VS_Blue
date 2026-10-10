@@ -32,5 +32,10 @@
   "isDefault": false,
   "playerRules": [
     "rule-soul-fracture-player"
-  ]
+  ],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:guldan",
+    "links": []
+  }
 }

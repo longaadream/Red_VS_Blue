@@ -32,7 +32,7 @@ describe('RED-209 flight markers do not block entry', () => {
     expect(next.pieces[0]).toMatchObject({ x: 2, y: 0 })
   })
 
-  it.each([false, true])('settles the whole flight using occupancy at expiry (occupant leaves: %s)', leaves => {
+  it.each([false, true])('settles each flight landing independently using occupancy at expiry (occupant leaves: %s)', leaves => {
     const definition = JSON.parse(readFileSync(resolve('data/skills/tails-twin-flight.json'), 'utf8'))
     const tails = makePiece({ instanceId: 'tails', templateId: 'tails', x: 1, y: 1,
       skills: [{ skillId: definition.id, currentCooldown: 0 }] })
@@ -52,7 +52,7 @@ describe('RED-209 flight markers do not block entry', () => {
       state = applyBattleAction({ ...state, turn: { ...state.turn, phase: 'action', currentPlayerId: 'player-red',
         turnNumber: state.turn.turnNumber + offset } }, { type: 'endTurn', playerId: 'player-red' })
     }
-    expect(state.pieces.find(p => p.instanceId === 'tails')).toMatchObject(leaves ? { x: 4, y: 4 } : { x: 1, y: 1 })
+    expect(state.pieces.find(p => p.instanceId === 'tails')).toMatchObject({ x: 4, y: 4 })
     expect(state.pieces.find(p => p.instanceId === 'ally')).toMatchObject(leaves ? { x: 4, y: 5 } : { x: 2, y: 1 })
     expect(state.pieces.find(p => p.instanceId === 'intruder')).toMatchObject(leaves ? { x: 6, y: 4 } : { x: 4, y: 5 })
     expect(state.extensions!.tileEffects?.some((e: { type: string }) => e.type === 'tails-flight-reservation')).toBe(false)

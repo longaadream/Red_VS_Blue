@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { applyContentGraph, assertContentGraphArtifact } from '@/electron-editor/content-graph-document'
 import {
   buildContentGraphWithPending,
   type PendingContentGraphBuild,
@@ -20,6 +19,17 @@ import {
 } from '@/lib/game/turn'
 import type { SkillDefinition } from '@/lib/game/skills'
 import { prepareAction } from '@/lib/game/targeting'
+import {
+  assertGameplayModuleDocument,
+  compileGameplayModuleGraph,
+  GAMEPLAY_MODULE_COMPILER_VERSION,
+  type GameplayModuleGraph,
+} from '@/lib/skill-graph/module-document'
+import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
+import {
+  SEMANTIC_PENDING_MIGRATIONS,
+  type PendingMigration,
+} from '@/scripts/migrate-semantic-pending-skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import {
   assertContentGraphParity,
@@ -36,6 +46,14 @@ type PendingFixture = {
   legacy: ContentRecord
   graph: ContentRecord
   build: PendingContentGraphBuild
+  migration: PendingMigration
+  semanticGraph: GameplayModuleGraph
+  semanticCode: string
+  continuations: Array<{
+    id: string
+    graph: GameplayModuleGraph
+    code: string
+  }>
 }
 
 const frozen = JSON.parse(readFileSync(LEGACY_FIXTURE_PATH, 'utf8')) as {
@@ -54,6 +72,19 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
+function semanticContinuations(root: GameplayModuleGraph): PendingFixture['continuations'] {
+  const result: PendingFixture['continuations'] = []
+  const visit = (graph: GameplayModuleGraph): void => {
+    for (const continuation of graph.continuations ?? []) {
+      const compiled = compileGameplayModuleGraph(continuation.graph, GAMEPLAY_MODULE_REGISTRY)
+      result.push({ id: continuation.id, graph: continuation.graph, code: compiled.code })
+      visit(continuation.graph)
+    }
+  }
+  visit(root)
+  return result
+}
+
 function pendingFixture(id: 'minato-spiral-barrage' | 'turalyon-grand-crusade'): PendingFixture {
   const cached = fixtureCache.get(id)
   if (cached) return cached
@@ -63,12 +94,26 @@ function pendingFixture(id: 'minato-spiral-barrage' | 'turalyon-grand-crusade'):
     throw new Error(`Frozen RED-252 fixture has no code for ${id}`)
   }
   const build = buildContentGraphWithPending(legacy.code, 'skill', `${id}.js`)
-  const expected = applyContentGraph(legacy, build.graph, 'code')
+  const migration = SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === `skills/${id}`)
+  if (!migration || migration.field !== 'code') {
+    throw new Error(`Missing semantic pending migration for skills/${id}`)
+  }
+  const semanticGraph = migration.build()
+  const semantic = compileGameplayModuleGraph(semanticGraph, GAMEPLAY_MODULE_REGISTRY)
   const graph = JSON.parse(readFileSync(`data/skills/${id}.json`, 'utf8')) as ContentRecord
-  assertContentGraphArtifact(graph)
-  expect(graph.code).toBe(expected.code)
-  expect(graph.contentGraph).toEqual(expected.contentGraph)
-  const fixture = { legacy, graph, build }
+  assertGameplayModuleDocument(graph)
+  expect(graph.gameplayModules?.entries?.code?.graph).toEqual(semanticGraph)
+  expect(graph.gameplayModules?.entries?.code?.compilerVersion).toBe(semantic.compilerVersion)
+  expect(graph.code).toBe(semantic.code)
+  const fixture = {
+    legacy,
+    graph,
+    build,
+    migration,
+    semanticGraph,
+    semanticCode: semantic.code,
+    continuations: semanticContinuations(semanticGraph),
+  }
   fixtureCache.set(id, fixture)
   return fixture
 }
@@ -388,10 +433,18 @@ function parityOptions<TContent extends ContentRecord>(input: {
 function assertPendingArtifact(fixture: PendingFixture, id: string): void {
   expect(fixture.build.pending.failures, `${id} pending extraction`).toEqual([])
   expect(fixture.build.sourcePairs.length, `${id} source pairs`).toBeGreaterThan(0)
+  expect(fixture.migration.id).toBe(`skills/${id}`)
+  expect(fixture.semanticGraph.surface).toBe('skill')
+  expect(fixture.graph.gameplayModules?.entries?.code?.graph).toEqual(fixture.semanticGraph)
+  expect(fixture.graph.gameplayModules?.entries?.code?.compilerVersion).toBe(GAMEPLAY_MODULE_COMPILER_VERSION)
   expect(fixture.graph.code, `${id} generated parent code`).toEqual(expect.any(String))
   expect(fixture.graph.code.length, `${id} generated parent code`).toBeGreaterThan(0)
-  expect(fixture.graph.contentGraph).toEqual(fixture.build.graph)
-  expect(fixture.graph.contentGraphField).toBe('code')
+  expect(fixture.graph.code).toBe(fixture.semanticCode)
+  expect(fixture.continuations.length, `${id} semantic continuations`).toBeGreaterThan(0)
+  for (const continuation of fixture.continuations) {
+    expect(continuation.graph.surface, `${id}:${continuation.id} surface`).toBe('pending')
+    expect(continuation.code, `${id}:${continuation.id} generated code`).toContain('function(ctx)')
+  }
   expect(fixture.graph.description).toBe(fixture.legacy.description)
 
   for (const pair of fixture.build.sourcePairs) {
@@ -405,6 +458,15 @@ function assertPendingArtifact(fixture: PendingFixture, id: string): void {
   // artifact assertion must never be satisfied by deleting them.
   expect(fixture.graph.code).toContain('effectCode')
   expect(fixture.graph.code).not.toBe(fixture.legacy.code)
+}
+
+function semanticContinuation(
+  fixture: PendingFixture,
+  id: string,
+): PendingFixture['continuations'][number] {
+  const continuation = fixture.continuations.find(candidate => candidate.id === id)
+  if (!continuation) throw new Error(`${fixture.migration.id} is missing semantic continuation ${id}`)
+  return continuation
 }
 
 function restoreLegacyTuralyonPendingState(
@@ -547,9 +609,13 @@ describe('RED-252 pending content graph integration parity', () => {
     expect(normalized.actions).toEqual([{ preStateHash: 'action-data' }])
   })
 
-  it('preserves typed source pairs and completes Turalyon two-stage selection', async () => {
+  it('preserves semantic continuation declarations and completes Turalyon two-stage selection', async () => {
     const fixture = pendingFixture('turalyon-grand-crusade')
     assertPendingArtifact(fixture, 'turalyon-grand-crusade')
+    expect(fixture.continuations.map(continuation => continuation.id)).toEqual([
+      'turalyon-grand-crusade-select-cell',
+      'turalyon-grand-crusade-complete',
+    ])
     expect(fixture.build.sourcePairs.map(pair => pair.candidate.functionName)).toEqual([
       'chooseGathering',
       'completeGathering',
@@ -608,15 +674,18 @@ describe('RED-252 pending content graph integration parity', () => {
     const fixture = pendingFixture('turalyon-grand-crusade')
     const plan = turalyonPlan(fixture.legacy)
     const childPair = fixture.build.sourcePairs[1]
+    const semanticChild = semanticContinuation(fixture, 'turalyon-grand-crusade-complete')
     if (!childPair) throw new Error('Turalyon is missing its completeGathering source pair')
     expect(childPair.candidate.functionName).toBe('completeGathering')
     expect(childPair.legacy).toContain('function completeGathering')
     expect(childPair.compiled).toContain('function(ctx)')
     expect(childPair.compiled).not.toBe(childPair.legacy)
+    expect(semanticChild.graph.surface).toBe('pending')
+    expect(semanticChild.code).toContain('function(ctx)')
 
     const legacyState = restoreLegacyTuralyonPendingState(plan, fixture.legacy, childPair.legacy)
-    const graphState = restoreLegacyTuralyonPendingState(plan, fixture.graph, childPair.compiled)
-    assertLegacyPendingStateEqual(legacyState, graphState, childPair.legacy, childPair.compiled)
+    const graphState = restoreLegacyTuralyonPendingState(plan, fixture.graph, semanticChild.code)
+    assertLegacyPendingStateEqual(legacyState, graphState, childPair.legacy, semanticChild.code)
 
     const legacy = executeLegacyPendingVariant(legacyState, fixture.legacy, plan.resolve, 'legacy')
     const graph = executeLegacyPendingVariant(graphState, fixture.graph, plan.resolve, 'graph')
@@ -636,6 +705,7 @@ describe('RED-252 pending content graph integration parity', () => {
     const fixture = pendingFixture('turalyon-grand-crusade')
     const plan = turalyonPlan(fixture.legacy)
     const childPair = fixture.build.sourcePairs[1]
+    const semanticChild = semanticContinuation(fixture, 'turalyon-grand-crusade-complete')
     if (!childPair) throw new Error('Turalyon is missing its completeGathering source pair')
     const invalidResolve: TuralyonPlan['resolve'] = {
       ...plan.resolve,
@@ -643,16 +713,16 @@ describe('RED-252 pending content graph integration parity', () => {
       targetY: -1,
     }
     const legacyState = restoreLegacyTuralyonPendingState(plan, fixture.legacy, childPair.legacy)
-    const graphState = restoreLegacyTuralyonPendingState(plan, fixture.graph, childPair.compiled)
+    const graphState = restoreLegacyTuralyonPendingState(plan, fixture.graph, semanticChild.code)
     const legacy = executeLegacyPendingVariant(legacyState, fixture.legacy, invalidResolve, 'legacy')
     const graph = executeLegacyPendingVariant(graphState, fixture.graph, invalidResolve, 'graph')
     if (!legacy.error || !graph.error) throw new Error('Expected invalid legacy pending target to be rejected')
     expect(legacy.error).toMatchObject({ name: 'TargetingRuleError' })
     expect(graph.error).toMatchObject({ name: 'TargetingRuleError' })
     expect(legacy.error.message).toBe(graph.error.message)
-    assertLegacyPendingStateEqual(legacy.state, graph.state, childPair.legacy, childPair.compiled)
+    assertLegacyPendingStateEqual(legacy.state, graph.state, childPair.legacy, semanticChild.code)
     expect(legacy.state.pendingTargetSelection?.effectCode).toBe(childPair.legacy)
-    expect(graph.state.pendingTargetSelection?.effectCode).toBe(childPair.compiled)
+    expect(graph.state.pendingTargetSelection?.effectCode).toBe(semanticChild.code)
     expect(legacy.state.pendingTargetSelection?.transaction).toBeUndefined()
     expect(graph.state.pendingTargetSelection?.transaction).toBeUndefined()
   })

@@ -16,5 +16,10 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { const sourcePiece = context.piece; const damage = context.damage || 0; const healAmount = Math.floor(damage * 0.5); if (healAmount > 0 && sourcePiece.currentHp < sourcePiece.maxHp) { const healResult = healDamage(sourcePiece, sourcePiece, healAmount, context.battle, context.skill.id); return { message: sourcePiece.name + '通过收割治疗了' + healResult.heal + '点生命', success: true }; } return { message: '', success: true }; }"
+  "code": "function executeSkill(context) { const sourcePiece = context.piece; const damage = context.damage || 0; const healAmount = Math.floor(damage * 0.5); if (healAmount > 0 && sourcePiece.currentHp < sourcePiece.maxHp) { const healResult = healDamage(sourcePiece, sourcePiece, healAmount, context.battle, context.skill.id); return { message: sourcePiece.name + '通过收割治疗了' + healResult.heal + '点生命', success: true }; } return { message: '', success: true }; }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:reap-heal",
+    "links": []
+  }
 }

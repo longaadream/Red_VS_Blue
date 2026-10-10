@@ -11,6 +11,7 @@
 <script src="content-graph-core.js"></script>
 <script src="content-graph-editor.js"></script>
 <script src="gameplay-module-editor.js"></script>
+<script src="skill-cluster-editor.js"></script>
 <script src="source-flow.js"></script>
 <script src="code-ide.js"></script>
 <link rel="stylesheet" href="code-ide.css">
@@ -18,6 +19,7 @@
 <link rel="stylesheet" href="skill-graph.css">
 <link rel="stylesheet" href="content-graph.css">
 <link rel="stylesheet" href="gameplay-module-editor.css">
+<link rel="stylesheet" href="skill-cluster-editor.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0d0f12;--rail:#101318;--surface:#15191f;--surface-2:#1b2028;--border:#2a3039;--border-soft:#20252d;--muted:#7f8997;--text:#eef1f5;--text-dim:#b3bac4;--accent:#f05252;--accent-h:#ff6b6b;--blue:#5b8def;--green:#35b97f;--red:#f06464;--yellow:#e8ad4d;--mono:'Cascadia Code','SFMono-Regular',Consolas,monospace}
@@ -50,6 +52,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .editor-frame{max-width:1040px;margin:0 auto;background:var(--surface);border:1px solid var(--border);box-shadow:0 18px 50px #0005}
 .editor-header{min-height:74px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--border)}
 .editor-title{min-width:0}.editor-title h2{font-size:22px;font-weight:680;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file-id{font:10px var(--mono);color:var(--muted);margin-top:5px}.dirty-state{font-size:11px;color:var(--muted);white-space:nowrap}.dirty-state.dirty{color:var(--yellow)}.dirty-state.valid{color:var(--green)}.dirty-state.invalid{color:var(--red)}
+.cluster-return-button{background:transparent;border:0;color:var(--blue);cursor:pointer;font-size:11px;margin-top:8px;padding:0}.cluster-return-button:hover{text-decoration:underline}
 .editor-tabs{height:42px;padding:0 18px;display:flex;gap:18px;border-bottom:1px solid var(--border);background:#12161b}.editor-mode{border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);font-size:12px;font-weight:650;cursor:pointer}.editor-mode.active{color:var(--text);border-bottom-color:var(--accent)}
 .editor-pane{display:none;padding:20px}.editor-pane.active{display:block}.form-section{padding-bottom:19px;margin-bottom:19px;border-bottom:1px solid var(--border-soft)}.form-section:last-child{border-bottom:0;margin-bottom:0}.section-label{font-size:10px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.12em}
 .field-group{margin-bottom:14px}.field-group label,.stat-item label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:6px}.field-group input,.field-group textarea,.field-group select,.stat-item input{width:100%;padding:8px 10px;background:#0e1115;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none}.field-group input:focus,.field-group textarea:focus,.field-group select:focus,.stat-item input:focus{border-color:var(--blue)}.field-group textarea{resize:vertical;min-height:76px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid4,.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat-item input{text-align:right;font-family:var(--mono)}
@@ -344,7 +347,7 @@ dialog{width:min(430px,calc(100vw - 32px));margin:auto;background:var(--surface)
 const api = window.editorAPI
 let projectRoot = 'content-authoring'
 api.projectInfo().then(info => { projectRoot = info.root; document.getElementById('data-root-label').textContent = projectRoot }).catch(error => toast(error.message, 'error'))
-const confirmDiscard = () => !document.querySelector('[data-saving="true"]') && ((!document.querySelector('.dirty-state.dirty, .dirty-state.invalid') && !window.workbenchHasDrafts?.()) || window.confirm('当前有未保存的编辑。继续会丢弃这些编辑，并重新读取磁盘文件。是否继续？'))
+const confirmDiscard = () => !document.querySelector('[data-saving="true"]') && ((!document.querySelector('.dirty-state.dirty, .dirty-state.invalid') && !hasDirtyDraftSessions() && !window.workbenchHasDrafts?.()) || window.confirm('当前有未保存的编辑。继续会丢弃这些编辑，并重新读取磁盘文件。是否继续？'))
 document.querySelectorAll('[data-project]').forEach(button => button.onclick = async () => {
   if (!confirmDiscard()) return
   try {
@@ -380,6 +383,7 @@ function toast(msg, type = 'success') {
 
 function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
 function clone(value) { return JSON.parse(JSON.stringify(value)) }
+function record(value) { return Boolean(value && typeof value === 'object' && !Array.isArray(value)) }
 function getPath(object, path) { return path.split('.').reduce((value, key) => value?.[key], object) }
 function setPath(object, path, value) {
   const keys = path.split('.')
@@ -416,6 +420,7 @@ function buildList(listEl, searchEl, items, onSelect) {
           if (document.querySelector('[data-saving="true"]')) return
           const panel = document.getElementById(listEl.id.replace('-list', '-detail'))
           if (panel?.querySelector('.dirty-state.dirty, .dirty-state.invalid') && !window.confirm('当前内容尚未保存，是否丢弃修改并打开其他内容？')) return
+          window.__editorDiscardDocumentSession?.(panel)
           selected = it.id
           render(searchEl.value)
           onSelect(it)
@@ -430,7 +435,7 @@ function buildList(listEl, searchEl, items, onSelect) {
 
 const EDITOR_TYPES = {
   pieces: { codeField:null, fields:[['name','名称'],['description','描述','textarea'],['faction','阵营'],['rarity','稀有度'],['stats.maxHp','生命值','number'],['stats.attack','攻击力','number'],['stats.defense','防御力','number'],['stats.moveRange','移动范围','number']] },
-  skills: { codeField:'code', fields:[['name','名称'],['description','描述','textarea'],['type','类型'],['cooldownTurns','冷却回合','number'],['actionPointCost','行动点','number'],['range','范围'],['requiresTarget','需要目标','boolean']] },
+  skills: { codeField:'code', fields:[['name','名称'],['description','描述','textarea'],['kind','能力类型','kind'],['type','类型'],['cooldownTurns','冷却回合','number'],['actionPointCost','行动点','number'],['range','范围'],['requiresTarget','需要目标','boolean']] },
   cards: { codeField:'code', fields:[['name','名称'],['description','描述','textarea'],['type','类型'],['actionPointCost','行动点','number'],['icon','图标']] },
   rules: { codeField:'skillCode', fields:[['name','名称'],['description','描述','textarea'],['trigger.type','触发类型'],['trigger.targetType','目标类型'],['priority','优先级','number']] },
 }
@@ -441,7 +446,68 @@ const NEW_DOCUMENT_TEMPLATES = {
   cards: (id, name) => ({ id, name, description:'', keywords:[], targetText:'', effectTags:[], type:'active', cardType:'neutral', actionPointCost:1, icon:'', image:'', isSample:false, trigger:null, targeting:null, summonCapability:null, code:'function executeCard(context) {\n  return { success: true };\n}' }),
   rules: (id, name) => ({ id, name, description:'', priority:0, trigger:{type:'gameStart'}, effect:null, targetValidation:null, limits:null, skillCode:'return { success: true };' }),
 }
+function newDocumentData(subdir, id, name) {
+  const data = NEW_DOCUMENT_TEMPLATES[subdir](id, name)
+  if (subdir !== 'skills') return data
+  const core = window.ContentGraphCore
+  if (typeof core?.createGameplayModuleGraph !== 'function' || typeof core?.applyGameplayModuleGraph !== 'function') return data
+  try {
+    const graph = core.createGameplayModuleGraph('skill')
+    if (!Array.isArray(graph.body) || !graph.body.length) graph.body = [{ kind:'return', id:'return-1' }]
+    return core.applyGameplayModuleGraph(data, graph, 'code')
+  } catch {
+    // Older bundles may expose the editor before the module compiler. Keep the
+    // established conservative template in that compatibility case.
+    return data
+  }
+}
 const COLLECTIONS = {}
+// Cluster navigation keeps an in-memory draft per collection/id.  The cache
+// is deliberately renderer-local: it is never written without the normal
+// document save button, and an ordinary list click can still explicitly
+// discard it after confirmation.
+const DRAFT_SESSIONS = new Map()
+let ACTIVE_EDITOR_SESSION = null
+
+function draftSessionKey(subdir, id) { return `${subdir}:${id}` }
+function sessionIsDirty(session) {
+  if (!session) return false
+  const savedSerialized = JSON.stringify(session.saved, null, 2)
+  return session.pendingCreate
+    || JSON.stringify(session.draft) !== JSON.stringify(session.saved)
+    || (typeof session.serialized === 'string' && session.serialized !== savedSerialized)
+}
+function hasDirtyDraftSessions() {
+  // The active panel may have a raw JSON edit that has not caused a field
+  // change yet. Capture only that panel; other collection panels cache their
+  // own edits at the input boundary and must not be overwritten by a stale
+  // active-session pointer.
+  ACTIVE_EDITOR_SESSION?.capture?.()
+  return [...DRAFT_SESSIONS.values()].some(sessionIsDirty)
+}
+function persistActiveEditorSession() { ACTIVE_EDITOR_SESSION?.capture?.() }
+function discardDocumentEditorSession(panel) {
+  const session = [...DRAFT_SESSIONS.values()].find(candidate => !panel || candidate.detailEl === panel)
+    || (!panel ? ACTIVE_EDITOR_SESSION : null)
+  if (!session) return
+  DRAFT_SESSIONS.delete(session.key)
+  if (ACTIVE_EDITOR_SESSION?.key === session.key) ACTIVE_EDITOR_SESSION = null
+}
+window.__editorDiscardDocumentSession = discardDocumentEditorSession
+window.__editorHasDirtyDraftSessions = hasDirtyDraftSessions
+window.__editorPersistActiveSession = persistActiveEditorSession
+
+function openCollectionDocument(collection, id, clusterReturn = null) {
+  const state = COLLECTIONS[collection]
+  const target = state?.items?.find(entry => entry.id === id)
+  if (!target) { toast(`找不到关联内容：${id}`, 'error'); return }
+  persistActiveEditorSession()
+  state.listController?.select(id)
+  document.querySelector(`[data-tab="${collection}"]`)?.click()
+  renderDocumentEditor({ subdir: collection, item: target, data: state.dataMap[id], dataMap: state.dataMap, items: state.items, listController: state.listController, clusterReturn })
+  const mode = document.querySelector(`#${collection}-detail [data-editor-mode="cluster"]`) ? 'cluster' : document.querySelector(`#${collection}-detail [data-editor-mode="graph"]`) ? 'graph' : 'fields'
+  document.querySelector(`#${collection}-detail [data-editor-mode="${mode}"]`)?.click()
+}
 
 function parseJsonDocument(text) {
   try {
@@ -460,38 +526,112 @@ function fieldMarkup(field, value) {
   const [path, label, type = 'text'] = field
   if (type === 'textarea') return `<div class="field-group"><label>${esc(label)} <small>${esc(path)}</small></label><textarea data-field-path="${esc(path)}" rows="3">${esc(value ?? '')}</textarea></div>`
   if (type === 'boolean') return `<div class="field-group"><label>${esc(label)} <small>${esc(path)}</small></label><select data-field-path="${esc(path)}" data-value-type="boolean"><option value="true" ${value === true ? 'selected' : ''}>是 / true</option><option value="false" ${value === false ? 'selected' : ''}>否 / false</option></select></div>`
+  if (type === 'kind') return `<div class="field-group"><label>${esc(label)} <small>${esc(path)}</small></label><select data-field-path="${esc(path)}" data-value-type="kind"><option value="" ${value !== 'active' && value !== 'passive' ? 'selected' : ''}>未设置</option><option value="active" ${value === 'active' ? 'selected' : ''}>主动能力</option><option value="passive" ${value === 'passive' ? 'selected' : ''}>被动能力</option></select><small class="field-help">用于技能 Cluster 的主动 / 被动分类；未设置会保留原数据。</small></div>`
   return `<div class="field-group"><label>${esc(label)} <small>${esc(path)}</small></label><input data-field-path="${esc(path)}" data-value-type="${type}" type="${type}" value="${esc(value ?? '')}"/></div>`
 }
 
-function renderDocumentEditor({ subdir, item, data, dataMap, items, listController, isNew = false }) {
+function renderDocumentEditor({ subdir, item, data, dataMap, items, listController, isNew = false, clusterReturn = null }) {
   const config = EDITOR_TYPES[subdir]
   const detailEl = document.getElementById(`${subdir}-detail`)
+  const key = draftSessionKey(subdir, item.id)
+  if (ACTIVE_EDITOR_SESSION?.key !== key) persistActiveEditorSession()
+  // One collection owns one detail panel. When another document replaces it,
+  // retire every older session that pointed at that DOM node so a cross-panel
+  // edit cannot write through an orphaned closure into the new document.
+  for (const candidate of DRAFT_SESSIONS.values()) {
+    if (candidate.detailEl !== detailEl) continue
+    candidate.mounted = false
+    candidate.detailEl = null
+    candidate.capture = null
+    candidate.applyDraft = null
+    if (ACTIVE_EDITOR_SESSION?.key === candidate.key) ACTIVE_EDITOR_SESSION = null
+  }
+  const cached = DRAFT_SESSIONS.get(key)
   detailEl.codeIDE?.destroy()
   detailEl.contentGraphEditor?.destroy()
   detailEl.gameplayModuleEditor?.destroy()
-  let saved = clone(data)
-  let draft = clone(data)
-  let pendingCreate = isNew
-  let serialized = JSON.stringify(draft, null, 2)
+  detailEl.skillClusterEditors?.forEach(editor => editor.destroy?.())
+  let saved = clone(cached?.saved ?? data)
+  let draft = clone(cached?.draft ?? data)
+  let pendingCreate = cached?.pendingCreate ?? isNew
+  if (cached?.revision) item.revision = cached.revision
+  let serialized = typeof cached?.serialized === 'string' ? cached.serialized : JSON.stringify(draft, null, 2)
+  let jsonError = cached?.jsonError || null
+  const clusterEditors = []
+  let jsonEl = null
+  const session = { key, saved: clone(saved), draft: clone(draft), pendingCreate, revision: item.revision, serialized, jsonError, detailEl, mounted: true, capture: null, applyDraft: null }
+  const applySessionDraft = (nextDraft, syncRaw = false) => {
+    if (!session.mounted || session.detailEl !== detailEl) {
+      session.draft = clone(nextDraft)
+      if (syncRaw) {
+        session.serialized = JSON.stringify(nextDraft, null, 2)
+        session.jsonError = null
+      }
+      DRAFT_SESSIONS.set(key, session)
+      return
+    }
+    draft = clone(nextDraft)
+    if (syncRaw) {
+      serialized = JSON.stringify(draft, null, 2)
+      jsonError = null
+      if (jsonEl) jsonEl.value = serialized
+    }
+    detailEl.querySelector('[data-document-title]')?.replaceChildren(document.createTextNode(draft.name || item.id))
+    refreshClusterEditors()
+    cacheSession()
+  }
+  const cacheSession = () => {
+    if (!session.mounted || session.detailEl !== detailEl) return
+    session.saved = clone(saved)
+    session.draft = clone(draft)
+    session.pendingCreate = pendingCreate
+    session.revision = item.revision
+    session.serialized = serialized
+    session.jsonError = jsonError
+    session.detailEl = detailEl
+    session.mounted = true
+    session.capture = captureSession
+    session.applyDraft = applySessionDraft
+    DRAFT_SESSIONS.set(key, session)
+  }
+  const clearSession = () => DRAFT_SESSIONS.delete(key)
+  const captureSession = () => {
+    if (!session.mounted || session.detailEl !== detailEl) return
+    if (jsonEl) {
+      serialized = jsonEl.value
+      const parsed = parseJsonDocument(serialized)
+      jsonError = parsed.error || null
+      // A valid raw JSON edit is a real draft even when the user has not
+      // switched away from the JSON pane. Invalid text stays visible and is
+      // retained separately from the last valid object used by the editors.
+      if (!parsed.error) draft = clone(parsed.value)
+    }
+    cacheSession()
+  }
   const executableFields = ['skillCode','code','previewCode','effectCode'].filter(field => Object.hasOwn(draft, field))
   if (config.codeField && executableFields.length === 0) executableFields.push(config.codeField)
-  const panes = ['fields', ...(['skills','rules','cards'].includes(subdir) ? ['graph'] : []), ...(executableFields.length ? ['code'] : []), 'json']
+  const panes = [...(['skills','pieces'].includes(subdir) ? ['cluster'] : []), 'fields', ...(['skills','rules','cards'].includes(subdir) ? ['graph'] : []), ...(executableFields.length ? ['code'] : []), 'json']
 
   detailEl.innerHTML = `<article class="editor-frame">
-    <header class="editor-header"><div class="editor-title"><h2 data-document-title>${esc(draft.name || item.id)}</h2><div class="file-id">${esc(item.filename)}</div></div><span class="dirty-state" role="status" aria-live="polite">${isNew ? '待创建' : '已保存'}</span></header>
-    <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({fields:'常用字段',graph:'流程图',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
-    <section class="editor-pane active" data-editor-pane="fields"><div class="editor-help">修改会同步到完整 JSON，未展示的字段不会被删除。标签声明与技能逻辑分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
+     <header class="editor-header"><div class="editor-title"><h2 data-document-title>${esc(draft.name || item.id)}</h2><div class="file-id">${esc(item.filename)}</div>${clusterReturn ? `<button class="cluster-return-button" data-cluster-return type="button">${esc(clusterReturn.label || '返回关联能力')}</button>` : ''}</div><span class="dirty-state" role="status" aria-live="polite">${isNew ? '待创建' : '已保存'}</span></header>
+     <nav class="editor-tabs" aria-label="编辑模式">${panes.map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${({cluster:'能力总览',fields:'常用字段',graph:'流程图',code:'代码',json:'完整 JSON'})[mode]}</button>`).join('')}</nav>
+     ${['skills','pieces'].includes(subdir) ? '<section class="editor-pane active" data-editor-pane="cluster"><div data-skill-cluster></div></section>' : ''}
+     <section class="editor-pane${panes[0] === 'fields' ? ' active' : ''}" data-editor-pane="fields"><div class="editor-help">修改会同步到完整 JSON，未展示的字段不会被删除。标签声明与技能逻辑分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
     ${['skills','rules','cards'].includes(subdir) ? '<section class="editor-pane" data-editor-pane="graph"><div data-content-graph></div>' + (['skills','rules'].includes(subdir) ? '<div data-source-flow></div>' : '') + (subdir === 'skills' ? '<details data-typed-graph><summary>类型化节点编程（原版）</summary><div data-skill-graph></div></details>' : '') + '</section>' : ''}
     ${executableFields.length ? '<section class="editor-pane" data-editor-pane="code"><div class="editor-help">直接粘贴 AI 写好的 JavaScript。保存时自动写回 JSON，无需手写转义字符或维护额外 JS 文件。代码不会在编辑器中执行。</div><div data-code-ide></div></section>' : ''}
     <section class="editor-pane" data-editor-pane="json"><div class="editor-help">可直接修改任意字段。只有合法的 JSON 对象才能保存；格式错误时原文件保持不变。</div><div class="json-error" data-json-error></div><textarea class="json-editor" data-json-source spellcheck="false">${esc(serialized)}</textarea></section>
     <footer class="editor-footer"><span class="dirty-state" data-footer-state>${isNew ? '待创建' : '已保存'}</span><div class="footer-actions"><button class="btn btn-ghost" data-open-external ${isNew ? 'disabled' : ''}>外部打开</button><button class="btn btn-ghost" data-reset-document>恢复</button><button class="btn btn-ghost" data-format-json>格式化 JSON</button><button class="btn btn-primary" data-save-json>${isNew ? '创建文件' : '保存 JSON'}</button></div></footer>
   </article>`
 
-  const jsonEl = detailEl.querySelector('[data-json-source]')
+  jsonEl = detailEl.querySelector('[data-json-source]')
   const errorEl = detailEl.querySelector('[data-json-error]')
   const headerState = detailEl.querySelector('.editor-header .dirty-state')
   const footerState = detailEl.querySelector('[data-footer-state]')
   const saveButton = detailEl.querySelector('[data-save-json]')
+  const clusterReturnButton = detailEl.querySelector('[data-cluster-return]')
+  if (clusterReturnButton && clusterReturn?.collection && clusterReturn?.id) {
+    clusterReturnButton.onclick = () => openCollectionDocument(clusterReturn.collection, clusterReturn.id)
+  }
   const codeIDE = executableFields.length ? window.ContentCodeIDE.mount(detailEl.querySelector('[data-code-ide]'), {
     category: subdir, primaryField: config.codeField, filename: item.filename,
     getDraft: () => draft, onChange: syncDraft, importCode: api.importCode,
@@ -503,6 +643,104 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     category: subdir, field: config.codeField, getDraft: () => draft, onChange: syncDraft,
   }) : null
   detailEl.contentGraphEditor = contentGraphEditor
+  function catalogWithDrafts() {
+    const catalog = { skills: {}, rules: {}, pieces: {}, cards: {} }
+    for (const collection of Object.keys(catalog)) {
+      const state = COLLECTIONS[collection]
+      for (const entry of state?.items || []) {
+        const session = DRAFT_SESSIONS.get(draftSessionKey(collection, entry.id))
+        catalog[collection][entry.id] = clone(session?.draft ?? state.dataMap[entry.id])
+      }
+    }
+    catalog[subdir][item.id] = clone(draft)
+    return catalog
+  }
+  function documentPathForMember(member) {
+    const source = member?.source
+    if (!source) return ''
+    const prefix = `${source.collection}.${source.id}.`
+    let path = typeof source.path === 'string' && source.path.startsWith(prefix) ? source.path.slice(prefix.length) : ''
+    if (!path || path === 'root') path = source.field || ''
+    return path.replace(/\[(\d+)\]/g, '.$1')
+  }
+  function setDocumentPath(target, path, value) {
+    const keys = String(path || '').split('.').filter(Boolean)
+    if (!keys.length) return
+    let parent = target
+    for (const key of keys.slice(0, -1)) {
+      if (parent[key] === undefined || parent[key] === null || typeof parent[key] !== 'object') parent[key] = /^\d+$/.test(key) ? [] : {}
+      parent = parent[key]
+    }
+    parent[keys.at(-1)] = value
+  }
+  function ensureDraftSession(collection, id) {
+    const state = COLLECTIONS[collection]
+    const target = state?.items?.find(entry => entry.id === id)
+    const source = state?.dataMap?.[id]
+    if (!target || !source) throw new Error(`找不到 ${collection}/${id} 的内容。`)
+    const targetKey = draftSessionKey(collection, id)
+    const existing = DRAFT_SESSIONS.get(targetKey)
+    if (existing) return existing
+    const session = { key: targetKey, saved: clone(source), draft: clone(source), pendingCreate: false, revision: target.revision, serialized: JSON.stringify(source, null, 2), jsonError: null, detailEl: null, mounted: false, capture: null, applyDraft: null }
+    DRAFT_SESSIONS.set(targetKey, session)
+    return session
+  }
+  function editClusterMember(member, patch) {
+    const source = member?.source
+    const collection = source?.collection === 'statuses' ? subdir : source?.collection
+    if (!collection || !source?.id) throw new Error('该状态没有可编辑的明确来源。')
+    const session = collection === subdir && source.id === item.id ? { key, saved, draft, pendingCreate, revision: item.revision, detailEl } : ensureDraftSession(collection, source.id)
+    if (session.key !== key) {
+      const ownerRaw = session.detailEl?.querySelector('[data-json-source]')?.value ?? session.serialized
+      if (parseJsonDocument(ownerRaw).error) throw new Error('关联内容的 JSON 有格式错误，请先修复后再编辑状态。')
+    }
+    const next = clone(session.draft)
+    const path = documentPathForMember(member)
+    const current = getPath(next, path)
+    const value = record(current) ? { ...current, ...clone(patch) } : clone(patch)
+    setDocumentPath(next, path, value)
+    if (session.key === key) {
+      draft = next
+      syncDraft(draft)
+      cacheSession()
+    } else {
+      const ownerRaw = session.detailEl?.querySelector('[data-json-source]')?.value ?? session.serialized
+      const ownerJson = parseJsonDocument(ownerRaw)
+      if (typeof session.applyDraft === 'function') session.applyDraft(next, !ownerJson.error)
+      else {
+        session.draft = next
+        if (!ownerJson.error) {
+          session.serialized = JSON.stringify(next, null, 2)
+          session.jsonError = null
+        }
+        DRAFT_SESSIONS.set(session.key, session)
+      }
+      refreshClusterEditors()
+    }
+  }
+  function openClusterDocument(collection, id) {
+    const returnTo = ACTIVE_EDITOR_SESSION?.key === key ? {
+      collection: subdir,
+      id: item.id,
+      label: subdir === 'pieces' ? '返回被动能力' : '返回技能总览',
+    } : null
+    openCollectionDocument(collection, id, returnTo)
+  }
+  function refreshClusterEditors() { clusterEditors.forEach(editor => editor.refresh?.()) }
+  cacheSession()
+  const clusterContainer = detailEl.querySelector('[data-skill-cluster]')
+  if (clusterContainer && window.SkillClusterEditor) {
+    const clusterEditor = window.SkillClusterEditor.mount(clusterContainer, {
+      core: window.ContentGraphCore,
+      root: { collection: subdir, id: item.id },
+      getCatalog: catalogWithDrafts,
+      navigate: (collection, id) => openClusterDocument(collection, id),
+      onMemberChange: editClusterMember,
+      openAdvanced: () => detailEl.querySelector('[data-editor-mode="graph"]')?.click(),
+    })
+    clusterEditors.push(clusterEditor)
+  }
+  detailEl.skillClusterEditors = clusterEditors
   const moduleContainer = document.createElement('div')
   moduleContainer.dataset.gameplayModules = ''
   const graphPane = detailEl.querySelector('[data-editor-pane="graph"]')
@@ -559,11 +797,15 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
         window.ContentGraphCore.assertGameplayModuleTransition(saved, result.value)
       } catch (error) { result.graphError = error.message }
     }
-    errorEl.textContent = result.error || result.graphError || ''
+    serialized = jsonEl.value
+    jsonError = result.error || result.graphError || null
+    if (!result.error) draft = clone(result.value)
+    errorEl.textContent = jsonError || ''
     jsonEl.classList.toggle('invalid', Boolean(result.error))
     saveButton.disabled = Boolean(result.error || result.graphError)
     const unchanged = jsonEl.value === JSON.stringify(saved, null, 2)
     setStatus(result.error ? 'JSON 有错误' : result.graphError ? '流程图需要修正或重新生成' : (pendingCreate ? '待创建' : (unchanged ? '已保存' : '未保存')), result.error || result.graphError ? 'invalid' : (pendingCreate || !unchanged ? 'dirty' : 'valid'))
+    cacheSession()
     return result
   }
   function syncDraft(nextDraft) {
@@ -576,6 +818,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       if (section) section.hidden = Boolean(draft.gameplayModules)
     }
     validateSource()
+    refreshClusterEditors()
   }
 
   detailEl.querySelectorAll('.editor-mode').forEach(button => button.onclick = () => {
@@ -605,7 +848,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
   })
   jsonEl.addEventListener('input', validateSource)
   detailEl.querySelector('[data-format-json]').onclick = () => { const parsed = validateSource(); if (!parsed.error) syncDraft(parsed.value) }
-  detailEl.querySelector('[data-reset-document]').onclick = () => renderDocumentEditor({ subdir, item, data:saved, dataMap, items, listController, isNew:pendingCreate })
+  detailEl.querySelector('[data-reset-document]').onclick = () => { clearSession(); if (ACTIVE_EDITOR_SESSION?.key === key) ACTIVE_EDITOR_SESSION = null; renderDocumentEditor({ subdir, item, data:saved, dataMap, items, listController, isNew:pendingCreate }) }
   detailEl.querySelector('[data-open-external]').onclick = async () => { const error = await api.openInEditor(subdir, item.filename); if (error) toast('无法打开文件：' + error, 'error') }
   saveButton.onclick = async () => {
     if (detailEl.dataset.saving === 'true') return
@@ -632,6 +875,8 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       } else item.revision = (await api.writeDocument(subdir, item.filename, parsed.value, item.revision)).revision
       saved = clone(parsed.value); draft = clone(parsed.value); dataMap[item.id] = clone(parsed.value)
       jsonEl.value = JSON.stringify(saved, null, 2)
+      serialized = jsonEl.value; jsonError = null
+      cacheSession(); refreshClusterEditors()
       item.name = parsed.value.name || item.id
       if (pendingCreate) { items.push(item); pendingCreate = false; detailEl.querySelector('[data-open-external]').disabled = false }
       listController.select(item.id); setStatus('已保存', 'valid'); toast(`${item.name} 已保存`)
@@ -642,8 +887,10 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     const section = detailEl.querySelector(selector)
     if (section) section.hidden = Boolean(draft.gameplayModules)
   }
+  session.capture = captureSession
+  ACTIVE_EDITOR_SESSION = session
   validateSource()
-  if (isNew) detailEl.querySelector('[data-editor-mode="json"]').click()
+  if (isNew) detailEl.querySelector(`[data-editor-mode="${subdir === 'skills' ? 'fields' : 'json'}"]`)?.click()
 }
 
 async function initializeCollection(subdir) {
@@ -659,7 +906,16 @@ async function initializeCollection(subdir) {
   COLLECTIONS[subdir] = { dataMap, items, listController }
 }
 
-for (const subdir of Object.keys(EDITOR_TYPES)) initializeCollection(subdir)
+async function initializeCollections() {
+  await Promise.all(Object.keys(EDITOR_TYPES).map(subdir => initializeCollection(subdir)))
+  refreshAllClusterEditors()
+}
+
+function refreshAllClusterEditors() {
+  document.querySelectorAll('[data-skill-cluster]').forEach(container => container.closest('.detail-col')?.skillClusterEditors?.forEach(editor => editor.refresh?.()))
+}
+
+initializeCollections().catch(error => toast('内容列表加载失败：' + error.message, 'error'))
 
 // ─── generic PVE JSON tree ───────────────────────────────────────────────────
 async function initializePve() {
@@ -778,9 +1034,11 @@ initializeAssets().catch(error => toast('图片资源加载失败：' + error.me
     if (!collection) { errorEl.textContent = '数据仍在加载，请稍后重试。'; return }
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) { errorEl.textContent = 'ID 只能使用小写字母、数字和单个连字符。'; return }
     if (collection.items.some(item => item.id === id)) { errorEl.textContent = '这个 ID 已经存在。'; return }
-    if (document.getElementById(`${subdir}-detail`)?.querySelector('.dirty-state.dirty, .dirty-state.invalid') && !window.confirm('当前内容尚未保存，是否丢弃修改并新建内容？')) return
+    const currentPanel = document.getElementById(`${subdir}-detail`)
+    if (currentPanel?.querySelector('.dirty-state.dirty, .dirty-state.invalid') && !window.confirm('当前内容尚未保存，是否丢弃修改并新建内容？')) return
+    window.__editorDiscardDocumentSession?.(currentPanel)
     const item = { id, filename:`${id}.json`, name:name || id }
-    const data = NEW_DOCUMENT_TEMPLATES[subdir](id, name || id)
+    const data = newDocumentData(subdir, id, name || id)
     dialog.close()
     renderDocumentEditor({ subdir, item, data, dataMap:collection.dataMap, items:collection.items, listController:collection.listController, isNew:true })
   })

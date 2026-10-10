@@ -13,5 +13,10 @@
   "kind": "passive",
   "type": "passive",
   "code": "function executeSkill(context) { return { success: true, message: '' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"敌人踩入毒素时受到4点真实伤害。\", expectedValues: { damage: 4 } }; }"
+  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"敌人踩入毒素时受到4点真实伤害。\", expectedValues: { damage: 4 } }; }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:blackwidow-toxin-damage",
+    "links": []
+  }
 }

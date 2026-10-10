@@ -1,6 +1,11 @@
 {
   "id": "red-rafaam",
-  "availability": { "modes": ["pvp"], "status": "ready" },
+  "availability": {
+    "modes": [
+      "pvp"
+    ],
+    "status": "ready"
+  },
   "name": "拉法姆",
   "faction": "evil",
   "description": "神秘的术士，擅长操控时间与诅咒之力",
@@ -32,5 +37,10 @@
   "relatedCards": [
     "rafaam-curse-sample"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:red-rafaam",
+    "links": []
+  }
 }

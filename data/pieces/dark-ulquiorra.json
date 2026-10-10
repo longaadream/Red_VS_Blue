@@ -36,5 +36,10 @@
     "rule-ulquiorra-damage-taken",
     "rule-ulquiorra-resurreccion"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:dark-ulquiorra",
+    "links": []
+  }
 }

@@ -60,6 +60,8 @@ export type GameplayValueType =
   | GameplayValueTypeName
   | { readonly kind: 'list'; readonly element: GameplayValueType }
   | { readonly kind: 'nullable'; readonly value: GameplayValueType }
+  /** A record whose shape is declared by the containing graph schema table. */
+  | { readonly kind: 'record'; readonly schema: string }
 
 /** Short aliases make descriptor declarations readable in content catalogs. */
 export type ModuleValueType = GameplayValueType
@@ -242,10 +244,121 @@ export type GameplayReturnStatement = {
   readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
+/** A graph-local typed record schema.  Field names and types are closed. */
+export type GameplayRecordSchema = {
+  readonly id: string
+  readonly version: string
+  readonly fields: readonly GameplayPort[]
+}
+
+export type GameplayStructuredRecordSchema = GameplayRecordSchema
+
+export type GameplayRecordCreateStatement = {
+  readonly kind: 'record.create'
+  readonly id: string
+  readonly schema: string
+  readonly fields?: Readonly<Record<string, GameplayValue>>
+}
+
+export type GameplayRecordGetStatement = {
+  readonly kind: 'record.get'
+  readonly id: string
+  readonly record: GameplayValue
+  readonly field: string
+}
+
+export type GameplayRecordWithStatement = {
+  readonly kind: 'record.with'
+  readonly id: string
+  readonly record: GameplayValue
+  readonly fields?: Readonly<Record<string, GameplayValue>>
+}
+
+export type GameplayCollectionMethod = 'map' | 'filter' | 'reduce'
+
+/**
+ * A bounded, data-only collection subprocess.  `inputs` are the only values
+ * captured from the surrounding graph; item/index/accumulator are local
+ * inputs whose names default to the corresponding canonical names.
+ */
+export type GameplayCollectionStatement = {
+  readonly kind: 'collection'
+  readonly id: string
+  readonly method: GameplayCollectionMethod
+  readonly items: GameplayValue
+  readonly inputs?: Readonly<Record<string, GameplayValue>>
+  readonly item?: string
+  readonly index?: string
+  readonly accumulator?: string
+  readonly initial?: GameplayValue
+  readonly body: readonly GameplayStatement[]
+}
+
+/** Alternate discriminators are accepted by the parser and normalize to the
+ * single collection statement above. */
+export type GameplayCollectionMapStatement = Omit<GameplayCollectionStatement, 'kind' | 'method' | 'accumulator' | 'initial'> & {
+  readonly kind: 'collection.map'
+}
+export type GameplayCollectionFilterStatement = Omit<GameplayCollectionStatement, 'kind' | 'method' | 'accumulator' | 'initial'> & {
+  readonly kind: 'collection.filter'
+}
+export type GameplayCollectionReduceStatement = Omit<GameplayCollectionStatement, 'kind' | 'method'> & {
+  readonly kind: 'collection.reduce'
+}
+
+export type GameplayPendingHostBindingName =
+  | 'payload'
+  | 'selectedTargets'
+  | 'targetCell'
+  | 'targetPiece'
+  | 'sourcePiece'
+  | 'player'
+
+export type GameplayPendingHostBindings = Readonly<Partial<Record<GameplayPendingHostBindingName, GameplayValueType | GameplayPort>>>
+
+/** The typed fields retained by the legacy pending target-selection envelope. */
+export type GameplayDeferChoiceStatement = {
+  readonly kind: 'defer-choice'
+  readonly id: string
+  readonly graph: string
+  /** Typed continuation payload.  The compiler never accepts raw source here. */
+  readonly payload: GameplayValue
+  readonly player?: GameplayValue
+  readonly title?: GameplayValue
+  readonly targetType?: GameplayValue
+  readonly candidates?: GameplayValue
+  readonly selectionMode?: GameplayValue
+  readonly min?: GameplayValue
+  readonly max?: GameplayValue
+  readonly minSelections?: GameplayValue
+  readonly maxSelections?: GameplayValue
+  readonly canCancel?: GameplayValue
+  readonly resumeOnCancel?: GameplayValue
+  readonly message?: GameplayValue
+}
+
+/** A pending graph owned by its parent graph and addressable by graph id. */
+export type GameplayContinuationDefinition = {
+  readonly id: string
+  readonly version: string
+  readonly graph: GameplayModuleGraph
+  readonly payloadType?: GameplayValueType
+  /** Runtime JSON alias accepted by the compiler for payloadType. */
+  readonly payload?: GameplayValueType
+}
+
 export type GameplayStatement =
   | GameplayCallStatement
   | GameplayIfStatement
   | GameplayForeachStatement
+  | GameplayRecordCreateStatement
+  | GameplayRecordGetStatement
+  | GameplayRecordWithStatement
+  | GameplayCollectionStatement
+  | GameplayCollectionMapStatement
+  | GameplayCollectionFilterStatement
+  | GameplayCollectionReduceStatement
+  | GameplayDeferChoiceStatement
   | GameplayReturnStatement
 
 export type GameplayModuleStatement = GameplayStatement
@@ -274,6 +387,9 @@ export type GameplayModuleGraph = {
   readonly outputs?: readonly GameplayPort[]
   readonly body: readonly GameplayStatement[]
   readonly composites?: readonly GameplayCompositeDefinition[]
+  readonly schemas?: readonly GameplayRecordSchema[]
+  readonly hostBindings?: GameplayPendingHostBindings
+  readonly continuations?: readonly GameplayContinuationDefinition[]
   readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
@@ -313,6 +429,8 @@ export type GameplayModuleCompilerOptions = {
   readonly maxExpandedStatements?: number
   readonly maxExpandedCalls?: number
   readonly maxLiteralBytes?: number
+  /** Maximum number of iterations a structured collection may execute. */
+  readonly maxCollectionIterations?: number
 }
 
 export type ModuleCompilerOptions = GameplayModuleCompilerOptions
@@ -339,5 +457,7 @@ export function createGameplayModuleGraph(surface: GameplayModuleSurface): Gamep
     outputs: [],
     body: [],
     composites: [],
+    schemas: [],
+    continuations: [],
   }
 }

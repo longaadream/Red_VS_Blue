@@ -25,5 +25,10 @@
       "level": 1
     }
   ],
-  "isDefault": true
+  "isDefault": true,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:ana",
+    "links": []
+  }
 }

@@ -13,1258 +13,651 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context) { var __rvb_import_effect_0, b, c, choice, generatedCardSource, id, modules, selected; var _pc = \"n19\"; for (var _step = 0; _step <= 20; _step++) { switch (_pc) { case \"n19\": c = (context)[\"piece\"]; _pc = \"n18\"; break; case \"n18\": b = (context)[\"battle\"]; _pc = \"n17\"; break; case \"n17\": modules = [{label: \"恢复模块\", value: \"heal\"}, {label: \"攻击模块\", value: \"attack\"}, {label: \"高速模块\", value: \"speed\"}, {label: \"硬化模块\", value: \"defense\"}]; _pc = \"n16\"; break; case \"n16\": choice = selectOption({title: \"护甲组装：选择两个不同模块\", options: modules, selectionMode: \"multi\", minSelections: 2, maxSelections: 2}); _pc = \"n15\"; break; case \"n15\": _pc = (! (! (choice && (choice)[\"needsOptionSelection\"]))) ? \"n14\" : \"n13\"; break; case \"n13\": _pc = (! (! (((! Array.isArray(choice)) || ((choice)[\"length\"] !== 2)) || ((choice)[0] === (choice)[1])))) ? \"n12\" : \"n11\"; break; case \"n11\": selected = ([String((choice)[0]), String((choice)[1])]).sort(); _pc = \"n10\"; break; case \"n10\": id = (\"armor-\" + (selected)[\"join\"](\"-\")); _pc = \"n9\"; break; case \"n9\": _pc = (! (! (((modules)[\"filter\"](function (m) { return ((selected)[\"indexOf\"]((m)[\"value\"]) !== (- 1)); }))[\"length\"] !== 2))) ? \"n8\" : \"n7\"; break; case \"n7\": _pc = (! (! (! (b)[\"customCards\"]))) ? \"n6\" : \"generated-card-source\"; break; case \"n6\": (b)[\"customCards\"] = {}; _pc = \"generated-card-source\"; break; case \"generated-card-source\": generatedCardSource = (function () { var __rvb_content_graph_materialized_source_0; var __rvb_content_graph_binding_snapshot_1 = (function snapshot(value, seen, g) { var type = typeof value; var encode = function (data) { var text = g.JSON.stringify(data); return text.split(g.String.fromCharCode(8232)).join(\"\\\\u2028\").split(g.String.fromCharCode(8233)).join(\"\\\\u2029\"); }; if (value === null) return \"null\"; if (type === \"string\") return encode(value); if (type === \"boolean\") return value ? \"true\" : \"false\"; if (type === \"number\") { if (!g.Number.isFinite(value)) throw new g.TypeError(\"content graph binding must be finite JSON\"); return encode(value); } if (type !== \"object\") throw new g.TypeError(\"content graph binding must be JSON data\"); if (seen.indexOf(value) !== -1) throw new g.TypeError(\"content graph binding must not contain cycles\"); seen.push(value); var prototype = g.Object.getPrototypeOf(value); if (g.Array.isArray(value) ? prototype !== g.Array.prototype : prototype !== g.Object.prototype) throw new g.TypeError(\"content graph binding must be a plain JSON object or array\"); for (var cursor = prototype; cursor !== null; cursor = g.Object.getPrototypeOf(cursor)) { if (g.Object.getOwnPropertyDescriptor(cursor, \"toJSON\")) throw new g.TypeError(\"content graph binding must not define toJSON\"); } var ownNames = g.Object.getOwnPropertyNames(value); for (var ownIndex = 0; ownIndex < ownNames.length; ownIndex += 1) { var ownDescriptor = g.Object.getOwnPropertyDescriptor(value, ownNames[ownIndex]); if (ownNames[ownIndex] === \"toJSON\") throw new g.TypeError(\"content graph binding must not define toJSON\"); if (!ownDescriptor || !(\"value\" in ownDescriptor)) throw new g.TypeError(\"content graph binding must not contain getters\"); } var symbols = g.Object.getOwnPropertySymbols ? g.Object.getOwnPropertySymbols(value) : []; if (symbols.length) throw new g.TypeError(\"content graph binding must not contain symbol properties\"); var parts = []; if (g.Array.isArray(value)) { var lengthDescriptor = g.Object.getOwnPropertyDescriptor(value, \"length\"); var length = lengthDescriptor && lengthDescriptor.value; if (typeof length !== \"number\" || !g.Number.isFinite(length) || length < 0 || g.Math.floor(length) !== length) throw new g.TypeError(\"content graph binding array length is invalid\"); var keys = g.Object.keys(value); for (var keyIndex = 0; keyIndex < keys.length; keyIndex += 1) { var key = keys[keyIndex]; var numericKey = g.Number(key); if (g.String(numericKey) !== key || numericKey < 0 || numericKey >= length || g.Math.floor(numericKey) !== numericKey) throw new g.TypeError(\"content graph binding array has unsupported properties\"); } for (var index = 0; index < length; index += 1) { var indexDescriptor = g.Object.getOwnPropertyDescriptor(value, g.String(index)); if (!indexDescriptor || !(\"value\" in indexDescriptor)) throw new g.TypeError(\"content graph binding array must not contain holes or getters\"); parts.push(snapshot(indexDescriptor.value, seen, g)); } seen.pop(); return \"[\" + parts.join(\",\") + \"]\"; } var objectKeys = g.Object.keys(value); for (var objectIndex = 0; objectIndex < objectKeys.length; objectIndex += 1) { var objectKey = objectKeys[objectIndex]; var objectDescriptor = g.Object.getOwnPropertyDescriptor(value, objectKey); if (!objectDescriptor || !(\"value\" in objectDescriptor)) throw new g.TypeError(\"content graph binding must not contain getters\"); parts.push(encode(objectKey) + \":\" + snapshot(objectDescriptor.value, seen, g)); } seen.pop(); return \"{\" + parts.join(\",\") + \"}\"; })(selected, [], globalThis); __rvb_content_graph_materialized_source_0 = 'function executeCard(context) { var ms, t; ' + \"var selected = globalThis.JSON.parse(\" + globalThis.JSON.stringify(__rvb_content_graph_binding_snapshot_1) + \");\" + ' var _pc = \"select\"; for (var _step = 0; _step <= 7; _step++) { switch (_pc) { case \"select\": t = selectTarget({type: \"piece\", range: 99, filter: \"ally\"}); _pc = \"target-check\"; break; case \"target-check\": _pc = ((! t) || (t)[\"needsTargetSelection\"]) ? \"return-target\" : \"modules\"; break; case \"modules\": ms = ((selected)[\"join\"](\",\"))[\"split\"](\",\"); _pc = \"init-status\"; break; case \"init-status\": (t)[\"statusTags\"] = ((t)[\"statusTags\"] || []); _pc = \"apply-modules\"; break; case \"apply-modules\": (ms)[\"forEach\"](function (m) { var healNow, speedNow; { var __rvb_content_graph_region_pc_0 = \"check-heal\"; while (__rvb_content_graph_region_pc_0 !== \"callback-end\") { switch (__rvb_content_graph_region_pc_0) { case \"check-heal\": __rvb_content_graph_region_pc_0 = (m === \"heal\") ? \"heal-clock\" : \"check-attack\"; break; case \"heal-clock\": healNow = Date.now(); __rvb_content_graph_region_pc_0 = \"heal-push\"; break; case \"heal-push\": ((t)[\"statusTags\"]).push({id: (((\"periodic-heal-\" + (t)[\"instanceId\"]) + \"-\") + healNow), type: \"periodic-heal\", name: \"恢复模块\", stacks: 1, relatedRules: [\"rule-tails-armor-recovery\"]}); __rvb_content_graph_region_pc_0 = \"heal-rule\"; break; case \"heal-rule\": addRuleById((t)[\"instanceId\"], \"rule-tails-armor-recovery\"); __rvb_content_graph_region_pc_0 = \"check-attack\"; break; case \"check-attack\": __rvb_content_graph_region_pc_0 = (m === \"attack\") ? \"attack-set\" : \"check-speed\"; break; case \"attack-set\": (t)[\"attack\"] = (((t)[\"attack\"] || 0) + 3); __rvb_content_graph_region_pc_0 = \"check-speed\"; break; case \"check-speed\": __rvb_content_graph_region_pc_0 = (m === \"speed\") ? \"speed-clock\" : \"check-defense\"; break; case \"speed-clock\": speedNow = Date.now(); __rvb_content_graph_region_pc_0 = \"speed-push\"; break; case \"speed-push\": ((t)[\"statusTags\"]).push({id: (((\"free-normal-move-every-turn-\" + (t)[\"instanceId\"]) + \"-\") + speedNow), type: \"free-normal-move-every-turn\", name: \"高速模块\", stacks: 1, relatedRules: [\"rule-sonic-free-move\"]}); __rvb_content_graph_region_pc_0 = \"speed-rule\"; break; case \"speed-rule\": addRuleById((t)[\"instanceId\"], \"rule-sonic-free-move\"); __rvb_content_graph_region_pc_0 = \"check-defense\"; break; case \"check-defense\": __rvb_content_graph_region_pc_0 = (m === \"defense\") ? \"defense-set\" : \"callback-end\"; break; case \"defense-set\": (t)[\"defense\"] = (((t)[\"defense\"] || 0) + 2); __rvb_content_graph_region_pc_0 = \"callback-end\"; break; case \"callback-end\": __rvb_content_graph_region_pc_0 = \"callback-end\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"done\"; break; case \"done\": return {success: true, message: \"获得组合护甲效果\"}; case \"return-target\": return t; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }'; return __rvb_content_graph_materialized_source_0; })(); _pc = \"n5\"; break; case \"n5\": ((b)[\"customCards\"])[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })(id)] = {id: id, name: ((\"组合护甲（\" + (selected)[\"join\"](\" + \")) + \"）\"), description: \"对一名友军使用，永久获得所选模块效果。\", type: \"active\", actionPointCost: 2, code: generatedCardSource}; _pc = \"n4\"; break; case \"n4\": __rvb_import_effect_0 = addCardToHand(id, (c)[\"ownerPlayerId\"]); _pc = \"n3\"; break; case \"n3\": _pc = (! (! (! __rvb_import_effect_0))) ? \"n2\" : \"n1\"; break; case \"n1\": return {success: true, message: \"创造了组合护甲手牌\"}; case \"n2\": return {success: false, message: \"无法创建组合护甲手牌\"}; case \"n8\": return {success: false, message: \"模块选择无效\"}; case \"n12\": return {success: false, message: \"必须选择两个不同模块\"}; case \"n14\": return choice; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "skill",
-    "entry": "n19",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "创造了组合护甲手牌"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "无法创建组合护甲手牌"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n3",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "ref",
-                "name": "__rvb_import_effect_0"
-              }
-            }
-          }
-        },
-        "yes": "n2",
-        "no": "n1"
-      },
-      {
-        "id": "n4",
-        "kind": "call",
-        "capability": "addCardToHand",
-        "args": [
-          {
-            "kind": "ref",
-            "name": "id"
-          },
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "c"
-            },
-            "key": "ownerPlayerId"
-          }
-        ],
-        "result": "__rvb_import_effect_0",
-        "next": "n3"
-      },
-      {
-        "id": "n5",
-        "kind": "set",
-        "target": {
-          "kind": "index",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "b"
-            },
-            "key": "customCards"
-          },
-          "index": {
-            "kind": "ref",
-            "name": "id"
-          }
-        },
-        "operator": "=",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "id",
-              "value": {
-                "kind": "ref",
-                "name": "id"
-              }
-            },
-            {
-              "key": "name",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "literal",
-                    "value": "组合护甲（"
-                  },
-                  "right": {
-                    "kind": "collection",
-                    "object": {
-                      "kind": "ref",
-                      "name": "selected"
-                    },
-                    "method": "join",
-                    "args": [
-                      {
-                        "kind": "literal",
-                        "value": " + "
-                      }
-                    ]
-                  }
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": "）"
-                }
-              }
-            },
-            {
-              "key": "description",
-              "value": {
-                "kind": "literal",
-                "value": "对一名友军使用，永久获得所选模块效果。"
-              }
-            },
-            {
-              "key": "type",
-              "value": {
-                "kind": "literal",
-                "value": "active"
-              }
-            },
-            {
-              "key": "actionPointCost",
-              "value": {
-                "kind": "literal",
-                "value": 2
-              }
-            },
-            {
-              "key": "code",
-              "value": {
-                "kind": "ref",
-                "name": "generatedCardSource"
-              }
-            }
-          ]
-        },
-        "next": "n4"
-      },
-      {
-        "id": "n6",
-        "kind": "set",
-        "target": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "b"
-          },
-          "key": "customCards"
-        },
-        "operator": "=",
-        "value": {
-          "kind": "object",
-          "entries": []
-        },
-        "next": "generated-card-source"
-      },
-      {
-        "id": "n7",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "b"
-                },
-                "key": "customCards"
-              }
-            }
-          }
-        },
-        "yes": "n6",
-        "no": "generated-card-source"
-      },
-      {
-        "id": "n8",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "模块选择无效"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n9",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "!==",
-              "left": {
-                "kind": "get",
-                "object": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "ref",
-                    "name": "modules"
-                  },
-                  "method": "filter",
-                  "args": [
-                    {
-                      "kind": "lambda",
-                      "parameters": [
-                        "m"
-                      ],
-                      "body": {
-                        "kind": "binary",
-                        "op": "!==",
-                        "left": {
-                          "kind": "collection",
-                          "object": {
-                            "kind": "ref",
-                            "name": "selected"
-                          },
-                          "method": "indexOf",
-                          "args": [
-                            {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "m"
-                              },
-                              "key": "value"
-                            }
-                          ]
-                        },
-                        "right": {
-                          "kind": "unary",
-                          "op": "-",
-                          "argument": {
-                            "kind": "literal",
-                            "value": 1
-                          }
-                        }
-                      }
-                    }
-                  ]
-                },
-                "key": "length"
-              },
-              "right": {
-                "kind": "literal",
-                "value": 2
-              }
-            }
-          }
-        },
-        "yes": "n8",
-        "no": "n7"
-      },
-      {
-        "id": "n10",
-        "kind": "bind",
-        "name": "id",
-        "expr": {
-          "kind": "binary",
-          "op": "+",
-          "left": {
-            "kind": "literal",
-            "value": "armor-"
-          },
-          "right": {
-            "kind": "collection",
-            "object": {
-              "kind": "ref",
-              "name": "selected"
-            },
-            "method": "join",
-            "args": [
-              {
-                "kind": "literal",
-                "value": "-"
-              }
-            ]
-          }
-        },
-        "next": "n9"
-      },
-      {
-        "id": "n11",
-        "kind": "call",
-        "capability": "array.sort",
-        "args": [
-          {
-            "kind": "array",
-            "items": [
-              {
-                "kind": "call",
-                "callee": "String",
-                "args": [
-                  {
-                    "kind": "index",
-                    "object": {
-                      "kind": "ref",
-                      "name": "choice"
-                    },
-                    "index": {
-                      "kind": "literal",
-                      "value": 0
-                    }
-                  }
-                ]
-              },
-              {
-                "kind": "call",
-                "callee": "String",
-                "args": [
-                  {
-                    "kind": "index",
-                    "object": {
-                      "kind": "ref",
-                      "name": "choice"
-                    },
-                    "index": {
-                      "kind": "literal",
-                      "value": 1
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ],
-        "result": "selected",
-        "next": "n10"
-      },
-      {
-        "id": "n12",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "必须选择两个不同模块"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n13",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "call",
-                    "callee": "Array.isArray",
-                    "args": [
-                      {
-                        "kind": "ref",
-                        "name": "choice"
-                      }
-                    ]
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "!==",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "choice"
-                    },
-                    "key": "length"
-                  },
-                  "right": {
-                    "kind": "literal",
-                    "value": 2
-                  }
-                }
-              },
-              "right": {
-                "kind": "binary",
-                "op": "===",
-                "left": {
-                  "kind": "index",
-                  "object": {
-                    "kind": "ref",
-                    "name": "choice"
-                  },
-                  "index": {
-                    "kind": "literal",
-                    "value": 0
-                  }
-                },
-                "right": {
-                  "kind": "index",
-                  "object": {
-                    "kind": "ref",
-                    "name": "choice"
-                  },
-                  "index": {
-                    "kind": "literal",
-                    "value": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "yes": "n12",
-        "no": "n11"
-      },
-      {
-        "id": "n14",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "choice"
-        }
-      },
-      {
-        "id": "n15",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "&&",
-              "left": {
-                "kind": "ref",
-                "name": "choice"
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "choice"
-                },
-                "key": "needsOptionSelection"
-              }
-            }
-          }
-        },
-        "yes": "n14",
-        "no": "n13"
-      },
-      {
-        "id": "n16",
-        "kind": "call",
-        "capability": "selectOption",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "title",
-                "value": {
-                  "kind": "literal",
-                  "value": "护甲组装：选择两个不同模块"
-                }
-              },
-              {
-                "key": "options",
-                "value": {
-                  "kind": "ref",
-                  "name": "modules"
-                }
-              },
-              {
-                "key": "selectionMode",
-                "value": {
-                  "kind": "literal",
-                  "value": "multi"
-                }
-              },
-              {
-                "key": "minSelections",
-                "value": {
-                  "kind": "literal",
-                  "value": 2
-                }
-              },
-              {
-                "key": "maxSelections",
-                "value": {
-                  "kind": "literal",
-                  "value": 2
-                }
-              }
-            ]
-          }
-        ],
-        "result": "choice",
-        "next": "n15"
-      },
-      {
-        "id": "n17",
-        "kind": "bind",
-        "name": "modules",
-        "expr": {
-          "kind": "array",
-          "items": [
-            {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "label",
-                  "value": {
-                    "kind": "literal",
-                    "value": "恢复模块"
-                  }
-                },
-                {
-                  "key": "value",
-                  "value": {
-                    "kind": "literal",
-                    "value": "heal"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "label",
-                  "value": {
-                    "kind": "literal",
-                    "value": "攻击模块"
-                  }
-                },
-                {
-                  "key": "value",
-                  "value": {
-                    "kind": "literal",
-                    "value": "attack"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "label",
-                  "value": {
-                    "kind": "literal",
-                    "value": "高速模块"
-                  }
-                },
-                {
-                  "key": "value",
-                  "value": {
-                    "kind": "literal",
-                    "value": "speed"
-                  }
-                }
-              ]
-            },
-            {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "label",
-                  "value": {
-                    "kind": "literal",
-                    "value": "硬化模块"
-                  }
-                },
-                {
-                  "key": "value",
-                  "value": {
-                    "kind": "literal",
-                    "value": "defense"
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "next": "n16"
-      },
-      {
-        "id": "n18",
-        "kind": "bind",
-        "name": "b",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "battle"
-        },
-        "next": "n17"
-      },
-      {
-        "id": "n19",
-        "kind": "bind",
-        "name": "c",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "piece"
-        },
-        "next": "n18"
-      },
-      {
-        "id": "generated-card-source",
-        "kind": "materializeSource",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _module0 = (flow.refs.player()); if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0))); } var _condition33 = ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"exists\")) ? _module1[\"exists\"] : _module1); if (_condition33 !== __gameplayInvalid && _condition33) { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)) ? flow.query.player(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)).playerId : null); } var _module3 = (flow.choice.option({options: JSON.parse(\"[\\\"heal\\\",\\\"attack\\\",\\\"speed\\\",\\\"defense\\\"]\").map(function(value, index) { return {label: JSON.parse(\"[\\\"恢复模块\\\",\\\"攻击模块\\\",\\\"高速模块\\\",\\\"硬化模块\\\"]\")[index] === undefined ? value : JSON.parse(\"[\\\"恢复模块\\\",\\\"攻击模块\\\",\\\"高速模块\\\",\\\"硬化模块\\\"]\")[index], value: value}; }), selectionMode: \"multi\", minSelections: 2, maxSelections: 2, canCancel: false, title: \"护甲组装：选择两个不同模块\"})); if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3) === __gameplayInvalid)) { _module4 = __gameplayInvalid; } else { var _module4 = ((!((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3) || Boolean(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3).needsTargetSelection) || Boolean(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3).needsOptionSelection))); } var _condition31 = ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4); if (_condition31 !== __gameplayInvalid && _condition31) { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3) === __gameplayInvalid)) { _module5 = __gameplayInvalid; } else { var _module5 = (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3)); } if (!((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"result\")) ? _module5[\"result\"] : _module5) === __gameplayInvalid))) { return ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"result\")) ? _module5[\"result\"] : _module5); } } else if (_condition31 !== __gameplayInvalid) { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3) === __gameplayInvalid)) { _module6 = __gameplayInvalid; } else { var _module6 = ((function(value) { var selected = Array.isArray(value) ? value : (value && Array.isArray(value.value) ? value.value : []); return selected.map(function(item) { return String(item && typeof item === \"object\" && item.value !== undefined ? item.value : item); }); })(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"choice\")) ? _module3[\"choice\"] : _module3))); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === null)) { _module7 = __gameplayInvalid; } else { var _module7 = (Array.isArray(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6)) ? ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6).length : 0); } if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"count\")) ? _module7[\"count\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"count\")) ? _module7[\"count\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"count\")) ? _module7[\"count\"] : _module7) === null) || (2 === __gameplayInvalid) || (2 === undefined) || (2 === null)) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"count\")) ? _module7[\"count\"] : _module7) === 2)); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === null)) { _module9 = __gameplayInvalid; } else { var _module9 = ((function(items) { return Array.isArray(items) && new Set(items).size !== items.length; })(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6))); } if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"duplicate\")) ? _module9[\"duplicate\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"duplicate\")) ? _module9[\"duplicate\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"duplicate\")) ? _module9[\"duplicate\"] : _module9) === null)) { _module10 = __gameplayInvalid; } else { var _module10 = (!(((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"duplicate\")) ? _module9[\"duplicate\"] : _module9))); } if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = ((function(items, allowed) { return Array.isArray(items) && items.every(function(item) { return allowed.indexOf(item) !== -1; }); })(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6), JSON.parse(\"[\\\"heal\\\",\\\"attack\\\",\\\"speed\\\",\\\"defense\\\"]\"))); } var _condition30 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); if (_condition30 !== __gameplayInvalid && _condition30) { var _condition28 = ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10); if (_condition28 !== __gameplayInvalid && _condition28) { var _condition26 = ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"valid\")) ? _module11[\"valid\"] : _module11); if (_condition26 !== __gameplayInvalid && _condition26) { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6) === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((Array.isArray(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6)) ? ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"values\")) ? _module6[\"values\"] : _module6).slice().sort() : [])); } if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((Array.isArray(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12)) ? ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12).join(\"-\") : \"\")); } if ((\"armor-\" === __gameplayInvalid) || (\"armor-\" === undefined) || (\"armor-\" === null) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((\"armor-\" + ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13))); } if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12) === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((Array.isArray(((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12)) ? ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"sorted\")) ? _module12[\"sorted\"] : _module12).join(\" + \") : \"\")); } if ((\"组合护甲（\" === __gameplayInvalid) || (\"组合护甲（\" === undefined) || (\"组合护甲（\" === null) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15) === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((\"组合护甲（\" + ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"text\")) ? _module15[\"text\"] : _module15))); } if ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"text\")) ? _module16[\"text\"] : _module16) === __gameplayInvalid) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"text\")) ? _module16[\"text\"] : _module16) === undefined) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"text\")) ? _module16[\"text\"] : _module16) === null) || (\"）\" === __gameplayInvalid) || (\"）\" === undefined) || (\"）\" === null)) { _module17 = __gameplayInvalid; } else { var _module17 = ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"text\")) ? _module16[\"text\"] : _module16) + \"）\")); } if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === null) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null) || (\"对一名友军使用，永久获得所选模块效果。\" === __gameplayInvalid) || (\"对一名友军使用，永久获得所选模块效果。\" === undefined) || (\"对一名友军使用，永久获得所选模块效果。\" === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2)))) { _module18 = { \"cardId\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module18 = (flow.content.materializeTemplate({kind: \"card\", templateId: ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14), cardId: ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"text\")) ? _module14[\"text\"] : _module14), name: ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17), description: \"对一名友军使用，永久获得所选模块效果。\", owner: ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2)})); } var _condition24 = (_module18[\"success\"]); if (_condition24 !== __gameplayInvalid && _condition24) { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2))) || ((_module18[\"cardId\"]) === __gameplayInvalid) || ((_module18[\"cardId\"]) === undefined) || ((_module18[\"cardId\"]) === null)) { _module19 = __gameplayInvalid; } else { var _module19 = (flow.cards.add(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2), (_module18[\"cardId\"]))); } var _condition22 = ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"success\")) ? _module19[\"success\"] : _module19); if (_condition22 !== __gameplayInvalid && _condition22) { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (\"创造了组合护甲手牌\" === __gameplayInvalid) || (\"创造了组合护甲手牌\" === null)) { _module20 = __gameplayInvalid; } else { var _module20 = (({success: true, message: \"创造了组合护甲手牌\"})); } if (!((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"result\")) ? _module20[\"result\"] : _module20) === __gameplayInvalid))) { return ((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"result\")) ? _module20[\"result\"] : _module20); } } else if (_condition22 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"无法创建组合护甲手牌\" === __gameplayInvalid) || (\"无法创建组合护甲手牌\" === null)) { _module21 = __gameplayInvalid; } else { var _module21 = (({success: false, message: \"无法创建组合护甲手牌\"})); } if (!((((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"result\")) ? _module21[\"result\"] : _module21) === __gameplayInvalid))) { return ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"result\")) ? _module21[\"result\"] : _module21); } } } else if (_condition24 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"无法创建组合护甲手牌\" === __gameplayInvalid) || (\"无法创建组合护甲手牌\" === null)) { _module23 = __gameplayInvalid; } else { var _module23 = (({success: false, message: \"无法创建组合护甲手牌\"})); } if (!((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"result\")) ? _module23[\"result\"] : _module23) === __gameplayInvalid))) { return ((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"result\")) ? _module23[\"result\"] : _module23); } } } else if (_condition26 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"模块选择无效\" === __gameplayInvalid) || (\"模块选择无效\" === null)) { _module25 = __gameplayInvalid; } else { var _module25 = (({success: false, message: \"模块选择无效\"})); } if (!((((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"result\")) ? _module25[\"result\"] : _module25) === __gameplayInvalid))) { return ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"result\")) ? _module25[\"result\"] : _module25); } } } else if (_condition28 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"必须选择两个不同模块\" === __gameplayInvalid) || (\"必须选择两个不同模块\" === null)) { _module27 = __gameplayInvalid; } else { var _module27 = (({success: false, message: \"必须选择两个不同模块\"})); } if (!((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"result\")) ? _module27[\"result\"] : _module27) === __gameplayInvalid))) { return ((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"result\")) ? _module27[\"result\"] : _module27); } } } else if (_condition30 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"必须选择两个不同模块\" === __gameplayInvalid) || (\"必须选择两个不同模块\" === null)) { _module29 = __gameplayInvalid; } else { var _module29 = (({success: false, message: \"必须选择两个不同模块\"})); } if (!((((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"result\")) ? _module29[\"result\"] : _module29) === __gameplayInvalid))) { return ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"result\")) ? _module29[\"result\"] : _module29); } } } } else if (_condition33 !== __gameplayInvalid) { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"无法找到护甲持有者\" === __gameplayInvalid) || (\"无法找到护甲持有者\" === null)) { _module32 = __gameplayInvalid; } else { var _module32 = (({success: false, message: \"无法找到护甲持有者\"})); } if (!((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"result\")) ? _module32[\"result\"] : _module32) === __gameplayInvalid))) { return ((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"result\")) ? _module32[\"result\"] : _module32); } } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:tails-armor-assembly",
+    "links": []
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
         "graph": {
-          "version": "rvb-content-graph/v1",
-          "surface": "card",
-          "entry": "select",
-          "nodes": [
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
             {
-              "id": "select",
-              "kind": "call",
-              "capability": "selectTarget",
-              "args": [
-                {
-                  "kind": "object",
-                  "entries": {
-                    "type": {
-                      "kind": "literal",
-                      "value": "piece"
-                    },
-                    "range": {
-                      "kind": "literal",
-                      "value": 99
-                    },
-                    "filter": {
-                      "kind": "literal",
-                      "value": "ally"
-                    }
-                  }
-                }
-              ],
-              "result": "t",
-              "next": "target-check"
-            },
-            {
-              "id": "target-check",
-              "kind": "branch",
-              "condition": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
-                  "kind": "unary",
-                  "op": "!",
-                  "argument": {
-                    "kind": "ref",
-                    "name": "t"
-                  }
-                },
-                "right": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "t"
-                  },
-                  "key": "needsTargetSelection"
-                }
-              },
-              "yes": "return-target",
-              "no": "modules"
-            },
-            {
-              "id": "return-target",
-              "kind": "return",
-              "value": {
-                "kind": "ref",
-                "name": "t"
-              }
-            },
-            {
-              "id": "modules",
-              "kind": "bind",
-              "name": "ms",
-              "expr": {
-                "kind": "collection",
-                "object": {
-                  "kind": "collection",
-                  "object": {
-                    "kind": "ref",
-                    "name": "selected"
-                  },
-                  "method": "join",
-                  "args": [
-                    {
-                      "kind": "literal",
-                      "value": ","
-                    }
-                  ]
-                },
-                "method": "split",
-                "args": [
-                  {
-                    "kind": "literal",
-                    "value": ","
-                  }
-                ]
-              },
-              "next": "init-status"
-            },
-            {
-              "id": "init-status",
-              "kind": "set",
-              "target": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "t"
-                },
-                "key": "statusTags"
-              },
-              "operator": "=",
-              "value": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "t"
-                  },
-                  "key": "statusTags"
-                },
-                "right": {
-                  "kind": "array",
-                  "items": []
-                }
-              },
-              "next": "apply-modules"
-            },
-            {
-              "id": "apply-modules",
-              "kind": "invoke",
-              "target": {
-                "kind": "array",
-                "object": {
-                  "kind": "ref",
-                  "name": "ms"
-                },
-                "method": "forEach"
-              },
-              "args": [
-                {
-                  "kind": "function",
-                  "parameters": [
-                    "m"
-                  ],
-                  "body": {
-                    "entry": "check-heal",
-                    "end": "callback-end",
-                    "nodes": [
-                      {
-                        "id": "check-heal",
-                        "kind": "branch",
-                        "condition": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "ref",
-                            "name": "m"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "heal"
-                          }
-                        },
-                        "yes": "heal-clock",
-                        "no": "check-attack"
-                      },
-                      {
-                        "id": "heal-clock",
-                        "kind": "call",
-                        "capability": "Date.now",
-                        "args": [],
-                        "result": "healNow",
-                        "next": "heal-push"
-                      },
-                      {
-                        "id": "heal-push",
-                        "kind": "call",
-                        "capability": "array.push",
-                        "args": [
-                          {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "t"
-                            },
-                            "key": "statusTags"
-                          },
-                          {
-                            "kind": "object",
-                            "entries": {
-                              "id": {
-                                "kind": "binary",
-                                "op": "+",
-                                "left": {
-                                  "kind": "binary",
-                                  "op": "+",
-                                  "left": {
-                                    "kind": "binary",
-                                    "op": "+",
-                                    "left": {
-                                      "kind": "literal",
-                                      "value": "periodic-heal-"
-                                    },
-                                    "right": {
-                                      "kind": "get",
-                                      "object": {
-                                        "kind": "ref",
-                                        "name": "t"
-                                      },
-                                      "key": "instanceId"
-                                    }
-                                  },
-                                  "right": {
-                                    "kind": "literal",
-                                    "value": "-"
-                                  }
-                                },
-                                "right": {
-                                  "kind": "ref",
-                                  "name": "healNow"
-                                }
-                              },
-                              "type": {
-                                "kind": "literal",
-                                "value": "periodic-heal"
-                              },
-                              "name": {
-                                "kind": "literal",
-                                "value": "恢复模块"
-                              },
-                              "stacks": {
-                                "kind": "literal",
-                                "value": 1
-                              },
-                              "relatedRules": {
-                                "kind": "array",
-                                "items": [
-                                  {
-                                    "kind": "literal",
-                                    "value": "rule-tails-armor-recovery"
-                                  }
-                                ]
-                              }
-                            }
-                          }
-                        ],
-                        "next": "heal-rule"
-                      },
-                      {
-                        "id": "heal-rule",
-                        "kind": "call",
-                        "capability": "addRuleById",
-                        "args": [
-                          {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "t"
-                            },
-                            "key": "instanceId"
-                          },
-                          {
-                            "kind": "literal",
-                            "value": "rule-tails-armor-recovery"
-                          }
-                        ],
-                        "next": "check-attack"
-                      },
-                      {
-                        "id": "check-attack",
-                        "kind": "branch",
-                        "condition": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "ref",
-                            "name": "m"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "attack"
-                          }
-                        },
-                        "yes": "attack-set",
-                        "no": "check-speed"
-                      },
-                      {
-                        "id": "attack-set",
-                        "kind": "set",
-                        "target": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "t"
-                          },
-                          "key": "attack"
-                        },
-                        "operator": "=",
-                        "value": {
-                          "kind": "binary",
-                          "op": "+",
-                          "left": {
-                            "kind": "binary",
-                            "op": "||",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "t"
-                              },
-                              "key": "attack"
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": 0
-                            }
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": 3
-                          }
-                        },
-                        "next": "check-speed"
-                      },
-                      {
-                        "id": "check-speed",
-                        "kind": "branch",
-                        "condition": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "ref",
-                            "name": "m"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "speed"
-                          }
-                        },
-                        "yes": "speed-clock",
-                        "no": "check-defense"
-                      },
-                      {
-                        "id": "speed-clock",
-                        "kind": "call",
-                        "capability": "Date.now",
-                        "args": [],
-                        "result": "speedNow",
-                        "next": "speed-push"
-                      },
-                      {
-                        "id": "speed-push",
-                        "kind": "call",
-                        "capability": "array.push",
-                        "args": [
-                          {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "t"
-                            },
-                            "key": "statusTags"
-                          },
-                          {
-                            "kind": "object",
-                            "entries": {
-                              "id": {
-                                "kind": "binary",
-                                "op": "+",
-                                "left": {
-                                  "kind": "binary",
-                                  "op": "+",
-                                  "left": {
-                                    "kind": "binary",
-                                    "op": "+",
-                                    "left": {
-                                      "kind": "literal",
-                                      "value": "free-normal-move-every-turn-"
-                                    },
-                                    "right": {
-                                      "kind": "get",
-                                      "object": {
-                                        "kind": "ref",
-                                        "name": "t"
-                                      },
-                                      "key": "instanceId"
-                                    }
-                                  },
-                                  "right": {
-                                    "kind": "literal",
-                                    "value": "-"
-                                  }
-                                },
-                                "right": {
-                                  "kind": "ref",
-                                  "name": "speedNow"
-                                }
-                              },
-                              "type": {
-                                "kind": "literal",
-                                "value": "free-normal-move-every-turn"
-                              },
-                              "name": {
-                                "kind": "literal",
-                                "value": "高速模块"
-                              },
-                              "stacks": {
-                                "kind": "literal",
-                                "value": 1
-                              },
-                              "relatedRules": {
-                                "kind": "array",
-                                "items": [
-                                  {
-                                    "kind": "literal",
-                                    "value": "rule-sonic-free-move"
-                                  }
-                                ]
-                              }
-                            }
-                          }
-                        ],
-                        "next": "speed-rule"
-                      },
-                      {
-                        "id": "speed-rule",
-                        "kind": "call",
-                        "capability": "addRuleById",
-                        "args": [
-                          {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "t"
-                            },
-                            "key": "instanceId"
-                          },
-                          {
-                            "kind": "literal",
-                            "value": "rule-sonic-free-move"
-                          }
-                        ],
-                        "next": "check-defense"
-                      },
-                      {
-                        "id": "check-defense",
-                        "kind": "branch",
-                        "condition": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "ref",
-                            "name": "m"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": "defense"
-                          }
-                        },
-                        "yes": "defense-set",
-                        "no": "callback-end"
-                      },
-                      {
-                        "id": "defense-set",
-                        "kind": "set",
-                        "target": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "t"
-                          },
-                          "key": "defense"
-                        },
-                        "operator": "=",
-                        "value": {
-                          "kind": "binary",
-                          "op": "+",
-                          "left": {
-                            "kind": "binary",
-                            "op": "||",
-                            "left": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "t"
-                              },
-                              "key": "defense"
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": 0
-                            }
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": 2
-                          }
-                        },
-                        "next": "callback-end"
-                      },
-                      {
-                        "id": "callback-end",
-                        "kind": "regionEnd"
-                      }
-                    ]
-                  }
-                }
-              ],
-              "next": "done"
-            },
-            {
-              "id": "done",
-              "kind": "return",
-              "value": {
-                "kind": "object",
-                "entries": {
-                  "success": {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  "message": {
-                    "kind": "literal",
-                    "value": "获得组合护甲效果"
-                  }
-                }
-              }
+              "name": "result",
+              "type": "record",
+              "nullable": true
             }
           ],
-          "metadata": {
-            "generatedFamily": "tails-armor",
-            "sourceField": "customCards.code"
-          }
+          "body": [
+            {
+              "kind": "call",
+              "id": "owner-ref",
+              "module": "ref.player",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner-present",
+              "module": "query.has-player",
+              "version": "1",
+              "inputs": {
+                "playerId": {
+                  "kind": "output",
+                  "node": "owner-ref",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "owner-guard",
+              "condition": {
+                "kind": "output",
+                "node": "owner-present",
+                "port": "exists"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "owner",
+                  "module": "query.player",
+                  "version": "1",
+                  "inputs": {
+                    "playerId": {
+                      "kind": "output",
+                      "node": "owner-ref",
+                      "port": "player"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "module-choice",
+                  "module": "choice.multi-string",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {
+                    "title": "护甲组装：选择两个不同模块",
+                    "options": [
+                      "heal",
+                      "attack",
+                      "speed",
+                      "defense"
+                    ],
+                    "labels": [
+                      "恢复模块",
+                      "攻击模块",
+                      "高速模块",
+                      "硬化模块"
+                    ],
+                    "minSelections": 2,
+                    "maxSelections": 2,
+                    "canCancel": false
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "choice-unresolved",
+                  "module": "choice.is-unresolved",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "module-choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "choice-pending",
+                  "condition": {
+                    "kind": "output",
+                    "node": "choice-unresolved",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "choice-pending-result",
+                      "module": "choice.as-result",
+                      "version": "1",
+                      "inputs": {
+                        "choice": {
+                          "kind": "output",
+                          "node": "module-choice",
+                          "port": "choice"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "choice-pending-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "choice-pending-result",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "selected",
+                      "module": "choice.as-string-list",
+                      "version": "1",
+                      "inputs": {
+                        "choice": {
+                          "kind": "output",
+                          "node": "module-choice",
+                          "port": "choice"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "selected-count",
+                      "module": "list.count",
+                      "version": "1",
+                      "inputs": {
+                        "items": {
+                          "kind": "output",
+                          "node": "selected",
+                          "port": "values"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-two",
+                      "module": "compare.equal",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "selected-count",
+                          "port": "count"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 2
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "duplicate",
+                      "module": "list.has-duplicate",
+                      "version": "1",
+                      "inputs": {
+                        "items": {
+                          "kind": "output",
+                          "node": "selected",
+                          "port": "values"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "no-duplicate",
+                      "module": "logic.not",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "duplicate",
+                          "port": "duplicate"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "allowed",
+                      "module": "list.all-in",
+                      "version": "1",
+                      "inputs": {
+                        "items": {
+                          "kind": "output",
+                          "node": "selected",
+                          "port": "values"
+                        }
+                      },
+                      "parameters": {
+                        "allowed": [
+                          "heal",
+                          "attack",
+                          "speed",
+                          "defense"
+                        ]
+                      }
+                    },
+                    {
+                      "kind": "if",
+                      "id": "selection-count-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "has-two",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "if",
+                          "id": "selection-duplicate-guard",
+                          "condition": {
+                            "kind": "output",
+                            "node": "no-duplicate",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "if",
+                              "id": "selection-domain-guard",
+                              "condition": {
+                                "kind": "output",
+                                "node": "allowed",
+                                "port": "valid"
+                              },
+                              "then": [
+                                {
+                                  "kind": "call",
+                                  "id": "sorted",
+                                  "module": "list.sort-string",
+                                  "version": "1",
+                                  "inputs": {
+                                    "items": {
+                                      "kind": "output",
+                                      "node": "selected",
+                                      "port": "values"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "joined",
+                                  "module": "list.join",
+                                  "version": "1",
+                                  "inputs": {
+                                    "items": {
+                                      "kind": "output",
+                                      "node": "sorted",
+                                      "port": "sorted"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "separator": "-"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "card-id-prefix",
+                                  "module": "text.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "literal",
+                                      "value": "armor-"
+                                    },
+                                    "right": {
+                                      "kind": "output",
+                                      "node": "joined",
+                                      "port": "text"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "name-joined",
+                                  "module": "list.join",
+                                  "version": "1",
+                                  "inputs": {
+                                    "items": {
+                                      "kind": "output",
+                                      "node": "sorted",
+                                      "port": "sorted"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "separator": " + "
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "card-name-prefix",
+                                  "module": "text.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "literal",
+                                      "value": "组合护甲（"
+                                    },
+                                    "right": {
+                                      "kind": "output",
+                                      "node": "name-joined",
+                                      "port": "text"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "card-name",
+                                  "module": "text.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "card-name-prefix",
+                                      "port": "text"
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": "）"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "card-materialized",
+                                  "module": "content.materialize-template",
+                                  "version": "1",
+                                  "inputs": {
+                                    "templateId": {
+                                      "kind": "output",
+                                      "node": "card-id-prefix",
+                                      "port": "text"
+                                    },
+                                    "cardId": {
+                                      "kind": "output",
+                                      "node": "card-id-prefix",
+                                      "port": "text"
+                                    },
+                                    "name": {
+                                      "kind": "output",
+                                      "node": "card-name",
+                                      "port": "text"
+                                    },
+                                    "description": {
+                                      "kind": "literal",
+                                      "value": "对一名友军使用，永久获得所选模块效果。"
+                                    },
+                                    "owner": {
+                                      "kind": "output",
+                                      "node": "owner",
+                                      "port": "player"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "kind": "card"
+                                  }
+                                },
+                                {
+                                  "kind": "if",
+                                  "id": "materialize-guard",
+                                  "condition": {
+                                    "kind": "output",
+                                    "node": "card-materialized",
+                                    "port": "success"
+                                  },
+                                  "then": [
+                                    {
+                                      "kind": "call",
+                                      "id": "add-card",
+                                      "module": "card.hand-add-ref",
+                                      "version": "1",
+                                      "inputs": {
+                                        "player": {
+                                          "kind": "output",
+                                          "node": "owner",
+                                          "port": "player"
+                                        },
+                                        "cardId": {
+                                          "kind": "output",
+                                          "node": "card-materialized",
+                                          "port": "cardId"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "if",
+                                      "id": "add-card-guard",
+                                      "condition": {
+                                        "kind": "output",
+                                        "node": "add-card",
+                                        "port": "success"
+                                      },
+                                      "then": [
+                                        {
+                                          "kind": "call",
+                                          "id": "created-result",
+                                          "module": "result.action",
+                                          "version": "1",
+                                          "inputs": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": true
+                                            },
+                                            "message": {
+                                              "kind": "literal",
+                                              "value": "创造了组合护甲手牌"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "return",
+                                          "id": "created-return",
+                                          "value": {
+                                            "kind": "output",
+                                            "node": "created-result",
+                                            "port": "result"
+                                          }
+                                        }
+                                      ],
+                                      "else": [
+                                        {
+                                          "kind": "call",
+                                          "id": "add-card-failed-result",
+                                          "module": "result.action",
+                                          "version": "1",
+                                          "inputs": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": false
+                                            },
+                                            "message": {
+                                              "kind": "literal",
+                                              "value": "无法创建组合护甲手牌"
+                                            }
+                                          },
+                                          "parameters": {}
+                                        },
+                                        {
+                                          "kind": "return",
+                                          "id": "add-card-failed-return",
+                                          "value": {
+                                            "kind": "output",
+                                            "node": "add-card-failed-result",
+                                            "port": "result"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "kind": "call",
+                                      "id": "materialize-failed-result",
+                                      "module": "result.action",
+                                      "version": "1",
+                                      "inputs": {
+                                        "success": {
+                                          "kind": "literal",
+                                          "value": false
+                                        },
+                                        "message": {
+                                          "kind": "literal",
+                                          "value": "无法创建组合护甲手牌"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "return",
+                                      "id": "materialize-failed-return",
+                                      "value": {
+                                        "kind": "output",
+                                        "node": "materialize-failed-result",
+                                        "port": "result"
+                                      }
+                                    }
+                                  ]
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "kind": "call",
+                                  "id": "invalid-module-result",
+                                  "module": "result.action",
+                                  "version": "1",
+                                  "inputs": {
+                                    "success": {
+                                      "kind": "literal",
+                                      "value": false
+                                    },
+                                    "message": {
+                                      "kind": "literal",
+                                      "value": "模块选择无效"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "return",
+                                  "id": "invalid-module-return",
+                                  "value": {
+                                    "kind": "output",
+                                    "node": "invalid-module-result",
+                                    "port": "result"
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "else": [
+                            {
+                              "kind": "call",
+                              "id": "duplicate-module-result",
+                              "module": "result.action",
+                              "version": "1",
+                              "inputs": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": false
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": "必须选择两个不同模块"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "return",
+                              "id": "duplicate-module-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "duplicate-module-result",
+                                "port": "result"
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "invalid-count-result",
+                          "module": "result.action",
+                          "version": "1",
+                          "inputs": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            },
+                            "message": {
+                              "kind": "literal",
+                              "value": "必须选择两个不同模块"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "invalid-count-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "invalid-count-result",
+                            "port": "result"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "missing-owner-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "无法找到护甲持有者"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "missing-owner-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "missing-owner-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            }
+          ]
         },
-        "bindings": {
-          "selected": {
-            "kind": "ref",
-            "name": "selected"
-          }
-        },
-        "result": "generatedCardSource",
-        "next": "n5"
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
       }
-    ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+    }
+  }
 }

@@ -29,5 +29,10 @@
     "rule-hidan-dying-immune",
     "rule-hidan-undying"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:red-hidan",
+    "links": []
+  }
 }

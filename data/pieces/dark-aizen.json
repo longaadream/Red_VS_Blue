@@ -29,5 +29,10 @@
     "rule-aizen-kyoka-rewrite",
     "rule-aizen-kyoka-expire"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:dark-aizen",
+    "links": []
+  }
 }

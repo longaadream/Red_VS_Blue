@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyGameplayModuleGraph,
+  applyGameplayModuleTextBindings,
   assertGameplayModuleDocument,
   compileGameplayModuleGraph,
   GAMEPLAY_MODULE_GRAPH_VERSION,
@@ -266,6 +267,19 @@ describe('RED-252 semantic gameplay content samples', () => {
     const semantic = semanticDocument(id, 'code', buildLuckyCoinGraph()) as unknown as CardDefinition
     expect(runCard(semantic, 'player-red')).toEqual(runCard(legacy, 'player-red'))
     expect(runCard(semantic, 'missing-player')).toEqual(runCard(legacy, 'missing-player'))
+  })
+
+  it('updates Lucky Coin description, effect and log from one author parameter', () => {
+    const original = semanticDocument('cards/lucky-coin', 'code', buildLuckyCoinGraph())
+    const bound = applyGameplayModuleTextBindings(original, {
+      description: { template: '获得{{amount}}点行动点。', values: { amount: { entry: 'code', input: 'gain' } } },
+    })
+    const modified = applyGameplayModuleGraph(bound, { ...buildLuckyCoinGraph(), inputBindings: { gain: 3 } })
+    const before = runCard(bound as unknown as CardDefinition) as any
+    const after = runCard(modified as unknown as CardDefinition) as any
+    expect(modified.description).toBe('获得3点行动点。')
+    expect(after.state.players[0].actionPoints - before.state.players[0].actionPoints).toBe(2)
+    expect(after.result.message).toContain('获得3点行动力')
   })
 
   it('matches the real rule host for Reap success and rejection paths', () => {

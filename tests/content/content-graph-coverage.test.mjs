@@ -53,7 +53,17 @@ test('coverage inventory is deterministic and exposes the dynamic evidence exten
   // stronger requirement that every feature expand to registered modules.
   assert.equal(first.assessmentScope, 'compiler-ir-and-behavior-compatibility')
   assert.equal(first.semanticModuleCoverage.status, 'partial')
-  assert.equal(first.semanticModuleCoverage.validatedInlineFields, 5)
+  // Every declared semantic entry must validate; compatibility IR must never
+  // inflate this total. Read declarations independently so later batches do
+  // not require replacing a stale milestone number.
+  const declaredSemanticFields = first.nodes.filter(node => node.scope === 'ordinary').flatMap(node => {
+    const definition = JSON.parse(fs.readFileSync(path.join(root, 'data', `${node.nodeKey}.json`), 'utf8'))
+    return Object.keys(definition.gameplayModules?.entries ?? {}).map(field => `${node.nodeKey}:${field}`)
+  }).sort()
+  assert.deepEqual(first.semanticModuleCoverage.fields, declaredSemanticFields)
+  assert.equal(first.semanticModuleCoverage.validatedInlineFields, declaredSemanticFields.length)
+  assert.ok(first.semanticModuleCoverage.fields.includes('skills/naruto-shadow-clone:code'))
+  assert.ok(first.semanticModuleCoverage.fields.includes('rules/rule-naruto-clone-one-hit:skillCode'))
   assert.equal(first.semanticModuleCoverage.complete, false)
   assert.equal(first.compilerValidator.available, true)
   assert.equal(first.compilerValidator.documentAvailable, true)
@@ -175,7 +185,8 @@ test('static reachability, unknown references, and dynamic references remain vis
   const generatedByFrom = new Map(report.generatedFamilies.map(family => [family.from, family]))
   assert.equal(generatedByFrom.get('rules/rule-rafaam-curse-ward').generatedSourceStatus, 'graph-source-validated')
   assert.equal(generatedByFrom.get('rules/rule-rafaam-curse-ward').generatedSourceProof.rawExecutableSourceLiterals.length, 0)
-  assert.equal(generatedByFrom.get('skills/tails-armor-assembly').generatedSourceProof.materializeSourceCount, 1)
+  assert.equal(generatedByFrom.get('skills/tails-armor-assembly').generatedSourceProof.materializeSourceCount, 6)
+  assert.equal(generatedByFrom.get('skills/tails-armor-assembly').generatedSourceProof.registeredGraphProof.templateProofs.length, 6)
   const copyProof = generatedByFrom.get('skills/rafaam-curse-amplify').generatedSourceProof.copySourceProof
   assert.equal(generatedByFrom.get('skills/rafaam-curse-amplify').generatedSourceStatus, 'graph-source-validated')
   assert.equal(copyProof.status, 'graph-source-validated')
@@ -615,22 +626,25 @@ test('source proof is rooted at executable sinks and Rafaam copy proof rejects c
   assert.equal(staleWardProof.status, 'graph-source-unverified')
   assert.match(staleWardProof.reason, /registered graph proof/i)
 
+  const findModule = (value, module) => {
+    if (!value || typeof value !== 'object') return null
+    if (value.kind === 'call' && value.module === module) return value
+    for (const child of Object.values(value)) { const found = findModule(child, module); if (found) return found }
+    return null
+  }
   const cloneCodeLiteral = structuredClone(amplify)
-  const cloneCodeSet = cloneCodeLiteral.contentGraph.nodes
-    .flatMap(node => node.body?.nodes ?? [])
-    .find(node => node.kind === 'set' && node.target?.kind === 'get' && node.target.object?.name === 'copy' && node.target.key === 'id')
-  cloneCodeSet.target.key = 'code'
-  cloneCodeSet.value = literal('function executeCard(context) { return 99; }')
+  const copyCall = findModule(cloneCodeLiteral.gameplayModules.entries.code.graph, 'content.copy-card')
+  assert.ok(copyCall)
+  copyCall.parameters.code = 'function executeCard(context) { return 99; }'
+  assert.equal(classifyMigration(cloneCodeLiteral, { validator }).status, 'graph-unverified')
   const cloneCodeProof = inspectRafaamCopySource(cloneCodeLiteral, amplifyMigration, copyOptions)
   assert.equal(cloneCodeProof.status, 'graph-source-unverified')
-  assert.equal(cloneCodeProof.graphProof.copyCodeMutation, true)
+  assert.equal(cloneCodeProof.graphProof.registeredArtifact, false)
 
   const unknownSource = structuredClone(amplify)
-  const customLookup = unknownSource.contentGraph.nodes
-    .flatMap(node => node.body?.nodes ?? [])
-    .find(node => node.kind === 'bind' && node.name === 'custom')
-  customLookup.expr.index = { kind: 'ref', name: 'externalScriptId' }
+  findModule(unknownSource.gameplayModules.entries.code.graph, 'content.copy-card').inputs.sourceId = literal('externalScriptId')
   const unknownSourceProof = inspectRafaamCopySource(unknownSource, amplifyMigration, copyOptions)
   assert.equal(unknownSourceProof.status, 'graph-source-unverified')
-  assert.equal(unknownSourceProof.graphProof.customCardsLookup, false)
+  assert.equal(unknownSourceProof.graphProof.registeredArtifact, false)
+
 })

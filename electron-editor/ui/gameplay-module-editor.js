@@ -20,6 +20,14 @@
   }
   const statementLabels = { call: '调用模块', if: '条件分支', foreach: '逐项执行', return: '返回结果' }
   const categoryFields = { skills: 'code', cards: 'code', rules: 'skillCode', triggerSkills: 'code', pending: 'effectCode', preview: 'previewCode' }
+  const paletteCategoryLabels = {
+    all: '全部', context: '上下文', query: '查询', math: '数值', logic: '逻辑', text: '文本',
+    choice: '选择', effect: '效果', card: '卡牌', status: '状态', rule: '规则', event: '事件', result: '结果', other: '其他',
+  }
+  const textBindingFields = [
+    { name: 'description', label: '描述' },
+    { name: 'targetText', label: '目标提示' },
+  ]
 
   const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
   const record = value => value && typeof value === 'object' && !Array.isArray(value)
@@ -176,6 +184,27 @@
   }
 
   function typeLabel(type) { return typeLabels[type] || typeName(type) }
+
+  function primitiveType(type) {
+    const value = typeof type === 'string' ? type : null
+    return typeof value === 'string' && ['number', 'boolean', 'string'].includes(value) ? value : null
+  }
+
+  function descriptorCategory(descriptor) {
+    const category = descriptor?.ui?.category
+    return typeof category === 'string' && category ? category : 'other'
+  }
+
+  function textBindingTokenNames(template) {
+    const tokens = []
+    const seen = new Set()
+    const source = typeof template === 'string' ? template : ''
+    for (const match of source.matchAll(/\{\{([^{}]+)\}\}/g)) {
+      const name = match[1].trim()
+      if (name && !seen.has(name)) { seen.add(name); tokens.push(name) }
+    }
+    return tokens
+  }
 
   function editableType(type) {
     return record(type) && type.kind === 'nullable' ? type.value : type
@@ -372,12 +401,135 @@
       let locked = false
       let destroyed = false
       let search = ''
+      let paletteCategory = 'all'
+      const collapsedPaletteCategories = new Set()
+      const openConfigurationSections = new Set()
+      let pendingTextBindings = {}
+      let expanded = false
+      let expandedFocus = null
+      let expandedScrollHost = null
+      let expandedScrollTop = 0
+      let expandedWindowScroll = { x: 0, y: 0 }
+      let escapeListener = null
 
       const editingLocked = () => locked || Boolean(container.closest('[data-saving="true"]'))
       const core = () => getCore()
       const draft = () => getDraft() || {}
       const currentGraph = () => graphFromDraft(draft(), core(), selectedField)
       const fields = () => graphFields(draft(), selectedField, initialField)
+
+      function textBindingEntries(value) {
+        const entries = record(value?.gameplayModules?.entries) ? value.gameplayModules.entries : {}
+        const result = []
+        for (const entryName of Object.keys(entries).sort()) {
+          const entry = entries[entryName]
+          const graph = record(entry) && record(entry.graph) ? entry.graph : null
+          if (!graph || !Array.isArray(graph.inputs) || !record(graph.inputBindings)) continue
+          for (const port of graph.inputs) {
+            const type = primitiveType(portType(port))
+            if (!type || !own(graph.inputBindings, port?.name)) continue
+            const value = graph.inputBindings[port.name]
+            if (typeof value !== type || (type === 'number' && !Number.isFinite(value))) continue
+            result.push({
+              entry: entryName,
+              input: port.name,
+              type,
+              label: `${entryName} · ${port.label || port.name}`,
+              value,
+            })
+          }
+        }
+        return result
+      }
+
+      function textBindingDocument(value) {
+        const modules = record(value?.gameplayModules) ? value.gameplayModules : null
+        const stored = record(modules?.textBindings) ? clone(modules.textBindings) : {}
+        return { ...stored, ...clone(pendingTextBindings) }
+      }
+
+      function applyTextBindings(bindings) {
+        if (editingLocked()) return
+        const current = draft()
+        const compiler = core()
+        try {
+          let next
+          if (typeof compiler?.applyGameplayModuleTextBindings === 'function') {
+            next = compiler.applyGameplayModuleTextBindings(current, bindings)
+          } else {
+            const modules = record(current.gameplayModules) ? clone(current.gameplayModules) : null
+            if (!modules || !record(modules.entries)) throw new Error('当前编辑器编译器不支持描述绑定，请先更新共享模块包。')
+            const rendered = {}
+            for (const [field, binding] of Object.entries(bindings)) {
+              if (!record(binding) || typeof binding.template !== 'string' || !record(binding.values)) throw new Error(`无效的${field}绑定。`)
+              rendered[field] = binding.template.replace(/\{\{([^{}]+)\}\}/g, (_match, token) => {
+                const source = binding.values[token]
+                const entry = modules.entries[source?.entry]
+                const graph = record(entry) && record(entry.graph) ? entry.graph : null
+                if (!graph || !Array.isArray(graph.inputs) || !record(graph.inputBindings) || !own(graph.inputBindings, source?.input)) throw new Error(`找不到占位符“${token}”的数据来源。`)
+                return String(graph.inputBindings[source.input])
+              })
+            }
+            next = { ...current, ...rendered, gameplayModules: { ...modules, textBindings: clone(bindings) } }
+          }
+          onChange(next)
+          pendingTextBindings = {}
+          message = '文字绑定已更新。'
+        } catch (error) {
+          message = errorText(error)
+        }
+        render()
+      }
+
+      function saveDocument() {
+        if (editingLocked()) return
+        const save = container.closest('.editor-frame')?.querySelector('[data-save-json]')
+        if (!save) {
+          message = '当前编辑器没有可用的保存入口。'
+          render()
+          return
+        }
+        save.click()
+      }
+
+      function setExpanded(value) {
+        const next = Boolean(value)
+        if (next === expanded) return
+        if (next) {
+          const active = document.activeElement
+          expandedFocus = active && active !== document.body && container.contains(active)
+            ? active
+            : container.querySelector('[data-gameplay-module-expand]')
+          expandedScrollHost = container.closest('.detail-col') || container.parentElement
+          expandedScrollTop = expandedScrollHost?.scrollTop || 0
+          expandedWindowScroll = { x: window.scrollX, y: window.scrollY }
+          expanded = true
+          document.body.classList.add('gameplay-module-workspace-expanded')
+          escapeListener = event => {
+            if (event.key === 'Escape' && expanded) {
+              event.preventDefault()
+              setExpanded(false)
+            }
+          }
+          document.addEventListener('keydown', escapeListener)
+          render()
+          container.querySelector('[data-gameplay-module-expand]')?.focus()
+          return
+        }
+        expanded = false
+        document.body.classList.remove('gameplay-module-workspace-expanded')
+        if (escapeListener) document.removeEventListener('keydown', escapeListener)
+        escapeListener = null
+        const host = expandedScrollHost
+        const focusTarget = expandedFocus
+        render()
+        if (host) host.scrollTop = expandedScrollTop
+        window.scrollTo(expandedWindowScroll.x, expandedWindowScroll.y)
+        if (focusTarget?.isConnected) focusTarget.focus()
+        else container.querySelector('[data-gameplay-module-expand]')?.focus()
+        expandedFocus = null
+        expandedScrollHost = null
+      }
 
       function activeScope(graph, createMissing = false) {
         if (!record(graph)) return { body: [], label: '主流程', frame: null }
@@ -437,10 +589,10 @@
           if (typeof compiler?.applyGameplayModuleGraph === 'function') {
             const next = compiler.applyGameplayModuleGraph(draft(), value, selectedField)
             onChange(next)
-            message = '模块图已通过类型检查，生成字段会随文档一起保存。'
+            message = '模块图已更新。'
           } else {
             onChange(rawGraphDraft(value))
-            message = '已更新模块图；可信编译器加载后会在保存时校验。'
+            message = '模块图已更新。'
           }
         } catch (error) {
           onChange(rawGraphDraft(value))
@@ -599,7 +751,10 @@
       }
 
       function renderStatementInspector(parent, statement, graph, scope, index) {
-        parent.append(node('h3', `${statementLabels[statement.kind] || '未知节点'} · ${statement.id}`))
+        parent.dataset.gameplayModuleSelected = statement.id || ''
+        const title = node('div', undefined, 'gameplay-module-inspector-title')
+        title.append(node('h3', statementLabels[statement.kind] || '未知节点'), node('code', statement.id || '无 ID', 'gameplay-module-node-id'))
+        parent.append(title)
         if (statement.kind === 'call') renderCallInspector(parent, statement, graph, scope, index)
         else if (statement.kind === 'if') {
           renderValueEditor(parent, '判断条件 · 布尔值', statement.condition, 'boolean', graph, scope, index, value => updateStatement(statement.id, item => { item.condition = value }), { type: 'boolean', default: true })
@@ -627,10 +782,13 @@
         if (statement.kind !== 'return' || scope.body.length > 1) parent.append(button('删除语句', () => { mutateBody(body => { const at = body.findIndex(item => item?.id === statement.id); if (at >= 0) body.splice(at, 1); if (selectedId === statement.id) selectedId = null }); }, 'gameplay-module-button danger'))
       }
 
-      function renderInterface(parent, graph) {
+      function renderInterface(parent, graph, validation = '') {
         const owner = interfaceOwner(graph)
-        const details = document.createElement('details'); details.open = true; details.dataset.gameplayGraphInterface = 'true'
-        details.append(node('summary', '图输入与输出'))
+        const details = document.createElement('details'); details.className = 'gameplay-module-config-fold'; details.open = Boolean(validation) || openConfigurationSections.has('interface'); details.dataset.gameplayGraphInterface = 'true'
+        details.ontoggle = () => { if (details.open) openConfigurationSections.add('interface'); else openConfigurationSections.delete('interface') }
+        const summary = node('summary', undefined, 'gameplay-module-config-summary')
+        summary.append(node('span', '图输入与输出'), node('small', '可选配置'))
+        details.append(summary)
         const columns = node('div', undefined, 'gameplay-module-port-columns')
         for (const kind of ['inputs', 'outputs']) {
           const column = node('section', undefined, 'gameplay-module-port-list'); column.append(node('h4', kind === 'inputs' ? '输入端口' : '输出端口'))
@@ -662,32 +820,173 @@
         details.append(columns); parent.append(details)
       }
 
+      function renderTextBindings(parent, graph, validation = '') {
+        const section = document.createElement('details')
+        section.className = 'gameplay-module-text-bindings gameplay-module-config-fold'
+        section.open = Boolean(validation) || openConfigurationSections.has('text')
+        section.ontoggle = () => { if (section.open) openConfigurationSections.add('text'); else openConfigurationSections.delete('text') }
+        const summary = node('summary', undefined, 'gameplay-module-config-summary')
+        summary.title = '用 {{名称}} 将文字绑定到已声明的根输入。'
+        summary.append(node('span', '文字绑定'), node('small', '可选 · 根输入'))
+        section.append(summary)
+        section.append(node('p', '用 {{名称}} 绑定根输入，保存时自动生成文字。', 'gameplay-module-help'))
+        const current = textBindingDocument(draft())
+        const entries = textBindingEntries(draft())
+        for (const field of textBindingFields) {
+          const existing = record(current[field]) ? current[field] : null
+          const template = document.createElement('input')
+          template.type = 'text'; template.value = existing?.template ?? (typeof draft()[field.name] === 'string' ? draft()[field.name] : '')
+          template.placeholder = field.name === 'description' ? '例如：获得 {{amount}} 点行动点。' : '例如：选择 {{target}}'
+          template.maxLength = 1000; template.disabled = editingLocked(); template.dataset.gameplayModuleTextTemplate = field.name
+          const fieldLabel = label(field.label, template, 'gameplay-module-text-field')
+          const tokenRows = node('div', undefined, 'gameplay-module-text-token-list')
+          const renderTokens = () => {
+            tokenRows.replaceChildren()
+            const tokens = textBindingTokenNames(template.value)
+            if (!tokens.length) {
+              tokenRows.append(node('p', '输入 {{名称}} 添加可绑定占位符。', 'gameplay-module-muted'))
+              return
+            }
+            for (const token of tokens) {
+              const row = node('div', undefined, 'gameplay-module-text-token')
+              row.append(node('span', `{{${token}}}`, 'gameplay-module-text-token-name'))
+              const select = document.createElement('select')
+              select.setAttribute('aria-label', `${field.label}占位符 ${token} 的数据来源`)
+              select.dataset.gameplayModuleTextSource = token
+              const empty = node('option', '选择根输入'); empty.value = ''; select.append(empty)
+              for (const entry of entries) {
+                const option = node('option', `${entry.label} = ${String(entry.value)}`)
+                option.value = encodeValue({ entry: entry.entry, input: entry.input })
+                select.append(option)
+              }
+              const source = existing?.values?.[token]
+              select.value = source ? encodeValue(source) : ''
+              select.disabled = editingLocked()
+              select.onchange = () => {
+                const bindings = textBindingDocument(draft())
+                const binding = record(bindings[field.name]) ? bindings[field.name] : { template: template.value, values: {} }
+                binding.template = template.value
+                binding.values = { ...(binding.values || {}) }
+                const next = decodeValue(select.value)
+                if (next) binding.values[token] = next
+                else delete binding.values[token]
+                bindings[field.name] = binding
+                pendingTextBindings[field.name] = clone(binding)
+                applyTextBindings(bindings)
+              }
+              row.append(select)
+              tokenRows.append(row)
+            }
+          }
+          template.oninput = renderTokens
+          template.onchange = () => {
+            const bindings = textBindingDocument(draft())
+            const prior = record(bindings[field.name]) ? bindings[field.name] : { values: {} }
+            const tokens = new Set(textBindingTokenNames(template.value))
+            const values = {}
+            for (const [token, source] of Object.entries(prior.values || {})) if (tokens.has(token)) values[token] = source
+            bindings[field.name] = { template: template.value, values }
+            pendingTextBindings[field.name] = clone(bindings[field.name])
+            applyTextBindings(bindings)
+          }
+          const fieldCard = node('div', undefined, 'gameplay-module-text-field-card')
+          fieldCard.append(fieldLabel, tokenRows)
+          if (existing) {
+            const clear = button('解除绑定', () => {
+              const bindings = textBindingDocument(draft()); delete bindings[field.name]; delete pendingTextBindings[field.name]; applyTextBindings(bindings)
+            }, 'gameplay-module-button secondary gameplay-module-text-clear')
+            fieldCard.append(clear)
+          }
+          section.append(fieldCard)
+          renderTokens()
+        }
+        parent.append(section)
+      }
+
       function renderPalette(parent, graph) {
         const currentSurface = surfaceFor(category, selectedField, graph)
-        const descriptors = catalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface)).filter(item => {
-          const query = search.trim().toLowerCase(); return !query || `${item.id} ${item.label || ''} ${item.description || ''}`.toLowerCase().includes(query)
-        })
+        const descriptors = catalog(core(), graph)
+          .filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface))
+          .filter(item => paletteCategory === 'all' || descriptorCategory(item) === paletteCategory)
+          .filter(item => {
+            const query = search.trim().toLowerCase(); return !query || `${item.id} ${item.label || ''} ${item.description || ''}`.toLowerCase().includes(query)
+          })
         const palette = node('aside', undefined, 'gameplay-module-palette'); palette.dataset.gameplayModulePalette = 'true'
-        palette.append(node('h3', '模块目录'))
-        const query = document.createElement('input'); query.type = 'search'; query.placeholder = '搜索已登记模块'; query.value = search; query.disabled = editingLocked(); query.setAttribute('aria-label', '搜索模块目录'); query.oninput = () => { search = query.value; render() }; palette.append(query)
-        if (!descriptors.length) palette.append(node('p', '当前入口没有可用的已登记模块。', 'gameplay-module-muted'))
-        for (const descriptor of descriptors) {
-          const item = button('', () => addStatement('call', descriptor), 'gameplay-module-palette-item'); item.dataset.gameplayModule = descriptor.id; item.dataset.gameplayModuleVersion = descriptor.version
-          item.append(node('strong', descriptor.label || descriptor.id), node('small', `${descriptor.id}@${descriptor.version}`))
-          if (descriptor.description || descriptor.uiDescription) item.append(node('span', descriptor.uiDescription || descriptor.description, 'gameplay-module-muted'))
-          palette.append(item)
+        const heading = node('div', undefined, 'gameplay-module-palette-heading')
+        heading.append(node('div', undefined, 'gameplay-module-palette-title'))
+        heading.firstChild.append(node('h3', '模块目录'), node('span', `${descriptors.length} 个可用`, 'gameplay-module-muted'))
+        palette.append(heading)
+        const query = document.createElement('input'); query.type = 'search'; query.placeholder = '搜索名称或 ID'; query.value = search; query.disabled = editingLocked(); query.setAttribute('aria-label', '搜索模块目录')
+        query.oninput = () => {
+          const cursor = query.selectionStart ?? query.value.length
+          search = query.value
+          render()
+          const next = container.querySelector('[data-gameplay-module-palette] input[type="search"]')
+          if (next) { next.focus(); next.setSelectionRange(cursor, cursor) }
         }
-        palette.append(node('h4', '结构语句'))
-        palette.append(button('新增条件分支', () => addStatement('if'), 'gameplay-module-palette-item'))
-        palette.append(button('新增逐项执行', () => addStatement('foreach'), 'gameplay-module-palette-item'))
-        palette.append(button('新增返回结果', () => addStatement('return'), 'gameplay-module-palette-item'))
+        palette.append(query)
+        const categories = node('div', undefined, 'gameplay-module-category-tabs'); categories.setAttribute('role', 'tablist'); categories.setAttribute('aria-label', '模块分类')
+        const availableCategories = ['all', ...new Set(catalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface)).map(descriptorCategory))]
+        for (const currentCategory of availableCategories) {
+          const tab = button(paletteCategoryLabels[currentCategory] || currentCategory, () => { paletteCategory = currentCategory; render() }, 'gameplay-module-category-tab')
+          tab.dataset.gameplayModuleCategory = currentCategory
+          tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', String(paletteCategory === currentCategory)); tab.setAttribute('aria-pressed', String(paletteCategory === currentCategory))
+          if (paletteCategory === currentCategory) tab.classList.add('active')
+          categories.append(tab)
+        }
+        palette.append(categories)
+        const groups = new Map()
+        for (const descriptor of descriptors) {
+          const key = descriptorCategory(descriptor)
+          if (!groups.has(key)) groups.set(key, [])
+          groups.get(key).push(descriptor)
+        }
+        if (!descriptors.length) palette.append(node('p', '没有匹配的已登记模块。', 'gameplay-module-muted'))
+        for (const [group, values] of groups) {
+          const details = document.createElement('details'); details.className = 'gameplay-module-palette-group'; details.open = !collapsedPaletteCategories.has(group)
+          details.dataset.gameplayModulePaletteGroup = group
+          details.ontoggle = () => { if (details.open) collapsedPaletteCategories.delete(group); else collapsedPaletteCategories.add(group) }
+          const summary = node('summary', undefined, 'gameplay-module-palette-group-summary')
+          summary.append(node('span', paletteCategoryLabels[group] || group), node('small', String(values.length)))
+          details.append(summary)
+          for (const descriptor of values) {
+            const item = button('', () => addStatement('call', descriptor), 'gameplay-module-palette-item'); item.dataset.gameplayModule = descriptor.id; item.dataset.gameplayModuleVersion = descriptor.version
+            item.setAttribute('aria-label', `添加 ${descriptor.label || descriptor.id}`)
+            const title = node('span', undefined, 'gameplay-module-palette-item-title')
+            title.append(node('strong', descriptor.label || descriptor.id), node('small', `${descriptor.id}@${descriptor.version}`))
+            item.append(title)
+            if (descriptor.inputs?.length || descriptor.outputs?.length) {
+              const types = node('span', undefined, 'gameplay-module-type-badges')
+              if (descriptor.inputs?.length) types.append(node('span', `入 ${descriptor.inputs.map(input => typeLabel(portType(input))).join(' · ')}`, 'gameplay-module-type-badge input'))
+              if (descriptor.outputs?.length) types.append(node('span', `出 ${descriptor.outputs.map(output => typeLabel(portType(output))).join(' · ')}`, 'gameplay-module-type-badge output'))
+              item.append(types)
+            }
+            if (descriptor.description || descriptor.uiDescription) item.append(node('span', descriptor.uiDescription || descriptor.description, 'gameplay-module-muted'))
+            details.append(item)
+          }
+          palette.append(details)
+        }
+        const structure = document.createElement('details'); structure.className = 'gameplay-module-palette-group gameplay-module-structure-group'; structure.open = !collapsedPaletteCategories.has('structure')
+        structure.ontoggle = () => { if (structure.open) collapsedPaletteCategories.delete('structure'); else collapsedPaletteCategories.add('structure') }
+        const structureSummary = node('summary', undefined, 'gameplay-module-palette-group-summary'); structureSummary.append(node('span', '流程结构'), node('small', '3'))
+        structure.append(structureSummary)
+        structure.append(button('新增条件分支', () => addStatement('if'), 'gameplay-module-palette-item'))
+        structure.append(button('新增逐项执行', () => addStatement('foreach'), 'gameplay-module-palette-item'))
+        structure.append(button('新增返回结果', () => addStatement('return'), 'gameplay-module-palette-item'))
+        palette.append(structure)
         if (!path.length) palette.append(button('新增组合模块', addComposite, 'gameplay-module-palette-item'))
         return palette
       }
 
-      function renderComposites(parent, graph) {
+      function renderComposites(parent, graph, validation = '') {
         if (!Array.isArray(graph.composites) || !graph.composites.length) return
-        const section = node('section', undefined, 'gameplay-module-composites'); section.append(node('h3', '组合模块'))
+        const section = document.createElement('details')
+        section.className = 'gameplay-module-composites gameplay-module-config-fold'
+        section.open = Boolean(validation) || openConfigurationSections.has('composites')
+        section.ontoggle = () => { if (section.open) openConfigurationSections.add('composites'); else openConfigurationSections.delete('composites') }
+        const summary = node('summary', undefined, 'gameplay-module-config-summary')
+        summary.append(node('span', '组合模块'), node('small', `${graph.composites.length} 个`))
+        section.append(summary)
         for (const composite of graph.composites) {
           const row = node('div', undefined, 'gameplay-module-composite-row')
           row.append(node('span', `${composite.label || composite.id} · ${composite.id}@${composite.version}`))
@@ -699,41 +998,76 @@
       }
 
       function renderBody(parent, graph, scope) {
-        const body = node('section', undefined, 'gameplay-module-body'); body.dataset.gameplayModuleBody = 'true'
+        const body = node('section', undefined, 'gameplay-module-body gameplay-module-flow'); body.dataset.gameplayModuleBody = 'true'
         const heading = node('div', undefined, 'gameplay-module-body-heading')
-        heading.append(node('h3', `${scope.label} · ${scope.body.length} 个语句`))
+        const headingTitle = node('div', undefined, 'gameplay-module-body-title')
+        headingTitle.append(node('h3', scope.label), node('span', `${scope.body.length} 个步骤`, 'gameplay-module-muted'))
+        heading.append(headingTitle)
         heading.append(button('返回上一级', () => { if (path.length) path.pop(); selectedId = null; render() }, 'gameplay-module-button secondary'))
         body.append(heading)
-        if (!scope.body.length) body.append(node('p', '此子流程为空。请从左侧加入结构语句或模块调用。', 'gameplay-module-empty'))
+        const flow = node('div', undefined, 'gameplay-module-flow-list')
+        if (!scope.body.length) flow.append(node('p', '此子流程为空。请从左侧加入结构语句或模块调用。', 'gameplay-module-empty'))
         scope.body.forEach((statement, index) => {
-          const row = node('article', undefined, 'gameplay-module-statement' + (statement.id === selectedId ? ' selected' : ''))
+          const selected = statement.id === selectedId
+          const descriptor = statement.kind === 'call' ? descriptorFor(core(), graph, statement.module, statement.version) : null
+          const row = node('article', undefined, 'gameplay-module-statement' + (selected ? ' selected' : ''))
           row.dataset.gameplayModuleStatement = statement.id || ''
+          row.dataset.gameplayModuleKind = statement.kind || 'unknown'
+          row.dataset.depth = String(path.length)
           const main = button('', () => { selectedId = statement.id; render() }, 'gameplay-module-statement-main')
-          main.append(node('strong', statementLabels[statement.kind] || `未知 · ${statement.kind || '空'}`), node('code', statement.id || '无 ID'))
+          main.setAttribute('aria-pressed', String(selected)); main.setAttribute('aria-label', `${descriptor?.label || statementLabels[statement.kind] || '未知语句'} ${statement.id || ''}`.trim())
+          const marker = node('span', String(index + 1).padStart(2, '0'), 'gameplay-module-step-marker')
+          const copy = node('span', undefined, 'gameplay-module-statement-copy')
+          const title = node('span', undefined, 'gameplay-module-statement-title')
+          title.append(node('strong', descriptor?.label || statementLabels[statement.kind] || `未知 · ${statement.kind || '空'}`), node('code', statement.id || '无 ID', 'gameplay-module-node-id'))
+          copy.append(title)
           if (statement.kind === 'call') {
-            const descriptor = descriptorFor(core(), graph, statement.module, statement.version)
-            main.append(node('span', descriptor ? `${descriptor.label || descriptor.id} · ${descriptor.id}@${descriptor.version}` : `未注册模块 · ${statement.module || '（空）'}`, descriptor ? 'gameplay-module-summary' : 'gameplay-module-error'))
-          } else if (statement.kind === 'if') main.append(node('span', '进入 then / else 编辑子流程', 'gameplay-module-summary'))
-          else if (statement.kind === 'foreach') main.append(node('span', `循环项 ${statement.item || 'item'} · 进入 body 编辑子流程`, 'gameplay-module-summary'))
-          else main.append(node('span', '图流程结束或返回值', 'gameplay-module-summary'))
+            const summary = node('span', undefined, descriptor ? 'gameplay-module-summary' : 'gameplay-module-error')
+            summary.append(node('span', descriptor ? descriptor.label || descriptor.id : `未注册模块 · ${statement.module || '（空）'}`))
+            if (descriptor) {
+              const reference = node('code', `${descriptor.id}@${descriptor.version}`, 'gameplay-module-node-reference')
+              reference.title = `已登记模块 ${descriptor.id}@${descriptor.version}`
+              summary.append(reference)
+            }
+            copy.append(summary)
+            if (descriptor?.inputs?.length || descriptor?.outputs?.length) {
+              const badges = node('span', undefined, 'gameplay-module-type-badges')
+              if (descriptor.inputs?.length) badges.append(node('span', `入 ${descriptor.inputs.map(input => typeLabel(portType(input))).join(' · ')}`, 'gameplay-module-type-badge input'))
+              if (descriptor.outputs?.length) badges.append(node('span', `出 ${descriptor.outputs.map(output => typeLabel(portType(output))).join(' · ')}`, 'gameplay-module-type-badge output'))
+              copy.append(badges)
+            }
+          } else if (statement.kind === 'if') {
+            copy.append(node('span', '判断条件 · 进入 then / else 子流程', 'gameplay-module-summary'))
+            copy.append(node('span', 'then  /  else', 'gameplay-module-flow-ports'))
+          } else if (statement.kind === 'foreach') {
+            copy.append(node('span', `遍历 ${statement.item || 'item'} · 进入循环体子流程`, 'gameplay-module-summary'))
+            copy.append(node('span', 'body', 'gameplay-module-flow-ports'))
+          } else if (statement.kind === 'return') copy.append(node('span', '图流程结束或返回值', 'gameplay-module-summary'))
+          else copy.append(node('span', `待支持语句 · ${statement.kind || '未知类型'}，请在检查器中修复`, 'gameplay-module-error'))
+          main.append(marker, copy)
           const actions = node('div', undefined, 'gameplay-module-statement-actions')
-          actions.append(button('↑', () => mutateBody(items => { if (index > 0) [items[index - 1], items[index]] = [items[index], items[index - 1]] }), 'gameplay-module-icon-button'))
-          actions.append(button('↓', () => mutateBody(items => { if (index < items.length - 1) [items[index + 1], items[index]] = [items[index], items[index + 1]] }), 'gameplay-module-icon-button'))
-          actions.append(button('复制', () => mutateBody(items => { const copy = copyStatement(graph, items[index]); items.splice(index + 1, 0, copy); selectedId = copy.id }), 'gameplay-module-icon-button'))
-          row.append(main, actions); body.append(row)
+          const up = button('↑', () => mutateBody(items => { if (index > 0) [items[index - 1], items[index]] = [items[index], items[index - 1]] }), 'gameplay-module-icon-button'); up.setAttribute('aria-label', '上移语句')
+          const down = button('↓', () => mutateBody(items => { if (index < items.length - 1) [items[index + 1], items[index]] = [items[index], items[index + 1]] }), 'gameplay-module-icon-button'); down.setAttribute('aria-label', '下移语句')
+          const copyButton = button('⧉', () => mutateBody(items => { const copied = copyStatement(graph, items[index]); items.splice(index + 1, 0, copied); selectedId = copied.id }), 'gameplay-module-icon-button'); copyButton.setAttribute('aria-label', '复制语句'); copyButton.title = '复制语句'
+          actions.append(up, down, copyButton)
+          row.append(main, actions); flow.append(row)
         })
+        body.append(flow)
         return body
       }
 
       function breadcrumbs(parent) {
         const nav = node('nav', undefined, 'gameplay-module-breadcrumbs'); nav.setAttribute('aria-label', '模块图位置')
+        nav.append(node('span', '编辑路径', 'gameplay-module-breadcrumb-label'))
         const rootButton = button('主流程', () => { path = []; selectedId = null; render() }, 'gameplay-module-breadcrumb')
         nav.append(rootButton)
         for (let index = 0; index < path.length; index++) {
           const frame = path[index]
           nav.append(node('span', ' / ', 'gameplay-module-breadcrumb-separator'))
           const title = frame.kind === 'composite' ? `组合 · ${frame.id}` : frame.slot === 'then' ? '条件成立' : frame.slot === 'else' ? '条件不成立' : '循环体'
-          nav.append(button(title, () => { path = path.slice(0, index + 1); selectedId = null; render() }, 'gameplay-module-breadcrumb'))
+          const crumb = button(title, () => { path = path.slice(0, index + 1); selectedId = null; render() }, 'gameplay-module-breadcrumb')
+          if (index === path.length - 1) crumb.setAttribute('aria-current', 'page')
+          nav.append(crumb)
         }
         parent.append(nav)
       }
@@ -743,9 +1077,10 @@
         const currentFields = fields()
         if (!currentFields.includes(selectedField)) selectedField = currentFields[0]
         const current = currentGraph()
-        container.className = 'gameplay-module-editor'
+        container.className = `gameplay-module-editor${expanded ? ' is-expanded' : ''}`
         container.dataset.gameplayModuleEditor = 'true'
         container.replaceChildren()
+        const topbar = node('div', undefined, 'gameplay-module-topbar')
         const heading = node('div', undefined, 'gameplay-module-header')
         heading.append(node('h2', `玩法模块图 · ${category}/${selectedField}`))
         heading.append(node('p', '使用已登记模块、类型化参数和数据引用组合玩法；修复完成前的草稿仍可留在编辑器中。', 'gameplay-module-help'))
@@ -757,13 +1092,29 @@
         }
         if (current) toolbar.append(button('重新检查图', () => { message = validateGraph(current) || '模块图检查通过。'; render() }, 'gameplay-module-button secondary'))
         else toolbar.append(button('建立模块图', () => { selectedId = null; path = []; writeGraph(starterGraph(surfaceFor(category, selectedField, null), core())) }, 'gameplay-module-button primary'))
-        container.append(heading, toolbar)
+        const workspaceButton = button(expanded ? '退出展开' : '展开工作区', () => setExpanded(!expanded), 'gameplay-module-button secondary')
+        workspaceButton.dataset.gameplayModuleExpand = 'true'
+        workspaceButton.setAttribute('aria-pressed', String(expanded))
+        workspaceButton.setAttribute('aria-label', expanded ? '退出展开工作区并恢复原位置' : '展开模块编辑工作区')
+        toolbar.append(workspaceButton)
+        if (expanded) {
+          const saveButton = button('保存 JSON', saveDocument, 'gameplay-module-button primary gameplay-module-save-button')
+          saveButton.dataset.gameplayModuleSave = 'true'
+          saveButton.setAttribute('aria-label', '保存当前内容 JSON')
+          saveButton.disabled = editingLocked() || !container.closest('.editor-frame')?.querySelector('[data-save-json]')
+          toolbar.append(saveButton)
+        }
+        topbar.append(heading, toolbar)
+        container.append(topbar)
         if (!current) { container.append(node('section', undefined, 'gameplay-module-empty-state')); const empty = container.lastChild; empty.append(node('h3', '这个内容还没有作者层模块图'), node('p', '建立后可从模块目录加入调用、分支、逐项执行和返回语句。旧脚本字段不会在这里编辑。')); return }
         const validation = validateGraph(current)
-        const notice = node('p', message || validation || '模块图已载入。选择语句后编辑参数与数据端口。', message && validation ? 'gameplay-module-error' : validation ? 'gameplay-module-error' : 'gameplay-module-notice'); notice.setAttribute('role', 'status'); container.append(notice)
+        const notice = node('p', message || validation || '图已载入 · 选择节点编辑参数。', message && validation ? 'gameplay-module-error' : validation ? 'gameplay-module-error' : 'gameplay-module-notice'); notice.setAttribute('role', 'status'); container.append(notice)
         breadcrumbs(container)
-        renderInterface(container, current)
-        renderComposites(container, current)
+        const configuration = node('div', undefined, 'gameplay-module-configuration')
+        renderInterface(configuration, current, validation)
+        renderTextBindings(configuration, current, validation)
+        renderComposites(configuration, current, validation)
+        container.append(configuration)
         const scope = activeScope(current)
         const layout = node('div', undefined, 'gameplay-module-layout')
         layout.append(renderPalette(layout, current), renderBody(layout, current, scope))
@@ -777,9 +1128,16 @@
       }
 
       const api = {
-        refresh: () => { message = ''; render() },
+        refresh: () => { message = ''; pendingTextBindings = {}; render() },
         setLocked: value => { locked = Boolean(value); render() },
-        destroy: () => { destroyed = true; container.replaceChildren() },
+        destroy: () => {
+          destroyed = true
+          expanded = false
+          document.body.classList.remove('gameplay-module-workspace-expanded')
+          if (escapeListener) document.removeEventListener('keydown', escapeListener)
+          escapeListener = null
+          container.replaceChildren()
+        },
       }
       render()
       return api

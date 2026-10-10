@@ -18,7 +18,7 @@
   "range": "global",
   "powerMultiplier": 1,
   "code": "function executeSkill(context) { var caster, enemies, msg, remaining, savedMaxHp, splashDamage, weakest; var _pc = \"n15\"; for (var _step = 0; _step <= 15; _step++) { switch (_pc) { case \"n15\": caster = (context)[\"piece\"]; _pc = \"n14\"; break; case \"n14\": enemies = ((battle)[\"pieces\"])[\"filter\"](function (p) { return ((! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"])) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n13\"; break; case \"n13\": _pc = (! (! ((enemies)[\"length\"] === 0))) ? \"n12\" : \"n11\"; break; case \"n11\": weakest = (enemies)[\"reduce\"](function (min, p) { return (((p)[\"currentHp\"] < (min)[\"currentHp\"]) ? p : min); }); _pc = \"n10\"; break; case \"n10\": savedMaxHp = (weakest)[\"maxHp\"]; _pc = \"n9\"; break; case \"n9\": splashDamage = Math.max(1, Math.floor((savedMaxHp * 0.3))); _pc = \"n8\"; break; case \"n8\": dealDamage(caster, weakest, 999, \"true\", battle, \"kiljaedan-soul-drain\"); _pc = \"n7\"; break; case \"n7\": msg = ((((((((caster)[\"name\"] + \"对以下目标使用了灵魂汲取：\") + (weakest)[\"name\"]) + \"（以其maxHp=\") + savedMaxHp) + \"x30%=\") + splashDamage) + \"）\"); _pc = \"n6\"; break; case \"n6\": remaining = ((battle)[\"pieces\"])[\"filter\"](function (p) { return ((! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (caster)[\"ownerPlayerId\"])) && ((p)[\"currentHp\"] > 0)); }); _pc = \"n5\"; break; case \"n5\": _pc = (! (! ((remaining)[\"length\"] > 0))) ? \"n3\" : \"n4\"; break; case \"n4\": msg += \"（没有存活敌人）\"; _pc = \"n1\"; break; case \"n3\": dealDamage(caster, remaining, splashDamage, \"magical\", battle, \"kiljaedan-soul-drain\"); _pc = \"n2\"; break; case \"n2\": msg += ((((\"，随后对\" + (remaining)[\"length\"]) + \"个存活敌方棋子各造成\") + splashDamage) + \"点法术伤害\"); _pc = \"n1\"; break; case \"n1\": return {success: true, message: msg}; case \"n12\": return {success: false, message: \"没有存活的敌方棋子\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。\" === __gameplayInvalid) || (\"对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。\" === undefined) || (\"对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
     "surface": "skill",
@@ -604,39 +604,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "对生命最低的敌人造成999点真实伤害。对所有存活敌人造成0.3x该目标最大生命的伤害。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:kiljaedan-soul-drain",
+    "links": []
   }
 }

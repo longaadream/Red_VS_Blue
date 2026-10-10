@@ -25,14 +25,18 @@
       "level": 1
     }
   ],
-  "rules": ["rule-mangekyo-friendly-death"],
+  "rules": [
+    "rule-mangekyo-friendly-death"
+  ],
   "initialStatusTags": [
     {
       "id": "mangekyo-witness",
       "type": "mangekyo-witness",
       "name": "万花筒",
       "visible": false,
-      "relatedRules": ["rule-mangekyo-friendly-death"]
+      "relatedRules": [
+        "rule-mangekyo-friendly-death"
+      ]
     }
   ],
   "transformedSkills": [
@@ -45,5 +49,10 @@
       "triggeredBy": "sasuke-susanoo"
     }
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:red-sasuke",
+    "links": []
+  }
 }

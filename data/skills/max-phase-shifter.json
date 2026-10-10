@@ -1485,5 +1485,10 @@
     ]
   },
   "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:max-phase-shifter",
+    "links": []
+  }
 }

@@ -17,37 +17,70 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {success: false, message: \"\"}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "triggerSkill",
-    "entry": "n1",
-    "nodes": [
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"\" === __gameplayInvalid) || (\"\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({success: false, message: \"\"})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:minato-flying-raijin-passive",
+    "links": [
       {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": ""
-              }
-            }
-          ]
-        }
+        "collection": "rules",
+        "id": "rule-minato-anchor-end-turn",
+        "relation": "owned",
+        "source": "pieces/blue-minato.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-minato-flying-raijin-trigger",
+        "relation": "owned",
+        "source": "pieces/blue-minato.rules"
       }
     ]
   },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1"
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "passive",
+              "module": "result.action",
+              "version": "1",
+              "inputs": {
+                "success": {
+                  "kind": "literal",
+                  "value": false
+                },
+                "message": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "passive-return",
+              "value": {
+                "kind": "output",
+                "node": "passive",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
+    }
+  }
 }

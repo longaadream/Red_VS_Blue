@@ -145,6 +145,14 @@ try {
   await until("document.querySelectorAll('#skills-detail [data-gameplay-module-statement]').length===1")
   assert.equal(await evaluate("document.querySelectorAll('#skills-detail [data-gameplay-module-palette] [data-gameplay-module]').length>10"), true)
   assert.equal(await evaluate("document.querySelector('#skills-detail [data-gameplay-module-statement=return-1]') !== null"), true)
+  assert.equal(await evaluate("document.querySelectorAll('#skills-detail [data-gameplay-module-category]').length>=2"), true, 'palette exposes real category filters')
+  await click("document.querySelector('#skills-detail [data-gameplay-module-category=\"math\"]')")
+  await until("Boolean(document.querySelector('#skills-detail [data-gameplay-module-palette] [data-gameplay-module=\"math.add\"]'))")
+  await click("document.querySelector('#skills-detail [data-gameplay-module-category=\"all\"]')")
+  await click("document.querySelector('#skills-detail [data-gameplay-module-palette-group] summary')")
+  assert.equal(await evaluate("document.querySelector('#skills-detail [data-gameplay-module-palette-group]').open"), false, 'palette categories can collapse')
+  await click("document.querySelector('#skills-detail [data-gameplay-module-palette-group] summary')")
+  assert.equal(await evaluate("document.querySelectorAll('#skills-detail [data-gameplay-module-text-template]').length"), 2, 'description and target text bindings have structured editors')
 
   await addPaletteModule('math.add')
   await selectStatement('call-1')
@@ -200,16 +208,46 @@ try {
   await openSkill()
   assert.equal(await evaluate("document.querySelectorAll('#skills-detail [data-gameplay-module-statement]').length"), 6)
   assert.equal(await evaluate("document.querySelectorAll('#skills-detail .gameplay-module-composite-row').length"), 1)
+  assert.equal(await evaluate("document.querySelector('#skills-detail [data-gameplay-graph-interface]')?.open === false"), true, 'valid graph interface settings should start collapsed')
+  assert.equal(await evaluate("document.querySelector('#skills-detail .gameplay-module-text-bindings')?.open === false"), true, 'valid text binding settings should start collapsed')
+  assert.equal(await evaluate("document.querySelector('#skills-detail .gameplay-module-composites')?.open === false"), true, 'valid composite settings should start collapsed')
   await click("[...document.querySelectorAll('#skills-detail .gameplay-module-statement-main')].find(e=>e.textContent.includes('math.add'))")
   assert.equal(await evaluate("(()=>{const e=document.querySelector('#skills-detail .gameplay-module-editor');return e.scrollWidth <= e.clientWidth+1})()"), true, 'module controls should fit the detail pane')
-  await evaluate("document.querySelector('#skills-detail .gameplay-module-layout').scrollIntoView({block:'center'})")
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('#skills-detail .gameplay-module-category-tabs')).overflowX === 'visible'"), true, 'categories should wrap without a horizontal scrollbar')
+
+  const scrollBeforeExpand = await evaluate("(()=>{const e=document.querySelector('#skills-detail [data-gameplay-module-editor]');const host=e.closest('.detail-col')||e.parentElement;return {host:host?.scrollTop||0,window:window.scrollY||0}})()")
+  await click("document.querySelector('#skills-detail [data-gameplay-module-expand]')")
+  await until("Boolean(document.querySelector('#skills-detail [data-gameplay-module-editor].is-expanded'))")
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('#skills-detail [data-gameplay-module-editor]')).position === 'fixed'"), true, 'expanded editor should use the available window')
+  assert.equal(await evaluate("Boolean(document.querySelector('#skills-detail [data-gameplay-module-save]'))"), true, 'expanded editor should keep a visible save entry')
+  assert.equal(await evaluate("document.querySelector('#skills-detail [data-gameplay-module-save]')?.textContent === '保存 JSON'"), true)
+  await click("document.querySelector('#skills-detail [data-gameplay-module-save]')")
+  await until("document.querySelector('#skills-detail [data-footer-state]')?.textContent==='已保存'")
+  await until("Boolean(document.querySelector('#skills-detail [data-gameplay-module-editor].is-expanded'))")
+  await until("document.querySelectorAll('#toast .toast-item').length===0")
+  await evaluate("document.querySelector('#skills-detail [data-gameplay-module-editor]').scrollTop=0")
+  assert.equal(await evaluate("document.querySelector('#skills-detail .gameplay-module-layout')?.getBoundingClientRect().top <= 220"), true, 'expanded flow should start within the first 220px')
+  const expandedScreenshot = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
+  fs.writeFileSync(path.join(evidence, 'gameplay-module-editor-expanded.png'), Buffer.from(expandedScreenshot.data, 'base64'))
+  await evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))")
+  await until("!document.querySelector('#skills-detail [data-gameplay-module-editor].is-expanded')")
+  assert.equal(await evaluate("document.activeElement?.matches('#skills-detail [data-gameplay-module-expand]')"), true, 'Escape should restore focus to the workspace toggle')
+  assert.deepEqual(await evaluate("(()=>{const e=document.querySelector('#skills-detail [data-gameplay-module-editor]');const host=e.closest('.detail-col')||e.parentElement;return {host:host?.scrollTop||0,window:window.scrollY||0}})()"), scrollBeforeExpand, 'Escape should restore the pre-expand scroll position')
+
+  await call('Emulation.setDeviceMetricsOverride', { width: 700, height: 900, deviceScaleFactor: 1, mobile: false })
+  await delay(150)
+  assert.equal(await evaluate("(()=>{const e=document.querySelector('#skills-detail .gameplay-module-editor');return e.scrollWidth <= e.clientWidth+1})()"), true, 'narrow editor has no horizontal overflow')
+  assert.equal(await evaluate("Boolean(document.querySelector('#skills-detail .gameplay-module-inspector'))"), true, 'narrow editor keeps the inspector available')
+  await call('Emulation.clearDeviceMetricsOverride')
+  await evaluate("document.querySelector('#skills-detail [data-gameplay-module-editor]').scrollIntoView({block:'start'})")
+  assert.equal(await evaluate("document.querySelector('#skills-detail .gameplay-module-body')?.getBoundingClientRect().top < 260"), true, 'normal layout should put the flow before the long palette list')
   const screenshot = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
   fs.writeFileSync(path.join(evidence, 'gameplay-module-editor.png'), Buffer.from(screenshot.data, 'base64'))
   const report = {
     ok: true,
     startedAt, completedAt: new Date().toISOString(),
-    checks: ['real Electron mount', 'registered palette', 'typed literal parameters', 'typed prior-output reference', 'composite navigation and persistence', 'module document save and reload', 'unknown fields preserved', 'controls fit detail pane'],
-    screenshot: 'gameplay-module-editor.png',
+    checks: ['real Electron mount', 'registered palette', 'category filters and collapsible groups', 'structured text binding controls', 'typed literal parameters', 'typed prior-output reference', 'composite navigation and persistence', 'module document save and reload', 'unknown fields preserved', 'controls fit detail pane', 'normal flow before long palette list', 'wrapped categories without horizontal overflow', 'expanded flow starts within 220px', 'expanded workspace save entry forwarding with Escape focus and scroll restore', 'narrow layout without horizontal overflow'],
+    screenshots: ['gameplay-module-editor.png', 'gameplay-module-editor-expanded.png'],
   }
   fs.writeFileSync(path.join(evidence, 'smoke.json'), JSON.stringify(report, null, 2) + '\n')
   console.log(JSON.stringify(report))

@@ -18,7 +18,7 @@
   "range": "self",
   "requiresTarget": false,
   "code": "function executeSkill(context) { var added, calm, cards, i, maxHand, player, rage, sourcePiece; var _pc = \"n23\"; for (var _step = 0; _step <= 16; _step++) { switch (_pc) { case \"n23\": sourcePiece = (context)[\"piece\"]; _pc = \"n22\"; break; case \"n22\": player = ((battle)[\"players\"])[\"find\"](function (p) { return ((p)[\"playerId\"] === (sourcePiece)[\"ownerPlayerId\"]); }); _pc = \"n21\"; break; case \"n21\": _pc = (! (! (! player))) ? \"n20\" : \"n19\"; break; case \"n19\": _pc = (! (! (! (player)[\"hand\"]))) ? \"n18\" : \"n17\"; break; case \"n18\": (player)[\"hand\"] = []; _pc = \"n17\"; break; case \"n17\": maxHand = 10; _pc = \"n16\"; break; case \"n16\": added = 0; _pc = \"n15\"; break; case \"n15\": calm = 0; _pc = \"n14\"; break; case \"n14\": rage = 0; _pc = \"n13\"; break; case \"n13\": cards = [\"watcher-calm\", \"watcher-rage\"]; _pc = \"n12\"; break; case \"n12\": i = 0; _pc = \"n11\"; break; case \"n11\": var __rvb_content_graph_loop_break_0 = false, __rvb_content_graph_loop_continue_1 = false; while ((! (! (((player)[\"hand\"])[\"length\"] < maxHand)))) { __rvb_content_graph_loop_continue_1 = false; { var __rvb_content_graph_region_pc_2 = \"n10\"; while (__rvb_content_graph_region_pc_2 !== \"n4\") { switch (__rvb_content_graph_region_pc_2) { case \"n10\": addCardToHand((cards)[(function (key) { if (typeof key === \"string\" && key.split(\".\").some(function (part) { return [\"__proto__\",\"arguments\",\"callee\",\"caller\",\"constructor\",\"prototype\"].indexOf(part) !== -1; })) throw new Error(\"unsafe content graph index\"); return key; })((i % 2))], (sourcePiece)[\"ownerPlayerId\"]); __rvb_content_graph_region_pc_2 = \"n9\"; break; case \"n9\": added = ((+ added) + 1); __rvb_content_graph_region_pc_2 = \"n8\"; break; case \"n8\": __rvb_content_graph_region_pc_2 = (! (! ((i % 2) === 0))) ? \"n6\" : \"n7\"; break; case \"n7\": rage = ((+ rage) + 1); __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n6\": calm = ((+ calm) + 1); __rvb_content_graph_region_pc_2 = \"n5\"; break; case \"n5\": i = ((+ i) + 1); __rvb_content_graph_region_pc_2 = \"n4\"; break; case \"n4\": __rvb_content_graph_region_pc_2 = \"n4\"; break; default: throw new Error(\"invalid content graph region node\"); } } } if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_break_0) break; if (__rvb_content_graph_loop_continue_1) { __rvb_content_graph_loop_continue_1 = false; continue; } } _pc = \"n3\"; break; case \"n3\": _pc = (! (! (added === 0))) ? \"n2\" : \"n1\"; break; case \"n1\": return {message: ((((((sourcePiece)[\"name\"] + \"释放潦草急救，手牌被平静(\") + calm) + \")和暴怒(\") + rage) + \")填满\"), success: true}; case \"n2\": return {message: ((sourcePiece)[\"name\"] + \"手牌已满，无法使用潦草急救\"), success: false}; case \"n20\": return {message: \"找不到玩家\", success: false}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var _pc = \"n1\"; for (var _step = 0; _step <= 1; _step++) { switch (_pc) { case \"n1\": return {description: \"用【平静】与【暴怒】填满手牌。\", expectedValues: {}}; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; var __gameplayInvalid = {}; if ((\"用【平静】与【暴怒】填满手牌。\" === __gameplayInvalid) || (\"用【平静】与【暴怒】填满手牌。\" === undefined) || (\"用【平静】与【暴怒】填满手牌。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"用【平静】与【暴怒】填满手牌。\", expectedValues: {}})); } if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } }",
   "contentGraph": {
     "version": "rvb-content-graph/v1",
     "surface": "skill",
@@ -591,39 +591,51 @@
   },
   "contentGraphField": "code",
   "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "contentGraphEntries": {
-    "previewCode": {
-      "graph": {
-        "version": "rvb-content-graph/v1",
-        "surface": "preview",
-        "entry": "n1",
-        "nodes": [
-          {
-            "id": "n1",
-            "kind": "return",
-            "value": {
-              "kind": "object",
-              "entries": [
-                {
-                  "key": "description",
-                  "value": {
-                    "kind": "literal",
-                    "value": "用【平静】与【暴怒】填满手牌。"
-                  }
-                },
-                {
-                  "key": "expectedValues",
-                  "value": {
-                    "kind": "object",
-                    "entries": []
-                  }
-                }
-              ]
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
             }
-          }
-        ]
-      },
-      "compilerVersion": "rvb-content-graph-compiler/v1"
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "用【平静】与【暴怒】填满手牌。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+      }
     }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:watcher-ultimate",
+    "links": []
   }
 }

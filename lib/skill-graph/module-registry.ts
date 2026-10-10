@@ -23,6 +23,23 @@ import type {
   GameplayValueType,
 } from './module-types'
 
+import { QUERY_GAMEPLAY_MODULES } from './module-registry-query'
+import { PREVIEW_GAMEPLAY_MODULES } from './module-registry-preview'
+import { FLIGHT_GAMEPLAY_MODULES } from './module-registry-flight-primitives'
+import { SUMMON_GAMEPLAY_MODULES } from './module-registry-summon-primitives'
+import { ABILITY_GAMEPLAY_MODULES } from './module-registry-abilities'
+import { STATUS_EVENT_GAMEPLAY_MODULES } from './module-registry-status-events'
+import { PREVIEW_VALUE_GAMEPLAY_MODULES } from './module-registry-preview-values'
+import { AREA_EFFECT_GAMEPLAY_MODULES } from './module-registry-area-effects'
+import { STATUS_TIMER_GAMEPLAY_MODULES } from './module-registry-status-timers'
+import { CONTENT_GENERATION_GAMEPLAY_MODULES } from './module-registry-content-generation'
+import { PENDING_SPATIAL_GAMEPLAY_MODULES } from './module-registry-pending-spatial'
+import { CARD_OPERATION_GAMEPLAY_MODULES } from './module-registry-card-operations'
+import { PROJECTILE_GAMEPLAY_MODULES } from './module-registry-projectiles'
+import { COUNTER_PASSIVE_GAMEPLAY_MODULES } from './module-registry-counter-passives'
+import { EXECUTION_LOCAL_GAMEPLAY_MODULES } from './module-registry-execution-locals'
+import { MOVEMENT_FAMILY_GAMEPLAY_MODULES } from './module-registry-movement-family'
+
 export const GAMEPLAY_MODULE_VERSION = '1' as const
 
 type Descriptor = GameplayModuleDescriptor
@@ -413,23 +430,23 @@ const choices: readonly Descriptor[] = [
     parameters: [
       parameter('range', numberType, { default: 5, minimum: 0 }),
       parameter('filter', stringType, { enum: ['enemy', 'ally', 'all'], default: 'enemy' }),
-      parameter('title', stringType, { default: '请选择目标' }),
-      parameter('canCancel', booleanType, { default: true }),
+      parameter('title', stringType, { optional: true }),
+      parameter('canCancel', booleanType, { optional: true }),
     ],
     allowedSurfaces: ['skill', 'card', 'pending'], effects: writes(['pending'], { pending: true }),
     lower: ctx => {
       const range = numberLiteral(ctx, 'range', 5)
       const filter = enumLiteral(ctx, 'filter', ['enemy', 'ally', 'all'] as const, 'enemy')
-      const title = stringLiteral(ctx, 'title', '请选择目标')
-      const canCancel = booleanLiteral(ctx, 'canCancel', true)
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, 'title') ? ', title: ' + stringLiteral(ctx, 'title') : ''
+      const canCancel = Object.prototype.hasOwnProperty.call(ctx.parameters, 'canCancel') ? ', canCancel: ' + booleanLiteral(ctx, 'canCancel') : ''
       // `type: "piece"`, `filter`, `range`, and the needsTargetSelection
       // result are intentionally kept in the generated shape.  Existing
       // targeting readers use this exact static form for previews and AI.
-      if (ctx.surface === 'pending') return expression(`ctx.flow.choice.target({type: "piece", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`)
+      if (ctx.surface === 'pending') return expression(`ctx.flow.choice.target({type: "piece", range: ${range}, filter: ${filter}${title}${canCancel}})`)
       // Keep the legacy helper spelling on active surfaces.  The targeting
       // static analyzer recognizes this exact call and the host supplies the
       // needsTargetSelection descriptor when the action must suspend.
-      return expression(`selectTarget({type: "piece", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`)
+      return expression(`selectTarget({type: "piece", range: ${range}, filter: ${filter}${title}${canCancel}})`)
     },
     ui: { category: 'choice' },
   }),
@@ -440,17 +457,17 @@ const choices: readonly Descriptor[] = [
     parameters: [
       parameter('range', numberType, { default: 5, minimum: 0 }),
       parameter('filter', stringType, { enum: ['enemy', 'ally', 'all'], default: 'all' }),
-      parameter('title', stringType, { default: '请选择地格' }),
-      parameter('canCancel', booleanType, { default: true }),
+      parameter('title', stringType, { optional: true }),
+      parameter('canCancel', booleanType, { optional: true }),
     ],
     allowedSurfaces: ['skill', 'card', 'pending'], effects: writes(['pending'], { pending: true }),
     lower: ctx => {
       const range = numberLiteral(ctx, 'range', 5)
       const filter = enumLiteral(ctx, 'filter', ['enemy', 'ally', 'all'] as const, 'all')
-      const title = stringLiteral(ctx, 'title', '请选择地格')
-      const canCancel = booleanLiteral(ctx, 'canCancel', true)
-      if (ctx.surface === 'pending') return expression(`ctx.flow.choice.target({type: "grid", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`)
-      return expression(`selectTarget({type: "grid", range: ${range}, filter: ${filter}, title: ${title}, canCancel: ${canCancel}})`)
+      const title = Object.prototype.hasOwnProperty.call(ctx.parameters, 'title') ? ', title: ' + stringLiteral(ctx, 'title') : ''
+      const canCancel = Object.prototype.hasOwnProperty.call(ctx.parameters, 'canCancel') ? ', canCancel: ' + booleanLiteral(ctx, 'canCancel') : ''
+      if (ctx.surface === 'pending') return expression(`ctx.flow.choice.target({type: "grid", range: ${range}, filter: ${filter}${title}${canCancel}})`)
+      return expression(`selectTarget({type: "grid", range: ${range}, filter: ${filter}${title}${canCancel}})`)
     },
     ui: { category: 'choice' },
   }),
@@ -487,15 +504,18 @@ const effects: readonly Descriptor[] = [
     inputs: [port('source', pieceType), port('target', pieceType), port('amount', numberType)],
     outputs: [port('result', recordType), port('success', booleanType), port('damage', numberType)],
     // Author content has one ordinary damage kind.  The legacy host still
-    // receives its frozen `physical` spelling through this trusted adapter;
-    // authors do not choose the obsolete physical/magical split.
-    parameters: [parameter('damageType', stringType, { enum: ['normal', 'true', 'toxin'], default: 'normal' }), parameter('skillId', stringType, { optional: true })],
+    // receives its frozen spelling for event/log compatibility. Both legacy
+    // spellings use the same normal-damage defense calculation.
+    parameters: [parameter('damageType', stringType, { enum: ['normal', 'true', 'toxin'], default: 'normal' }), parameter('skillId', stringType, { optional: true }),
+      parameter('legacyNormalSpelling', stringType, { enum: ['physical', 'magical'], optional: true, label: '旧内容普通伤害日志兼容', description: '仅保留迁移前日志和事件中的旧称呼，不新增伤害分类。' }),
+      parameter('inputPolicy', stringType, { enum: ['floor', 'host'], optional: true, label: '伤害输入时机', description: 'host 将原始数值交给权威伤害流程，保留旧内容触发后取整的顺序。' })],
     allowedSurfaces: EFFECT_SURFACES, effects: writes(['damage', 'events'], { events: ['beforeDamageDealt', 'afterDamageDealt'] }),
     lower: ctx => {
       const kind = enumLiteral(ctx, 'damageType', ['normal', 'true', 'toxin'] as const, 'normal')
-      const engineKind = kind === '"normal"' ? '"physical"' : kind
+      const engineKind = kind === '"normal"' ? enumLiteral(ctx, 'legacyNormalSpelling', ['physical', 'magical'] as const, 'physical') : kind
       const id = Object.prototype.hasOwnProperty.call(ctx.parameters, 'skillId') ? stringLiteral(ctx, 'skillId') : `${context(ctx.surface)}.skill?.id || ${context(ctx.surface)}.ruleId || "flow"`
-      const call = `${runtime(ctx.surface)}.effects.damage(${input(ctx, 'source')}, ${input(ctx, 'target')}, ${input(ctx, 'amount')}, ${engineKind}, ${id})`
+      const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, 'inputPolicy') ? ', ' + enumLiteral(ctx, 'inputPolicy', ['floor', 'host'] as const) : ''
+      const call = `${runtime(ctx.surface)}.effects.damage(${input(ctx, 'source')}, ${input(ctx, 'target')}, ${input(ctx, 'amount')}, ${engineKind}, ${id}${policy})`
       return wrappedEffectResult(call, ['success', 'damage'])
     },
     ui: { category: 'effect' },
@@ -709,6 +729,22 @@ const results: readonly Descriptor[] = [
 ]
 
 const ALL_DESCRIPTORS: readonly Descriptor[] = [
+  ...QUERY_GAMEPLAY_MODULES.map(descriptor),
+  ...PREVIEW_GAMEPLAY_MODULES.map(descriptor),
+  ...FLIGHT_GAMEPLAY_MODULES.map(descriptor),
+  ...SUMMON_GAMEPLAY_MODULES.map(descriptor),
+  ...ABILITY_GAMEPLAY_MODULES.map(descriptor),
+  ...STATUS_EVENT_GAMEPLAY_MODULES.map(descriptor),
+  ...PREVIEW_VALUE_GAMEPLAY_MODULES.map(descriptor),
+  ...AREA_EFFECT_GAMEPLAY_MODULES.map(descriptor),
+  ...STATUS_TIMER_GAMEPLAY_MODULES.map(descriptor),
+  ...CONTENT_GENERATION_GAMEPLAY_MODULES.map(descriptor),
+  ...PENDING_SPATIAL_GAMEPLAY_MODULES.map(descriptor),
+  ...CARD_OPERATION_GAMEPLAY_MODULES.map(descriptor),
+  ...PROJECTILE_GAMEPLAY_MODULES.map(descriptor),
+  ...COUNTER_PASSIVE_GAMEPLAY_MODULES.map(descriptor),
+  ...EXECUTION_LOCAL_GAMEPLAY_MODULES.map(descriptor),
+  ...MOVEMENT_FAMILY_GAMEPLAY_MODULES.map(descriptor),
   ...allRefs,
   ...queries,
   ...arithmetic,

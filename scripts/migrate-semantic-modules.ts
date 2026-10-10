@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   applyGameplayModuleGraph,
+  applyGameplayModuleTextBindings,
   assertGameplayModuleDocument,
   GAMEPLAY_MODULE_COMPILER_VERSION,
   GAMEPLAY_MODULE_GRAPH_VERSION,
@@ -176,6 +177,8 @@ export function buildLuckyCoinGraph(): GameplayModuleGraph {
   return {
     version: GAMEPLAY_MODULE_GRAPH_VERSION,
     surface: 'card',
+    inputs: [port('gain', 'number', { label: '获得行动点' })],
+    inputBindings: { gain: 1 },
     outputs: successMessageOutputs,
     composites: [RESULT_MESSAGE_COMPOSITE],
     body: [
@@ -189,13 +192,16 @@ export function buildLuckyCoinGraph(): GameplayModuleGraph {
         }),
         call('updated-action-points', 'resource.adjust', {
           player: output('player', 'player'),
-          amount: literal(1),
+          amount: input('gain'),
         }, { resource: 'actionPoints' }),
         call('number-text', 'text.from-number', {
           value: output('updated-action-points', 'value'),
         }),
+        call('gain-text', 'text.from-number', { value: input('gain') }),
+        call('gain-prefix', 'text.concat', { left: literal('幸运币：获得'), right: output('gain-text', 'text') }),
+        call('gain-suffix', 'text.concat', { left: output('gain-prefix', 'text'), right: literal('点行动力（当前：') }),
         call('message-prefix', 'text.concat', {
-          left: literal('幸运币：获得1点行动力（当前：'),
+          left: output('gain-suffix', 'text'),
           right: output('number-text', 'text'),
         }),
         call('message', 'text.concat', {
@@ -363,7 +369,10 @@ function migrateOne(root: string, baseline: JsonRecord, entry: SemanticMigration
   const current = readJson(file)
   assertCompatibilityFields(current, fixtureEntry, entry.id, entry.field)
   const graph = entry.build()
-  const document = applyGameplayModuleGraph(current, graph, entry.field)
+  let document = applyGameplayModuleGraph(current, graph, entry.field)
+  if (entry.id === 'cards/lucky-coin') document = applyGameplayModuleTextBindings(document, {
+    description: { template: '获得{{amount}}点行动点。', values: { amount: { entry: 'code', input: 'gain' } } },
+  })
   assertGameplayModuleDocument(document)
   return document
 }

@@ -1073,10 +1073,27 @@ function scanData(state, owner, value, path = '') {
     return
   }
   if (!isPlainObject(value)) return
+  // Module output/input references name graph-local ports, not content IDs.
+  // Literal values and module parameters still pass through the content scan.
+  if (path.startsWith('gameplayModules.') && (value.kind === 'output' || value.kind === 'input')) return
   for (const [key, child] of Object.entries(value)) {
     const childPath = path ? `${path}.${key}` : key
     if (CODE_FIELDS.has(key) && typeof child === 'string') {
-      scanCode(state, owner, childPath, child)
+      const expected = state.registeredGraphProofs.entries[owner.nodeKey]
+      const semantic = owner.definition.gameplayModules?.entries?.[childPath]?.graph
+      const proof = semantic && expected?.legacySource ? registeredGraphProofFor(state.registeredGraphProofs, owner.nodeKey, childPath, owner.definition) : null
+      if (proof?.status === 'graph-source-validated') {
+        // Frozen analysis is permitted only after independently rebuilding and
+        // matching both the current author graph and its executable bytes.
+        const starts = [state.dynamic.length, state.generatedFamilies.length, state.baselineMissingCandidates.length]
+        scanCode(state, owner, childPath, expected.legacySource)
+        for (const [items, start] of [[state.dynamic, starts[0]], [state.generatedFamilies, starts[1]], [state.baselineMissingCandidates, starts[2]]]) {
+          for (const item of items.slice(start)) {
+            const sourceProof = item.resolution?.sourceProof ?? item.sourceProof
+            if (sourceProof) { sourceProof.legacySourceSha256 = sourceProof.sourceSha256; sourceProof.sourceSha256 = sha256(child); sourceProof.registeredGraphProof = proof }
+          }
+        }
+      } else scanCode(state, owner, childPath, child)
       continue
     }
     scanData(state, owner, child, childPath)
@@ -1205,8 +1222,16 @@ export function loadRegisteredGraphProofs(root) {
   const source = [
     "import fs from 'node:fs'",
     "import * as generatedModule from './scripts/migrate-generated-content-graphs.ts'",
-    "import * as pendingModule from './electron-editor/content-graph-pending.ts'",
-    "import * as documentModule from './electron-editor/content-graph-document.ts'",
+    "import * as pendingModule from './scripts/migrate-semantic-pending-skills.ts'",
+    "import * as documentModule from './lib/skill-graph/module-document.ts'",
+    "import * as semanticGeneratedModule from './scripts/migrate-semantic-generated-content.ts'",
+    "import * as grantsModule from './scripts/migrate-semantic-hand-grants.ts'",
+    "import * as timersModule from './scripts/migrate-semantic-status-timers.ts'",
+    "import * as cardsModule from './scripts/migrate-semantic-cards.ts'",
+    'const semanticGenerated = semanticGeneratedModule.default ?? semanticGeneratedModule',
+    'const grants = grantsModule.default ?? grantsModule',
+    'const timers = timersModule.default ?? timersModule',
+    'const cards = cardsModule.default ?? cardsModule',
     'const generated = generatedModule.default ?? generatedModule',
     'const pending = pendingModule.default ?? pendingModule',
     'const document = documentModule.default ?? documentModule',
@@ -1219,10 +1244,30 @@ export function loadRegisteredGraphProofs(root) {
     '}',
     "for (const id of ['skills/minato-spiral-barrage', 'skills/turalyon-grand-crusade']) {",
     '  const legacy = fixture.entries[id]',
-    '  const built = pending.buildContentGraphWithPending(String(legacy.code), \'skill\', `${id}.js`)',
-    "  const migrated = document.applyContentGraph(legacy, built.graph, 'code')",
-    "  result[id] = { field: 'code', graph: built.graph, compiled: migrated.code, sourcePairs: built.sourcePairs }",
+    '  const graph = pending.SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === id && entry.field === \'code\').build()',
+    "  const migrated = document.applyGameplayModuleGraph(legacy, graph, 'code')",
+    "  result[id] = { field: 'code', graph, compiled: migrated.code }",
     '}',
+    'const semantic = {',
+    "  'skills/tails-armor-assembly': ['code', semanticGenerated.buildTailsArmorAssemblyGraph()],",
+    "  'skills/rafaam-curse-amplify': ['code', semanticGenerated.buildRafaamCurseAmplifyGraph()],",
+    "  'skills/elune-blessing': ['code', grants.buildHandGrantGraph('elune-blessing')],",
+    "  'skills/initial-draw': ['code', grants.buildHandGrantGraph('initial-draw')],",
+    "  'skills/turalyon-expedition-order': ['code', pending.buildTuralyonExpeditionOrderGraph()],",
+    "  'rules/rule-watcher-form': ['skillCode', timers.STATUS_TIMER_GRAPHS['rule-watcher-form']],",
+    "  'cards/demon-summon-5': ['code', cards.buildSemanticCardGraph('demon-summon-5')],",
+    '}',
+    'for (const [id, [field, graph]] of Object.entries(semantic)) {',
+    '  const legacy = fixture.entries[id]',
+    '  const migrated = document.applyGameplayModuleGraph(legacy, graph, field)',
+    '  result[id] = { ...(result[id] ?? {}), field, graph, compiled: migrated[field], legacySource: legacy[field] }',
+    '}',
+    "result['skills/tails-armor-assembly'].templateProofs = semanticGenerated.buildGeneratedCardDefinitions().map(expected => {",
+    '  const current = JSON.parse(fs.readFileSync(`./data/cards/${expected.id}.json`, \'utf8\'))',
+    '  document.assertGameplayModuleDocument(current)',
+    "  if (current.code !== expected.code || JSON.stringify(current.gameplayModules.entries.code.graph) !== JSON.stringify(expected.gameplayModules.entries.code.graph)) throw new Error('Generated template differs from registered builder: ' + expected.id)",
+    '  return { id: expected.id, graph: expected.gameplayModules.entries.code.graph, compiled: expected.code }',
+    '})',
     'process.stdout.write(JSON.stringify(result))',
   ].join('\n')
   try {
@@ -1237,7 +1282,7 @@ export function loadRegisteredGraphProofs(root) {
     }).trim()
     const rawEntries = JSON.parse(output)
     const entries = {}
-    for (const key of REGISTERED_GRAPH_PROOF_KEYS) {
+    for (const key of new Set([...REGISTERED_GRAPH_PROOF_KEYS, ...Object.keys(rawEntries)])) {
       const entry = rawEntries[key]
       if (!isPlainObject(entry) || !isPlainObject(entry.graph) || typeof entry.field !== 'string' || typeof entry.compiled !== 'string') {
         return unavailable(`Registered graph builder did not return a complete proof entry for ${key}.`)
@@ -1246,6 +1291,8 @@ export function loadRegisteredGraphProofs(root) {
         field: entry.field,
         graph: entry.graph,
         compiled: entry.compiled,
+        ...(typeof entry.legacySource === 'string' ? { legacySource: entry.legacySource } : {}),
+        ...(Array.isArray(entry.templateProofs) ? { templateProofs: entry.templateProofs.map(template => ({ id: template.id, graphSha256: sha256(template.graph), sourceSha256: sha256(template.compiled) })) } : {}),
         expectedGraphSha256: sha256(entry.graph),
         expectedCompiledSourceSha256: sha256(entry.compiled),
         ...(Array.isArray(entry.families) ? {
@@ -1307,6 +1354,7 @@ export function registeredGraphProofFor(proofs, nodeKey, field, definition) {
     actualCompiledSourceSha256,
     graphMatches,
     compiledMatches,
+    ...(expected.templateProofs ? { templateProofs: expected.templateProofs } : {}),
     ...(expected.expectedFamilyGraphSha256 ? { expectedFamilyGraphSha256: expected.expectedFamilyGraphSha256 } : {}),
     ...(expected.expectedPendingSourcePairs ? { expectedPendingSourcePairs: expected.expectedPendingSourcePairs } : {}),
     reason: status === 'graph-source-validated'
@@ -1657,6 +1705,27 @@ export function inspectTypedSourceGraph(graph) {
     rawExecutableSourceLiterals: [],
     unresolvedSinkPaths: [],
   }
+  if (graph?.version === 'rvb-gameplay-modules/v1') {
+    // Continuation references are authorable typed child graphs, never source
+    // strings. Count actual defer sites, including nested continuation bodies.
+    const inspect = (current, prefix, inherited = new Map()) => {
+      const definitions = new Map(inherited)
+      for (const continuation of current.continuations ?? []) { definitions.set(continuation.id, continuation.graph); definitions.set(`${continuation.id}@${continuation.version}`, continuation.graph) }
+      const walk = (value, location) => {
+        if (!value || typeof value !== 'object') return
+        if (value.kind === 'defer-choice') {
+          if (definitions.get(value.graph)?.surface === 'pending') result.sourceExpressionPaths.push(location)
+          else result.unresolvedSinkPaths.push(location)
+        }
+        for (const [key, child] of Object.entries(value)) walk(child, `${location}.${key}`)
+      }
+      walk(current.body, `${prefix}.body`)
+      for (const [index, continuation] of (current.continuations ?? []).entries()) inspect(continuation.graph, `${prefix}.continuations.${index}.graph`, definitions)
+    }
+    inspect(graph, '$')
+    result.sourceExpressionCount = result.sourceExpressionPaths.length
+    return { ...result, typedSourceCount: result.sourceExpressionCount }
+  }
   const sourcePaths = new Set()
   const materializePaths = new Set()
   const rawPaths = new Set()
@@ -1858,6 +1927,8 @@ export function inspectTypedSourceGraph(graph) {
 }
 
 function graphForField(definition, field) {
+  const semantic = definition?.gameplayModules?.entries?.[field]?.graph
+  if (isPlainObject(semantic)) return semantic
   if (definition?.contentGraphField === field && isPlainObject(definition.contentGraph)) return definition.contentGraph
   const entry = definition?.contentGraphEntries?.[field]
   if (isPlainObject(entry?.graph)) return entry.graph
@@ -1879,6 +1950,11 @@ export function inspectSourceField(definition, field, migration, expectedSourceC
     rawExecutableSourceLiterals: [],
     unresolvedSinkPaths: [],
     typedSourceCount: 0,
+  }
+  if (graph?.version === 'rvb-gameplay-modules/v1' && options.registeredProof?.templateProofs?.length) {
+    graphInspection.materializeSourcePaths = options.registeredProof.templateProofs.map(template => `data/cards/${template.id}.json:code`)
+    graphInspection.materializeSourceCount = graphInspection.materializeSourcePaths.length
+    graphInspection.typedSourceCount += graphInspection.materializeSourceCount
   }
   const artifactStatus = migrationFieldStatus(migration, field)
   const registeredProof = options.registeredProof
@@ -2127,6 +2203,10 @@ export function inspectRafaamCopySource(definition, migration, options = {}) {
     copiedCardStored: Boolean(storeNode),
     copiedIdReusedForHand: Boolean(copyIdAssignment),
     copyCodeMutation: Boolean(copyCodeMutation),
+  }
+  if (graph?.version === 'rvb-gameplay-modules/v1') {
+    graphProof.status = registeredArtifactMatches ? 'graph-source-validated' : 'graph-source-unverified'
+    graphProof.authoringKind = 'registered-gameplay-modules'
   }
   const staticSource = inspectRootGraphSource(options.staticSourceEntry, 'code')
   const generatedSource = options.generatedSourceProof ?? { status: 'graph-source-unverified', reason: 'Generated source proof was not supplied.' }
