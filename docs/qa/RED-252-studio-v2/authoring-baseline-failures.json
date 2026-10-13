@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 1,
+  "issue": "RED-252",
+  "evidence": "Independent frozen baseline game-suite reproduction",
+  "baseBranch": "main",
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "exportPath": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6",
+  "archivePath": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6.tar",
+  "nodeModules": {
+    "linkType": "Junction",
+    "target": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\node_modules"
+  },
+  "command": "npx.cmd vitest run tests/game --maxWorkers=1 --reporter=json",
+  "exitCode": 1,
+  "summary": {
+    "totalTestSuites": 422,
+    "passedTestSuites": 368,
+    "failedTestSuites": 54,
+    "pendingTestSuites": 0,
+    "totalTests": 1938,
+    "passedTests": 1888,
+    "failedTests": 50,
+    "pendingTests": 0,
+    "todoTests": 0,
+    "testFilesReported": 178,
+    "failedTestFiles": 26
+  },
+  "report": {
+    "path": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6\\baseline-game-tests.json",
+    "bytes": 782854,
+    "copiedByteForByteTo": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\authoring-baseline-game-tests.json"
+  },
+  "stderr": {
+    "path": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6\\baseline-game-tests.stderr.log",
+    "bytes": 378,
+    "contents": "(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\r\n  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `\"type\": \"module\"` in the closest package.json\r\nSet `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning."
+  },
+  "pathResolutionEvidence": [
+    "vitest.config.ts was extracted into export and its @ alias resolves from __dirname.",
+    "Failure stack locations identify archived tests under the export path; only node_modules frames resolve through the dependency junction."
+  ],
+  "failures": [
+    {
+      "file": "tests/game/ai-semantics.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed",
+          "failure": "Error: Command failed: C:\\Program Files\\nodejs\\node.exe scripts/audit-ai-semantics.mjs"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/battle-card-metadata-runtime.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "LAN battle hand card display metadata marks the page disposed before clearing in-flight card metadata requests",
+          "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /battlePageDisposed = true\\s*cardDispl…/"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/battle-page-contract.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "battle page route contract keeps one responsive HUD, opposite-edge piece dock, and unsectioned curved hand",
+          "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /const targetSubmissionNeedsOverlay = …/"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/battle-state-hash.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles",
+          "failure": "Error: ENOENT: no such file or directory, open 'C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6\\android-client\\www\\js\\game-engine.js'"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/battle-ui-boundary.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "battle presentation boundary keeps renderer and DOM responsibilities behind explicit modules",
+          "failure": "AssertionError: expected ';(function () {\\r\\n  \\'use strict\\'\\r…' to match /function _preferredInitialZoom\\b[\\s\\S…/"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "failed": 8,
+      "tests": [
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine allows native resumption after a compatible raster-only update",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine uses native Room reconnection without creating a replacement join",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine reconnects the existing Colyseus session after page navigation instead of duplicating the player join",
+          "failure": "AssertionError: expected +0 to be 1 // Object.is equality"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine ignores a stale Room leave after a replacement join",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'leaveFromServer')"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine surfaces Colyseus Room errors without silently applying an action",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'fail')"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine requests the exact authoritative receipt and gates actions until it arrives",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'sent')"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine correlates a resync request with the original timed-out action",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "fullName": "Colyseus reconnect and authority resync state machine releases the authority sync gate on timeout and disconnect",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/colyseus-origin-architecture.test.ts",
+      "failed": 3,
+      "tests": [
+        {
+          "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'http://127.0.0.1:4200'",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+        },
+        {
+          "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'http://192.168.1.20:8080'",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+        },
+        {
+          "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'https://relay.example:8443'",
+          "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/developer-tools-trace.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "developer tools match trace boundary keeps a multi-command Trace compact while preserving skills and materialized states",
+          "failure": "AssertionError: expected [ Object{ …(9) }, …(51) ] to deep equally contain ObjectContaining{…}"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/flight-landing-contact.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)",
+          "failure": "AssertionError: expected { instanceId: 'tails', …(19) } to match object { x: 1, y: 1 }"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/ichigo-itachi.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text",
+          "failure": "AssertionError: expected { id: 'ichigo-zangetsu', …(17) } to match object { id: 'ichigo-zangetsu', …(3) }"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/mangekyo.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs",
+          "failure": "AssertionError: expected { id: 'sasuke-susanoo', …(16) } to match object { chargeCost: 2, …(3) }"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/map-catalog.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-119 selectable map catalog loads the authoritative map API and keeps room creation disabled until the catalog succeeds",
+          "failure": "AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/pending-presentation-contract.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "pending selection live board settles newly delivered animation only for the choosing viewer=true",
+          "failure": "AssertionError: expected 'a:0' to be null"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/player-colyseus-contract.test.ts",
+      "failed": 2,
+      "tests": [
+        {
+          "fullName": "RED-116 Electron lobby profile bridge pins the local Profile Identity before navigating to the server lobby",
+          "failure": "AssertionError: expected 115 to be less than -1"
+        },
+        {
+          "fullName": "RED-116 Electron lobby profile bridge resolves the client local runtime through trusted game IPC",
+          "failure": "AssertionError: expected 'async function getLocalGameProfileIde…' to contain 'window.electronAPI.getMode'"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/projectile-trace.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers",
+          "failure": "AssertionError: expected '对自身周围3×3内所有敌人造成2倍伤害。' to be '对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的…' // Object.is equality"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-129-rule-interactions.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-129 波风水门回合结束锚点 opens a mandatory atomic target pending and commits one anchor after selection",
+          "failure": "AssertionError: expected { playerId: 'player-red', …(23) } to match object { playerId: 'player-red', …(2) }"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-129-shishio-browser.test.ts",
+      "failed": 2,
+      "tests": [
+        {
+          "fullName": "RED-129 tracked-browser pending damage compatibility resolves Black Getsuga landing hazards through data rules in the frozen bundle",
+          "failure": "AssertionError: expected Object{ …(3) } to match object { currentCooldown: 1 }"
+        },
+        {
+          "fullName": "RED-129 tracked-browser pending damage compatibility cancels Black Getsuga teleport while committing its projectile exactly once",
+          "failure": "AssertionError: expected Object{ …(3) } to match object { currentCooldown: 1 }"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-130-balance.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-130 action-point settlement charges 2 AP for Amaterasu Bind",
+          "failure": "AssertionError: expected [ { x: 3, y: +0, …(2) } ] to deeply equal [ { x: 3, y: +0 } ]"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-163-dark-characters.test.ts",
+      "failed": 3,
+      "tests": [
+        {
+          "fullName": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats",
+          "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌人行动后若位于自身4格内，可移动至空地格（2）。移动后若与该敌人相邻，攻…' // Object.is equality"
+        },
+        {
+          "fullName": "RED-163 dark character contract resumes Kyoka Suigetsu pending selection against the replacement exactly once",
+          "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+        },
+        {
+          "fullName": "RED-163 dark character contract lets the original skill resolve when Kyoka Suigetsu has no legal replacement, then expires at turn end",
+          "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "failed": 5,
+      "tests": [
+        {
+          "fullName": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light",
+          "failure": "AssertionError: expected '选择友军（7），赋予圣盾。对自身使用时回复1点行动点。' to contain '若目标是本棋子，你恢复1行动点'"
+        },
+        {
+          "fullName": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns",
+          "failure": "AssertionError: expected '选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记…' to contain '持续2回合'"
+        },
+        {
+          "fullName": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution",
+          "failure": "AssertionError: expected '选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分…' to be '选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送…' // Object.is equality"
+        },
+        {
+          "fullName": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message",
+          "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若…' // Object.is equality"
+        },
+        {
+          "fullName": "RED-183 character rules and selection UI regressions keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source",
+          "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to contain '<script src=\"js/deck-presets.js\"></sc…'"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/red-192-rules.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "RED-192 rule dictionary preserves Bankai per-battle usage through a real death and revival",
+          "failure": "AssertionError: expected [Function] to throw error including 'per-battle uses' but got 'Not enough charge points for this ski…'"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/relay-deployment.test.ts",
+      "failed": 2,
+      "tests": [
+        {
+          "fullName": "relay deployment initialization validates and persists Android room map selection before writes",
+          "failure": "AssertionError: expected [ 'large-hole-arena', …(7) ] to deeply equal [ 'large-hole-arena', …(3) ]"
+        },
+        {
+          "fullName": "standalone Relay map persistence accepts only the exact four authoritative map IDs",
+          "failure": "AssertionError: expected [ 'large-hole-arena', …(3) ] to deeply equal [ 'large-hole-arena', …(7) ]"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/skill-presentation-ui.test.ts",
+      "failed": 2,
+      "tests": [
+        {
+          "fullName": "projected skill display in the actual browser consumers plays one sound for each real queue AOE batch while preserving separate hit batches",
+          "failure": "AssertionError: expected [ [ 'damage' ], [ 'damage' ], …(2) ] to deeply equal [ [ 'damage' ], [ 'damage' ] ]"
+        },
+        {
+          "fullName": "projected skill display in the actual browser consumers the battle controller consumes new cues without modifying the model",
+          "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /on\\('disconnect'[\\s\\S]{0,150}beginSki…/"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/skillcode-static-audit.test.ts",
+      "failed": 2,
+      "tests": [
+        {
+          "fullName": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+          "failure": "AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(17) ] to have a length of 21 but got 20"
+        },
+        {
+          "fullName": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+          "failure": "AssertionError: data/cards/pve-blood-cut.json: expected null not to be null"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "failed": 5,
+      "tests": [
+        {
+          "fullName": "Sonic roster mechanics only exposes skill keywords that have a glossary explanation",
+          "failure": "AssertionError: expected [ '真实伤害', '禁疗', '冰冻', '睡眠', …(21) ] to include '治疗'"
+        },
+        {
+          "fullName": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs",
+          "failure": "AssertionError: expected '选择正方向冲刺最多5格，对路径首个敌人造成1.5倍伤害并停在其前方。动能5…' to be '选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。' // Object.is equality"
+        },
+        {
+          "fullName": "Sonic roster mechanics extends Sonic spin dash target selection to seven cells at three momentum and stops at the selected cell",
+          "failure": "AssertionError: expected 5 to be 7 // Object.is equality"
+        },
+        {
+          "fullName": "Sonic roster mechanics replaces consumed Sonic momentum with the distance gained from spin dash",
+          "failure": "AssertionError: expected { instanceId: 'sonic', …(20) } to match object { x: 3, y: +0, momentum: 3 }"
+        },
+        {
+          "fullName": "Sonic roster mechanics grants temporary action points and keeps the displayed momentum in sync through Sonic Super Form",
+          "failure": "AssertionError: expected 9 to be 5 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "file": "tests/game/turn.test.ts",
+      "failed": 1,
+      "tests": [
+        {
+          "fullName": "interrupted skill release does not pay or execute a skill when the resumed trigger blocks",
+          "failure": "BattleRuleError: blocked"
+        }
+      ]
+    }
+  ],
+  "packageScript": "test: vitest run",
+  "archiveIntegrity": {
+    "vitestConfigBlobExpected": "437e4043118173961aefa253fbfeeaba54614f36",
+    "vitestConfigBlobActual": "437e4043118173961aefa253fbfeeaba54614f36",
+    "representativeTestBlobExpected": "2ce891a68f2dfc537b248237eb944a7ad5bafa56",
+    "representativeTestBlobActual": "2ce891a68f2dfc537b248237eb944a7ad5bafa56",
+    "reportedTestFilesOutsideExport": 0
+  }
+}

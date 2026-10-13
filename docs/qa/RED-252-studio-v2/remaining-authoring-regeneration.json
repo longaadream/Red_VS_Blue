@@ -1,0 +1,260 @@
+{
+  "root": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P",
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "reports": [
+    {
+      "id": "arthas-howling-blast",
+      "field": "code",
+      "surface": "skill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\arthas-howling-blast.json"
+    },
+    {
+      "id": "blackwidow-toxin-damage",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\blackwidow-toxin-damage.json"
+    },
+    {
+      "id": "elune-guidance-trigger",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\elune-guidance-trigger.json"
+    },
+    {
+      "id": "elune-protection-trigger",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\elune-protection-trigger.json"
+    },
+    {
+      "id": "grimmjow-gran-rey-cero",
+      "field": "code",
+      "surface": "skill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\grimmjow-gran-rey-cero.json"
+    },
+    {
+      "id": "holy-shield-defense",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\holy-shield-defense.json"
+    },
+    {
+      "id": "obito-kamui",
+      "field": "code",
+      "surface": "skill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\obito-kamui.json"
+    },
+    {
+      "id": "reap-heal",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\reap-heal.json"
+    },
+    {
+      "id": "venom-corrosion",
+      "field": "code",
+      "surface": "triggerSkill",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\venom-corrosion.json"
+    },
+    {
+      "id": "arthas-howling-blast",
+      "field": "previewCode",
+      "surface": "preview",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\arthas-howling-blast.json"
+    },
+    {
+      "id": "blackwidow-toxin-damage",
+      "field": "previewCode",
+      "surface": "preview",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\blackwidow-toxin-damage.json"
+    },
+    {
+      "id": "hand-cannon",
+      "field": "previewCode",
+      "surface": "preview",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\hand-cannon.json"
+    },
+    {
+      "id": "obito-kamui",
+      "field": "previewCode",
+      "surface": "preview",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\skills\\obito-kamui.json"
+    },
+    {
+      "id": "rule-lucky-coin-gamestart",
+      "field": "skillCode",
+      "surface": "rule",
+      "status": "ready",
+      "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-baseline-EppY1P\\data\\rules\\rule-lucky-coin-gamestart.json"
+    }
+  ],
+  "refreshed": [
+    {
+      "file": "data\\skills\\arthas-howling-blast.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "ff11ef06f0330e6f7974285aaa774e2c259ead08f50bcf295ab4ed4381a73e8f",
+          "graphSha256": "ff11ef06f0330e6f7974285aaa774e2c259ead08f50bcf295ab4ed4381a73e8f",
+          "previousCodeSha256": "606218ba3deaf76b6d7e4934a94fd391ff8d512cd4520ed07d7e6237abd9d26c",
+          "newCodeSha256": "82aeb53ca3fa38fa5644c6e3049eea5937391705bf020ddf72ae9a9e07d7bd8f"
+        },
+        {
+          "field": "previewCode",
+          "previousGraphSha256": "91dc25fa3f2a25ff0a1f15984076e43c1a478f237e859dc0bd7285e55f5942c0",
+          "graphSha256": "91dc25fa3f2a25ff0a1f15984076e43c1a478f237e859dc0bd7285e55f5942c0",
+          "previousCodeSha256": "2e6af44d3baf0a8b6719afa9d1874fdd60c17d0bf1065bacd50c19254c51099e",
+          "newCodeSha256": "16bfeaa2fde3620f5b575f1142eaffb543d593aef15c256f1ca495df7a3b123e"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\blackwidow-toxin-damage.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "930d82040c7c368e634eef3c75a07469745306b37d4f19ff8b1de64da9c660fa",
+          "graphSha256": "930d82040c7c368e634eef3c75a07469745306b37d4f19ff8b1de64da9c660fa",
+          "previousCodeSha256": "54bcc8411cc2082c28959d8c461c23dacf8c9287c498172d9f0422ff95205991",
+          "newCodeSha256": "6564b08b06f091a552a5c84d9124292990351ad089557bc2f934329d520e3489"
+        },
+        {
+          "field": "previewCode",
+          "previousGraphSha256": "ade92c509401c92b571860b8f1d2f5da7222b75dd16ad964f5d62afde9895368",
+          "graphSha256": "ade92c509401c92b571860b8f1d2f5da7222b75dd16ad964f5d62afde9895368",
+          "previousCodeSha256": "4f5f2de2a1f7590d9529ed1d54a5baf598dec3f3ed99f8a42a351c0defc42b50",
+          "newCodeSha256": "a0319001bfdd6cf662c6136be3bca1b50c92740c24646e7aba56c1f42fa0a2b5"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\elune-guidance-trigger.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "8cb991caa386d560921c76ddc95d6136b0eafbe38012886e97280e68985b3a74",
+          "graphSha256": "8cb991caa386d560921c76ddc95d6136b0eafbe38012886e97280e68985b3a74",
+          "previousCodeSha256": "0be02a67e99f74bf9dea4c7a11d3c932aa606d538f8ab3cdbddd626adee00339",
+          "newCodeSha256": "581912c1a1f9ad72bc83f7b1e32c69ba341aff8d46007d2c03f82c77d384b53d"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\elune-protection-trigger.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "8c51fe2014634ee0698993d45a9f4268454da65a608c6019d5a1130de350d5b7",
+          "graphSha256": "4872d875facefaeeff955d8f78433e36c6610730214cb6d44d2c206760e44255",
+          "previousCodeSha256": "e994909a818f853fdbcbea1b84ee829d44291a31f87aebd2ff7798f1f0d18a25",
+          "newCodeSha256": "0ab1bf80aebb43f73828c2c67b4009866f9a842aaf155e2e112ec647922e0801"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\grimmjow-gran-rey-cero.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "3629afc357997f940089b7188ad77057ea0aed1c8fce5ccb950a1b8a1285c13d",
+          "graphSha256": "3629afc357997f940089b7188ad77057ea0aed1c8fce5ccb950a1b8a1285c13d",
+          "previousCodeSha256": "fb20afe25ea9792e12d4f1710e49bc0dd240564965fd9af4eb2ef18bf911174e",
+          "newCodeSha256": "82374a045b58dd93570001cecfbd1dc4d181ec833f4bab1e614d5fa0e55317d8"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\holy-shield-defense.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "e96a2e3187c9ffcd1d78693d5f0bab4bad55a3250323b1f83fbeefc430019f48",
+          "graphSha256": "e96a2e3187c9ffcd1d78693d5f0bab4bad55a3250323b1f83fbeefc430019f48",
+          "previousCodeSha256": "ae1478d5d798385f4e1f9f9a14cf3795c51d98a0f35be8e2424a347e528f974c",
+          "newCodeSha256": "81008336b0527568a5f6b339bbf66a470ae70cb6e3ea680601fe40bae5f8ee37"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\obito-kamui.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "5c997db936d319e59d730efd64117c641cb2d49724094b1a442d16a3555b59ae",
+          "graphSha256": "5c997db936d319e59d730efd64117c641cb2d49724094b1a442d16a3555b59ae",
+          "previousCodeSha256": "bfc2589b5d2d436699393ecac1922044494f3bca3514992f8a482b59602c7698",
+          "newCodeSha256": "ef940daa48383ba3aa997424379be3d81eb5e56e1e4d7c20126bcc57872b2cef"
+        },
+        {
+          "field": "previewCode",
+          "previousGraphSha256": "2b95e42483bba40bd7106779863c7961537c50e9d3a9fdd1282772b1e8b5e5ab",
+          "graphSha256": "2b95e42483bba40bd7106779863c7961537c50e9d3a9fdd1282772b1e8b5e5ab",
+          "previousCodeSha256": "4f53532e21f8d66f668bdfd7a2750fd1f10f5fb45a5b31624151b7fb7ea7d37f",
+          "newCodeSha256": "a78dcafac4a216642eefecf8fc22de5b28f691b4e6709b4f76a3d1995ad2f48d"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\reap-heal.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "d2acfb822b32056c4c806d1c2de16f2abb27b72623b3b93017ae9515901780eb",
+          "graphSha256": "d2acfb822b32056c4c806d1c2de16f2abb27b72623b3b93017ae9515901780eb",
+          "previousCodeSha256": "86ae3eeb148fc45e6aebe509769d47b7d46d521db5fd88c582867013e5cba7a5",
+          "newCodeSha256": "93e24533618b6579ce7fcd9c128cca66355b4d9b0259cfacd2e33f3ca4b0e75c"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\venom-corrosion.json",
+      "fields": [
+        {
+          "field": "code",
+          "previousGraphSha256": "81597d24892bdbcb5c3a74573ee6f58f5c00b47039e11ff87d3d278a1eb78db7",
+          "graphSha256": "81597d24892bdbcb5c3a74573ee6f58f5c00b47039e11ff87d3d278a1eb78db7",
+          "previousCodeSha256": "4862f99715f099cf47d62c85053e2f0438c1c58c46797df4809a684a8ef92dd7",
+          "newCodeSha256": "10b647e03670997c8ade4acb1ca67aac82a4f3f936dc8a8858144e3c472727f2"
+        }
+      ]
+    },
+    {
+      "file": "data\\skills\\hand-cannon.json",
+      "fields": [
+        {
+          "field": "previewCode",
+          "previousGraphSha256": "0c461a58f2bfe21b9889f4c93b2bebcf6ec31a61a570a2201ddd398621d381ce",
+          "graphSha256": "0c461a58f2bfe21b9889f4c93b2bebcf6ec31a61a570a2201ddd398621d381ce",
+          "previousCodeSha256": "899976f688876ee6fdc21349dbdd262e8380f231557fa0975977eaa98985f77e",
+          "newCodeSha256": "c5753a174dcddf72188c65c1cf5755736a7137b33845bfac926520f527542cc4"
+        }
+      ]
+    },
+    {
+      "file": "data\\rules\\rule-lucky-coin-gamestart.json",
+      "fields": [
+        {
+          "field": "skillCode",
+          "previousGraphSha256": "7e014c2632efdefc19ec857ad55542745b9db253bd5e4198129e5681068dc15c",
+          "graphSha256": "7e014c2632efdefc19ec857ad55542745b9db253bd5e4198129e5681068dc15c",
+          "previousCodeSha256": "a4f485be28add41e791a680061bdf18ac7a27e8336487caeb48a296125ba9421",
+          "newCodeSha256": "617f9313ecce9afb6461d76ca56b9f2445b5c45ce7fe1f163c6449ca666b03a7"
+        }
+      ]
+    }
+  ],
+  "reason": "Refresh only 14 newly authored v2 fields from independently rebuilt fixed-SHA migration after emitter stabilization; preserve other metadata and graph fields. Elune protection graph removes added intensity/stacks fields to match fixed-SHA source (which has neither), covered by differential test. Every merged document validates before any write."
+}

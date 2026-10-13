@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { compileGameplayModuleGraph } from '../../lib/skill-graph/module-compiler'
+import { compileGameplayModuleGraph, compileGameplayModuleGraphV1 } from '../../lib/skill-graph/module-compiler'
 import { applyBattleAction, type BattleState } from '../../lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import {
@@ -43,6 +43,86 @@ const add = descriptor(
 )
 
 describe('structured record and collection statements', () => {
+  it('omits undefined optional record fields in v2 while preserving invalid dependencies and v1 output', () => {
+    const undefinedValue = descriptor(
+      'test.undefined-value',
+      [],
+      [{ name: 'value', type: 'string', nullable: true }],
+      () => ({ expression: 'undefined' }),
+    )
+    const invalidValue = descriptor(
+      'test.invalid-value',
+      [],
+      [{ name: 'value', type: 'string', nullable: true }],
+      () => ({ expression: '__gameplayInvalid' }),
+    )
+    const schema = {
+      id: 'payload',
+      version: '1',
+      fields: [
+        { name: 'count', type: 'number' as const },
+        { name: 'sourcePieceId', type: 'string' as const, nullable: true, optional: true },
+      ],
+    }
+    const makeGraph = (module: string): GameplayModuleGraph => graph('skill', [
+      { kind: 'call', id: 'source', module, version, inputs: {} },
+      {
+        kind: 'record.create',
+        id: 'created',
+        schema: 'payload@1',
+        fields: {
+          count: literal(2),
+          sourcePieceId: { kind: 'output', node: 'source', port: 'value' },
+        },
+      },
+      { kind: 'return', id: 'done', values: { result: { kind: 'output', node: 'created', port: 'value' } } },
+    ], { schemas: [schema], outputs: [{ name: 'result', type: { kind: 'record', schema: 'payload@1' } }] })
+
+    const v2 = compileGameplayModuleGraph(makeGraph('test.undefined-value'), registryOf(undefinedValue, invalidValue))
+    const v2Execute = runInNewContext('(' + v2.code + ')') as (context: unknown) => { result: Record<string, unknown> } | undefined
+    const v2Result = v2Execute({})
+    expect(v2Result).toEqual({ result: { count: 2 } })
+    expect(v2Result && Object.prototype.hasOwnProperty.call(v2Result.result, 'sourcePieceId')).toBe(false)
+    expect(JSON.stringify(v2Result)).toBe('{"result":{"count":2}}')
+
+    const v1 = compileGameplayModuleGraphV1(makeGraph('test.undefined-value'), registryOf(undefinedValue, invalidValue))
+    const v1Execute = runInNewContext('(' + v1.code + ')') as (context: unknown) => { result: Record<string, unknown> } | undefined
+    const v1Result = v1Execute({})
+    expect(v1Result).toEqual({ result: { count: 2, sourcePieceId: undefined } })
+    expect(v1Result && Object.prototype.hasOwnProperty.call(v1Result.result, 'sourcePieceId')).toBe(true)
+
+    const invalid = compileGameplayModuleGraph(makeGraph('test.invalid-value'), registryOf(undefinedValue, invalidValue))
+    const invalidExecute = runInNewContext('(' + invalid.code + ')') as (context: unknown) => unknown
+    expect(invalidExecute({})).toBeUndefined()
+
+    const withGraph = (fields: Record<string, GameplayValue>): GameplayModuleGraph => graph('skill', [
+      { kind: 'record.create', id: 'base', schema: 'payload@1', fields: { count: literal(2) } },
+      { kind: 'record.with', id: 'updated', record: { kind: 'output', node: 'base', port: 'value' }, fields },
+      { kind: 'return', id: 'done', values: { result: { kind: 'output', node: 'updated', port: 'value' } } },
+    ], { schemas: [schema], outputs: [{ name: 'result', type: { kind: 'record', schema: 'payload@1' } }] })
+    const withUndefined = compileGameplayModuleGraph(withGraph({}), registryOf())
+    const withUndefinedExecute = runInNewContext('(' + withUndefined.code + ')') as (context: unknown) => { result: Record<string, unknown> } | undefined
+    const withUndefinedResult = withUndefinedExecute({})
+    expect(withUndefinedResult).toEqual({ result: { count: 2 } })
+    expect(withUndefinedResult && Object.prototype.hasOwnProperty.call(withUndefinedResult.result, 'sourcePieceId')).toBe(false)
+
+    const withInvalidGraph = graph('skill', [
+      { kind: 'record.create', id: 'base', schema: 'payload@1', fields: { count: literal(2) } },
+      { kind: 'call', id: 'invalid', module: invalidValue.id, version, inputs: {} },
+      { kind: 'record.with', id: 'updated', record: { kind: 'output', node: 'base', port: 'value' }, fields: { sourcePieceId: { kind: 'output', node: 'invalid', port: 'value' } } },
+      { kind: 'return', id: 'done', values: { result: { kind: 'output', node: 'updated', port: 'value' } } },
+    ], { schemas: [schema], outputs: [{ name: 'result', type: { kind: 'record', schema: 'payload@1' } }] })
+    const withInvalid = compileGameplayModuleGraph(withInvalidGraph, registryOf(undefinedValue, invalidValue))
+    const withInvalidExecute = runInNewContext('(' + withInvalid.code + ')') as (context: unknown) => unknown
+    expect(withInvalidExecute({})).toBeUndefined()
+
+    const withV1 = compileGameplayModuleGraphV1(withGraph({}), registryOf())
+    const withV1Execute = runInNewContext('(' + withV1.code + ')') as (context: unknown) => { result: Record<string, unknown> } | undefined
+    const withV1Result = withV1Execute({})
+    expect(withV1Result).toEqual({ result: { count: 2, sourcePieceId: undefined } })
+    expect(withV1Result && Object.prototype.hasOwnProperty.call(withV1Result.result, 'sourcePieceId')).toBe(true)
+  })
+
   it('creates, reads, and updates a closed typed record', () => {
     const compiled = compileGameplayModuleGraph(graph('skill', [
       { kind: 'record.create', id: 'created', schema: 'payload@1', fields: { count: literal(2), label: literal('first') } },
@@ -174,6 +254,83 @@ describe('structured record and collection statements', () => {
       ],
     }])
     expect(() => compileGameplayModuleGraph(foreachGraph, registryOf(modules[0]))).not.toThrow()
+  })
+})
+
+describe('bounded while statements', () => {
+  const readCounter = descriptor(
+    'test.read-counter',
+    [],
+    [{ name: 'value', type: 'number' }],
+    () => ({ expression: '({value: Number(context.counter || 0)})' }),
+  )
+  const incrementCounter: GameplayModuleDescriptor = {
+    ...descriptor('test.increment-counter', [], [{ name: 'value', type: 'boolean' }], () => ({ statements: 'context.counter = Number(context.counter || 0) + 1;', result: '({value: true})' })),
+    effects: { pure: false, previewSafe: false, writes: ['test-counter'] },
+  }
+  const lessThan = descriptor(
+    'test.less-than',
+    [{ name: 'left', type: 'number' }, { name: 'right', type: 'number' }],
+    [{ name: 'value', type: 'boolean' }],
+    ({ inputs }) => ({ expression: '({value: (' + inputs.left + ' < ' + inputs.right + ')})' }),
+  )
+
+  it('re-evaluates a pure condition subgraph and exposes a bounded body index', () => {
+    const compiled = compileGameplayModuleGraph(graph('skill', [{
+      kind: 'while', id: 'loop', index: 'iteration', budget: 3,
+      condition: { inputs: {}, body: [
+        { kind: 'call', id: 'read', module: readCounter.id, version, inputs: {} },
+        { kind: 'call', id: 'room', module: lessThan.id, version, inputs: { left: { kind: 'output', node: 'read', port: 'value' }, right: literal(3) } },
+        { kind: 'return', id: 'condition-result', value: { kind: 'output', node: 'room', port: 'value' } },
+      ] },
+      body: [{ kind: 'call', id: 'increment', module: incrementCounter.id, version, inputs: {} }],
+    }], { outputs: [] }), registryOf(readCounter, incrementCounter, lessThan, add))
+    const execute = runInNewContext('(' + compiled.code + ')') as (context: { counter: number }) => unknown
+    const context = { counter: 0 }
+    expect(execute(context)).toBeUndefined()
+    expect(context.counter).toBe(3)
+    expect(compiled.code).toContain('while (true)')
+  })
+
+  it('fails clearly when the condition stays true after the finite budget', () => {
+    const compiled = compileGameplayModuleGraph(graph('skill', [{
+      kind: 'while', id: 'never-done', budget: 2,
+      condition: { body: [{ kind: 'return', id: 'always', value: literal(true) }] },
+      body: [],
+    }]), registryOf())
+    const execute = runInNewContext('(' + compiled.code + ')') as () => unknown
+    expect(() => execute()).toThrow(/while iteration budget exceeded/)
+    expect(() => compileGameplayModuleGraph(graph('skill', [{
+      kind: 'while', id: 'too-large', budget: 3,
+      condition: { body: [{ kind: 'return', id: 'done', value: literal(false) }] }, body: [],
+    }]), registryOf(), { maxWhileIterations: 2 })).toThrow(/while iteration budget exceeded/)
+  })
+
+  it('keeps condition scopes closed and rejects effectful condition modules', () => {
+    expect(() => compileGameplayModuleGraph(graph('skill', [{
+      kind: 'call', id: 'outer', module: readCounter.id, version, inputs: {},
+    }, {
+      kind: 'while', id: 'closed', budget: 1,
+      condition: { body: [{ kind: 'return', id: 'bad', value: { kind: 'output', node: 'outer', port: 'value' } }] }, body: [],
+    }]), registryOf(readCounter))).toThrow(/output is not in scope|unknown output/)
+    expect(() => compileGameplayModuleGraph(graph('skill', [{
+      kind: 'while', id: 'effectful-condition', budget: 1,
+      condition: { body: [
+        { kind: 'call', id: 'write', module: incrementCounter.id, version, inputs: {} },
+        { kind: 'return', id: 'bad', value: literal(true) },
+      ] }, body: [],
+    }]), registryOf(incrementCounter))).toThrow(/collection body cannot call effectful module/)
+  })
+
+  it('does not let a while body bypass preview effect restrictions', () => {
+    const previewEffect = { ...incrementCounter, allowedSurfaces: ['preview', 'skill'] as const }
+    expect(() => compileGameplayModuleGraph({
+      ...graph('preview', [{
+        kind: 'while', id: 'preview-loop', budget: 1,
+        condition: { body: [{ kind: 'return', id: 'done', value: literal(false) }] },
+        body: [{ kind: 'call', id: 'write', module: incrementCounter.id, version, inputs: {} }],
+      }]),
+    }, registryOf(previewEffect))).toThrow(/module has effects forbidden in preview/)
   })
 })
 
@@ -388,4 +545,65 @@ describe('structured pending continuations', () => {
     })
     expect(() => compileGameplayModuleGraph(nested, registryOf())).toThrow(/cannot be nested/)
   })
+})
+
+
+describe('presentation foreach scopes', () => {
+  it('preserves ordered effects inside one host batch and continues afterward', () => {
+    const record = { ...descriptor('test.record', [{ name: 'number', type: 'number' }], [], ({ inputs }) => 'context.record(' + inputs.number + ')'), effects: { pure: false, previewSafe: false } }
+    const compiled = compileGameplayModuleGraph(graph('skill', [
+      { kind: 'foreach', id: 'all', items: literal([1, 2]), presentation: 'statusAdded', body: [
+        { kind: 'call', id: 'effect', module: 'test.record', version: '1', inputs: { number: { kind: 'output', node: 'all', port: 'item' } } },
+      ] },
+      { kind: 'call', id: 'after', module: 'test.record', version: '1', inputs: { number: literal(3) } },
+    ]), registryOf(record))
+    const observed: unknown[] = []
+    const execute = runInNewContext('(' + compiled.code + ')') as (context: unknown) => unknown
+    execute({ record: (value: number) => observed.push(value), presentationQueue: { push: (kind: string, run: () => void) => { observed.push(kind); run(); observed.push('end') } } })
+    expect(observed).toEqual(['statusAdded', 1, 2, 'end', 3])
+  })
+
+  it('rejects escaping returns and unsupported batch kinds', () => {
+    expect(() => compileGameplayModuleGraph(graph('skill', [{ kind: 'foreach', id: 'all', items: literal([1]), presentation: 'statusAdded', body: [{ kind: 'return', id: 'escape' }] }]), registryOf())).toThrow(/cannot return or suspend/)
+    const invalid = graph('skill', [{ kind: 'foreach', id: 'all', items: literal([1]), presentation: 'statusAdded', body: [] }])
+    ;(invalid.body[0] as unknown as { presentation: string }).presentation = 'damage'
+    expect(() => compileGameplayModuleGraph(invalid, registryOf())).toThrow(/unknown presentation batch kind/)
+  })
+
+  it('walks presentation nesting through while and collection subgraphs', () => {
+    const inner = { kind: 'foreach' as const, id: 'inner', items: literal([0]), presentation: 'statusAdded' as const, body: [] }
+    const nestedWhile = {
+      kind: 'while' as const, id: 'nested-while', budget: 1,
+      condition: { body: [{ kind: 'return' as const, id: 'condition-return', value: literal(false) }] },
+      body: [inner],
+    }
+    expect(() => compileGameplayModuleGraph(graph('skill', [{ kind: 'foreach', id: 'outer', items: literal([1]), presentation: 'statusAdded', body: [nestedWhile] }]), registryOf())).toThrow(/nested presentation/)
+
+    const localCondition = {
+      kind: 'while' as const, id: 'local-condition', budget: 1,
+      condition: { body: [{ kind: 'return' as const, id: 'condition-return', value: literal(false) }] },
+      body: [],
+    }
+    expect(() => compileGameplayModuleGraph(graph('skill', [{ kind: 'foreach', id: 'outer', items: literal([1]), presentation: 'statusAdded', body: [localCondition] }]), registryOf())).not.toThrow()
+
+    const nestedCollection = {
+      kind: 'collection.map' as const, id: 'nested-collection', items: literal([1]),
+      body: [inner, { kind: 'return' as const, id: 'collection-return', value: { kind: 'input' as const, name: 'item' } }],
+    }
+    expect(() => compileGameplayModuleGraph(graph('skill', [nestedCollection]), registryOf())).toThrow(/presentation groups|collection body/)
+  })
+})
+
+
+it('rejects nested presentation groups including called composites', () => {
+  const inner = { kind: 'foreach' as const, id: 'inner', items: literal([0]), presentation: 'statusAdded' as const, body: [] }
+  const outer = { kind: 'foreach' as const, id: 'outer', items: literal([1, 2]), presentation: 'statusAdded' as const, body: [inner] }
+  expect(() => compileGameplayModuleGraph(graph('skill', [outer]), registryOf())).toThrow(/nested presentation/)
+  const composite = { id: 'nested', version: '1', inputs: [], outputs: [], body: [inner] }
+  expect(() => compileGameplayModuleGraph(graph('skill', [{ ...outer, body: [{ kind: 'call', id: 'call-inner', module: 'nested', version: '1' }] }], { composites: [composite] }), registryOf())).toThrow(/nested presentation/)
+})
+
+
+it('rejects presentation scopes on trigger hosts without a presentation queue', () => {
+  expect(() => compileGameplayModuleGraph(graph('triggerSkill', [{ kind: 'foreach', id: 'all', items: literal([1]), presentation: 'statusAdded', body: [] }]), registryOf())).toThrow(/require a skill surface/)
 })

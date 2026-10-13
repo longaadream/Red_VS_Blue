@@ -1,0 +1,9 @@
+{
+  "className": "sentence-inline-editor sentence-structured-editor sentence-slot-only-editor",
+  "text": "编辑生命完成生命 · 数值请选择数据来源常量＋ 组合表达式下一项：label",
+  "moduleSelect": false,
+  "inputs": [],
+  "parameters": [],
+  "slotEditor": "input:field:hp",
+  "chooser": false
+}

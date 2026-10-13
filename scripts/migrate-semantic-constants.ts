@@ -432,6 +432,8 @@ function assertPreservedFields(current: JsonRecord, next: JsonRecord, id: string
 }
 
 function isComplexEntry(id: string): boolean {
+  // This passive's executable is only the success marker; its rule remains a separate Cluster member.
+  if (id === 'skills/rafaam-curse-ward') return false
   const name = id.split('/')[1] ?? ''
   return COMPLEX_PREFIXES.some(prefix => name.startsWith(prefix))
 }

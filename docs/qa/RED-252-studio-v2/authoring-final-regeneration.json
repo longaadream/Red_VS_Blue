@@ -1,0 +1,1768 @@
+{
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "validatedPreimage": "C:/Users/lngsc/AppData/Local/Temp/red252-before-final-compatibility-fixes.json",
+  "preimageSha256": "3859e5bf1ef6088609c2248ef281738ec0dac6de8bfa954b0cfbfc7b569960b3",
+  "documents": 293,
+  "entries": 381,
+  "reason": "Seven reviewed graph fixes and optional-record emission. All original documents strictly validated before compiler changes; exact preimage hash rechecked before complete batch compile and write.",
+  "files": [
+    {
+      "file": "data/skills/aizen-black-coffin.json",
+      "before": "610195d7a255c3cf926b5f956336250c3b80a2df97fa36a08534265249b474c1",
+      "after": "829f49fcb53a832e0f8378bd5ef0193ea676124328c882cd23c7ae19351c5c23",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/aizen-kyoka-suiguetsu.json",
+      "before": "3ecd20b7e1da5e4f7bb929b512ef23960055ecfc5afd3094a65339a2be5eb4c3",
+      "after": "58c30686e30d2752809df6d071ef4cb33d83ee45acc0bd024e0fd512eaa20481",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/aizen-shunpo.json",
+      "before": "1cbd0950a647bda8bf6c95fe29aaf5f20e85bb35dab518af4fc7fe0c99184fbc",
+      "after": "1cbd0950a647bda8bf6c95fe29aaf5f20e85bb35dab518af4fc7fe0c99184fbc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/akaza-annihilation.json",
+      "before": "5c0fe343ba805f5232455bc884c67217ecb9847dc6d5beed37814e3110567ce2",
+      "after": "03b99b1d1d9e13a4233dcc57c2c526c0e25f3c2b319959937ecd7f86c70d9656",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/akaza-disorder.json",
+      "before": "277f2f75653fd0f9d2a7e587f136f9711bb14837b7f4332acaf7fc9bf38a01d6",
+      "after": "1041c7e2319ab420f28bacf495c202a2332e062c7d871c3c5f09f38b4c59dbda",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/akaza-fighting-spirit.json",
+      "before": "966f0ad82b8d6d2fe74b1e12e4f3e9a480c8d6052fa122a5f524ac28dec2990c",
+      "after": "966f0ad82b8d6d2fe74b1e12e4f3e9a480c8d6052fa122a5f524ac28dec2990c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/akaza-flash-step.json",
+      "before": "9296e1d7b98c63c6b028551b2618a69b45cea9cd053c5e51815b1161ba5756f0",
+      "after": "61f3e54d5aff5d92804becbe06303c0721e602461cd5b875df5cba051da003a8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/alfonso-freeze.json",
+      "before": "b2cbf0aec8a4af610fcd4671c570956c240dd3bb0e263560812334997a09ea5a",
+      "after": "330469515d9a11dffefe1642c5cb5a2d14da17856fa1a29475bcf5c53b2f6d75",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/alfonso-kick.json",
+      "before": "9cbe9e93b7edafd670f4302d069e24068d0c38c0588b63bbaadd42ceb37131c1",
+      "after": "9cbe9e93b7edafd670f4302d069e24068d0c38c0588b63bbaadd42ceb37131c1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/alfonso-water-dash.json",
+      "before": "4e9e53990fef45dd4aea714bbb91210dddf73d15178e2066bf74a0b740616cc9",
+      "after": "4e9e53990fef45dd4aea714bbb91210dddf73d15178e2066bf74a0b740616cc9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/anti-heal-block.json",
+      "before": "4f64e9daa19b145972da785a80f9f7cded93687e59be6c15fa75e56e71a48346",
+      "after": "4f64e9daa19b145972da785a80f9f7cded93687e59be6c15fa75e56e71a48346",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/arthas-frostmourne.json",
+      "before": "50d6f01016ba5260c0e36974fd4da4490d3d5e2d5d1181e50edf61158647d9ce",
+      "after": "0f78a9285ce8928e9552add8bbba6bfd90f215865e023c9a9f79225b0e5dd5a4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/arthas-howling-blast.json",
+      "before": "40f6f6b0b2481030bcd185a6535f95b201968d9aee7df8954e08d0bc61667db5",
+      "after": "20618e216c13cfa510f732cf2ab80f9a0f19c5cc291f6053693678890728f136",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/arthas-icebound-fortitude.json",
+      "before": "31d29b9ac98058f5d5c0b821addc9f7ba121e68320766c0cad463ec1fdd5d5d0",
+      "after": "abbc2322d6028ba3800b89451fa897ae2c9257c1d16a52d8bf8d38bcffbedaf5",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/arthas-lich-covenant.json",
+      "before": "3984d3003b36b1444fa9bc03b71321b92ac70570075b9ab8383c516307ec9e2d",
+      "after": "cdb75012f2456db53104beb94c17fccf50881fa71e243506907d42d740749632",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ashbringer.json",
+      "before": "5ca80945742977f34cdfe8e0efe524f1cb532cd04cf108d0582b06521d35053c",
+      "after": "5ca80945742977f34cdfe8e0efe524f1cb532cd04cf108d0582b06521d35053c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/biotic-grenade.json",
+      "before": "e8a49f302bc51f9fe053ac9b323370e880adfcf8494544b7c4510dabb57eb798",
+      "after": "fc8af623abebb4f9dde5bb9ada804984f482a735f2e43b8899145bf994983c14",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blackwidow-deadly-gaze.json",
+      "before": "8e4bb41f575aa98e7079961f0f941a16d0840955583e134063db863dc2fef6a6",
+      "after": "8e4bb41f575aa98e7079961f0f941a16d0840955583e134063db863dc2fef6a6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blackwidow-lethal-strike.json",
+      "before": "f2fcd69123432270f1aa5107c15e37f1e39c44f899a7672230c8761bda5041fc",
+      "after": "87f3b39d569d7b120074b6a1533fab526b127d78d07a24cc6136380dafcdb04d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blackwidow-lethal-toxin.json",
+      "before": "f991d433708858ce25e13c2076647bf5a41f5e89c2e7c992b4862ee45b66d9cf",
+      "after": "430d727518b9fa5608afa69458aa38c0d12a147acdc04477e566d684b2e7599e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blackwidow-toxin-damage.json",
+      "before": "e1f8cc4717ea3125d4d33f3f403ca50137515002970c047c14515928f5db036a",
+      "after": "579285710267f654e94c3c8fa2fb0163f4c917bf908bc79a1b088599baaa5d96",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blessed-hammer.json",
+      "before": "a07dbd4f1c58e9d92931f240935c66169ded0d42e766bddb70ccf232240bccdd",
+      "after": "a07dbd4f1c58e9d92931f240935c66169ded0d42e766bddb70ccf232240bccdd",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blink.json",
+      "before": "b4c73f1aa52cda2f78c12afbfc5d498960696d436a6ef2e048006c79bb1ef4a4",
+      "after": "b4c73f1aa52cda2f78c12afbfc5d498960696d436a6ef2e048006c79bb1ef4a4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blizzard-damage.json",
+      "before": "cf030ec63691590e75caa064ca3365470b3e52543db7f54e5fe99a64b6920ef8",
+      "after": "515553e966a02d5a44338a01634a89125f79dbf021ae3eac11cea39e2bb4bd0d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blizzard.json",
+      "before": "27f70cff05c0e93c807ad05f3bcbb49d23bfd80682ac234ac46206fba2b3db48",
+      "after": "914b3bc00f18a06dbc5a43151b2b9a2a358e7c3536cd7f5be1cae2c6a8a73dc3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blood-echo-trigger.json",
+      "before": "d771760414b18dce776a2d5fb55d5747428b956a133d0b9e06abbe5adbbf9eaa",
+      "after": "d771760414b18dce776a2d5fb55d5747428b956a133d0b9e06abbe5adbbf9eaa",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/blood-echo.json",
+      "before": "5e33ca5d3d2b2d5043e4731455e914eb6635511890c0114ee20889788fe1caf4",
+      "after": "5e33ca5d3d2b2d5043e4731455e914eb6635511890c0114ee20889788fe1caf4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/colt-big-stride.json",
+      "before": "f354691ef042ff35fae69452efe678bceedca39e5794ea21fd9a7232395ac3c7",
+      "after": "f354691ef042ff35fae69452efe678bceedca39e5794ea21fd9a7232395ac3c7",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/colt-bullet-storm.json",
+      "before": "c7eb3d01e7b687717f96eddaf0717bfcaa7656ec815bdb92af0992e116edc4de",
+      "after": "8cc11775eb6abeae2b527a9a16ee2398040a23eaf55f20d3df6d2054d2cb9658",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/colt-piercing.json",
+      "before": "d29f7059391d9975fdad93218aadc8c590472baeff64648faf2c59fa76c8ae70",
+      "after": "d29f7059391d9975fdad93218aadc8c590472baeff64648faf2c59fa76c8ae70",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/colt-revolver.json",
+      "before": "f071a53d79685e0b45effe0be8aafba88da2dbdf695b676cabb0731989216407",
+      "after": "5eb152afaf1a81d3cc72a0aff68fa03cad838270a19d4e38941b934d988fa69a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/death-blossom.json",
+      "before": "530f5a0957c18a627696c4ebccd6cf46bd3871cbc234e6d94df03b9ed5857a43",
+      "after": "eac543a9c3b7e2e08271919a7675ba0f89b4ffe82b3689f7e8e5f32b41910e18",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/divine-blessing.json",
+      "before": "f3a90596ad2eca3a54cb689b0154d768ba9995ec6cb82a6f4643892ee93dcf6e",
+      "after": "fee35278eb535ff5b5371c440c03d274f64a3c305118e713f407f0b24fe25215",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/divine-shield-defense.json",
+      "before": "ec73f2e7648c871f788eb26af24a167c798818a2b8837878360bb0b4f9a7df6e",
+      "after": "ec73f2e7648c871f788eb26af24a167c798818a2b8837878360bb0b4f9a7df6e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/earthshatter.json",
+      "before": "7820ef1cc476176f1239a040b16d0a2aaac388e8ba0ccef75d6146e67cc237e4",
+      "after": "502e800a574a3b87eed1f548868e93854ab62ef630510d88a0b7dd51568915e7",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/edgar-fisticuffs.json",
+      "before": "5215c0c1be14d5c0f900723e452b23ea8004e593c96f6b551424b51fb40fef95",
+      "after": "14a7946de2c87a23d0ac7124651b974f556b6b2bb7263c4f6b8ccb4169a73307",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/edgar-pogo-jump.json",
+      "before": "4b02ef3e7ac91879607026ba78531adc9a91dbbc9e0bfbc97c4d90fae4fd960b",
+      "after": "e3ee732631ba58cd3fbb9e33f2e21c101c195e8aa3cd87866251572be00ad2cc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/el-primo-elbow.json",
+      "before": "aea99e09edb88b2d084ed8448ef357d3a90ed977729798e0342af036aa883da3",
+      "after": "aea99e09edb88b2d084ed8448ef357d3a90ed977729798e0342af036aa883da3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/el-primo-meteor-belt.json",
+      "before": "159bfe2d791f6aba7ff85e821c8295fed3125d3f2d7ff260c20351dbf1e6b3ca",
+      "after": "014661a531f35a23649d000075ca6d29e9f0dbbafcc59a4d7bc556caf92b3f91",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/el-primo-punch.json",
+      "before": "4871c6801571b4b8d5ec8f0000be1c1169a90b396861d9985004cfdd8b273a22",
+      "after": "4871c6801571b4b8d5ec8f0000be1c1169a90b396861d9985004cfdd8b273a22",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/elune-blessing.json",
+      "before": "c3bcafefb0393d984cfb43cd7495634244af1578b954f1b55652b18f2373b8cc",
+      "after": "127988fc7f4c3102186cc13509fada33c501aa3ff6f82620e75394cdd959fe19",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/elune-guidance-trigger.json",
+      "before": "518f497ad2830363502e6a87b00344f10d0b4f1781393f015cb68688ebf8fae4",
+      "after": "2c590d15ab7b4a8266fda9e768f2550f153db919690304d24e3e6fbfb2194a00",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/elune-guidance.json",
+      "before": "0836c7afd5964b9de87f64df7ca316e2beb956032043840a3ca2d889a6b539a0",
+      "after": "0836c7afd5964b9de87f64df7ca316e2beb956032043840a3ca2d889a6b539a0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/elune-protection-trigger.json",
+      "before": "85bfd50457ee9b676e75620cea24c84cfadd8a79e70f2225eecfe259ff29e582",
+      "after": "a8670c03be15dc841afe40a17323e803861740461a9ca3f827715983547e77c3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/elune-protection.json",
+      "before": "13fab857e721dc21cc4df073c4a1982a6c63f51557fcf860d8c009c6cc787c36",
+      "after": "13fab857e721dc21cc4df073c4a1982a6c63f51557fcf860d8c009c6cc787c36",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/fel-blessing.json",
+      "before": "59673b6e115f4418cd1b66251ab9a15a78b41a8d1763ae4e0f5af310f0ab02ec",
+      "after": "59673b6e115f4418cd1b66251ab9a15a78b41a8d1763ae4e0f5af310f0ab02ec",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/fireball.json",
+      "before": "d6a01dce28e1caa317c026c36261b68dcb2843fe19f3a620628d200d65bf4489",
+      "after": "d6a01dce28e1caa317c026c36261b68dcb2843fe19f3a620628d200d65bf4489",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/freeze-prevent.json",
+      "before": "1d16833f258c7eafee6d0d1b6feec58c355313dad6966f2205cf89441efaee2c",
+      "after": "1d16833f258c7eafee6d0d1b6feec58c355313dad6966f2205cf89441efaee2c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/frostbolt.json",
+      "before": "746edfa403d4d1b38dc6c86b8270a85d93d24fb78180c6f4bd97c0a608d18b26",
+      "after": "aa6d62b60aecc4f9ca9a70abb786af2ebb1be82a0ed067207fffd6ef4b83dbfe",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grant-lucky-coin.json",
+      "before": "86e78bc944d607c13cb0730d3073ef2f2024c5106127fc7c44b659a1f5168fdb",
+      "after": "86e78bc944d607c13cb0730d3073ef2f2024c5106127fc7c44b659a1f5168fdb",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grimmjow-destruction-instinct.json",
+      "before": "fd47c778d3ea2f13af8cb683c448e2c8321a68b9b5aa11d373082bfcaaf97704",
+      "after": "fd47c778d3ea2f13af8cb683c448e2c8321a68b9b5aa11d373082bfcaaf97704",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grimmjow-gran-rey-cero.json",
+      "before": "359ce1f45bac97e1e59132af3270b9a1768c5ad0d3513df995c547e726cd2dab",
+      "after": "359ce1f45bac97e1e59132af3270b9a1768c5ad0d3513df995c547e726cd2dab",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grimmjow-hunting-instinct.json",
+      "before": "b405bc60b50bd01c8fcc523c88e995e30512def742d11623238df65ac43e69ba",
+      "after": "b405bc60b50bd01c8fcc523c88e995e30512def742d11623238df65ac43e69ba",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grimmjow-panther-claw.json",
+      "before": "46f5cd963007075cc2dbb21627a8057a644a00771b636701d3e7d21829bd4bc8",
+      "after": "46f5cd963007075cc2dbb21627a8057a644a00771b636701d3e7d21829bd4bc8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/grimmjow-resurreccion.json",
+      "before": "8774fb1bed73c494716d38b0eb9fa5f77d254c5a4d9a1861f2314131ed049582",
+      "after": "8774fb1bed73c494716d38b0eb9fa5f77d254c5a4d9a1861f2314131ed049582",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hand-cannon.json",
+      "before": "3fc0894f4389410750748e3e57c3da4899fbbc2ba9cd85dd2f16a478a9f5bf40",
+      "after": "a7dbb6c31dcbf221a0a1f6618f18e8f2ad6171c16739d9af0a8112544099dcea",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hardy-block-trigger.json",
+      "before": "8bc6c858e60905c28186306f6719cec0cce5ce1157ceea7c1005b6ce157cac32",
+      "after": "8bc6c858e60905c28186306f6719cec0cce5ce1157ceea7c1005b6ce157cac32",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hardy-block.json",
+      "before": "646188256cf452fd5951d85e356d0a7b6df81ad8ce1e5a527d8724ac199a3e3e",
+      "after": "2140791b6a13d5f7630b93b6c494a0606f2f30bf2bab242f510d3e1a5818bfff",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hashirama-edo-regen.json",
+      "before": "69ca5aaeb5a6c0aa7ccfda6f2e99fbf30e878b23dff8f06ae487781bf2619bd9",
+      "after": "69ca5aaeb5a6c0aa7ccfda6f2e99fbf30e878b23dff8f06ae487781bf2619bd9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hashirama-edo-sage-buddha.json",
+      "before": "bffe124bd836beb0a14994570574df0d9ac4e8a8a94c9ba053a2506c27fa44aa",
+      "after": "d4f5234925ea18b86fc286b497a839d045434053f15514dcbfeddca65bc11ea6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-dragon.json",
+      "before": "7e89a4ffd966341fd5d1844e2203a444ed7550612e46b1d9058f1f22ccae8234",
+      "after": "cffe49b17a24f573d85ea8bb99ad7245d7dce13a71001c4aa76b41412ff98d7b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-spike.json",
+      "before": "572fc0b15daa9635caa7162357d3e11b289745defc22b9c8c4aa5d8d851ce737",
+      "after": "22b1f1b97973b1cc4653df5ece05f06ccd6494ab22a665c4b74f4f7906a61dae",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hellfire-shotgun.json",
+      "before": "0754cf9c610956a5fbf60e3f36b76c6091459b2c645a7b7ce8d74a927bddedcc",
+      "after": "b88a79978d990d6a0cec5f0ebb9a2219b5655bcdb008669be227335c4ad6d853",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hidan-blood-oath.json",
+      "before": "19512541d48e610b8b51d94389c5cd3e9d44811f02587f4a57a4aa4a215da9c5",
+      "after": "c36204be610a760c4ddfb06abc67d571a319536a2a77c2700def83b8d29ef0a9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hidan-sacrifice.json",
+      "before": "672e1113c22c9c91eb2a33406ab7fedc146d5a8256f884fd991b7f73c0769663",
+      "after": "05ca37288fae2a7bd0025ee99fb0541bbbf379717a4767f561aef753bf5cf12f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/hidan-undying.json",
+      "before": "b54e8fd45404bd3c890cd3acadf3d457efb0492348d52eab258dddfd7a07ac8b",
+      "after": "b54e8fd45404bd3c890cd3acadf3d457efb0492348d52eab258dddfd7a07ac8b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/holy-light-descend.json",
+      "before": "06d398580d6a65a140621e56c643304c3566f897bb388e2fb4998e3eb026068e",
+      "after": "456abc5b27c357ee0e0569db4a60fb4c3294d3a55233fce603f52fc4e660a2ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/holy-shield-defense.json",
+      "before": "63b061c0c98f26a871d53ded83742397a9e61adc56c01f51bd254270924784ef",
+      "after": "63b061c0c98f26a871d53ded83742397a9e61adc56c01f51bd254270924784ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ichigo-bankai-tensa-zangetsu.json",
+      "before": "76829c820745c133b33dc45f49dddc0b0859d15901771f9f03048562f0052515",
+      "after": "5d06650128bb9ed66acde8150eb3b782cb1f154097c618f0822e16f1de7f2802",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ichigo-black-getsuga-tensho.json",
+      "before": "261cd70c1eff19325ac14a8297d76a92ed77499bda52f38fb5bbed42af803328",
+      "after": "62a44483daef7b58fe009e95943372cad6ea9d96ce3f3d2ca1978268fae957af",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ichigo-getsuga-tensho.json",
+      "before": "ade663383d30f4cf05aac703e501322a1347402ac68b700aebae28ba5871079a",
+      "after": "5f99e2e4414b83237648bf1e3eb986d29b624a3e49f04f34a92c966e4e7d87d0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ichigo-zangetsu.json",
+      "before": "8ea745a46e8cce28eac1f87e290f79a0f9d76f9f410e3a7d0cd61567bd4aeb45",
+      "after": "8ea745a46e8cce28eac1f87e290f79a0f9d76f9f410e3a7d0cd61567bd4aeb45",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/illidan-blade-dash.json",
+      "before": "f9a300f1592c63785b50c56e2595a65f7ac59f1a88f5871956536a93f3ca7c3c",
+      "after": "253c7dcec3011989a4877cbbbdd18a8d44b7e780aeb21e604a229b54460092ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/illidan-demon-strike.json",
+      "before": "00b8704500e4a4fd8f1d58622135a91c7fa5d58177cd99d68b3dff6dcd218608",
+      "after": "00b8704500e4a4fd8f1d58622135a91c7fa5d58177cd99d68b3dff6dcd218608",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/illidan-eye-beam.json",
+      "before": "d3c7ae8bd2f4542fe12ff25bae8341ce884d53be9d48e2eb76e1eda6f2f6afce",
+      "after": "d3c7ae8bd2f4542fe12ff25bae8341ce884d53be9d48e2eb76e1eda6f2f6afce",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/illidan-metamorphosis.json",
+      "before": "56df1ea29931bc601d92f64f4e89c3998ece91c8c2c2f2ef65fa87dcb0f5cf4e",
+      "after": "6427d05aa04cbcfd7b6322b55c62872a84925fc83435c308347dedd7f7cbfdd3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/initial-draw.json",
+      "before": "957a2a947acbc3e997275f314a31b5c32dcbc42a73facc49dc03e274e39f03f1",
+      "after": "957a2a947acbc3e997275f314a31b5c32dcbc42a73facc49dc03e274e39f03f1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/itachi-amaterasu.json",
+      "before": "de2ccf1ce8e93dbf1eff29ec07e330d4b6769fc42e49e513d771c7906b646b19",
+      "after": "054d87c31f81c082bef42ec5c8d1c16b8210add6bea14ec6fccb76edffde54b4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/itachi-totsuka-blade.json",
+      "before": "9c659233a1e2fbe6c072c0df3451af2744a147453e0af1ba6b024cb42b8ee126",
+      "after": "ded592cb1bf9426e1e074f84393cda2dd06528490817cd4573009f69857cd76e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/itachi-tsukuyomi.json",
+      "before": "d18f448eb2ed1ee121a47a38d9d5c1177d47047d3fdafc882086c46ffae62b7a",
+      "after": "5e3befc28a92e45d6e74ac065d89d3f022218149d2ff517f9e6c86f1e5c749e5",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kenshin-amakakeru.json",
+      "before": "62decc74d124b999448600be661e58d9bc5286999375b304ce41661a46a05727",
+      "after": "2157e4f4882f5b0c265e92effb7205dce5a4b61d6c7165247ba6d6c2ccb0c5d9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kenshin-ryusosen.json",
+      "before": "d35f006e8196f5d351c139de516fdc5534cb0d8a3179452b76c5b6fb1f7efdca",
+      "after": "b828151a2f052ce088d80a3f4357bf672f2e8e5c707a52e07aef1559df394dbf",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kenshin-ryutsuisen.json",
+      "before": "b7ebce95d31af9699e27b0ce2fd4c8998739267d814b6df83eac21adc63f7a91",
+      "after": "55403bf41b10143ac6620b23b57c71f0dc36b16691f437dc42502b6330953747",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kiljaedan-demonic-pact.json",
+      "before": "5550a6c4718f311f9eeedc9b695e046b46ef968a2f4dd9aea4076c907f4a448d",
+      "after": "5550a6c4718f311f9eeedc9b695e046b46ef968a2f4dd9aea4076c907f4a448d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kiljaedan-fel-fire.json",
+      "before": "53ade5ed9692fdb804336ee79d7a84776c05504a65d1616cf925b5727cbe5453",
+      "after": "34d447f3f8ed6a41f86f91d3e95004650c01c810641f6321cf064080da432693",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/kiljaedan-soul-drain.json",
+      "before": "777e9d52f3a1a68ee5ed92080a6383f3516a03fe89e45ab65d634c486495c35e",
+      "after": "777e9d52f3a1a68ee5ed92080a6383f3516a03fe89e45ab65d634c486495c35e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/light-extraction.json",
+      "before": "1bde79933ea3480110c9a566919ef44cc0d3a2c69243351ece9bdfaa8296c978",
+      "after": "b1371a01348891573d5ae3a96076b615e3e2dc6f0a1f2a94bd608695f4f341ce",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/light-of-the-light.json",
+      "before": "522fc4151e05296866369af532528ba8e71724258f157d22a3d6479f10786def",
+      "after": "522fc4151e05296866369af532528ba8e71724258f157d22a3d6479f10786def",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/max-full-speed.json",
+      "before": "6956cdd9dc345cf273d4d5ca2f90f0df99f4dff6fdb966867c20b578d618a130",
+      "after": "7fde128e0fc011ea462ba992df670200befa5ac3d0ab81aeb080254d92e53248",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/max-phase-shifter.json",
+      "before": "53311a7cd7ece62ef1b2fd4599a7e2efc8dba4904a4dc0201f22fa045ae5f614",
+      "after": "d22735ff1572f1676cd7afa3216956f861ca03b2175420c8c6e90d6428e1eb9e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/max-speed-shot.json",
+      "before": "2c04e07cbf077b9be09f244eaec28df9e3cf0d0a0ce04b0f2325e9ca9e56aa8a",
+      "after": "60cc0b2100088604da74413f5206527c4abadf5a523e8b0a9d945bba20717381",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/minato-flying-raijin-passive.json",
+      "before": "3cfc37389510f2912ad1f2cc86b8d4f4049f1f075cba7d283cb2ce923172bbc1",
+      "after": "3cfc37389510f2912ad1f2cc86b8d4f4049f1f075cba7d283cb2ce923172bbc1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/minato-kunai-formula.json",
+      "before": "bd20f32a66f0f0db9a277d57dee2858410e2df90503695d40875eef3be5dd306",
+      "after": "bd20f32a66f0f0db9a277d57dee2858410e2df90503695d40875eef3be5dd306",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/minato-rasengan.json",
+      "before": "02c3a085dec6382a533916621051e416d14911f5ba2aa0e0f8389272f797adcd",
+      "after": "d7dc3ea94a8329a4da127fb744757d1fc85d4ca14e0a4ff3d8e6a4df6ab6767e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/minato-spiral-barrage.json",
+      "before": "ee60fbbb6d45ace39e738d331bac37b9e76a83ff490fea6b84c323bb456a1fc4",
+      "after": "5344a0e8e22b4687d32437830ee45632e924922b1b5f8b6ec1f7fe552240cf81",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/mortis-bat-support.json",
+      "before": "beaedc06cf918f4984c017849c81fde392465cbe1c267f8d4b489fe419bd2670",
+      "after": "beaedc06cf918f4984c017849c81fde392465cbe1c267f8d4b489fe419bd2670",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/mortis-shovel-charge.json",
+      "before": "aae28a933cb2b662165b814e1165fe51e767e744bfdcb071ca2dfcb39ba7a8bb",
+      "after": "aae28a933cb2b662165b814e1165fe51e767e744bfdcb071ca2dfcb39ba7a8bb",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/muru-lament.json",
+      "before": "8c4586c7981334d4134e68a51d81f07666493dc490c5ddf485496689d949a427",
+      "after": "27f7fda91df062190e0715f081bc12416c23bff35c0157bace7cdf9277005295",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/muzan-blood-whip.json",
+      "before": "6ae2a174e837d4893bca5c1d729789117cd5dc570001e37741f8b9825d3617b8",
+      "after": "454ded2f75530a3dd81eaaf1b7382725c3ad35c88a60c8195d7fdcb042d76fa5",
+      "graphOverride": "code"
+    },
+    {
+      "file": "data/skills/muzan-demon-body.json",
+      "before": "433d63078fe8f8bda3b8314467dd891cc22cdd1447910f6f99e75e50990dfe62",
+      "after": "2c622c40ff9703c5aa44f3937f24dba438bdbf2ceac1a51611f5439e73fb7dd2",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/muzan-flesh-regeneration.json",
+      "before": "54430def74a4213a899c4aff699fb5fcc7a688758a13340a759faa5eb335b242",
+      "after": "54430def74a4213a899c4aff699fb5fcc7a688758a13340a759faa5eb335b242",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/muzan-parasitism.json",
+      "before": "c6d1a3fc8c2bc125189478de31141e454d3b36876623e9535671f0af80c196e3",
+      "after": "c6d1a3fc8c2bc125189478de31141e454d3b36876623e9535671f0af80c196e3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/nano-boost-damage.json",
+      "before": "e2859302ba92054dfa85bf466902d4c4f0bfd62e95b1188f807e36101689919a",
+      "after": "e2859302ba92054dfa85bf466902d4c4f0bfd62e95b1188f807e36101689919a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/nano-boost.json",
+      "before": "880e0b02e7e7e6943f52670c8b46410c27f5341d6425e70eaf6d4aa51e5f8d11",
+      "after": "108a585c1e37fddcff502c9c5c400da585b60171da6a0ec93de48993b26203ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/naruto-rasengan.json",
+      "before": "b47e17983d16b8347ffef7431712ebd4773d36766b2f221287556c5a9393deef",
+      "after": "59f071145b6be114bfb369097c2eea350438da4be94e68bc31c874d8b6ddadd0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/naruto-sage-mode.json",
+      "before": "6542978fe00cd87364632dd63aa6f7b6499b3a8b9004cc1e1eea027b36f02ef7",
+      "after": "edcc3247d969f2aa973e41ecd45a3085f41a692a226d21f4dd646ee21c509f6e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/naruto-shadow-clone.json",
+      "before": "2d9d9d8a11b4a25ca3a19d14d95dd1d23f0effcb098bdc370c0d64d62a881b01",
+      "after": "2d9d9d8a11b4a25ca3a19d14d95dd1d23f0effcb098bdc370c0d64d62a881b01",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/naruto-vanguard.json",
+      "before": "f91d1e7ac081ddedadac9722a051b381c9dd0f322fa8fc1d3c6451d4882ebeb6",
+      "after": "f91d1e7ac081ddedadac9722a051b381c9dd0f322fa8fc1d3c6451d4882ebeb6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/obito-ally-teleport.json",
+      "before": "6c0dabffaa40b9dcb315db6a8efdafbf5d678044e29f45dd43bb38c36bd4d052",
+      "after": "9b84a344e65cbf5ab177cc06656f7bfe9c97c5cc6199f6f63e4a6f374f2fd52e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/obito-grudge.json",
+      "before": "0fd71bf8f2b0e20efa46fd9634294b93e4a0bbbf8d42f05da9ede8992a1854ec",
+      "after": "0fd71bf8f2b0e20efa46fd9634294b93e4a0bbbf8d42f05da9ede8992a1854ec",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/obito-kamui.json",
+      "before": "ab7221e90172078adce8b17dd1e491ffdd465d02908da0dfea8bbea01164c895",
+      "after": "7077337eea82e040885184777b290b2e3bd9ab0d89e2f12d211a72f92baf6079",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/obito-space-time.json",
+      "before": "c38943e84e932db8dcb10f71dda7f2774ee5666a770ac59818470aa9482fb818",
+      "after": "c38943e84e932db8dcb10f71dda7f2774ee5666a770ac59818470aa9482fb818",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/pulse-pistol-move.json",
+      "before": "c9e4390b7ffe1fa970935e18bbfecf4fb0039bf34bd02e6fe7a475a9fc3f814b",
+      "after": "c9e4390b7ffe1fa970935e18bbfecf4fb0039bf34bd02e6fe7a475a9fc3f814b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/pulse-pistol.json",
+      "before": "dab9687293c662acc3e6c6fc2481c76e02afba2f70b3d930b487a08dfe3202ce",
+      "after": "dab9687293c662acc3e6c6fc2481c76e02afba2f70b3d930b487a08dfe3202ce",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/rafaam-curse-amplify.json",
+      "before": "863ce327315a03b82a051429d4a9f3ccba40748da4dd7ea4f930c1b463c59108",
+      "after": "69daa7076d608f64541a9114d3865471136cd2d5a167c81c9efa55027b756917",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/rafaam-curse-ward.json",
+      "before": "9df10e79a20ef88406d354160c6cf0446ff314f991b6da3d75bf5743d8f0a445",
+      "after": "9df10e79a20ef88406d354160c6cf0446ff314f991b6da3d75bf5743d8f0a445",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/rafaam-temporal-distortion.json",
+      "before": "617d6c2246fa99faec4d5c43668ce3d5f587f24a9aa887184b0a0a0487ad47f7",
+      "after": "0ee6d2663eceb38ee12718d8156a4428b7320958743bf6c3d8d94b90bf86571e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/reap-heal.json",
+      "before": "b1c8df84ada890834d5ce20cf4a8d0a27e0bef75440c7f5e1cc52c565d8bc35b",
+      "after": "b1c8df84ada890834d5ce20cf4a8d0a27e0bef75440c7f5e1cc52c565d8bc35b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/reap.json",
+      "before": "3599e9169247c7372eebcc555672886b00e42935b97d1dd3ff834c3ce79697d8",
+      "after": "3599e9169247c7372eebcc555672886b00e42935b97d1dd3ff834c3ce79697d8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/recall-endturn-trigger.json",
+      "before": "4d2207583e92b535301d6c91b6cef6be49d97f79839460a89290611b601461fc",
+      "after": "4d2207583e92b535301d6c91b6cef6be49d97f79839460a89290611b601461fc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/recall-move-trigger.json",
+      "before": "1738b2f02035147d5a8ae68066af8363ce7b97ee03e5d13197b4cc2400734485",
+      "after": "a24198a398b28f679b9ddde1c75b84f2dad2e24ea6e32474c2568b2e9b4d1530",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/recall-skill-trigger.json",
+      "before": "36fafb4745c27db222065c70db4fec78e125f941183d2cc1f8bd5621429a7199",
+      "after": "566263f3e05fa4de1d08753e0937b6976f8939421c008a4ab102725edba72c9e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/recall.json",
+      "before": "835853290cbe1395f6a4ec38a6696088010df13ddeb1ea4a7e633c3697942184",
+      "after": "c034c8c6090cbf590d0511759181f859920716565b0e0c7695c554e7af28b8cf",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/rocket-punch.json",
+      "before": "c821aa1f0ff59e82efe305b7ebc31f3154b49c100564f28bd258a363a0bffc5f",
+      "after": "3cea4c92a5d61adacb2292235fbe6624c09ea3dd8464af10631348076ffbfb90",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sasuke-amaterasu.json",
+      "before": "cfbe3ad0acac5b18d5d6368e3b431ce69f79b8327390c93cb5a5ed73375e1e12",
+      "after": "cfbe3ad0acac5b18d5d6368e3b431ce69f79b8327390c93cb5a5ed73375e1e12",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sasuke-chidori.json",
+      "before": "38ebc6a76e7ad51668432d3e6895feec8de4a566860db2b05a4b085f4b387f8c",
+      "after": "efcb01ff85436763477457d59f86ce2fd9df8168cdacdc7f04c86912c9f5db90",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sasuke-indra-arrow.json",
+      "before": "67541891a77d6bc80490d297ab1d48bb076ac44524d701e3efbe576d5b969387",
+      "after": "67541891a77d6bc80490d297ab1d48bb076ac44524d701e3efbe576d5b969387",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sasuke-kagutsuchi.json",
+      "before": "544b9679da5a180cf7a46894e33a785cf2df87ece5babaca463d09a0cd2d5f72",
+      "after": "a5a147ee01fdaf11cf1abc91b08533a5a1dd576426302d935e645392f8baf51f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sasuke-susanoo.json",
+      "before": "0991c4cf367f8d6cb4966f3435150fdd2ec470a5a03b94c40c049fcedd252595",
+      "after": "72d398c7b292a9b29cee0219f3b2f152d07529d1d3f29ad2294cb677aea12c0b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shadow-bolt.json",
+      "before": "90c84662d1b32b8d04fe8fa21e6b6074fc70bd2fbd93628d4b24cd0a03aec3dd",
+      "after": "90c84662d1b32b8d04fe8fa21e6b6074fc70bd2fbd93628d4b24cd0a03aec3dd",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shadow-chaos-control.json",
+      "before": "d5c92f1ef5802ea5bb2adc64f094c9fedb3a019586218bc36e1aae95c6ad7c1f",
+      "after": "458eeb6d5a309b37bb8177670fec08604614e8ebaf0a5e28af211a8aba56ebf3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shadow-chaos-spear.json",
+      "before": "b61f7735ddbc82e4f635cf0c635f5d92c52f859fa8cc79930b2bf87d6b036fe5",
+      "after": "d908347a104e51fc9ae4ea04572014c4dd768b26f69fb48ce9e7b523f3831f89",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shadow-ride-sweep.json",
+      "before": "1c020c4661cd2a9e0b5947f09b3287417e345d2f752b526c8c82b22ff27a764e",
+      "after": "eeb30cec271fb9d17169fbe03ca6c2c5254edfae5e1fb671a4be40e0507973a2",
+      "graphOverride": "code"
+    },
+    {
+      "file": "data/skills/shadow-step-teleport.json",
+      "before": "8871d5de7aa363f2fc003078cb4df81d1db00538901306078401ed05be818fcd",
+      "after": "8871d5de7aa363f2fc003078cb4df81d1db00538901306078401ed05be818fcd",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shadow-step.json",
+      "before": "19fc953e7b053e5ffd35c037092a0a1dbb2a99d73d06df425dae89955ffdce2d",
+      "after": "30572744ce43b8398dbab3ce4e502d133d937273dc43804334d1453bf9c31444",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shelly-bandage.json",
+      "before": "26b0750b8b04075ff31ce9439631162bae90fed278e54d3b3bab5b29d7ae2c03",
+      "after": "26b0750b8b04075ff31ce9439631162bae90fed278e54d3b3bab5b29d7ae2c03",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shelly-dash.json",
+      "before": "de8828a4c0e50331b9ec72b7ba8b38f3847c9b77441cd14947138ab355b232d6",
+      "after": "de8828a4c0e50331b9ec72b7ba8b38f3847c9b77441cd14947138ab355b232d6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shelly-shotgun.json",
+      "before": "7383fc46f49ea86aa66694aaba500afea37758710542c56b5d69994dea5a7405",
+      "after": "e37573507a4007afebfba22776b978bf715a1a98b4f3a93fdff471da0ff8be9c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shelly-super-shell.json",
+      "before": "ad2727e4b685e6fa8cf04e7346a76f64eb612f050c7090184909366a4892b861",
+      "after": "25eee91baa7513990cbf922a5571ad6053e008a3fe8c7639ca0a2f4f881e15f3",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shield-of-light.json",
+      "before": "2c433616e7414b6cae352be56666d8b16ef50c306f28139696ad23b2a9357cd7",
+      "after": "83623842eebfd959dc61a55b65037b093e6a08f736bb286eb3c496d5091633ba",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shishio-combustion-passive.json",
+      "before": "925291c4f8b8f6e1bab4c43cb7672c3a8d7e258595aefe1ca0a7e362c4f4e656",
+      "after": "925291c4f8b8f6e1bab4c43cb7672c3a8d7e258595aefe1ca0a7e362c4f4e656",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shishio-flame-spirit.json",
+      "before": "0c456d958f685c0a0f37f0cd24bdf7077c7123172b296731df127236454e6b7b",
+      "after": "86dc7948de02254f2e3f822d6ca7d48541cad971b4f1f8825ac105591f79421f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/shishio-infinite-blade.json",
+      "before": "7dfab6625fbf2326e55815bf8969edd59463f19539ec4f64acbcc2828daf17fe",
+      "after": "ac09e85a0e300fa7fe5f23a481a5ab72f7b0e9e6fdc52aa38a2915839638d1e6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sleep-dart.json",
+      "before": "2274a76a2f1d1cec3837f508643d7b6ec768c984dd920a71ce96cce669f48fb5",
+      "after": "cc57061ea5ff4bd8369aeab53f4f585e4135bdf89ab96c292bcd45f4c9da2d57",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sleep-prevent.json",
+      "before": "41453c831aee6a2d8ef0bd0089cfa8d6a9c92f25ff1dcd6d9230d4e4839e091e",
+      "after": "41453c831aee6a2d8ef0bd0089cfa8d6a9c92f25ff1dcd6d9230d4e4839e091e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sleep-remove.json",
+      "before": "d5e8f20ed3c09c21d00a6c08610bdac0da24903a5a1ef2be4dc4b5644b08546a",
+      "after": "d5e8f20ed3c09c21d00a6c08610bdac0da24903a5a1ef2be4dc4b5644b08546a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sonic-homing-attack.json",
+      "before": "7b427e71a30fa1e29ca7ecef5d1057b969f6e39e67d5e7aaa6ffd4d8f7c09597",
+      "after": "7b427e71a30fa1e29ca7ecef5d1057b969f6e39e67d5e7aaa6ffd4d8f7c09597",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/sonic-spin-dash.json",
+      "before": "e1a8c5e20ea4262432260c73ed6e133563be2053d3898e1fbab11ae0b3ccc0bb",
+      "after": "b01e53233cdc38a68f1f25385bea80ac67a32656930f58283bf111272de5be4c",
+      "graphOverride": "code"
+    },
+    {
+      "file": "data/skills/sonic-super-form.json",
+      "before": "e0d67cc58a1a79ec4b8cf2abb7628f46810ecfff4f74d195e849a7a5ebfbf0f1",
+      "after": "9f10ff8d98f7ee33fccb9018288d1a0d2888db72015c57b5c999d9fd0ddd2109",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/soul-fracture.json",
+      "before": "86750e6295c6d4fca5178e30f5fc89fb2715efecd09b2eef6d0163b09b83b489",
+      "after": "86750e6295c6d4fca5178e30f5fc89fb2715efecd09b2eef6d0163b09b83b489",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/tails-armor-assembly.json",
+      "before": "d5eccb605d46b46000bd26be53ba50868d1d9206e58287201a303e72efbe1ef4",
+      "after": "d5eccb605d46b46000bd26be53ba50868d1d9206e58287201a303e72efbe1ef4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/tails-mechanical-support.json",
+      "before": "3337d2e715878996e3cf31e959da8e0c364674f0886eb45cc44cfeb9b36148fc",
+      "after": "3337d2e715878996e3cf31e959da8e0c364674f0886eb45cc44cfeb9b36148fc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/tails-twin-flight.json",
+      "before": "fc16dd1fd7b422e44e2388175d474cd3d016d852297951d849388ea8e2b12d14",
+      "after": "eb48b3f1686cebeb9e9fd09218e1ef3d30179e433e2993530fd57d17c0fd980f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/tirion-holy-recall.json",
+      "before": "fa5df124958a40a027d61db044581d0ea3692b1eed0c6056443e24be1af99b22",
+      "after": "620abd88e51f56c06d324f090feb5e98264a0c12ba20b4cddccd9221540ca9e9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/turalyon-expedition-order.json",
+      "before": "7864f80a0c58f8ebcf478a3910c17dfcad94e9070abdcbfa99df9494174546aa",
+      "after": "59f3400f054ccd10a7eff061e0aaecc8d75fd7e9cbd0e3440f4a697f8e7daab1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/turalyon-grand-crusade.json",
+      "before": "899f5d19a48455f2d258525588097bade5cfc42611fc282396616c3d28184759",
+      "after": "3053e15f1eda26b50072ab6c6b294ac23f090bd0d26efdfaea439fcefdddea2d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/turalyon-lightforged-march.json",
+      "before": "18ef3023042ed073dc9c20d0579da3069214f555725b1a8bc46e6b0533769701",
+      "after": "18ef3023042ed073dc9c20d0579da3069214f555725b1a8bc46e6b0533769701",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ulquiorra-black-cero.json",
+      "before": "e94e58101badfc8c6b2475e3319abb681640f258d9e6e1df35eb8f18d97ef595",
+      "after": "e94e58101badfc8c6b2475e3319abb681640f258d9e6e1df35eb8f18d97ef595",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ulquiorra-cero.json",
+      "before": "673f5e2c83a851cb32f4b0d9c8913bb438ae89d825e128006b2941e7b062b448",
+      "after": "673f5e2c83a851cb32f4b0d9c8913bb438ae89d825e128006b2941e7b062b448",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ulquiorra-high-speed-regeneration.json",
+      "before": "56ba32e80e219f75dc82610310eb55ec06148da061ade0fffedb0a1edf600395",
+      "after": "56ba32e80e219f75dc82610310eb55ec06148da061ade0fffedb0a1edf600395",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/ulquiorra-resurreccion.json",
+      "before": "c38e9990f47078365e859d550ff3b1a8401922496eff7aac218be9ed94f7a8f6",
+      "after": "c38e9990f47078365e859d550ff3b1a8401922496eff7aac218be9ed94f7a8f6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/velen-fate-shelter.json",
+      "before": "fd407ed39e0a9fb5c32ce88c6dbd72b0789e6da93346c2fc27cacffaabc29036",
+      "after": "bb67362b15761012373644fb54242c67cea4ce4aa0bea66b03357b93c1c95416",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/velen-holy-prophecy.json",
+      "before": "d2042f21b2327abc30172b7ec77dc970e8d493b39a9fd8651e30cdc5208c5a0c",
+      "after": "3de537b8a2b47bd96cf67f075ef1815c5b547498767a0fa3243a8178a23437ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/velen-thousand-futures-ultimate.json",
+      "before": "6990ee97123bac5ad2dc58687b75b9a877887282fb651ec40c605ded765594b3",
+      "after": "9f739f05ca511d3fab6e263ba46c6445fe4b513c33f0b80e5b31d8a2e6799e7b",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/venom-claw-rend.json",
+      "before": "f05e3acca748e48f6b3a3a319b1c8b038c0fa22f01cfff338546e9f3039f2eed",
+      "after": "9ffa27a6ac32c0be588bc96663dfb02d1b5d27698b3b96d69e910cf0b02d1953",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/venom-corrosion.json",
+      "before": "80828fb4646a577b270f41b31d2be0fe00ca38dd4d78395de920e32d4504a567",
+      "after": "80828fb4646a577b270f41b31d2be0fe00ca38dd4d78395de920e32d4504a567",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/venom-host-transfer.json",
+      "before": "59bee57bb99bdfd05db60bf4d11f4735d6434c2d42400daa32c0872cd574f12e",
+      "after": "7cbb45e72f09364743dafaaf1ec25ec6d9572c7861d6739011eab5e8ddc73796",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/venom-symbiote-drag.json",
+      "before": "41a7da08f1942536782f03190e1424be409557c304a509fc0ad96b2bc476edf2",
+      "after": "fbf9751db3657ff9ae8ab521c6aa371405951976f8b951d1a4c379f4c2ac3e49",
+      "graphOverride": null
+    },
+    {
+      "file": "data/skills/watcher-ultimate.json",
+      "before": "6537d742df0f0086f0f80e571af4d27b2a3b377887a1ebfeb777e5f7717796e6",
+      "after": "6537d742df0f0086f0f80e571af4d27b2a3b377887a1ebfeb777e5f7717796e6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-end.json",
+      "before": "b09c7b9059ad7c05536778fbca52c78da0cc0cd17e65dbee37f5a2130d02a1c9",
+      "after": "b09c7b9059ad7c05536778fbca52c78da0cc0cd17e65dbee37f5a2130d02a1c9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-move.json",
+      "before": "da126c141f9dc0270dab15b2b98ce83bc713fd54a463adca851a4289c2e16112",
+      "after": "da126c141f9dc0270dab15b2b98ce83bc713fd54a463adca851a4289c2e16112",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-expire.json",
+      "before": "c2c6a5073238d29f6b4959d4f668a22ed9c442e08f5716256f40429d70971cfa",
+      "after": "c2c6a5073238d29f6b4959d4f668a22ed9c442e08f5716256f40429d70971cfa",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-rewrite.json",
+      "before": "dc4b749e4d74e588ae77aba1f76a4fbe959eaf3a6e316497da3b90ac2bf9947c",
+      "after": "dc4b749e4d74e588ae77aba1f76a4fbe959eaf3a6e316497da3b90ac2bf9947c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-akaza-damage-mark.json",
+      "before": "b68dec361a58d316365dd96fb5755b0dcbbe2a632b6b4d0ba8b12c9d33ed17f1",
+      "after": "3e486d7e3048868d078e3519e8a1c25a8c2986c024cd93bfffdf3aaf7c393126",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-akaza-fighting-spirit.json",
+      "before": "f50b2ac0635ab210351f14a5cb8059707ec36ba515fd0e04e5bad389e9e4baa8",
+      "after": "f50b2ac0635ab210351f14a5cb8059707ec36ba515fd0e04e5bad389e9e4baa8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound-retaliate.json",
+      "before": "46dea37aeedc4b259e499d9cfde3ed42f287e459fdd26d4480eb4dd43df29a86",
+      "after": "98d0607603d9fabcc78072183aad49a0e923d231968129e8c07f0ca95f515ff4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound.json",
+      "before": "3db4afa206b827fdbf15a2d3ab5ef9f68419334c2825667b6d03f55783d7e0f6",
+      "after": "3db4afa206b827fdbf15a2d3ab5ef9f68419334c2825667b6d03f55783d7e0f6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-arthas-lich-covenant.json",
+      "before": "264a78850db65f37f49bf3341c50f6c85c2afa862b8864b960cc0cc2b1e59a49",
+      "after": "aaa5381793e1b0507d1dc1ead967496e7446ec750656c7c1dbd2b9c5f78d2760",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-arthas-slow-restore.json",
+      "before": "902b06d9963bfd10c5bfff1ffa069ea607cd932eae148cfb2fb3ebc9a4e43fe2",
+      "after": "902b06d9963bfd10c5bfff1ffa069ea607cd932eae148cfb2fb3ebc9a4e43fe2",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-blackwidow-toxin-player.json",
+      "before": "3504c5ae4df618457b7599d354fe654a8235f965183c72c723148962557e998e",
+      "after": "3504c5ae4df618457b7599d354fe654a8235f965183c72c723148962557e998e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-blood-oath-tick.json",
+      "before": "7971b3d42fcf2b19f1ad4e02d9d9277a495c7004426bd39f2b1c5e71bd167532",
+      "after": "7971b3d42fcf2b19f1ad4e02d9d9277a495c7004426bd39f2b1c5e71bd167532",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-chidori-immobile.json",
+      "before": "2d58407a4e9023e478e8ba058c3110c8495ed1a077fdd937a6cc4e474db13cb6",
+      "after": "2d58407a4e9023e478e8ba058c3110c8495ed1a077fdd937a6cc4e474db13cb6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-colt-big-stride.json",
+      "before": "cb6b77c7c036eebc0c7ab26503ab5cc721a40790160c3f5f6fa1d1ebddf3209c",
+      "after": "cb6b77c7c036eebc0c7ab26503ab5cc721a40790160c3f5f6fa1d1ebddf3209c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-colt-zone-endturn.json",
+      "before": "ea9017a791359c96fd6b68fbc8717f1a9ceac03a28ab652a7dc0f69ea0019f4a",
+      "after": "ea9017a791359c96fd6b68fbc8717f1a9ceac03a28ab652a7dc0f69ea0019f4a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-damage-buff.json",
+      "before": "bb477c4f2b2b187ec4f5432f6719d7e22fe46833390a0fdc702fd23edaeb5c51",
+      "after": "bb477c4f2b2b187ec4f5432f6719d7e22fe46833390a0fdc702fd23edaeb5c51",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-divine-shield.json",
+      "before": "c3f69601862e8a7054be521af945f615db9c6e357fe41095b562d33a9dee432d",
+      "after": "c3f69601862e8a7054be521af945f615db9c6e357fe41095b562d33a9dee432d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-el-primo-injury-counter.json",
+      "before": "465fd0d466168b13532a1ee8bca93f973e1fb2a1f65110f24dd7c9ca61d31f19",
+      "after": "465fd0d466168b13532a1ee8bca93f973e1fb2a1f65110f24dd7c9ca61d31f19",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-el-primo-meteor-belt.json",
+      "before": "269eda41c3d2c42f5f22fc8fa99c2d49cae4e6ac031e08d47bdb51fd6a655010",
+      "after": "269eda41c3d2c42f5f22fc8fa99c2d49cae4e6ac031e08d47bdb51fd6a655010",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-elune-guidance.json",
+      "before": "8260e9153c69e7f573c1ebd28a4cdc5f743d8ee0436c7f698be43fedf384fc34",
+      "after": "fc9e6287b9ad09a508bf24a7db1a628ba49fa96bb515d279f4aa5789bece0f00",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-elune-protection-player.json",
+      "before": "36b6e555007c7c0b5348f1c37cfd50f6d5f5684ccc63c27cf9f846c2874686fa",
+      "after": "36b6e555007c7c0b5348f1c37cfd50f6d5f5684ccc63c27cf9f846c2874686fa",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-elune-protection.json",
+      "before": "b0ee6e63bd7fee985eb1f2346ef6a30c5a8987ee38236ef0755c8386eca382cd",
+      "after": "be2d846e2f036954642275b866beecd9d03c32c09d6b10ec544c6405c0ee48ad",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-grimmjow-destruction-instinct.json",
+      "before": "c2ce0a27197ec4d93da38322b83073bf5be53597904202eae0a738966a2e8420",
+      "after": "c2ce0a27197ec4d93da38322b83073bf5be53597904202eae0a738966a2e8420",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "before": "cc5a0668181f884ccbe8f6e79f4a88882e83dcbce8603d281bd880247e052e10",
+      "after": "cc5a0668181f884ccbe8f6e79f4a88882e83dcbce8603d281bd880247e052e10",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "before": "71ccf3ff0fac7eb590bcf34c83c69dbcd41b125da8a257657b5e2b950f41cc3e",
+      "after": "71ccf3ff0fac7eb590bcf34c83c69dbcd41b125da8a257657b5e2b950f41cc3e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-grimmjow-resurreccion.json",
+      "before": "8db399b65717651ea025e252593ab767c1e1d8e4e6dfebf551386ced6d4991f5",
+      "after": "b3560aff71b9372cbe0e445137c12cebb580789d9884032967d0cf1a21517348",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-hashirama-edo-regen.json",
+      "before": "241e4a86195adaf107a18ed5fe4d7022540531ee25610bc718a24ac4799650f1",
+      "after": "241e4a86195adaf107a18ed5fe4d7022540531ee25610bc718a24ac4799650f1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-hidan-blood-oath-reflect.json",
+      "before": "9c86823661bb724a0cf0babcbb9d9192813050b0bd7d6ac849ce9c818facdffc",
+      "after": "9c86823661bb724a0cf0babcbb9d9192813050b0bd7d6ac849ce9c818facdffc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-hidan-dying-immune.json",
+      "before": "ecd37762d315956e0f9674b6f65868b44d7953ded5cc4f14fbde84b0674e5023",
+      "after": "ecd37762d315956e0f9674b6f65868b44d7953ded5cc4f14fbde84b0674e5023",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-hidan-undying-tick.json",
+      "before": "438ea0ec1a080f379e4592fc61d66133992cd4339b8115d1220a222dece2a44c",
+      "after": "438ea0ec1a080f379e4592fc61d66133992cd4339b8115d1220a222dece2a44c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-hidan-undying.json",
+      "before": "ee72e20ff17938c1612a7a20802d66246b98fc94620af895b9a4e7d331c33c5d",
+      "after": "a9ae55f0d0babe2848402e642f7661497b2fb1b6e2b0519ba65c05c7eb3b8af2",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-ichigo-black-getsuga-teleport.json",
+      "before": "831cefd069d5046d55e5be3a66248de55534fc9e67798e3b755ed8397fefa0a2",
+      "after": "390f74b42a2bc48da7d397d2b638702e84e3eccde298d3e8a6dca37e4706805e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-illidan-demon-strike.json",
+      "before": "a788b290a489cce66a789f7e041b5cac4555fb2458de360833b89af1b45ef9d8",
+      "after": "a788b290a489cce66a789f7e041b5cac4555fb2458de360833b89af1b45ef9d8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-itachi-tsukuyomi.json",
+      "before": "4c6e02127bacdd2713cbf3ecd4f5a6134f8c6dd90c8966d25f2e3301d836a50d",
+      "after": "4c6e02127bacdd2713cbf3ecd4f5a6134f8c6dd90c8966d25f2e3301d836a50d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken-boost.json",
+      "before": "86392b8e096dbfd603a34742277581d8a715782a91d68fe513f409f55ed8d49e",
+      "after": "86392b8e096dbfd603a34742277581d8a715782a91d68fe513f409f55ed8d49e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken.json",
+      "before": "7fbe738cb853b0677c611d96a773767c76de995126ebc12978dc67efc2183802",
+      "after": "23b9093b13ca071c90b5ae37f61b6564157ada5ed5232438eea2869fcb3e0f37",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-lucky-coin-gamestart.json",
+      "before": "234ca7f61bfb84c1667b5250e1f0c28edf15e122a65ce291f8243cc7835023db",
+      "after": "234ca7f61bfb84c1667b5250e1f0c28edf15e122a65ce291f8243cc7835023db",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-mangekyo-friendly-death.json",
+      "before": "4b856fbdf0131b5d546c016a42847dc11279c1ba22bccf1117f1ffedb22729e4",
+      "after": "9145b6a83dd19dd04261be1678399fc127c21bb4d55c57f5d7775888b590e42d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-max-phase-recast-expire.json",
+      "before": "f0dd403905cc999d3883279e576e1eefc04bdd32f2657e5af65de2999ee70aee",
+      "after": "f0dd403905cc999d3883279e576e1eefc04bdd32f2657e5af65de2999ee70aee",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-minato-anchor-end-turn.json",
+      "before": "e6f0a339864b47508807158784c1a872442617c493252f72a07173f776936f33",
+      "after": "e6f0a339864b47508807158784c1a872442617c493252f72a07173f776936f33",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-minato-flying-raijin-trigger.json",
+      "before": "bc8fa12b88466379783b2c5bb08d39ba8046d94c7229139e3eec6a528cfcc17e",
+      "after": "bc8fa12b88466379783b2c5bb08d39ba8046d94c7229139e3eec6a528cfcc17e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-momentum-consume.json",
+      "before": "750b056ff00feb1e69d31b39f733429dae452136368db30ebd99862bfee24b28",
+      "after": "f380a0c024954a8692892f5f78e927a125e5a7460c0eba862fb37373681f9429",
+      "graphOverride": "skillCode"
+    },
+    {
+      "file": "data/rules/rule-momentum-gain.json",
+      "before": "8eafec810e026915c3fb3e2e78f292c14eba63d588f0605db0586716b3ec2a47",
+      "after": "c4391cde77bba0fd9fb6221c3d444011b464c588118add40c213d78c5704c0b8",
+      "graphOverride": "skillCode"
+    },
+    {
+      "file": "data/rules/rule-mortis-damage-counter.json",
+      "before": "1dfb54d81c61f3aae45e7984350e57685ca7beab14e0e6e3dee24a25ea8eb652",
+      "after": "e17277d047ad9cdeea961b432f1dff60aac6025a79356c0fdbde5b412b8dd034",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-muzan-damage-reduction.json",
+      "before": "f99a72990d93f1f74785fca7db97fb0e44b6d7306fcab3e2a771ca792fe2c172",
+      "after": "f99a72990d93f1f74785fca7db97fb0e44b6d7306fcab3e2a771ca792fe2c172",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-damage.json",
+      "before": "b8bcace01eb0a8dfb2df38a00074fba5cd2c36de14703cbff98274970744a49a",
+      "after": "b8bcace01eb0a8dfb2df38a00074fba5cd2c36de14703cbff98274970744a49a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-end.json",
+      "before": "00540a3549d329aacd37b1ac2190391187e839b6907def99af54a5a3825ce9d6",
+      "after": "00540a3549d329aacd37b1ac2190391187e839b6907def99af54a5a3825ce9d6",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-died.json",
+      "before": "4aa9bbe8771d761d247c9bc289eff2da6f99faabfdd9b1bed503ac8b1a30a190",
+      "after": "4aa9bbe8771d761d247c9bc289eff2da6f99faabfdd9b1bed503ac8b1a30a190",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-endturn-charge.json",
+      "before": "867d10ace26b4b629d6273d08d1b203544083431c6f46822548d424844baaeec",
+      "after": "867d10ace26b4b629d6273d08d1b203544083431c6f46822548d424844baaeec",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-immobile.json",
+      "before": "c2b847561305483ef178bd73dd76eb2389e6e82a613d259dc162a7de29cc56dc",
+      "after": "c2b847561305483ef178bd73dd76eb2389e6e82a613d259dc162a7de29cc56dc",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-one-hit.json",
+      "before": "0cadcb08dd493691512081126938b986c757e409444f0fb6728723a12a3ec157",
+      "after": "0cadcb08dd493691512081126938b986c757e409444f0fb6728723a12a3ec157",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-block-skill.json",
+      "before": "2ab564b1ce2412240ab23144d2b8d88c2bd969c3abfc07eeb2822f78184e4d34",
+      "after": "2ab564b1ce2412240ab23144d2b8d88c2bd969c3abfc07eeb2822f78184e4d34",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immobile.json",
+      "before": "dbf6b46cf37e769d21115f951fab1d7fdc50897b01445644ffbfa8cc2af770e0",
+      "after": "dbf6b46cf37e769d21115f951fab1d7fdc50897b01445644ffbfa8cc2af770e0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immunity.json",
+      "before": "a47ea43752d4a72d19f8cc20c8510937e0154eef8bccf1b05960c26e418a08e4",
+      "after": "a47ea43752d4a72d19f8cc20c8510937e0154eef8bccf1b05960c26e418a08e4",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-tick.json",
+      "before": "e48a52829bb527dc80132a285472a0d000defb7ec826e81a83206a582832cf34",
+      "after": "e48a52829bb527dc80132a285472a0d000defb7ec826e81a83206a582832cf34",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-obito-grudge-reset.json",
+      "before": "ed8bf95803ac2374fcb4b1bc2300ef096247c75c4285d61e4ba629dd092f22c0",
+      "after": "ed8bf95803ac2374fcb4b1bc2300ef096247c75c4285d61e4ba629dd092f22c0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-obito-grudge.json",
+      "before": "523ae9414575804d48ec9865c6768d04a08e8bd98b47bf69be4c212f70aa73ad",
+      "after": "522e8e367f790abf837d170991564adf9879919f62222b0804c71a59631b769c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-obito-kamui-block.json",
+      "before": "aae4b8b5ac0894d69a62a537dfd3ffb00733ae269c29b154e9e2ea443f5a1bc8",
+      "after": "aae4b8b5ac0894d69a62a537dfd3ffb00733ae269c29b154e9e2ea443f5a1bc8",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-end-turn.json",
+      "before": "c946512e8a6d4f453b922f37cca67d6fe83d3a3bd6d6c2578374891941f41d20",
+      "after": "c946512e8a6d4f453b922f37cca67d6fe83d3a3bd6d6c2578374891941f41d20",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-ward.json",
+      "before": "e62af5de3562d4aad19587b466470b4cf924a22b01a10eaa380da855e0f74138",
+      "after": "b40587c3fccfe0c87fc1e1e29bee121f110624e14338eb6b1a5df369c81a43ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-rafaam-temporal-distortion.json",
+      "before": "ebde8b9c081c1ba904fccf3e30b0a3887b0c571c0fffdfa1e2391acc7f901118",
+      "after": "ebde8b9c081c1ba904fccf3e30b0a3887b0c571c0fffdfa1e2391acc7f901118",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-reap.json",
+      "before": "fb73d732e163e8a0df4fbe4fa115508c5ea8824a645db6faac5ed6fc6afcfd45",
+      "after": "fb73d732e163e8a0df4fbe4fa115508c5ea8824a645db6faac5ed6fc6afcfd45",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-damage.json",
+      "before": "2921ec9b020ac59cbb55206b685d7d30295b8b148d4fc02a97220f7e95c8097c",
+      "after": "2921ec9b020ac59cbb55206b685d7d30295b8b148d4fc02a97220f7e95c8097c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-endturn.json",
+      "before": "dcf9298b4bcfbf998c5b328bf1a4dc589df74962a8edcf79adbabba7ddab07d6",
+      "after": "3e0acfa1c5d86312a65035ee2ed15f6d61e198fcd5b787ef316ff21bea8b63b5",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-move.json",
+      "before": "977f43b83eec9f864af982cda132521f48cab1cc5020907d9fe82eb358d67896",
+      "after": "52977455d4f56bf3362837d1894fc49dbe651e682d79ce10f71fe0c66642d518",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-stack.json",
+      "before": "5a74ff42c241df5d57ff1d413253ff153683abae4eb0322989960565bd73feb9",
+      "after": "54bf545439a22236c5ec42fa6ec894208ac68ccd58731da06b194b6ed434246a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shadow-chaos-spear-restore.json",
+      "before": "d27ac89795c723d37a05b984b3dcaaa7a04cb3823049be99434ee5097abff2ee",
+      "after": "d27ac89795c723d37a05b984b3dcaaa7a04cb3823049be99434ee5097abff2ee",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shelly-bandage.json",
+      "before": "d7e0b240f9f9b7c9367874e3a1c3b4cf6acc07cabefc44811c00f0319ecc5824",
+      "after": "216a0cae5b4a648fc0b2d3500eaa680751a375a755b3eb118cd585dade68751f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-endturn.json",
+      "before": "c984031ef011a84c9af994027fa6ae8933f3e83f53b126a3a55a6caac7ccd1a0",
+      "after": "b826f95bd834745a565b8d28dbd3bb59ecbb6f3c946746e1a7be0fa172a0bd5a",
+      "graphOverride": "skillCode"
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-move.json",
+      "before": "98664849a608e5f923a4131aa128bb7a19a88b92dc6654e3f0d5c615ab662a93",
+      "after": "d605c40fd35849b44f4ab24c86ca9fd85aa2ca15ca8c2be55f02553bcd6b631c",
+      "graphOverride": "skillCode"
+    },
+    {
+      "file": "data/rules/rule-shishio-combustion.json",
+      "before": "9c695e69aade0748c8b9289ef0d04a1b61f6b128208b48690cb199c2757bcde9",
+      "after": "08fa271af61945fff3df36a084347c17b23f3b0d5acaa0c36964768b3bf13601",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-cooldown-once.json",
+      "before": "3b47b5e0c463de2d8fe0d2a04fdadd19cdc2ecc5aa970d0fc8f3e7664d3a9c05",
+      "after": "8729a6cbb8792371b922b2db74d70ebfc2431b03b4b1ff387f3bf930a8dd0495",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-execute-option.json",
+      "before": "6b75d6155ba1e7f6cf69870b19ce983aecd7a7301bab8d0b4be35390def29aba",
+      "after": "6b75d6155ba1e7f6cf69870b19ce983aecd7a7301bab8d0b4be35390def29aba",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-infinite-blade-recast.json",
+      "before": "d9091c3915d17da0db78d5bce2e61e25ddd22c603fd760a8bd833843eef7d3a0",
+      "after": "d9091c3915d17da0db78d5bce2e61e25ddd22c603fd760a8bd833843eef7d3a0",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-kill-track.json",
+      "before": "77fab6634c1e48ebc996c0b7617a2ce44f99735c5703b1f31001ada70d230cb0",
+      "after": "f5bab9aee66f80aaca167c651b7e70c9cb123acd0621f6e8124dfd83b51a1157",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-no-heal.json",
+      "before": "c5e930a7b22582d9b2e8aa9b2550ae3a9d2e6239affb00c9c3af6e8ebe59808f",
+      "after": "c5e930a7b22582d9b2e8aa9b2550ae3a9d2e6239affb00c9c3af6e8ebe59808f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-shishio-silence-burst.json",
+      "before": "2d630e6d68aeb56af8b680f6552426540a815f7305ef6a6465138ee3e23e08ce",
+      "after": "36f5938ae6bf7080ee7365eca55c6ab60604fae8e34ae193c87c9ecacd84f058",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-silenced-block.json",
+      "before": "dfc20986ce00a6562694baab534644f13db953fc0c4e0eaea6124d72debfdcd1",
+      "after": "dfc20986ce00a6562694baab534644f13db953fc0c4e0eaea6124d72debfdcd1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-sonic-free-move.json",
+      "before": "c7df8593ef8e3c5ca80a3ea3b7206c7a15f53e8713d5184fad6bab699cafada1",
+      "after": "c7df8593ef8e3c5ca80a3ea3b7206c7a15f53e8713d5184fad6bab699cafada1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-soul-fracture-player.json",
+      "before": "6a8a35011705e5d65010358d6e4ee06efb9f27306ea0ded5d7f39d41c26093a2",
+      "after": "6a8a35011705e5d65010358d6e4ee06efb9f27306ea0ded5d7f39d41c26093a2",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-soul-fracture.json",
+      "before": "a68ca6ab97d94c74ce95a0a40843013f266ed97a47abb3385ed366707adea30d",
+      "after": "a68ca6ab97d94c74ce95a0a40843013f266ed97a47abb3385ed366707adea30d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-armor-recovery.json",
+      "before": "999b5a04d33d7da9d0bf9cdbb4a4d43a74ca8508f968b31663757d2134a888a1",
+      "after": "999b5a04d33d7da9d0bf9cdbb4a4d43a74ca8508f968b31663757d2134a888a1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune-target.json",
+      "before": "c010161cb867ee26bd70464c6b79f1526352b2f3e72d0503756dfe70d8f51913",
+      "after": "c010161cb867ee26bd70464c6b79f1526352b2f3e72d0503756dfe70d8f51913",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune.json",
+      "before": "2823c94952f0883383dd67d6811b70cee66777babaf8737e6ca95a4bf9ef0aed",
+      "after": "2823c94952f0883383dd67d6811b70cee66777babaf8737e6ca95a4bf9ef0aed",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable-skill.json",
+      "before": "b40b817648aa61d66474fc7d218171c231588b1bc70316a68f0f094be937c827",
+      "after": "b40b817648aa61d66474fc7d218171c231588b1bc70316a68f0f094be937c827",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable.json",
+      "before": "657aab3149baa560979d6a25a074f63967f75484ee374cd1ba715063d760a420",
+      "after": "657aab3149baa560979d6a25a074f63967f75484ee374cd1ba715063d760a420",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-reservation-block.json",
+      "before": "771fd3252816c41fa4c7a84926fd2fb1c81b186585019afa2c18e60d909ebdf9",
+      "after": "771fd3252816c41fa4c7a84926fd2fb1c81b186585019afa2c18e60d909ebdf9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tails-flight-resolve.json",
+      "before": "5e56285206207165b67365da11cbf209ff8ca76bded1671b90d89819f0d50f95",
+      "after": "5e56285206207165b67365da11cbf209ff8ca76bded1671b90d89819f0d50f95",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-glory.json",
+      "before": "fe419b599644f2e433727dd682e05eda960e40a15a5d2973a74a23bd3591f0be",
+      "after": "fe419b599644f2e433727dd682e05eda960e40a15a5d2973a74a23bd3591f0be",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-shield-start.json",
+      "before": "a7416f44c2e00f309fa9eaba3d3d004fe333489a193f29a3d96d8602990c5733",
+      "after": "130326fa6c17bf75b099bab0371e7819cae496c97a4f88e7aca5985165882e8e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-turalyon-lightforged-march.json",
+      "before": "3173f703bd50d150307608cbcc281a6c08096151113b95f6be9ab852fa64ca95",
+      "after": "a35f5991d3fbbd50976f3da322750371db571245e392ae4f8a2c54a13af7e3a1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-dealt.json",
+      "before": "a836aacabab9355b102eb57d005cffc788840ab1301c614b6db98cd9ad365d60",
+      "after": "39265e6741102872659a47544ed810f685815f69bc5314624557909c66e0aeee",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-taken.json",
+      "before": "482fbd7f3214c63fe21cbb72c0432de36ec5201718eb7afe629fe72c223fcfe1",
+      "after": "309fed15077581b120b04137babd13a9ab0f0750eacdb27811960b9e6a679088",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-resurreccion.json",
+      "before": "e900d254f5d4f92319539bf7eca97493a59ae83ddc7d3865a00c295a07e5abdd",
+      "after": "587c2c3d20b6e3309f9cad68b754ddb042a49250e19a9a0b506c1c5897183932",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-velen-death-cleanup.json",
+      "before": "68ebcc6f0958e6ec9eeae9ec15d0c19f6ed7b4a476e68ed2523c68cea95e148c",
+      "after": "68ebcc6f0958e6ec9eeae9ec15d0c19f6ed7b4a476e68ed2523c68cea95e148c",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-velen-delayed-effects.json",
+      "before": "b1b57d0b913fb8dfca25043217bf6394bb703ced1b2bf970a0de24815309b663",
+      "after": "7e0fb11da2bf68ba041d5ba5205c2bfca52acab968607114b013eb8fa7e2dc62",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-velen-fate-target.json",
+      "before": "8f03865378d79478ce09691c77ac0d80f33a346a929e5d15f675d382917b1a32",
+      "after": "8f03865378d79478ce09691c77ac0d80f33a346a929e5d15f675d382917b1a32",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-venom-corrosion-immobile.json",
+      "before": "3e6671222a674739bf0fd456a12a15a09448a504dc9ae155141dc6dae23552d1",
+      "after": "3e6671222a674739bf0fd456a12a15a09448a504dc9ae155141dc6dae23552d1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-watcher-form.json",
+      "before": "39f0a0f31c66c42fa90703528c78d73a411091c9c63d91a6d852041c5dbacbdb",
+      "after": "39f0a0f31c66c42fa90703528c78d73a411091c9c63d91a6d852041c5dbacbdb",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-dealt.json",
+      "before": "54c04c85e2ab909b8b6e95b8dfd4df6bd3831dc441978c8502bf33f3994b80ef",
+      "after": "54c04c85e2ab909b8b6e95b8dfd4df6bd3831dc441978c8502bf33f3994b80ef",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-taken.json",
+      "before": "ad5090719575969d3eaa7823eb5c03ac1bf6c750012d66cd4c9395d50ddedeb1",
+      "after": "ad5090719575969d3eaa7823eb5c03ac1bf6c750012d66cd4c9395d50ddedeb1",
+      "graphOverride": null
+    },
+    {
+      "file": "data/rules/rule-watcher-shield.json",
+      "before": "1967b66f63c6378f60f86b488609e0953eb207f3704d9d342c6577f00b0e20df",
+      "after": "1967b66f63c6378f60f86b488609e0953eb207f3704d9d342c6577f00b0e20df",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-attack-defense.json",
+      "before": "e7aeec6a90da9ff5dc5ed8dde9d11ab819aeb2ed38705ec9d7139b2618b6d10f",
+      "after": "ceab1ec82f906a4a5fe25d7e64b77958897228db88eb35d463de4f57bf17b0d2",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-attack-heal.json",
+      "before": "f14122ebded86656a9a068f067b2e2066af081ae86340873d8cbc8c8232a6561",
+      "after": "512ba5291bbf0212d94b630450bd93fa609139aac62a02c5162918c4d24c680a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-attack-speed.json",
+      "before": "86f076ca26ac12410b7f6541f323a13caaf0f201a0aa0046fd344521c96d4a8e",
+      "after": "2b0ec1aa7e0a21e55d5b77ca08708f9d457e9a1272f859bcdc403ce7c008d412",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-defense-heal.json",
+      "before": "ff2e6068fc32e25b9fbc7c60073ce1b19165beb38be84742d578f7f1e2ba58dc",
+      "after": "a5ee09492c8edef8e805066592bc13f6ffcb2449bcfe9ed1958a28ae9ce179bf",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-defense-speed.json",
+      "before": "7ea732649b7f02938f36fb49f6e9bfbabfbe5e0dfa116ba02ca64a1278bd478a",
+      "after": "e986074d52fdb9dca9bbbc77f4ecf050de815fb249b8f1abce6e6d7c8ac2751f",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/armor-heal-speed.json",
+      "before": "a4c768ce9b1cbc69be401f595076345b91220aa705f3e83a7a7e140b23097f98",
+      "after": "622eef6505db4e3ba4f364ff096620a968924942df41f2c82f27ba05d585d2f9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/demon-summon-1.json",
+      "before": "57c44988a6bd66825aa26e1debb167579bd00fc3ab062087a49b12010ab12a86",
+      "after": "57c44988a6bd66825aa26e1debb167579bd00fc3ab062087a49b12010ab12a86",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/demon-summon-2.json",
+      "before": "9dcc9c5c6f69c840adc531430f4c3bb07a8399e53e801e46016405d0cf3d8614",
+      "after": "9dcc9c5c6f69c840adc531430f4c3bb07a8399e53e801e46016405d0cf3d8614",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/demon-summon-3.json",
+      "before": "75e5288333c6161cd4c227b79bd1124dace557050b8068faa0c70721976ce725",
+      "after": "75e5288333c6161cd4c227b79bd1124dace557050b8068faa0c70721976ce725",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/demon-summon-4.json",
+      "before": "c0385372a6f625cf229276627aa2a374e1c6bb0fb3070fda91ea9b9185207ef9",
+      "after": "c0385372a6f625cf229276627aa2a374e1c6bb0fb3070fda91ea9b9185207ef9",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/demon-summon-5.json",
+      "before": "ad27de5f1f673aaabecd01bdb2d4f2569abe8cda4015b481ce9a2efe590e257a",
+      "after": "ad27de5f1f673aaabecd01bdb2d4f2569abe8cda4015b481ce9a2efe590e257a",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/hashirama-edo-nature-heal.json",
+      "before": "e8ede7d7327b3fc428a95b91652edd65ebbb0842eb1d45fbd15746aad6f4c63d",
+      "after": "e8ede7d7327b3fc428a95b91652edd65ebbb0842eb1d45fbd15746aad6f4c63d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/hashirama-edo-thousand-hands.json",
+      "before": "cacc6bb8764b34aab3c3f344f35ddfb798ad663507f656e69cd58d58859a74ca",
+      "after": "cacc6bb8764b34aab3c3f344f35ddfb798ad663507f656e69cd58d58859a74ca",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/holy-charge.json",
+      "before": "d8a4571e83474e0909c778587283fee482a74f4aa51e8e1140c5e7e093da51c8",
+      "after": "4d838467f4ee881ffd53c47dc5abe52d574ab4f9df7fbbb681bbf9ebcfc4689e",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/holy-heal.json",
+      "before": "0e6dfc6f63b63e4caa1bd82442c592f2e644abb3f891057d81a90b76cb624474",
+      "after": "0e6dfc6f63b63e4caa1bd82442c592f2e644abb3f891057d81a90b76cb624474",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/holy-smite.json",
+      "before": "fda7965f58f2df01978f23039c59f0ead9198844d7ab8b74ef6511b48d460724",
+      "after": "fda7965f58f2df01978f23039c59f0ead9198844d7ab8b74ef6511b48d460724",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/lucky-coin.json",
+      "before": "e382522f359cf24675c562c77dee6cee40d51f71fb552c5f967cc2ebddfdd421",
+      "after": "e382522f359cf24675c562c77dee6cee40d51f71fb552c5f967cc2ebddfdd421",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/rafaam-curse-sample.json",
+      "before": "e8bef10428678a8dab44b2b3db93f56cc948a522d3ba80d205ddab289f125536",
+      "after": "e8bef10428678a8dab44b2b3db93f56cc948a522d3ba80d205ddab289f125536",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/sample-reactive-card.json",
+      "before": "52f8b1e7926b7fd2d3b6cf64371e8633eec9ff9bcae377e76843ca7d41178088",
+      "after": "52f8b1e7926b7fd2d3b6cf64371e8633eec9ff9bcae377e76843ca7d41178088",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/soul-fragment.json",
+      "before": "553225044c429b78218963cc9361068a251de68cb3b54f14873ee2a8055fc13d",
+      "after": "553225044c429b78218963cc9361068a251de68cb3b54f14873ee2a8055fc13d",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/watcher-calm.json",
+      "before": "44df68e1db08a0597db4110066db56ce64f7fb96b763d98bfa0fdadd20436043",
+      "after": "cad563069111b0841bf16729282bcd77fcac5fffb9554343a0bd7a08ba436679",
+      "graphOverride": null
+    },
+    {
+      "file": "data/cards/watcher-rage.json",
+      "before": "42d33cd773d7a7ff41b66e4082094c504fe7547b89bb6331796dbd01d40e8ed8",
+      "after": "8d2b64a7a0f25a8e984f4726f3eb54676eddc580f3a5a8b691e8c8a1310ffb40",
+      "graphOverride": null
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "file": "data/rules/rule-momentum-consume.json",
+  "before": "f380a0c024954a8692892f5f78e927a125e5a7460c0eba862fb37373681f9429",
+  "after": "b35c0da6d046c5ca6e84a0c4e61d00c4380a7e1d1ff17c041af119508fbd7ffc",
+  "oldDocumentStrictlyValidated": true,
+  "oldInterfacePreserved": true,
+  "changes": [
+    "terrain-bounded side rays",
+    "Chinese side label"
+  ]
+}

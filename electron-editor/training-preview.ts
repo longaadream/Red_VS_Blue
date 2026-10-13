@@ -40,7 +40,9 @@ export async function openTrainingPreview(appRoot: string, snapshot: TrainingSna
       return result ? new Response(new Uint8Array(result.bytes), { headers: { 'Content-Type': result.contentType, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } }) : new Response('候选资源不存在', { status: 404 })
     })
     registered = true
-    const title = `训练营 · 已接受版本 ${snapshot.contentHash.slice(0, 12)}`
+    const title = snapshot.draft
+      ? `训练营 · 草稿试用 · ${snapshot.draft.skillName} · ${snapshot.contentHash.slice(0, 12)}`
+      : `训练营 · 已接受版本 ${snapshot.contentHash.slice(0, 12)}`
     preview = new BrowserWindow({ width: 1440, height: 960, minWidth: 900, minHeight: 700, title, show: !hidden,
       webPreferences: { session: isolated, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, backgroundThrottling: !hidden, offscreen: hidden } })
     windows.add(preview)
@@ -53,7 +55,7 @@ export async function openTrainingPreview(appRoot: string, snapshot: TrainingSna
     preview.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     preview.on('closed', cleanup)
     await preview.loadURL(`${origin}/battle.html?mode=training`)
-    return { contentHash: snapshot.contentHash, windowId: preview.id }
+    return { contentHash: snapshot.contentHash, windowId: preview.id, ...(snapshot.draft ? { draft: snapshot.draft } : {}) }
   } catch (error) { if (preview && !preview.isDestroyed()) preview.destroy(); cleanup(); throw error }
 }
 

@@ -181,8 +181,8 @@ export function buildTailsArmorAssemblyGraph(): GameplayModuleGraph {
     call('owner-present', 'query.has-player', { playerId: output('owner-ref', 'player') }),
     branch('owner-guard', output('owner-present', 'exists'), [
       call('owner', 'query.player', { playerId: output('owner-ref', 'player') }),
-      call('module-choice', 'choice.multi-string', {}, {
-        title: '护甲组装：选择两个不同模块', options: [...ARMOR_MODULES], labels: ['恢复模块', '攻击模块', '高速模块', '硬化模块'], minSelections: 2, maxSelections: 2, canCancel: false,
+      call('module-choice', 'choice.string-options', {}, {
+        title: '护甲组装：选择两个不同模块', options: [...ARMOR_MODULES], labels: ['恢复模块', '攻击模块', '高速模块', '硬化模块'], minSelections: 2, maxSelections: 2, selectionMode: 'multi',
       }),
       call('choice-unresolved', 'choice.is-unresolved', { choice: output('module-choice', 'choice') }),
       branch('choice-pending', output('choice-unresolved', 'value'), pendingResult('choice-pending', 'module-choice'), [
@@ -365,9 +365,9 @@ export function buildSonicFreeMoveRuleGraph(): GameplayModuleGraph {
 }
 
 /**
- * Count armor recovery records, cap the direct current-HP write at max HP,
- * and remove the owning rule when its last record is gone.  This intentionally
- * avoids effect.heal so the frozen rule does not gain heal-event behavior.
+ * Count every armor recovery instance, including legacy records without ids.
+ * Recovery uses the authoritative healing path, as required by the author
+ * contract, so healing rules and presentation observe the same operation.
  */
 export function buildTailsArmorRecoveryRuleGraph(): GameplayModuleGraph {
   const body: GameplayStatement[] = [
@@ -382,15 +382,17 @@ export function buildTailsArmorRecoveryRuleGraph(): GameplayModuleGraph {
       call('own-turn', 'compare.player-reference', { left: output('owner', 'player'), right: output('event-player', 'player') }),
       branch('event-guard', output('alive', 'value'), [
         branch('turn-guard', output('own-turn', 'value'), [
-          call('status-ids', 'status.list-ids', { piece: output('piece', 'piece') }, { statusType: 'periodic-heal' }),
-          call('status-count', 'list.count', { items: output('status-ids', 'ids') }),
-          call('has-status', 'compare.greater-than', { left: output('status-count', 'count'), right: literal(0) }),
+          call('status-instances', 'status.instances', { piece: output('piece', 'piece') }),
+          { kind: 'collection', id: 'recovery-statuses', method: 'filter', items: output('status-instances', 'statuses'), item: 'status', body: [
+            call('status-type', 'status.instance-field', { status: input('status') }, { field: 'type' }),
+            call('is-recovery', 'compare.values', { left: output('status-type', 'value'), right: literal('periodic-heal') }, { valueType: JSON.stringify({ kind: 'nullable', value: 'string' }), operator: '==' }),
+            returnValue('recovery-match', output('is-recovery', 'value')),
+          ] },
+          call('status-count', 'collection.length', { items: output('recovery-statuses', 'value') }),
+          call('has-status', 'compare.greater-than', { left: output('status-count', 'value'), right: literal(0) }),
           branch('status-guard', output('has-status', 'value'), [
-            call('amount', 'math.multiply', { left: output('status-count', 'count'), right: literal(3) }),
-            call('uncapped', 'math.add', { left: output('hp', 'value'), right: output('amount', 'value') }),
-            call('max-hp', 'attribute.read', { piece: output('piece', 'piece') }, { attribute: 'maxHp' }),
-            call('capped', 'math.min', { left: output('max-hp', 'value'), right: output('uncapped', 'value') }),
-            call('set-hp', 'attribute.set-current-hp', { piece: output('piece', 'piece'), value: output('capped', 'value') }),
+            call('amount', 'math.multiply', { left: output('status-count', 'value'), right: literal(3) }),
+            call('heal', 'effect.heal', { source: output('piece', 'piece'), target: output('piece', 'piece'), amount: output('amount', 'value') }, { skillId: 'rule-tails-armor-recovery' }),
             call('name', 'attribute.text', { piece: output('piece', 'piece') }, { attribute: 'name' }),
             call('prefix', 'text.concat', { left: output('name', 'text'), right: literal('的恢复模块回复') }),
             call('amount-text', 'text.from-number', { value: output('amount', 'value') }),

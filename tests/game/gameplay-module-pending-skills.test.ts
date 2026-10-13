@@ -11,6 +11,7 @@ import {
   type GameplayModuleGraph,
   type GameplayStatement,
 } from '@/lib/skill-graph/module-document'
+import { GAMEPLAY_MODULE_GRAPH_VERSION } from '@/lib/skill-graph/module-types'
 import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
 import {
   runSemanticPendingMigrations,
@@ -69,11 +70,72 @@ function deferChoices(root: GameplayModuleGraph): Extract<GameplayStatement, { k
   return result
 }
 
+function storageKeyGraph(module: string, storageKey: string): GameplayModuleGraph {
+  const outputPort = module === 'marker.anchor-cells'
+    ? 'cells'
+    : module === 'marker.anchor-exists'
+      ? 'value'
+      : module === 'turn.once-read'
+        ? 'used'
+        : 'success'
+  const outputType = module === 'marker.anchor-cells'
+    ? { kind: 'list', element: 'cell' }
+    : 'boolean'
+  const inputs = module.startsWith('turn.')
+    ? {
+        source: { kind: 'input', name: 'sourcePiece' },
+        turn: { kind: 'literal', value: 1 },
+      }
+    : module === 'marker.anchor-cells'
+      ? { source: { kind: 'input', name: 'sourcePiece' } }
+      : {
+          source: { kind: 'input', name: 'sourcePiece' },
+          cell: { kind: 'input', name: 'targetCell' },
+        }
+  const parameters = module === 'marker.anchor-place'
+    ? { storageKey, tileType: 'flying-raijin-anchor', maxAnchors: 3 }
+    : module === 'marker.anchor-remove'
+      ? { storageKey, tileType: 'flying-raijin-anchor' }
+      : { storageKey }
+  return {
+    version: GAMEPLAY_MODULE_GRAPH_VERSION,
+    surface: 'pending',
+    hostBindings: {
+      sourcePiece: 'piece',
+      ...(module === 'marker.anchor-cells' || module.startsWith('turn.')
+        ? {}
+        : { targetCell: { kind: 'nullable', value: 'cell' } }),
+    },
+    outputs: [{ name: 'result', type: outputType }],
+    body: [
+      { kind: 'call', id: 'storage', module, version: '1', inputs, parameters },
+      { kind: 'return', id: 'return', value: { kind: 'output', node: 'storage', port: outputPort } },
+    ],
+  } as GameplayModuleGraph
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
 describe('RED-252 semantic pending skill modules', () => {
+  it('closes marker and turn extension storage keys at compile time', () => {
+    const markerModules = ['marker.anchor-cells', 'marker.anchor-exists', 'marker.anchor-place', 'marker.anchor-remove']
+    const turnModules = ['turn.once-read', 'turn.once-mark']
+    for (const moduleId of markerModules) {
+      expect(() => compileGameplayModuleGraph(storageKeyGraph(moduleId, 'minatoAnchors'), GAMEPLAY_MODULE_REGISTRY)).not.toThrow()
+      for (const storageKey of ['unknownStorage', '__proto__', 'constructor']) {
+        expect(() => compileGameplayModuleGraph(storageKeyGraph(moduleId, storageKey), GAMEPLAY_MODULE_REGISTRY)).toThrow(/outside its enum/)
+      }
+    }
+    for (const moduleId of turnModules) {
+      expect(() => compileGameplayModuleGraph(storageKeyGraph(moduleId, 'turalyonLightforgedTurns'), GAMEPLAY_MODULE_REGISTRY)).not.toThrow()
+      for (const storageKey of ['unknownStorage', '__proto__', 'constructor']) {
+        expect(() => compileGameplayModuleGraph(storageKeyGraph(moduleId, storageKey), GAMEPLAY_MODULE_REGISTRY)).toThrow(/outside its enum/)
+      }
+    }
+  })
+
   it('compiles every pending graph with real continuations and no legacy wrappers', () => {
     expect(SEMANTIC_PENDING_MIGRATIONS).toHaveLength(10)
     for (const migration of SEMANTIC_PENDING_MIGRATIONS) {
@@ -91,7 +153,7 @@ describe('RED-252 semantic pending skill modules', () => {
     const turalyon = SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === 'skills/turalyon-grand-crusade')!.build()
     expect(calls(turalyon).map(statement => statement.module)).toEqual(expect.arrayContaining([
       'spatial.formation-selection-valid', 'spatial.formation-candidates', 'spatial.formation-slots',
-      'effect.displace-many', 'status.apply-record', 'rule.has-piece', 'rule.apply-piece',
+      'effect.displace-many', 'status.apply-record', 'rule.has-piece', 'rule.append-reference',
     ]))
     const minatoTrigger = SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === 'rules/rule-minato-flying-raijin-trigger')!.build()
     expect(calls(minatoTrigger).map(statement => statement.module)).toEqual(expect.arrayContaining([
@@ -101,7 +163,7 @@ describe('RED-252 semantic pending skill modules', () => {
     expect(randomLanding?.inputs?.ignore).toEqual({ kind: 'output', node: 'minato', port: 'piece' })
     const expedition = SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === 'skills/turalyon-expedition-order')!.build()
     expect(calls(expedition).map(statement => statement.module)).toEqual(expect.arrayContaining([
-      'choice.multi-string', 'choice.is-unresolved', 'choice.raw-string-value', 'card.hand-add',
+      'choice.string-options', 'choice.is-unresolved', 'choice.raw-string-value', 'card.hand-add',
     ]))
     const march = SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === 'rules/rule-turalyon-lightforged-march')!.build()
     expect(deferChoices(march).every(choice => choice.targetType?.kind === 'literal' && choice.targetType.value === (choice.id === 'piece-choice' ? 'piece' : 'grid'))).toBe(true)

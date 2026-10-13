@@ -17,6 +17,21 @@ function fixture() {
   return makeState({ pieces: [makePiece({ instanceId: 'self' }), makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 3, currentHp: 20 })] })
 }
 describe('trusted code-node runtime facade', () => {
+  it('materializes large verified templates with data bindings without changing their executable or source', () => {
+    const battle = fixture()
+    const template = { id: 'template', name: '样本', isSample: true, image: 'sample.png', code: 'x'.repeat(70000), gameplayModules: { entries: { code: { graph: {} } } } }
+    const flow = createFlowRuntime(battle, {}, 'rule', { loadCardDefinition: () => template })
+    const options = { kind: 'card' as const, templateId: 'template', cardId: 'generated', name: '生成卡', description: '说明', fields: { damageAmount: 4, trigger: { type: 'endTurn' } }, extension: { sourcePlayerId: 'player-red' }, omitFields: ['isSample', 'image'] }
+    expect(flow.content.materializeTemplate(options)).toEqual({ cardId: 'generated', success: true })
+    expect(battle.customCards?.generated).toMatchObject({ code: template.code, damageAmount: 4, extension: { sourcePlayerId: 'player-red' } })
+    expect(battle.customCards?.generated).not.toHaveProperty('image')
+    expect(template.image).toBe('sample.png')
+    const before = JSON.stringify(battle.customCards)
+    expect(() => flow.content.materializeTemplate({ ...options, fields: { code: 'bad' } })).toThrow('不可绑定')
+    expect(() => flow.content.materializeTemplate({ ...options, omitFields: ['code'] })).toThrow('展示字段')
+    expect(() => flow.content.materializeTemplate({ ...options, extension: { text: 'x'.repeat(70000) } })).toThrow('64KB')
+    expect(JSON.stringify(battle.customCards)).toBe(before)
+  })
   it('isolates loop counters from battle state and other executions', () => {
     const battle = fixture(), before = JSON.stringify(battle)
     const first = createFlowRuntime(battle, {}, 'skill', {}), second = createFlowRuntime(battle, {}, 'skill', {})
@@ -53,6 +68,20 @@ describe('trusted code-node runtime facade', () => {
     another.effects.captureSource('enemy')
     expect(() => another.effects.damageManyCaptured(handle, ['enemy'], 2, 'true')).toThrow('不属于当前执行')
     expect(battle.pieces[0].currentHp).toBe(18)
+  })
+  it('keeps the captured damage default while allowing an explicit unattributed policy', () => {
+    const battle = fixture(), skillIds: unknown[] = []
+    const flow = createFlowRuntime(battle, { skill: { id: 'captured-context' } }, 'skill', {
+      dealDamage: (_source: unknown, _target: unknown, _amount: number, _type: string, _battle: unknown, skillId?: string) => {
+        skillIds.push(skillId)
+        return { success: true, damage: 1 }
+      },
+    })
+    const handle = flow.effects.captureSource('self')
+    flow.effects.damageManyCaptured(handle, ['enemy'], 1, 'true')
+    flow.effects.damageManyCaptured(handle, ['enemy'], 1, 'true', undefined, 'unattributed')
+    flow.effects.damageManyCaptured(handle, ['enemy'], 1, 'true', '')
+    expect(skillIds).toEqual(['captured-context', undefined, ''])
   })
   it('keeps ritual bookkeeping bound to its captured execution object', () => {
     const battle = fixture(), source = battle.pieces[0], queue: any[] = []
@@ -104,6 +133,23 @@ describe('trusted code-node runtime facade', () => {
     expect(() => flow.attributes.setCurrentHp('enemy', 10)).toThrow('死亡或复活')
     expect(battle.pieces[1].currentHp).toBe(0)
   })
+  it('writes stored numeric and presentation fields with active-first resolution', () => {
+    const active = makePiece({ instanceId: 'stored-target', attack: 4 }) as any
+    const graveyard = makePiece({ instanceId: 'stored-target', attack: 9 }) as any
+    const battle = makeState({ pieces: [active] }) as any
+    battle.graveyard = [graveyard]
+    const flow = createFlowRuntime(battle, {}, 'skill', {})
+
+    expect(flow.attributes.setStored('stored-target', 'attack', 6.5)).toBe(true)
+    expect(active.attack).toBe(6.5)
+    expect(graveyard.attack).toBe(9)
+    expect(flow.attributes.setStored('stored-target', 'showFreezeEffect', true)).toBe(true)
+    expect(active.showFreezeEffect).toBe(true)
+    expect(flow.attributes.setStored('missing', 'defense', 2)).toBe(false)
+    expect(() => flow.attributes.setStored('stored-target', 'showFreezeEffect', 1 as any)).toThrow('保存属性无效')
+    expect(() => flow.attributes.setStored('stored-target', 'attack', true as any)).toThrow('保存属性无效')
+    expect(active.attack).toBe(6.5)
+  })
   it('rejects non-module templates before creating dynamic content', () => {
     const battle = fixture(), flow = createFlowRuntime(battle, {}, 'skill', { loadCardDefinition: () => ({ id: 'legacy', code: 'function executeCard(){}' }) })
     expect(() => flow.content.materializeTemplate({ kind: 'card', templateId: 'legacy', cardId: 'copy', name: '复制', description: '' })).toThrow('已验证模块图')
@@ -130,6 +176,35 @@ describe('trusted code-node runtime facade', () => {
     for (const field of ['currentDuration', 'remainingDuration', 'currentUses', 'remainingUses']) expect(() => flow.status.setNumber('self', 'one', field, 0)).toThrow('状态数值字段')
     expect(() => flow.status.setNumber('self', 'one', 'intensity', Infinity)).toThrow('状态数值字段')
     expect(battle.pieces[0].statusTags.map(tag => tag.intensity)).toEqual([2.5, 8])
+  })
+  it('keeps no-id status instance references exact across reorder and replacement', () => {
+    const battle = fixture(), flow = createFlowRuntime(battle, {}, 'rule', {})
+    const first = { type: 'momentum-core', stacks: 0, skillIds: ['skill-a'] }, second = { type: 'momentum-core', stacks: 9, skillIds: ['skill-b'] }, unrelated = { type: 'other', stacks: 4 }
+    battle.pieces[0].statusTags = [first, second, unrelated] as any
+    const handle = flow.status.findInstance('self', 'momentum-core')
+    expect(handle).toBeTypeOf('object')
+    expect(flow.status.readNumberInstance(handle, 'stacks', 7)).toBe(0)
+    expect(flow.status.hasSkillInstance(handle, 'skill-a')).toBe(true)
+    expect(flow.status.hasSkillInstance(handle, 'skill-b')).toBe(false)
+    expect(flow.status.hasSkillInstance({ ...(handle as object) }, 'skill-a')).toBe(false)
+    expect(flow.status.setNumberInstance(handle, 'stacks', 3)).toBe(true)
+    const otherFlow = createFlowRuntime(battle, {}, 'rule', {})
+    expect(otherFlow.status.readNumberInstance(handle, 'stacks', 7)).toBe(7)
+    expect(otherFlow.status.hasSkillInstance(handle, 'skill-a')).toBe(false)
+    expect(otherFlow.status.setNumberInstance(handle, 'stacks', 15)).toBe(false)
+    expect(first.stacks).toBe(3)
+    expect(second.stacks).toBe(9)
+    expect(unrelated.stacks).toBe(4)
+    expect(first).not.toHaveProperty('id')
+
+    battle.pieces[0].statusTags = [second, first, unrelated] as any
+    expect(flow.status.readNumberInstance(handle, 'stacks', 7)).toBe(3)
+    battle.pieces[0].statusTags = [second, { type: 'momentum-core', stacks: 12 }, unrelated] as any
+    expect(flow.status.readNumberInstance(handle, 'stacks', 7)).toBe(7)
+    expect(flow.status.hasSkillInstance(handle, 'skill-a')).toBe(false)
+    expect(flow.status.setNumberInstance(handle, 'stacks', 15)).toBe(false)
+    expect((battle.pieces[0].statusTags[1] as any).stacks).toBe(12)
+    expect(flow.status.readNumberInstance({ ...(handle as object) }, 'stacks', 7)).toBe(7)
   })
   it('retains explicit status origins under host input policy and validates attribute sets', () => {
     const battle = fixture(), flow = createSkillCodeFlow(battle, { piece: battle.pieces[0] }, 'skill')
@@ -194,7 +269,10 @@ describe('trusted code-node runtime facade', () => {
     expect(toPublicBattleState(battle, 'player-blue').extensions!.flowState).toEqual([])
     expect(toPublicBattleState(battle, 'player-red').extensions!.flowState).toHaveLength(1)
     const before = JSON.stringify(battle)
-    for (const invalid of [NaN, { fn() {} }, { get x() { throw Error('must not invoke') } }]) expect(() => flow.state.set('piece', 'self', 'naruto', 'meditation', invalid)).toThrow()
+    const hidden = Object.defineProperty({}, 'value', { value: 7, enumerable: false })
+    const sparse = new Array(1)
+    const extra = Object.assign([], { other: 1 })
+    for (const invalid of [NaN, sparse, extra, hidden, '😀'.repeat(20000), { fn() {} }, { get x() { throw Error('must not invoke') } }]) expect(() => flow.state.set('piece', 'self', 'naruto', 'meditation', invalid)).toThrow()
     expect(JSON.stringify(battle)).toBe(before)
     battle.pieces[0].currentHp = 0
     expect(flow.state.get('piece', 'self', 'naruto', 'meditation')).toBeUndefined()

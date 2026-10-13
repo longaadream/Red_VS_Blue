@@ -11,24 +11,25 @@
  * guesses ownership from IDs or display names.
  */
 
-import { compileGameplayModuleGraph } from './module-compiler'
+import { compileGameplayModuleGraph, compileGameplayModuleGraphV1, compileGameplayModuleGraphV2 } from './module-compiler'
+import { GAMEPLAY_MODULE_COMPILER_V1_VERSION, GAMEPLAY_MODULE_COMPILER_V2_VERSION, GAMEPLAY_MODULE_COMPILER_VERSION, GAMEPLAY_MODULE_GRAPH_VERSION } from './module-types'
 import { GAMEPLAY_MODULE_REGISTRY } from './module-registry'
 
 export const SKILL_CLUSTER_DEFINITION_VERSION = 'rvb-skill-cluster/v1' as const
 export const SKILL_CLUSTER_VERSION = SKILL_CLUSTER_DEFINITION_VERSION
 const GAMEPLAY_MODULE_DOCUMENT_VERSION = 'rvb-gameplay-module-document/v1'
-const GAMEPLAY_MODULE_GRAPH_VERSION = 'rvb-gameplay-modules/v1'
-const GAMEPLAY_MODULE_COMPILER_VERSION = 'rvb-gameplay-module-compiler/v1'
 
 type JsonRecord = Record<string, unknown>
 
-export type SkillClusterCollection = 'skills' | 'pieces'
+/** Collections that may own a Cluster root. Statuses remain owner-scoped. */
+export type SkillClusterCollection = 'skills' | 'pieces' | 'rules' | 'cards'
 export type SkillClusterMemberKind =
   | 'skill'
   | 'piece'
   | 'rule'
   | 'status'
   | 'card'
+  | 'extension'
   | 'continuation'
   | 'presentation'
 export type SkillClusterKind = 'active' | 'passive'
@@ -91,6 +92,8 @@ export type SkillClusterMembers = {
   /** Alias matching the source field vocabulary. */
   readonly statusTags: readonly SkillClusterMember[]
   readonly cards: readonly SkillClusterMember[]
+  /** Structured extension fields, scoped to the owning definition path. */
+  readonly extensions: readonly SkillClusterMember[]
   readonly continuations: readonly SkillClusterMember[]
   readonly presentations: readonly SkillClusterMember[]
   readonly all: readonly SkillClusterMember[]
@@ -184,6 +187,8 @@ export type SkillClusterBuildOptions = {
     | Readonly<Record<string, SkillClusterMappingOverride | readonly SkillClusterMappingOverride[]>>
   /** Alias for consumers that keep mappings in a keyed authoring table. */
   readonly skillRuleMappings?: Readonly<Record<string, readonly SkillClusterMappingOverride[]>>
+  /** Limit catalog enumeration for a menu while keeping single-root builds universal. */
+  readonly rootCollections?: readonly SkillClusterCollection[]
   readonly metadata?: Readonly<JsonRecord>
 }
 
@@ -193,6 +198,19 @@ export type SkillClusterCatalogResult = {
   /** Alias useful to callers that use the persisted-definition vocabulary. */
   readonly definitions: readonly SkillClusterDefinition[]
   readonly diagnostics: readonly SkillClusterDiagnostic[]
+}
+
+/**
+ * A structured member replacement sent by the Cluster editor.
+ *
+ * The marker is intentionally editor-only.  It tells the document bridge to
+ * replace the owner's extension object instead of shallow-merging it, so a
+ * field deliberately removed by the author cannot be resurrected on save.
+ */
+export const SKILL_CLUSTER_REPLACE_MEMBER = '__skillClusterReplace' as const
+export type SkillClusterMemberReplacement = {
+  readonly [SKILL_CLUSTER_REPLACE_MEMBER]: true
+  readonly value: JsonRecord
 }
 
 const own = (value: object, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key)
@@ -273,12 +291,13 @@ function asStringList(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string' && item.length > 0)
 }
 
-function memberBucket(kind: SkillClusterMemberKind): keyof Omit<SkillClusterMembers, 'all'> {
+function memberBucket(kind: SkillClusterMemberKind): keyof Omit<SkillClusterMembers, 'all' | 'statusTags'> {
   if (kind === 'skill') return 'skills'
   if (kind === 'piece') return 'pieces'
   if (kind === 'rule') return 'rules'
   if (kind === 'status') return 'statuses'
   if (kind === 'card') return 'cards'
+  if (kind === 'extension') return 'extensions'
   if (kind === 'continuation') return 'continuations'
   return 'presentations'
 }
@@ -348,6 +367,7 @@ function memberKey(kind: SkillClusterMemberKind, id: string, scope?: SkillCluste
   // use the same status ID/type with different parameters, so its owner is
   // part of the aggregation key.
   if (kind === 'status' && scope) return `${kind}:${id}:${scope.collection}:${scope.id}`
+  if (kind === 'extension' && scope) return `${kind}:${id}:${scope.collection}:${scope.id}:${scope.path}`
   return `${kind}:${id}`
 }
 
@@ -368,6 +388,13 @@ function evidenceRank(evidence: SkillClusterEvidence): number {
   if (evidence === 'inline' || evidence === 'declarative') return 3
   if (evidence === 'compatibility') return 2
   return 1
+}
+
+function linkRelationRank(relation: SkillClusterLinkRelation | undefined): number {
+  if (relation === 'owned') return 3
+  if (relation === 'shared') return 2
+  if (relation === 'related') return 1
+  return 0
 }
 
 function createMembers(): Map<string, MutableMember> {
@@ -404,7 +431,10 @@ function addMember(
       && item.path === location.path)) existing.provenance.push(location)
   }
   if (existing.role !== 'root' && input.role === 'root') existing.role = 'root'
-  if (!existing.relation && input.relation) existing.relation = input.relation
+  // A member can first be discovered through a dependency walk and later
+  // through an explicit Cluster link. Keep the strongest explicit ownership
+  // relation instead of allowing traversal order to erase it.
+  if (linkRelationRank(input.relation) > linkRelationRank(existing.relation)) existing.relation = input.relation
   const nextEvidence = evidenceRank(input.evidence) > evidenceRank(existing.evidence) ? input.evidence : existing.evidence
   const nextEditable = existing.editable || input.editable
   if (existing.definition.id !== undefined && input.definition.id !== undefined && existing.definition.id !== input.definition.id) {
@@ -493,55 +523,144 @@ function collectLegacyGraphEvidence(value: unknown, path = 'contentGraph'): Lega
 function collectSemanticGraphEvidence(value: unknown, path: string): LegacyEvidence {
   const rules: { id: string; path: string }[] = []
   const statuses: { id: string; definition: JsonRecord; path: string; relatedRules: readonly string[] }[] = []
+  type RecordEvidence = { readonly fields: JsonRecord; readonly path: string }
+  type RecordOutputs = Map<string, RecordEvidence>
+  type BodyScope = {
+    readonly records: Map<string, RecordEvidence>
+    readonly callOutputs: Map<string, RecordOutputs>
+    readonly inputs: ReadonlyMap<string, RecordEvidence>
+  }
+
   const inspectGraph = (graph: JsonRecord, graphPath: string): void => {
     const composites = new Map<string, { value: JsonRecord; path: string }>()
     if (Array.isArray(graph.composites)) graph.composites.forEach((entry, index) => {
       if (record(entry)) composites.set(`${entry.id}@${entry.version}`, { value: entry, path: `${graphPath}.composites[${index}]` })
     })
     const usedContinuations = new Set<string>()
-    const inspectBody = (body: unknown, bodyPath: string, stack = new Set<string>()): void => {
+    const resolveRecord = (value: unknown, scope: BodyScope): RecordEvidence | undefined => {
+      if (!record(value)) return undefined
+      if (value.kind === 'input' && typeof value.name === 'string') return scope.inputs.get(value.name)
+      if (value.kind !== 'output' || typeof value.node !== 'string' || typeof value.port !== 'string') return undefined
+      if (value.port === 'value') return scope.records.get(value.node) ?? scope.callOutputs.get(value.node)?.get(value.port)
+      return scope.callOutputs.get(value.node)?.get(value.port)
+    }
+    const literalFields = (value: unknown): JsonRecord => {
+      const output: JsonRecord = {}
+      if (!record(value)) return output
+      for (const [key, field] of Object.entries(value)) {
+        if (record(field) && field.kind === 'literal') output[key] = cloneJson(field.value)
+      }
+      return output
+    }
+    const inspectBody = (
+      body: unknown,
+      bodyPath: string,
+      stack = new Set<string>(),
+      inputs: ReadonlyMap<string, RecordEvidence> = new Map(),
+      outputNames: readonly string[] = [],
+    ): RecordOutputs => {
       const base = collectLegacyGraphEvidence(body, bodyPath)
       rules.push(...base.rules); statuses.push(...base.statuses)
-      const records = new Map<string, JsonRecord>()
-      const calls: Array<{ node: JsonRecord; path: string }> = []
-      const walk = (node: unknown, nodePath: string): void => {
-        if (Array.isArray(node)) { node.forEach((child, index) => walk(child, `${nodePath}[${index}]`)); return }
-        if (!record(node)) return
-        if (node.kind === 'record.create' && typeof node.id === 'string' && record(node.fields)) records.set(node.id, node.fields)
-        if (node.kind === 'call') calls.push({ node, path: nodePath })
-        if (node.kind === 'defer-choice' && typeof node.graph === 'string') usedContinuations.add(node.graph)
-        for (const [key, child] of Object.entries(node)) walk(child, `${nodePath}.${key}`)
-      }
-      walk(body, bodyPath)
-      for (const call of calls) {
-        const compositeKey = `${call.node.module}@${call.node.version}`
-        const composite = composites.get(compositeKey)
-        if (composite && !stack.has(compositeKey)) {
-          const inputs = record(call.node.inputs) ? call.node.inputs : {}
-          const bindLiterals = (value: unknown): unknown => {
-            if (Array.isArray(value)) return value.map(bindLiterals)
-            if (!record(value)) return value
-            if (value.kind === 'input' && typeof value.name === 'string') {
-              const bound = inputs[value.name]
-              if (record(bound) && bound.kind === 'literal') return cloneJson(bound)
-            }
-            return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, bindLiterals(child)]))
+      const returned: RecordOutputs = new Map()
+      const inspectStatements = (
+        list: unknown,
+        scope: BodyScope,
+        scopePath: string,
+        returnOutputs: RecordOutputs,
+      ): void => {
+        if (!Array.isArray(list)) return
+        list.forEach((entry, index) => {
+          if (!record(entry)) return
+          const nodePath = `${scopePath}[${index}]`
+          if (entry.kind === 'record.create') {
+            if (typeof entry.id === 'string' && record(entry.fields)) scope.records.set(entry.id, { fields: cloneRecord(entry.fields), path: nodePath })
+            return
           }
-          inspectBody(bindLiterals(composite.value.body), `${composite.path}.body`, new Set([...stack, compositeKey]))
-        }
-        if (!['status.apply-record', 'status.apply-player-record'].includes(String(call.node.module))) continue
-        const input = record(call.node.inputs) ? call.node.inputs.record : undefined
-        if (!record(input) || input.kind !== 'output' || input.port !== 'value' || typeof input.node !== 'string') continue
-        const fields = records.get(input.node)
-        if (!fields) continue
-        const definition: JsonRecord = {}
-        for (const [key, field] of Object.entries(fields)) if (record(field) && field.kind === 'literal') definition[key] = cloneJson(field.value)
-        const id = asString(definition.id) ?? asString(definition.type)
-        if (!id) continue
-        statuses.push({ id, definition, path: call.path, relatedRules: asStringList(definition.relatedRules) })
+          if (entry.kind === 'record.with') {
+            const source = resolveRecord(entry.record, scope)
+            if (typeof entry.id === 'string' && source) scope.records.set(entry.id, { fields: { ...cloneRecord(source.fields), ...cloneRecord(entry.fields) }, path: nodePath })
+            return
+          }
+          if (entry.kind === 'call') {
+            const compositeKey = `${entry.module}@${entry.version}`
+            const composite = composites.get(compositeKey)
+            if (composite && !stack.has(compositeKey) && typeof entry.id === 'string') {
+              const callInputs = record(entry.inputs) ? entry.inputs : {}
+              const compositeInputs = new Map<string, RecordEvidence>()
+              for (const [name, binding] of Object.entries(callInputs)) {
+                const evidence = resolveRecord(binding, scope)
+                if (evidence) compositeInputs.set(name, evidence)
+              }
+              const compositeOutputNames = Array.isArray(composite.value.outputs)
+                ? composite.value.outputs.filter(record).map(output => typeof output.name === 'string' ? output.name : '').filter(Boolean)
+                : []
+              const outputs = inspectBody(composite.value.body, `${composite.path}.body`, new Set([...stack, compositeKey]), compositeInputs, compositeOutputNames)
+              scope.callOutputs.set(entry.id, outputs)
+            }
+            if (['status.apply-record', 'status.apply-player-record'].includes(String(entry.module))) {
+              const input = record(entry.inputs) ? entry.inputs.record : undefined
+              const evidence = resolveRecord(input, scope)
+              if (evidence) {
+                const definition = literalFields(evidence.fields)
+                const id = asString(definition.id) ?? asString(definition.type)
+                if (id) statuses.push({ id, definition, path: nodePath, relatedRules: asStringList(definition.relatedRules) })
+              }
+            }
+            return
+          }
+          if (entry.kind === 'defer-choice' && typeof entry.graph === 'string') {
+            usedContinuations.add(entry.graph)
+            return
+          }
+          if (entry.kind === 'if') {
+            inspectStatements(entry.then, { records: new Map(scope.records), callOutputs: new Map(scope.callOutputs), inputs: scope.inputs }, `${nodePath}.then`, returnOutputs)
+            inspectStatements(entry.else, { records: new Map(scope.records), callOutputs: new Map(scope.callOutputs), inputs: scope.inputs }, `${nodePath}.else`, returnOutputs)
+            return
+          }
+          if (entry.kind === 'foreach') {
+            inspectStatements(entry.body, { records: new Map(scope.records), callOutputs: new Map(scope.callOutputs), inputs: scope.inputs }, `${nodePath}.body`, returnOutputs)
+            return
+          }
+          if (entry.kind === 'while') {
+            const conditionInputs = new Map<string, RecordEvidence>()
+            const condition = record(entry.condition) ? entry.condition : undefined
+            if (condition && record(condition.inputs)) for (const [name, binding] of Object.entries(condition.inputs)) {
+              const evidence = resolveRecord(binding, scope)
+              if (evidence) conditionInputs.set(name, evidence)
+            }
+            if (condition) inspectStatements(condition.body, { records: new Map(), callOutputs: new Map(), inputs: conditionInputs }, `${nodePath}.condition.body`, new Map())
+            inspectStatements(entry.body, { records: new Map(scope.records), callOutputs: new Map(scope.callOutputs), inputs: scope.inputs }, `${nodePath}.body`, returnOutputs)
+            return
+          }
+          if (entry.kind === 'collection') {
+            const collectionInputs = new Map<string, RecordEvidence>()
+            if (record(entry.inputs)) for (const [name, binding] of Object.entries(entry.inputs)) {
+              const evidence = resolveRecord(binding, scope)
+              if (evidence) collectionInputs.set(name, evidence)
+            }
+            inspectStatements(entry.body, { records: new Map(), callOutputs: new Map(), inputs: collectionInputs }, `${nodePath}.body`, new Map())
+            return
+          }
+          if (entry.kind !== 'return') return
+          if (record(entry.values)) {
+            for (const [name, value] of Object.entries(entry.values)) {
+              const evidence = resolveRecord(value, scope)
+              if (evidence && !returnOutputs.has(name)) returnOutputs.set(name, evidence)
+            }
+          } else if (entry.value !== undefined) {
+            const evidence = resolveRecord(entry.value, scope)
+            const name = outputNames.length === 1 ? outputNames[0] : 'value'
+            if (evidence && !returnOutputs.has(name)) returnOutputs.set(name, evidence)
+          }
+        })
       }
+      inspectStatements(body, { records: new Map(), callOutputs: new Map(), inputs }, bodyPath, returned)
+      return returned
     }
-    inspectBody(graph.body, `${graphPath}.body`)
+    const graphOutputNames = Array.isArray(graph.outputs)
+      ? graph.outputs.filter(record).map(output => typeof output.name === 'string' ? output.name : '').filter(Boolean)
+      : []
+    inspectBody(graph.body, `${graphPath}.body`, new Set(), new Map(), graphOutputNames)
     if (Array.isArray(graph.continuations)) graph.continuations.forEach((continuation, index) => {
       if (record(continuation) && typeof continuation.id === 'string' && (usedContinuations.has(continuation.id) || usedContinuations.has(`${continuation.id}@${continuation.version}`)) && record(continuation.graph)) inspectGraph(continuation.graph, `${graphPath}.continuations[${index}].graph`)
     })
@@ -667,23 +786,36 @@ function explicitCardValues(value: unknown, basePath: string): Array<{ id: strin
  * runtime entry for the definition.  A preview-only entry deliberately does
  * not establish semantic coverage for a skill's executable behavior.
  */
-function hasValidatedSemanticRuntime(value: JsonRecord, collection: 'skills' | 'rules'): boolean {
+function hasValidatedSemanticRuntime(value: JsonRecord, collection: 'skills' | 'rules' | 'cards'): boolean {
   const document = value.gameplayModules
   if (!record(document) || document.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION || !record(document.entries)) return false
-  const runtimeFields = (collection === 'rules' ? ['skillCode', 'code'] : ['code', 'skillCode']).filter(field => typeof value[field] === 'string' && value[field] !== '')
+  const runtimeFields = (collection === 'rules'
+    ? ['skillCode', 'code']
+    : collection === 'cards'
+      ? ['code', 'effectCode']
+      : ['code', 'skillCode'])
+    .filter(field => typeof value[field] === 'string' && value[field] !== '')
   if (!runtimeFields.length) return false
   const fields = [...runtimeFields, ...['previewCode', 'effectCode'].filter(field => typeof value[field] === 'string' && value[field] !== '')]
   for (const field of fields) {
     const entry = document.entries[field]
-    if (!record(entry) || entry.compilerVersion !== GAMEPLAY_MODULE_COMPILER_VERSION || !record(entry.graph)) return false
+    if (!record(entry) || !record(entry.graph)) return false
+    const compile = entry.compilerVersion === GAMEPLAY_MODULE_COMPILER_V1_VERSION
+      ? compileGameplayModuleGraphV1
+      : entry.compilerVersion === GAMEPLAY_MODULE_COMPILER_V2_VERSION
+        ? compileGameplayModuleGraphV2
+      : entry.compilerVersion === GAMEPLAY_MODULE_COMPILER_VERSION
+        ? compileGameplayModuleGraph
+        : undefined
+    if (!compile) return false
     const graph = entry.graph
     if (graph.version !== GAMEPLAY_MODULE_GRAPH_VERSION || !Array.isArray(graph.body)) return false
     // Unsaved drafts have not passed admission. Never advertise completeness
     // from a version label alone, stale generated source, or an unknown node.
     try {
-      const compiled = compileGameplayModuleGraph(graph, GAMEPLAY_MODULE_REGISTRY)
-      if (compiled.code !== value[field]) return false
-      if (field === 'previewCode' ? compiled.surface !== 'preview' : field === 'effectCode' ? compiled.surface !== 'pending' : collection === 'rules' ? compiled.surface !== 'rule' : !['skill', 'triggerSkill'].includes(compiled.surface)) return false
+      const compiled = compile(graph, GAMEPLAY_MODULE_REGISTRY)
+      if (compiled.compilerVersion !== entry.compilerVersion || compiled.code !== value[field]) return false
+      if (field === 'previewCode' ? compiled.surface !== 'preview' : field === 'effectCode' ? compiled.surface !== 'pending' : collection === 'rules' ? compiled.surface !== 'rule' : collection === 'cards' ? compiled.surface !== 'card' : !['skill', 'triggerSkill'].includes(compiled.surface)) return false
     } catch {
       // Invalid authoring drafts remain editable and explicitly uncovered;
       // the normal document validator reports the detailed compiler error.
@@ -714,11 +846,41 @@ function memberId(definition: JsonRecord, path: string, diagnostics: SkillCluste
   return id
 }
 
+/**
+ * Project an owner's extension as a first-class, owner-scoped member.
+ *
+ * The path points at the actual persisted field.  The member is still a
+ * reference-only author projection; it never registers a runtime extension
+ * or invents an execution hook.
+ */
+function extensionMember(
+  members: Map<string, MutableMember>,
+  diagnostics: SkillClusterDiagnostic[],
+  owner: { collection: 'skills' | 'pieces' | 'rules' | 'cards'; id: string; field: string; path: string },
+  definition: JsonRecord,
+  role: SkillClusterMemberRole,
+  evidence: SkillClusterEvidence,
+  editable: boolean,
+): void {
+  if (!record(definition.extension)) return
+  const path = `${owner.path}.extension`
+  const location = makeLocation(owner.collection, owner.id, 'extension', path)
+  addMember(members, diagnostics, {
+    kind: 'extension',
+    id: 'extension',
+    role,
+    provenance: location,
+    evidence,
+    editable: editable && evidence !== 'generated' && evidence !== 'compatibility',
+    definition: cloneRecord(definition.extension),
+  })
+}
+
 function statusMember(
   members: Map<string, MutableMember>,
   diagnostics: SkillClusterDiagnostic[],
   status: { definition: JsonRecord; path: string; evidence: SkillClusterEvidence },
-  sourceCollection: 'skills' | 'pieces' | 'rules',
+  sourceCollection: 'skills' | 'pieces' | 'rules' | 'cards',
   sourceId: string,
   sourceField: string,
   role: SkillClusterMemberRole,
@@ -735,6 +897,17 @@ function statusMember(
     editable: editable && status.evidence !== 'generated' && status.evidence !== 'compatibility',
     definition: status.definition,
   })
+  // Inline status extension data is owned by the containing declaration. Do
+  // not project generated semantic records as editable owner fields.
+  if (status.evidence !== 'generated' && status.evidence !== 'compatibility') extensionMember(
+    members,
+    diagnostics,
+    { collection: sourceCollection, id: sourceId, field: sourceField, path: status.path },
+    status.definition,
+    role,
+    status.evidence,
+    editable,
+  )
 }
 
 function mapOverrides(options: SkillClusterBuildOptions | undefined, skillId: string): SkillClusterMappingOverride[] {
@@ -797,12 +970,12 @@ function buildDefinition(
   const shape = validateCatalogShape(catalog)
   const diagnostics: SkillClusterDiagnostic[] = [...shape.diagnostics]
   const rootField = root?.field
-  if (!root || (root.collection !== 'skills' && root.collection !== 'pieces') || !asString(root.id)) {
+  if (!root || !collections.includes(root.collection as CatalogCollection) || !asString(root.id)) {
     diagnostics.push(diagnostic('invalid-root', 'Cluster root must contain collection and id'))
   }
   if (rootField !== undefined && !pathSegments(rootField)) diagnostics.push(diagnostic('unsafe-field-path', 'Cluster root field must be a safe dot path', 'root.field'))
   const normalizedRoot: SkillClusterRoot = {
-    collection: root?.collection === 'pieces' ? 'pieces' : 'skills',
+    collection: collections.includes(root?.collection as CatalogCollection) ? root.collection as SkillClusterCollection : 'skills',
     id: asString(root?.id) ?? '',
     ...(rootField !== undefined ? { field: rootField } : {}),
   }
@@ -816,8 +989,12 @@ function buildDefinition(
   }
 
   const members = createMembers()
-  const active = rootCollection === 'skills' && rootEntry?.kind === 'active'
-  const kind: SkillClusterKind = rootCollection === 'pieces' ? 'passive' : active ? 'active' : 'passive'
+  const active = rootCollection === 'skills'
+    ? rootEntry?.kind === 'active'
+    : rootCollection === 'cards'
+      ? rootEntry?.kind !== 'passive'
+      : false
+  const kind: SkillClusterKind = active ? 'active' : 'passive'
   let semanticRoot = false
   let compatibilityRoot = false
   let declarativeRoot = !!rootEntry
@@ -843,7 +1020,7 @@ function buildDefinition(
     const target = makeLocation(sourceCollection, sourceId, sourceField, `${sourceCollection}.${sourceId}`)
     const origin = makeLocation(sourceCollection, sourceId, sourceField, path)
     const provenance = target.path === origin.path ? target : [target, origin]
-    return addMember(members, diagnostics, {
+    const member = addMember(members, diagnostics, {
       kind: memberKind,
       id,
       role,
@@ -853,6 +1030,16 @@ function buildDefinition(
       ...(relation ? { relation } : {}),
       definition,
     })
+    if (memberKind !== 'extension') extensionMember(
+      members,
+      diagnostics,
+      { collection: sourceCollection, id: sourceId, field: sourceField, path: `${sourceCollection}.${sourceId}` },
+      definition,
+      role,
+      evidence,
+      editable,
+    )
+    return member
   }
 
   const addRule = (ruleId: string, source: SkillClusterReferenceLocation, role: SkillClusterMemberRole, evidence: SkillClusterEvidence, editable: boolean, relation?: SkillClusterLinkRelation): void => {
@@ -880,6 +1067,17 @@ function buildDefinition(
     for (const ref of explicitRuleValues(definition, fieldPathRoot)) {
       addRule(ref.id, makeLocation('rules', resolvedKey, 'rule', ref.path), 'dependency', 'explicit', true)
     }
+    for (const ref of explicitCardValues(definition, fieldPathRoot)) {
+      addCard(ref.id, makeLocation('rules', resolvedKey, 'rule', ref.path), 'dependency', 'explicit', true)
+    }
+    for (const { link, path } of explicitClusterLinks(definition, fieldPathRoot)) {
+      const location = makeLocation('rules', resolvedKey, 'rule', link.source ? `${path}.source:${link.source}` : path)
+      const linkedRole: SkillClusterMemberRole = link.relation === 'related' ? 'related' : 'dependency'
+      if (link.collection === 'rules') addRule(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else if (link.collection === 'skills') addSkill(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else if (link.collection === 'pieces') addPiece(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else addCard(link.id, location, linkedRole, 'explicit', true, link.relation)
+    }
     for (const status of inlineStatuses(definition, fieldPathRoot)) {
       statusMember(members, diagnostics, status, 'rules', resolvedKey, 'rule', 'dependency', true)
       const related = asStringList(status.definition.relatedRules)
@@ -903,6 +1101,59 @@ function buildDefinition(
     visited.add(keyForVisit)
     visiting.delete(keyForVisit)
     void existing
+  }
+
+  const addCard = (cardId: string, source: SkillClusterReferenceLocation, role: SkillClusterMemberRole, evidence: SkillClusterEvidence, editable: boolean, relation?: SkillClusterLinkRelation): void => {
+    const index = shape.indexes.cards
+    const key = index.byId.get(cardId)
+    const definition = key ? index.entries[key] : undefined
+    if (!definition || !key) {
+      diagnostics.push(diagnostic('missing-reference', `missing card "${cardId}"`, source.path, source, cardId))
+      return
+    }
+    const resolvedKey = key
+    diagnostics.push(...persistedClusterDiagnostics(definition.cluster, `cards:${cardId}`, `cards.${resolvedKey}.cluster`))
+    addDefinitionMember('card', cardId, role, 'cards', resolvedKey, 'card', source.path, definition, evidence, editable, relation)
+    const keyForVisit = memberKey('card', cardId)
+    if (visiting.has(keyForVisit)) {
+      diagnostics.push(diagnostic('cycle', `cycle while resolving card "${cardId}"`, source.path, source, cardId))
+      return
+    }
+    if (visited.has(keyForVisit)) return
+    visiting.add(keyForVisit)
+    const fieldPathRoot = `cards.${resolvedKey}`
+    const semantic = hasValidatedSemanticRuntime(definition, 'cards')
+    if (semantic) semanticRoot = true
+    if (typeof definition.code === 'string' || typeof definition.effectCode === 'string' || record(definition.contentGraph)) compatibilityRoot = true
+    for (const ref of explicitSkillValues(definition, fieldPathRoot)) addSkill(ref.id, makeLocation('cards', resolvedKey, 'card', ref.path), 'dependency', 'explicit', true)
+    for (const ref of explicitRuleValues(definition, fieldPathRoot)) addRule(ref.id, makeLocation('cards', resolvedKey, 'card', ref.path), 'dependency', 'explicit', true)
+    for (const ref of explicitCardValues(definition, fieldPathRoot)) addCard(ref.id, makeLocation('cards', resolvedKey, 'card', ref.path), 'dependency', 'explicit', true)
+    for (const { link, path } of explicitClusterLinks(definition, fieldPathRoot)) {
+      const location = makeLocation('cards', resolvedKey, 'card', link.source ? `${path}.source:${link.source}` : path)
+      const linkedRole: SkillClusterMemberRole = link.relation === 'related' ? 'related' : 'dependency'
+      if (link.collection === 'rules') addRule(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else if (link.collection === 'skills') addSkill(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else if (link.collection === 'pieces') addPiece(link.id, location, linkedRole, 'explicit', true, link.relation)
+      else addCard(link.id, location, linkedRole, 'explicit', true, link.relation)
+    }
+    for (const status of inlineStatuses(definition, fieldPathRoot)) statusMember(members, diagnostics, status, 'cards', resolvedKey, 'card', 'dependency', true)
+    if (semantic) {
+      const modules = collectSemanticGraphEvidence(definition.gameplayModules, `${fieldPathRoot}.gameplayModules`)
+      for (const ref of modules.rules) addRule(ref.id, makeLocation('cards', resolvedKey, 'card', ref.path), 'dependency', 'semantic', true)
+      for (const status of modules.statuses) {
+        statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: 'semantic' }, 'cards', resolvedKey, 'card', 'dependency', false)
+        status.relatedRules.forEach(id => addRule(id, makeLocation('cards', resolvedKey, 'card', status.path), 'dependency', 'semantic', true))
+      }
+    }
+    const legacy = collectLegacyGraphEvidence(definition.contentGraph, `${fieldPathRoot}.contentGraph`)
+    if (legacy.rules.length || legacy.statuses.length) compatibilityRoot = true
+    for (const ref of legacy.rules) addRule(ref.id, makeLocation('cards', resolvedKey, 'card', ref.path), 'related', 'generated', false)
+    for (const status of legacy.statuses) {
+      statusMember(members, diagnostics, { definition: status.definition, path: status.path, evidence: 'generated' }, 'cards', resolvedKey, 'card', 'related', false)
+      status.relatedRules.forEach(id => addRule(id, makeLocation('cards', resolvedKey, 'card', status.path), 'related', 'generated', false))
+    }
+    visited.add(keyForVisit)
+    visiting.delete(keyForVisit)
   }
 
   const addSkill = (skillId: string, source: SkillClusterReferenceLocation, role: SkillClusterMemberRole, evidence: SkillClusterEvidence, editable: boolean, relation?: SkillClusterLinkRelation): void => {
@@ -936,11 +1187,7 @@ function buildDefinition(
       if (link.collection === 'rules') addRule(link.id, location, role, 'explicit', true, link.relation)
       else if (link.collection === 'skills') addSkill(link.id, location, role, 'explicit', true, link.relation)
       else if (link.collection === 'pieces') addPiece(link.id, location, role, 'explicit', true, link.relation)
-      else {
-        const cardKey = shape.indexes.cards.byId.get(link.id)
-        if (!cardKey) diagnostics.push(diagnostic('missing-reference', `missing card "${link.id}"`, path, location, link.id))
-        else addDefinitionMember('card', link.id, role, 'cards', cardKey, 'card', path, shape.indexes.cards.entries[cardKey], 'explicit', true, link.relation)
-      }
+      else addCard(link.id, location, role, 'explicit', true, link.relation)
     }
     for (const status of inlineStatuses(definition, fieldPathRoot)) {
       statusMember(members, diagnostics, status, 'skills', resolvedKey, 'skill', 'dependency', true)
@@ -951,7 +1198,7 @@ function buildDefinition(
       const cardIndex = shape.indexes.cards
       const cardKey = cardIndex.byId.get(ref.id)
       if (!cardKey) diagnostics.push(diagnostic('missing-reference', `missing card "${ref.id}"`, ref.path, makeLocation('skills', resolvedKey, 'skill', ref.path), ref.id))
-      else addDefinitionMember('card', ref.id, 'dependency', 'cards', cardKey, 'card', ref.path, cardIndex.entries[cardKey], 'explicit', true)
+      else addCard(ref.id, makeLocation('skills', resolvedKey, 'skill', ref.path), 'dependency', 'explicit', true)
     }
     if (hasValidatedSemanticRuntime(definition, 'skills')) {
       const modules = collectSemanticGraphEvidence(definition.gameplayModules, `${fieldPathRoot}.gameplayModules`)
@@ -999,11 +1246,7 @@ function buildDefinition(
       if (link.collection === 'rules') addRule(link.id, location, linkedRole, 'explicit', true, link.relation)
       else if (link.collection === 'skills') addSkill(link.id, location, linkedRole, 'explicit', true, link.relation)
       else if (link.collection === 'pieces') addPiece(link.id, location, linkedRole, 'explicit', true, link.relation)
-      else {
-        const cardKey = shape.indexes.cards.byId.get(link.id)
-        if (!cardKey) diagnostics.push(diagnostic('missing-reference', `missing card "${link.id}"`, path, location, link.id))
-        else addDefinitionMember('card', link.id, linkedRole, 'cards', cardKey, 'card', path, shape.indexes.cards.entries[cardKey], 'explicit', true, link.relation)
-      }
+      else addCard(link.id, location, linkedRole, 'explicit', true, link.relation)
     }
     for (const status of inlineStatuses(definition, fieldPathRoot)) {
       statusMember(members, diagnostics, status, 'pieces', resolvedKey, 'piece', 'dependency', true)
@@ -1014,16 +1257,20 @@ function buildDefinition(
       const cardIndex = shape.indexes.cards
       const cardKey = cardIndex.byId.get(ref.id)
       if (!cardKey) diagnostics.push(diagnostic('missing-reference', `missing card "${ref.id}"`, ref.path, makeLocation('pieces', resolvedKey, 'piece', ref.path), ref.id))
-      else addDefinitionMember('card', ref.id, 'dependency', 'cards', cardKey, 'card', ref.path, cardIndex.entries[cardKey], 'explicit', true)
+      else addCard(ref.id, makeLocation('pieces', resolvedKey, 'piece', ref.path), 'dependency', 'explicit', true)
     }
     visited.add(keyForVisit)
     visiting.delete(keyForVisit)
   }
 
   if (rootEntry) {
-    const rootLocation = makeLocation(rootCollection, rootKey ?? normalizedRoot.id, rootCollection === 'skills' ? 'skill' : 'piece', rootField ? `root.${rootField}` : 'root')
-    if (rootCollection === 'skills') addSkill(normalizedRoot.id, rootLocation, 'root', hasValidatedSemanticRuntime(rootEntry, 'skills') ? 'semantic' : 'declarative', true)
-    else addPiece(normalizedRoot.id, rootLocation, 'root', 'declarative', true)
+    const rootFieldName = rootCollection === 'skills' ? 'skill' : rootCollection === 'pieces' ? 'piece' : rootCollection === 'rules' ? 'rule' : 'card'
+    const rootLocation = makeLocation(rootCollection, rootKey ?? normalizedRoot.id, rootFieldName, rootField ? `root.${rootField}` : 'root')
+    const rootSemantic = rootCollection !== 'pieces' && hasValidatedSemanticRuntime(rootEntry, rootCollection === 'skills' ? 'skills' : rootCollection === 'rules' ? 'rules' : 'cards')
+    if (rootCollection === 'skills') addSkill(normalizedRoot.id, rootLocation, 'root', rootSemantic ? 'semantic' : 'declarative', true)
+    else if (rootCollection === 'pieces') addPiece(normalizedRoot.id, rootLocation, 'root', 'declarative', true)
+    else if (rootCollection === 'rules') addRule(normalizedRoot.id, rootLocation, 'root', rootSemantic ? 'semantic' : 'declarative', true)
+    else addCard(normalizedRoot.id, rootLocation, 'root', rootSemantic ? 'semantic' : 'declarative', true)
     if (rootField) {
       const selected = readPath(rootEntry, rootField)
       if (!selected.found) diagnostics.push(diagnostic('missing-field', `missing root field "${rootField}"`, `root.field`))
@@ -1063,7 +1310,7 @@ function buildDefinition(
     execution: 'reference-only' as const,
   }))
   const buckets = {} as { -readonly [K in keyof Omit<SkillClusterMembers, 'all' | 'statusTags'>]: SkillClusterMember[] }
-  for (const bucket of ['skills', 'pieces', 'rules', 'statuses', 'cards', 'continuations', 'presentations'] as const) buckets[bucket] = allMembers.filter(item => memberBucket(item.kind) === bucket)
+  for (const bucket of ['skills', 'pieces', 'rules', 'statuses', 'cards', 'extensions', 'continuations', 'presentations'] as const) buckets[bucket] = allMembers.filter(item => memberBucket(item.kind) === bucket)
   const grouped: SkillClusterMembers = { ...buckets, statusTags: buckets.statuses, all: allMembers }
   const hasErrors = diagnostics.some(item => item.severity === 'error')
   const semantic = coverageFor(allMembers, 'semantic', semanticRoot, hasErrors)
@@ -1103,8 +1350,12 @@ export function buildSkillClusterCatalog(
 ): SkillClusterCatalogResult {
   const shape = validateCatalogShape(catalog)
   const roots: SkillClusterRoot[] = []
-  for (const id of Object.keys(shape.indexes.skills.entries)) roots.push({ collection: 'skills', id })
-  for (const id of Object.keys(shape.indexes.pieces.entries)) roots.push({ collection: 'pieces', id })
+  const selectedCollections = options?.rootCollections?.length
+    ? collections.filter(collection => options.rootCollections?.includes(collection))
+    : collections
+  for (const collection of selectedCollections) {
+    for (const id of Object.keys(shape.indexes[collection].entries)) roots.push({ collection, id })
+  }
   const clusters = roots.map(root => buildDefinition(catalog, root, options))
   const diagnostics = [...shape.diagnostics, ...clusters.flatMap(cluster => cluster.diagnostics.filter(item => item.code !== 'key-mismatch' && item.code !== 'duplicate-id' && item.code !== 'invalid-catalog'))]
   return { version: SKILL_CLUSTER_DEFINITION_VERSION, clusters, definitions: clusters, diagnostics }
@@ -1120,7 +1371,7 @@ export function validateSkillClusterDefinition(value: unknown): readonly SkillCl
   if (!record(value)) return [diagnostic('invalid-definition', 'Cluster definition must be an object')]
   if (value.version !== SKILL_CLUSTER_DEFINITION_VERSION) diagnostics.push(diagnostic('invalid-definition', 'unsupported Cluster definition version', 'version'))
   if (!asString(value.id) || !asString(value.clusterId)) diagnostics.push(diagnostic('invalid-definition', 'Cluster definition needs id and clusterId', 'id'))
-  if (!record(value.root) || (value.root.collection !== 'skills' && value.root.collection !== 'pieces') || !asString(value.root.id)) diagnostics.push(diagnostic('invalid-definition', 'Cluster definition has an invalid root', 'root'))
+  if (!record(value.root) || !collections.includes(value.root.collection as CatalogCollection) || !asString(value.root.id)) diagnostics.push(diagnostic('invalid-definition', 'Cluster definition has an invalid root', 'root'))
   else if (value.root.field !== undefined && !pathSegments(value.root.field as string)) diagnostics.push(diagnostic('unsafe-field-path', 'Cluster root field must be a safe dot path', 'root.field'))
   if (!record(value.members)) diagnostics.push(diagnostic('invalid-definition', 'Cluster definition needs members', 'members'))
   if (!record(value.coverage)) diagnostics.push(diagnostic('invalid-definition', 'Cluster definition needs coverage', 'coverage'))
@@ -1146,10 +1397,10 @@ export function assertSkillClusterMetadata(content: unknown): void {
   if (!contentId) throw new Error('Skill cluster metadata: content needs an id')
   const metadata = content.cluster
   const clusterId = record(metadata) ? asString(metadata.id) : undefined
-  const expected = clusterId && /^(skills|pieces):[^:]+$/.test(clusterId)
+  const expected = clusterId && /^(skills|pieces|rules|cards):[^:]+$/.test(clusterId)
     ? clusterId.split(':', 2)[0] as SkillClusterCollection
     : undefined
-  if (!expected || clusterId !== `${expected}:${contentId}`) throw new Error(`Skill cluster metadata: id must be skills:${contentId} or pieces:${contentId}`)
+  if (!expected || clusterId !== `${expected}:${contentId}`) throw new Error(`Skill cluster metadata: id must be skills:${contentId}, pieces:${contentId}, rules:${contentId}, or cards:${contentId}`)
   const diagnostics = persistedClusterDiagnostics(metadata, clusterId, 'cluster')
   const error = diagnostics.find(item => item.severity === 'error')
   if (error) throw new Error(`Skill cluster metadata: ${error.message}${error.path ? ` (${error.path})` : ''}`)

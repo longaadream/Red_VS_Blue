@@ -6,6 +6,9 @@ import { assertSkillGraphArtifact } from './skill-graph'
 
 const MARKER = 'rvb-content-project.json'
 const COLLECTIONS = ['pieces', 'skills', 'cards', 'rules']
+// These belong to the web shell, not the game's content assets. In particular
+// icon.svg uses responsive CSS that is intentionally forbidden in pack SVGs.
+const WEB_SHELL_ICONS = new Set(['icon.svg', 'icon-dark-32x32.png', 'icon-light-32x32.png', 'apple-icon.png'])
 
 function rejectLinks(root: string): void {
   const stat = fs.lstatSync(root)
@@ -36,6 +39,22 @@ export function assertContentProjectRoot(root: string): void {
   }
 }
 
+/** Legacy piece portraits are served from public/, alongside public/images/. */
+export function copyBundledRootImages(bundledRoot: string, projectRoot: string): void {
+  const source = path.join(bundledRoot, 'public')
+  if (!fs.existsSync(source)) return
+  if (fs.lstatSync(source).isSymbolicLink()) throw new Error('素材来源不允许符号链接')
+  const destination = path.join(projectRoot, 'images')
+  fs.mkdirSync(destination, { recursive: true })
+  if (fs.lstatSync(destination).isSymbolicLink()) throw new Error('素材目录不允许符号链接')
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (!entry.isFile() || !/\.(?:png|jpe?g|webp|svg)$/i.test(entry.name)) continue
+    if (WEB_SHELL_ICONS.has(entry.name)) continue
+    const output = path.join(destination, entry.name)
+    if (!fs.existsSync(output)) fs.copyFileSync(path.join(source, entry.name), output, fs.constants.COPYFILE_EXCL)
+  }
+}
+
 export function createContentProject(parent: string, mode: 'official' | 'blank', bundledRoot: string): string {
   if (mode !== 'official' && mode !== 'blank') throw new Error('无效的内容项目模板')
   const canonicalParent = fs.realpathSync(parent)
@@ -49,6 +68,7 @@ export function createContentProject(parent: string, mode: 'official' | 'blank',
         fs.cpSync(input, path.join(root, destination), { recursive: true, force: false, errorOnExist: true })
       }
     }
+    copyBundledRootImages(bundledRoot, root)
   }
   for (const collection of COLLECTIONS) {
     const directory = path.join(root, 'data', collection)

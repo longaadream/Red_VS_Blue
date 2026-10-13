@@ -35,7 +35,6 @@ describe('player protection semantic rules', () => {
         if (scenario === 'combat') battle.players[0].rules = [rule]
         const result = scenario === 'combat' ? dealDamage(other, holder, damage, 'true', battle, 'protection-parity') : rule.effect(battle, context)
         const plain = JSON.parse(JSON.stringify(battle))
-        for (const player of plain.players) if (player.rules) player.rules = player.rules.map((rule: any) => rule.id)
         return { result, battle: plain }
       }
       for (const damage of [0, 1, 7.5, 8, 9, 100]) for (const scenario of ['normal', 'no-status', 'ally', 'enemy', 'missing-holder', 'missing-target', 'missing-player', 'wrong-source']) {

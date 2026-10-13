@@ -11,6 +11,7 @@ import {
   buildCoverageReport,
   canonicalize,
   classifyMigration,
+  coverageAuditFailed,
   inspectPendingSourceField,
   inspectRafaamCopySource,
   inspectSourceField,
@@ -18,6 +19,8 @@ import {
   loadContentGraphArtifactValidator,
   loadRegisteredGraphProofs,
   registeredGraphProofFor,
+  hasVerifiedStaticCardWrites,
+  scanSemanticGraphDynamic,
   sha256,
 } from '../../scripts/audit-content-graph-coverage.mjs'
 
@@ -32,6 +35,26 @@ test('module coverage requires a valid registered graph and matching generated s
   assert.equal(valid.fields.code.status, 'graph-validated')
   const tampered = classifyMigration({ ...document, code: 'function executeSkill(){}' }, { validator })
   assert.equal(tampered.status, 'graph-unverified')
+})
+
+test('coverage CLI treats partial structural evidence as a failed audit while preserving explicit exceptions', () => {
+  assert.equal(coverageAuditFailed({
+    validation: { errors: [] },
+    semanticModuleCoverage: { status: 'partial', structuralComplete: false },
+  }), true)
+  assert.equal(coverageAuditFailed({
+    validation: { errors: ['catalog error'] },
+    semanticModuleCoverage: { status: 'complete', structuralComplete: true },
+  }), true)
+  assert.equal(coverageAuditFailed({
+    validation: { errors: [] },
+    semanticModuleCoverage: {
+      status: 'complete',
+      structuralComplete: true,
+      overallComplete: false,
+      nonManifestExceptions: { count: 1 },
+    },
+  }), false)
 })
 
 function dynamicByFrom(report, from) {
@@ -49,10 +72,8 @@ test('coverage inventory is deterministic and exposes the dynamic evidence exten
   assert.equal(first.baseSha, BASE_SHA)
   assert.equal(first.contentGraphVersion, CONTENT_GRAPH_VERSION)
   assert.equal(first.graphCompilerVersion, GRAPH_COMPILER_VERSION)
-  // Even a fully validated compiler-IR corpus cannot satisfy the author's
-  // stronger requirement that every feature expand to registered modules.
-  assert.equal(first.assessmentScope, 'compiler-ir-and-behavior-compatibility')
-  assert.equal(first.semanticModuleCoverage.status, 'partial')
+  assert.equal(first.assessmentScope, 'semantic-author-graph-and-dependency-structure')
+  assert.equal(first.semanticModuleCoverage.status, 'complete')
   // Every declared semantic entry must validate; compatibility IR must never
   // inflate this total. Read declarations independently so later batches do
   // not require replacing a stale milestone number.
@@ -64,7 +85,21 @@ test('coverage inventory is deterministic and exposes the dynamic evidence exten
   assert.equal(first.semanticModuleCoverage.validatedInlineFields, declaredSemanticFields.length)
   assert.ok(first.semanticModuleCoverage.fields.includes('skills/naruto-shadow-clone:code'))
   assert.ok(first.semanticModuleCoverage.fields.includes('rules/rule-naruto-clone-one-hit:skillCode'))
-  assert.equal(first.semanticModuleCoverage.complete, false)
+  assert.equal(first.semanticModuleCoverage.complete, true)
+  assert.equal(first.semanticModuleCoverage.structuralComplete, true)
+  assert.equal(first.semanticModuleCoverage.remainingReachableFields.length, 0)
+  assert.deepEqual(first.semanticModuleCoverage.generatedStructuralEvidence.missingFamilySources, [])
+  assert.deepEqual(first.semanticModuleCoverage.continuationStructuralEvidence.missingSourceFields, [])
+  assert.equal(first.semanticModuleCoverage.verificationGates.runtime.status, 'not-assessed')
+  assert.equal(first.semanticModuleCoverage.verificationGates.editor.status, 'not-assessed')
+  assert.ok(['assessed-per-field', 'not-assessed'].includes(first.semanticModuleCoverage.verificationGates.compilerArtifact.status))
+  assert.equal(typeof first.semanticModuleCoverage.overallComplete, 'boolean')
+  assert.equal(first.semanticModuleCoverage.manifestExceptions.fieldCount,
+    first.counts.manifestExceptions.ordinaryFields)
+  assert.equal(first.semanticModuleCoverage.nonManifestExceptions.count,
+    first.counts.nonManifestExceptions.unknownReferences
+      + first.counts.nonManifestExceptions.dynamicUnresolved
+      + first.counts.nonManifestExceptions.baselineMissingCandidates)
   assert.equal(first.compilerValidator.available, true)
   assert.equal(first.compilerValidator.documentAvailable, true)
   assert.ok(Array.isArray(first.generatedFamilies))
@@ -131,13 +166,30 @@ test('static reachability, unknown references, and dynamic references remain vis
     'skills/initial-draw',
     'skills/rafaam-curse-amplify',
     'skills/tails-armor-assembly',
-    'skills/turalyon-expedition-order',
     'skills/watcher-ultimate',
   ])
-  assert.equal(report.counts.dynamicResolved, 8)
+  assert.equal(report.counts.dynamicResolved, 7)
   assert.equal(report.counts.dynamicUnresolved, 0)
   assert.ok(report.dynamicReferences.every(reference => typeof reference.expression === 'string' && reference.expression.length > 0))
+  for (const source of [
+    'rules/rule-watcher-form',
+    'skills/elune-blessing',
+    'skills/initial-draw',
+    'skills/watcher-ultimate',
+  ]) {
+    assert.match(dynamicByFrom(report, source).resolution.sourceProof.authorGraphSha256, /^[a-f0-9]{64}$/)
+  }
   const dynamicBySource = new Map(report.dynamicReferences.map(reference => [reference.from, reference]))
+  // Expedition Order now uses one fixed card reference per authored branch.
+  // Verify the executable sinks remain in the closure instead of retaining
+  // the retired dynamic dispatch merely to keep the old count unchanged.
+  assert.deepEqual([...new Set(report.references.filter(reference => (
+    reference.from === 'skills/turalyon-expedition-order'
+      && reference.toGroup === 'cards'
+      && reference.evidenceKind === 'data-literal'
+      && reference.fieldPath.startsWith('gameplayModules.entries.code.graph.')
+      && reference.fieldPath.endsWith('.parameters.cardId')
+  )).map(reference => reference.toId))].sort(), ['holy-charge', 'holy-heal', 'holy-smite'])
   assert.deepEqual(dynamicBySource.get('rules/rule-watcher-form').resolution.candidateIds, ['watcher-calm', 'watcher-rage'])
   assert.deepEqual(dynamicBySource.get('skills/elune-blessing').resolution.candidateIds, ['holy-charge', 'holy-heal', 'holy-smite'])
   assert.deepEqual(dynamicBySource.get('skills/initial-draw').resolution.candidateIds, ['sample-reactive-card'])
@@ -224,6 +276,192 @@ test('dynamic proofs hash the exact legacy source that produced each candidate s
   const alteredSourceHash = sha256(`${JSON.parse(fs.readFileSync(path.join(root, 'data/skills/initial-draw.json'), 'utf8')).code}\n`)
   assert.notEqual(initial.resolution.sourceProof.sourceSha256, alteredSourceHash)
   assert.ok(report.generatedFamilies.every(family => /^[a-f0-9]{64}$/.test(family.sourceProof.sourceSha256)))
+})
+
+test('verified static card branches do not resurrect a legacy dynamic card sink', () => {
+  const definition = JSON.parse(fs.readFileSync(path.join(root, 'data/skills/turalyon-expedition-order.json'), 'utf8'))
+  const proofs = loadRegisteredGraphProofs(root)
+  const proof = registeredGraphProofFor(proofs, 'skills/turalyon-expedition-order', 'code', definition)
+  const graph = definition.gameplayModules.entries.code.graph
+  assert.equal(proof.status, 'graph-source-validated')
+  assert.equal(hasVerifiedStaticCardWrites(graph, definition.code, proof), true)
+
+  const findCall = value => {
+    if (!value || typeof value !== 'object') return null
+    if (value.kind === 'call' && value.module === 'card.hand-add') return value
+    for (const child of Object.values(value)) {
+      const found = findCall(child)
+      if (found) return found
+    }
+    return null
+  }
+  const dynamicGraph = structuredClone(graph)
+  const dynamicSink = findCall(dynamicGraph)
+  assert.ok(dynamicSink)
+  dynamicSink.module = 'card.hand-add-ref'
+  dynamicSink.inputs = {
+    ...dynamicSink.inputs,
+    cardId: { kind: 'output', node: 'selected', port: 'value' },
+  }
+  const dynamicProof = {
+    ...proof,
+    expectedGraphSha256: sha256(dynamicGraph),
+    actualGraphSha256: sha256(dynamicGraph),
+    graphMatches: true,
+  }
+  assert.equal(hasVerifiedStaticCardWrites(dynamicGraph, definition.code, dynamicProof), false)
+
+  const gainGraph = structuredClone(graph)
+  const gainSink = findCall(gainGraph)
+  assert.ok(gainSink)
+  gainSink.module = 'author.card.gain'
+  gainSink.parameters = { extensionType: 'record' }
+  gainSink.inputs = {
+    player: gainSink.inputs.player,
+    card: { kind: 'output', node: 'selected', port: 'value' },
+  }
+  const gainProof = {
+    ...proof,
+    expectedGraphSha256: sha256(gainGraph),
+    actualGraphSha256: sha256(gainGraph),
+    graphMatches: true,
+  }
+  assert.equal(hasVerifiedStaticCardWrites(gainGraph, definition.code, gainProof), false)
+
+  const codeBlockGraph = structuredClone(graph)
+  const codeBlockSink = findCall(codeBlockGraph)
+  assert.ok(codeBlockSink)
+  codeBlockSink.module = 'code-block.invoke'
+  codeBlockSink.parameters = { blockType: 'record', argsType: 'record', resultType: 'record' }
+  codeBlockSink.inputs = {
+    block: { kind: 'output', node: 'selected', port: 'value' },
+    args: { kind: 'literal', value: {} },
+  }
+  const codeBlockProof = {
+    ...proof,
+    expectedGraphSha256: sha256(codeBlockGraph),
+    actualGraphSha256: sha256(codeBlockGraph),
+    graphMatches: true,
+  }
+  assert.equal(hasVerifiedStaticCardWrites(codeBlockGraph, definition.code, codeBlockProof), false)
+
+  const tamperedDefinition = {
+    ...definition,
+    code: `${definition.code}\n// compiled source tamper`,
+  }
+  const tamperedProof = registeredGraphProofFor(
+    proofs,
+    'skills/turalyon-expedition-order',
+    'code',
+    tamperedDefinition,
+  )
+  assert.equal(tamperedProof.status, 'graph-source-unverified')
+  assert.equal(hasVerifiedStaticCardWrites(graph, tamperedDefinition.code, tamperedProof), false)
+})
+
+test('semantic Rafaam materialization closes only through its registered template and sink chain', () => {
+  const validator = loadContentGraphArtifactValidator(root)
+  const proofs = loadRegisteredGraphProofs(root)
+  const ward = JSON.parse(fs.readFileSync(path.join(root, 'data/rules/rule-rafaam-curse-ward.json'), 'utf8'))
+  const sample = JSON.parse(fs.readFileSync(path.join(root, 'data/cards/rafaam-curse-sample.json'), 'utf8'))
+  const ownerFor = definition => ({
+    group: 'rules',
+    id: definition.id,
+    nodeKey: `rules/${definition.id}`,
+    definition,
+    migration: classifyMigration(definition, { validator }),
+  })
+  const cardEntry = {
+    group: 'cards',
+    id: sample.id,
+    nodeKey: `cards/${sample.id}`,
+    scope: 'ordinary',
+    definition: sample,
+    migration: classifyMigration(sample, { validator }),
+  }
+  const stateFor = () => ({
+    catalogs: {
+      pieces: new Map(),
+      skills: new Map(),
+      rules: new Map(),
+      cards: new Map([[sample.id, cardEntry]]),
+    },
+    legacyFixture: { entries: new Map() },
+    registeredGraphProofs: proofs,
+    knownIds: new Set([sample.id]),
+    references: [],
+    referenceKeys: new Set(),
+    unknown: [],
+    unknownKeys: new Set(),
+    dynamic: [],
+    dynamicKeys: new Set(),
+    generatedFamilies: [],
+    generatedFamilyKeys: new Set(),
+    baselineMissingCandidates: [],
+    baselineMissingCandidateKeys: new Set(),
+  })
+  const scan = (definition, registeredProof) => {
+    const state = stateFor()
+    const graph = definition.gameplayModules.entries.skillCode.graph
+    scanSemanticGraphDynamic(state, ownerFor(definition), 'skillCode', definition.skillCode, graph, registeredProof)
+    return state.dynamic[0]?.resolution
+  }
+  const proof = registeredGraphProofFor(
+    proofs,
+    'rules/rule-rafaam-curse-ward',
+    'skillCode',
+    ward,
+  )
+  const resolved = scan(ward, proof)
+  assert.equal(resolved.status, 'resolved-generated-family')
+  assert.equal(resolved.sourceProof.kind, 'recognized-author-graph-curse-family')
+  assert.deepEqual(resolved.generatedFamilies.map(family => family.familyPattern), ['^rafaam-curse-[0-9]+$'])
+  assert.equal(resolved.generatedFamilies[0].generatedSourceStatus, 'graph-source-validated')
+  assert.deepEqual(resolved.generatedFamilies[0].generatedSourceProof.materializeSourcePaths, [
+    'data/cards/rafaam-curse-sample.json:code',
+  ])
+
+  const findCall = (value, predicate) => {
+    if (!value || typeof value !== 'object') return null
+    if (predicate(value)) return value
+    for (const child of Object.values(value)) {
+      const found = findCall(child, predicate)
+      if (found) return found
+    }
+    return null
+  }
+  const variant = mutate => {
+    const definition = structuredClone(ward)
+    mutate(definition.gameplayModules.entries.skillCode.graph)
+    const registeredProof = registeredGraphProofFor(
+      proofs,
+      'rules/rule-rafaam-curse-ward',
+      'skillCode',
+      definition,
+    )
+    return scan(definition, registeredProof)
+  }
+
+  const brokenChain = variant(graph => {
+    const sink = findCall(graph, call => call.kind === 'call' && call.module === 'card.hand-add-ref')
+    assert.ok(sink)
+    sink.inputs.cardId.node = 'missing-materialization'
+  })
+  assert.notEqual(brokenChain?.status, 'resolved-generated-family')
+
+  const wrongTemplate = variant(graph => {
+    const materialize = findCall(graph, call => call.kind === 'call' && call.module === 'content.materialize-template')
+    assert.ok(materialize)
+    materialize.inputs.templateId.value = 'rafaam-curse-other'
+  })
+  assert.notEqual(wrongTemplate?.status, 'resolved-generated-family')
+
+  const wrongPlayerSource = variant(graph => {
+    const materialize = findCall(graph, call => call.kind === 'call' && call.module === 'content.materialize-template')
+    assert.ok(materialize)
+    materialize.inputs.owner.node = 'owner'
+  })
+  assert.notEqual(wrongPlayerSource?.status, 'resolved-generated-family')
 })
 
 test('parity hashes and source classifications are stable', () => {
@@ -611,8 +849,9 @@ test('source proof is rooted at executable sinks and Rafaam copy proof rejects c
   }).status, 'graph-source-unverified', 'copy provenance must revalidate semantic source bytes, not trust a cached classification')
 
   const graphMetadataMutation = structuredClone(ward)
-  graphMetadataMutation.contentGraph.metadata = {
-    ...(graphMetadataMutation.contentGraph.metadata ?? {}),
+  const wardAuthorGraph = graphMetadataMutation.gameplayModules.entries.skillCode.graph
+  wardAuthorGraph.layout = {
+    ...(wardAuthorGraph.layout ?? {}),
     auditMutation: true,
   }
   const graphMetadataMigration = classifyMigration(graphMetadataMutation, { validator })

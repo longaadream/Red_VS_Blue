@@ -77,6 +77,17 @@ describe('mobile battle focus controls', () => {
     expect(h.hand.inert).toBe(false); expect(h.toggle.disabled).toBe(true)
     h.context.onCardClick('c1', 'card'); expect(h.nativeCard).toHaveBeenCalledWith('c1', 'card'); expect(h.show).not.toHaveBeenCalled()
   })
+  it('opens the hand for local skill choices and routes card taps to selection', () => {
+    const h = harness()
+    Object.assign(h.live, { getHandOptionSelection: () => ({ hand: true }) })
+    h.live.pendingSkill = 'local-hand-skill'
+    h.context.renderHand()
+    expect(h.hand.inert).toBe(false)
+    expect(h.toggle.disabled).toBe(true)
+    h.context.onCardClick('c1', 'card')
+    expect(h.nativeCard).toHaveBeenCalledWith('c1', 'card')
+    expect(h.show).not.toHaveBeenCalled()
+  })
   it('folds the hand when choosing a skill target', () => {
     const h = harness(); h.toggle.click(); h.live.pendingSkill = 'skill'; h.context.render()
     expect(h.hand.inert).toBe(true)

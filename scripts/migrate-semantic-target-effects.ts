@@ -8,7 +8,7 @@ import { applyGameplayModuleGraph, assertGameplayModuleDocument, GAMEPLAY_MODULE
 const value = (value: string | number | boolean): GameplayValue => ({ kind: 'literal', value })
 const out = (node: string, port: string): GameplayValue => ({ kind: 'output', node, port })
 const call = (id: string, module: string, inputs: Record<string, GameplayValue> = {}, parameters: Record<string, string | number | boolean> = {}): GameplayStatement => ({ kind: 'call', id, module, version: '1', inputs, parameters })
-type Recipe = { range: number; ally?: boolean; damage?: 'normal' | 'true'; spell?: boolean; amount?: number; multiplier?: boolean; fixedMultiplier?: number; previewMultiplier?: number; floor?: boolean; minimumDistance?: number; damageFallback?: boolean; heal?: number; drain?: boolean; attackBonus?: number; blockedMessage?: string; freeze?: boolean; message: readonly (string | { node: string; port: string })[] }
+type Recipe = { range: number; ally?: boolean; damage?: 'normal' | 'true'; spell?: boolean; amount?: number; multiplier?: boolean; fixedMultiplier?: number; previewMultiplier?: number; floor?: boolean; minimumDistance?: number; rewrittenTargetIgnoresMinimumDistance?: boolean; damageFallback?: boolean; heal?: number; drain?: boolean; attackBonus?: number; blockedMessage?: string; freeze?: boolean; message: readonly (string | { node: string; port: string })[] }
 const sourceName = { node: 'source-name', port: 'text' }, targetName = { node: 'target-name', port: 'text' }, damageText = { node: 'damage-text', port: 'text' }, healText = { node: 'heal-text', port: 'text' }
 export const TARGET_EFFECT_RECIPES: Readonly<Record<string, Recipe>> = {
   frostbolt: { range: 5, damage: 'normal', spell: true, multiplier: true, freeze: true, message: [sourceName, '使用了冰霜箭，对', targetName, '造成', damageText, '点伤害并使其冰冻'] },
@@ -23,7 +23,7 @@ export const TARGET_EFFECT_RECIPES: Readonly<Record<string, Recipe>> = {
   'ulquiorra-black-cero': { range: 2, damage: 'normal', spell: true, fixedMultiplier: 2, damageFallback: true, message: [sourceName, '释放黑虚闪，造成', damageText, '点魔法伤害'] },
   'ulquiorra-cero': { range: 4, damage: 'normal', spell: true, fixedMultiplier: 0.75, floor: true, damageFallback: true, message: [sourceName, '释放虚闪，造成', damageText, '点魔法伤害'] },
   'ichigo-zangetsu': { range: 1, damage: 'normal', multiplier: true, floor: true, message: [sourceName, '以斩月对', targetName, '造成', damageText, '点物理伤害'] },
-  'blackwidow-deadly-gaze': { range: 99, damage: 'normal', multiplier: true, floor: true, previewMultiplier: 2, minimumDistance: 7, message: [sourceName, '发动致命视线，对', targetName, '造成', damageText, '点伤害（距离', { node: 'distance-text', port: 'text' }, '格）'] },
+  'blackwidow-deadly-gaze': { range: 99, damage: 'normal', multiplier: true, floor: true, previewMultiplier: 2, minimumDistance: 7, rewrittenTargetIgnoresMinimumDistance: true, message: [sourceName, '发动致命视线，对', targetName, '造成', damageText, '点伤害（距离', { node: 'distance-text', port: 'text' }, '格）'] },
 }
 
 export function buildTargetEffectGraph(id: string): GameplayModuleGraph {
@@ -42,15 +42,24 @@ export function buildTargetEffectGraph(id: string): GameplayModuleGraph {
     call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
     call('target-name', 'attribute.text', { piece: out('target', 'piece') }, { attribute: 'name' }),
   ]
-  if (recipe.minimumDistance !== undefined) body.push(
-    call('distance', 'query.distance', { from: out('source', 'piece'), to: out('target', 'piece') }),
-    call('too-close', 'compare.less-than', { left: out('distance', 'distance'), right: value(recipe.minimumDistance) }),
-    { kind: 'if', id: 'distance-guard', condition: out('too-close', 'value'), then: [
-      call('invalid-distance', 'result.action', { success: value(false), message: value('目标距离太近，必须选择6格外的敌人') }),
-      { kind: 'return', id: 'return-invalid-distance', value: out('invalid-distance', 'result') },
-    ] },
-    call('distance-text', 'text.from-number', { value: out('distance', 'distance') }),
-  )
+  if (recipe.minimumDistance !== undefined) {
+    body.push(
+      call('distance', 'query.distance', { from: out('source', 'piece'), to: out('target', 'piece') }),
+      call('too-close', 'compare.less-than', { left: out('distance', 'distance'), right: value(recipe.minimumDistance) }),
+    )
+    if (recipe.rewrittenTargetIgnoresMinimumDistance) body.push(
+      call('target-rewritten', 'context.primary-target-rewritten', { target: out('target', 'piece') }),
+      call('target-not-rewritten', 'logic.not', { value: out('target-rewritten', 'value') }),
+      call('invalid-distance-condition', 'logic.and', { left: out('too-close', 'value'), right: out('target-not-rewritten', 'value') }),
+    )
+    body.push(
+      { kind: 'if', id: 'distance-guard', condition: out(recipe.rewrittenTargetIgnoresMinimumDistance ? 'invalid-distance-condition' : 'too-close', 'value'), then: [
+        call('invalid-distance', 'result.action', { success: value(false), message: value('目标距离太近，必须选择6格外的敌人') }),
+        { kind: 'return', id: 'return-invalid-distance', value: out('invalid-distance', 'result') },
+      ] },
+      call('distance-text', 'text.from-number', { value: out('distance', 'distance') }),
+    )
+  }
   if (recipe.attackBonus !== undefined) body.push(call('attack-bonus', 'attribute.adjust', { piece: out('target', 'piece'), amount: value(recipe.attackBonus) }, { attribute: 'attack' }))
   if (recipe.damage) {
     let amount: GameplayValue = value(recipe.amount ?? 0)

@@ -33,1130 +33,1310 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var __rvb_import_effect_1, affected, b, c, pos, tile; var _pc = \"n28\"; for (var _step = 0; _step <= 14; _step++) { switch (_pc) { case \"n28\": c = (context)[\"piece\"]; _pc = \"n27\"; break; case \"n27\": b = (context)[\"battle\"]; _pc = \"n26\"; break; case \"n26\": pos = selectTarget({type: \"grid\", range: 5, filter: \"all\"}); _pc = \"n25\"; break; case \"n25\": _pc = (! (! ((! pos) || (pos)[\"needsTargetSelection\"]))) ? \"n24\" : \"n23\"; break; case \"n23\": tile = (((b)[\"map\"])[\"tiles\"])[\"find\"](function (t) { return (((t)[\"x\"] === (pos)[\"x\"]) && ((t)[\"y\"] === (pos)[\"y\"])); }); _pc = \"n22\"; break; case \"n22\": _pc = (! (! ((((! tile) || (! ((tile)[\"props\"])[\"walkable\"])) || ((((tile)[\"props\"])[\"type\"] !== \"floor\") && (((tile)[\"props\"])[\"type\"] !== \"cover\"))) || ((b)[\"pieces\"])[\"some\"](function (p) { return ((((p)[\"currentHp\"] > 0) && ((p)[\"x\"] === (pos)[\"x\"])) && ((p)[\"y\"] === (pos)[\"y\"])); })))) ? \"n21\" : \"n20\"; break; case \"n20\": __rvb_import_effect_1 = flow.effects.displace([{pieceId: (c)[\"instanceId\"], x: (pos)[\"x\"], y: (pos)[\"y\"]}], \"teleport\"); _pc = \"n19\"; break; case \"n19\": _pc = (! (! (! (__rvb_import_effect_1)[\"success\"]))) ? \"n18\" : \"n17\"; break; case \"n17\": affected = 0; _pc = \"n2\"; break; case \"n2\": ((context)[\"presentationQueue\"]).push(\"statusAdded\", function () { var __rvb_import_operand_0; { var __rvb_content_graph_region_pc_0 = \"n16\"; while (__rvb_content_graph_region_pc_0 !== \"n3\") { switch (__rvb_content_graph_region_pc_0) { case \"n16\": __rvb_import_operand_0 = ((b)[\"pieces\"])[\"filter\"](function (p) { return ((((p)[\"currentHp\"] > 0) && (! arePlayersAllied(battle, (p)[\"ownerPlayerId\"], (c)[\"ownerPlayerId\"]))) && (Math.max(Math.abs(((p)[\"x\"] - (c)[\"x\"])), Math.abs(((p)[\"y\"] - (c)[\"y\"]))) <= 2)); }); __rvb_content_graph_region_pc_0 = \"n4\"; break; case \"n4\": (__rvb_import_operand_0)[\"forEach\"](function (p) { var immobilized; { var __rvb_content_graph_region_pc_1 = \"n15\"; while (__rvb_content_graph_region_pc_1 !== \"n5\") { switch (__rvb_content_graph_region_pc_1) { case \"n15\": (p)[\"statusTags\"] = ((p)[\"statusTags\"] || []); __rvb_content_graph_region_pc_1 = \"n14\"; break; case \"n14\": addStatusEffectById((p)[\"instanceId\"], {id: (\"silenced-\" + (p)[\"instanceId\"]), type: \"silenced\", name: \"沉默\", stacks: 1, currentDuration: 1, remainingDuration: 1, relatedRules: [\"rule-silenced-block\"]}); __rvb_content_graph_region_pc_1 = \"n13\"; break; case \"n13\": addRuleById((p)[\"instanceId\"], \"rule-silenced-block\"); __rvb_content_graph_region_pc_1 = \"n12\"; break; case \"n12\": immobilized = ((p)[\"statusTags\"])[\"find\"](function (t) { return ((t)[\"type\"] === \"chidori-immobile\"); }); __rvb_content_graph_region_pc_1 = \"n11\"; break; case \"n11\": __rvb_content_graph_region_pc_1 = (! (! immobilized)) ? \"n8\" : \"n10\"; break; case \"n10\": addStatusEffectById((p)[\"instanceId\"], {id: (\"immobile-\" + (p)[\"instanceId\"]), type: \"chidori-immobile\", name: \"定身\", stacks: 1, currentDuration: 1, remainingDuration: 1, relatedRules: [\"rule-chidori-immobile\"]}); __rvb_content_graph_region_pc_1 = \"n9\"; break; case \"n9\": addRuleById((p)[\"instanceId\"], \"rule-chidori-immobile\"); __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n8\": (immobilized)[\"currentDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n7\"; break; case \"n7\": (immobilized)[\"remainingDuration\"] = 1; __rvb_content_graph_region_pc_1 = \"n6\"; break; case \"n6\": affected = ((+ affected) + 1); __rvb_content_graph_region_pc_1 = \"n5\"; break; case \"n5\": __rvb_content_graph_region_pc_1 = \"n5\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); __rvb_content_graph_region_pc_0 = \"n3\"; break; case \"n3\": __rvb_content_graph_region_pc_0 = \"n3\"; break; default: throw new Error(\"invalid content graph region node\"); } } } }); _pc = \"n1\"; break; case \"n1\": return {success: true, message: ((\"混沌控制生效，\" + affected) + \"名敌人被沉默并定身1回合\")}; case \"n18\": return {success: true, message: \"位移被阻挡，本次位移效果取消\"}; case \"n21\": return {success: false, message: \"目标必须是未被占据的空地或掩体\"}; case \"n24\": return pos; default: throw new Error(\"invalid content graph node\"); } } throw new Error(\"content graph execution budget exceeded\"); }",
-  "contentGraph": {
-    "version": "rvb-content-graph/v1",
-    "surface": "skill",
-    "entry": "n28",
-    "nodes": [
-      {
-        "id": "n1",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"source\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { var _module2 = (selectTarget({type: \"grid\", range: 5, filter: \"all\"})); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"choice\", __gameplayError, \"choice.target-cell\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module3 = __gameplayInvalid; } else { var _module3 = ((!((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsTargetSelection) || Boolean(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2).needsOptionSelection))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"unresolved\", __gameplayError, \"choice.is-unresolved\"); _module3 = __gameplayInvalid; } try { var _condition5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3); if (_condition5 !== __gameplayInvalid && _condition5) { try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid)) { _module4 = __gameplayInvalid; } else { var _module4 = (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"pending\", __gameplayError, \"choice.as-result\"); _module4 = __gameplayInvalid; } try { if (!((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4) === __gameplayInvalid))) { return ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"waiting\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"choice-check\", __gameplayError); _condition5 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = (({x: (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)).x, y: (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"choice\")) ? _module2[\"choice\"] : _module2)).y})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"cell\", __gameplayError, \"choice.cell\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === undefined)) { _module7 = __gameplayInvalid; } else { var _module7 = ((function(cell) { if (!cell) return false; var tile = battle.map && Array.isArray(battle.map.tiles) ? battle.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; return Boolean(tile && tile.props && tile.props.walkable); })(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"walkable\", __gameplayError, \"spatial.cell-walkable-safe\"); _module7 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === null)) { _module8 = __gameplayInvalid; } else { var _module8 = ((function(cell){return {value:(function(){var tile=battle.map.tiles.find(function(tile){return tile.x===cell.x&&tile.y===cell.y;});return tile&&tile.props&&typeof tile.props.type===\"string\"?tile.props.type:null;})()};})(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"terrain--terrain-type\", __gameplayError, \"cell.field\"); _module8 = __gameplayInvalid; } var _loopRoot18 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection9 = __gameplayInvalid; var _items10 = JSON.parse(\"[\\\"floor\\\",\\\"cover\\\"]\"); var _capture15 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); if (Array.isArray(_items10) && _capture15 !== __gameplayInvalid && _capture15 !== undefined) { if (_items10.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection9 = null;  for (var _index11 = 0; _index11 < _items10.length; _index11 += 1) { __gameplayConsumeIteration(); var _item12 = _items10[_index11]; var _collectionResult13 = __gameplayInvalid; _collectionDone14: { try { if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_capture15 === __gameplayInvalid) || (_capture15 === undefined)) { _module16 = __gameplayInvalid; } else { var _module16 = ((_item12 === _capture15)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"terrain--terrain-equal\", __gameplayError, \"compare.values\"); _module16 = __gameplayInvalid; } try { if (!((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === __gameplayInvalid))) { _collectionResult13 = { \"value\": ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) }; break _collectionDone14; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"terrain--terrain-match-return\", __gameplayError); } } if (_collectionResult13 !== __gameplayInvalid && _collectionResult13 != null && _collectionResult13[\"value\"]) { _collection9 = _item12; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot18) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"terrain--terrain-match\", new Error(\"gameplay shared iteration budget exceeded\")); _collection9 = __gameplayInvalid; } else { __gameplayRecordFault(\"terrain--terrain-match\", __gameplayError); _collection9 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection9 === __gameplayInvalid) || (_collection9 === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module19 = __gameplayInvalid; } else { var _module19 = ((_collection9 !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"terrain\", __gameplayError, \"compare.values\"); _module19 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === undefined)) { _module20 = __gameplayInvalid; } else { var _module20 = ((function(cell, ignore) { if (!cell) return false; return !(battle.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || \"\"); }); })(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6), (function(value) { return value && typeof value === \"object\" ? value.instanceId : value; })(null))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"vacant\", __gameplayError, \"spatial.cell-unoccupied\"); _module20 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === null) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === undefined) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === null)) { _module21 = __gameplayInvalid; } else { var _module21 = ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) && ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"valid-terrain\", __gameplayError, \"logic.and\"); _module21 = __gameplayInvalid; } try { if ((((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === __gameplayInvalid) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === undefined) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === null) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === null)) { _module22 = __gameplayInvalid; } else { var _module22 = ((((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) && ((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"valid\", __gameplayError, \"logic.and\"); _module22 = __gameplayInvalid; } try { var _condition24 = ((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22); if (_condition24 !== __gameplayInvalid && _condition24) {  } else if (_condition24 !== __gameplayInvalid) { try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"目标必须是未被占据的空地或掩体\" === __gameplayInvalid) || (\"目标必须是未被占据的空地或掩体\" === null)) { _module23 = __gameplayInvalid; } else { var _module23 = (({success: false, message: \"目标必须是未被占据的空地或掩体\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"invalid\", __gameplayError, \"result.action\"); _module23 = __gameplayInvalid; } try { if (!((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"result\")) ? _module23[\"result\"] : _module23) === __gameplayInvalid))) { return ((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"result\")) ? _module23[\"result\"] : _module23); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"invalid-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"valid-check\", __gameplayError); _condition24 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6) === null)) { _module25 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module25 = ((function(pieceId,cell){var value=flow.effects.displace([{pieceId:pieceId,x:cell.x,y:cell.y}],\"teleport\");return {result:value,success:Boolean(value&&value.success)};})((function(value) { return value && typeof value === \"object\" ? value.instanceId : value; })(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)),((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cell\")) ? _module6[\"cell\"] : _module6))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"move\", __gameplayError, \"effect.displace-one\"); _module25 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { var _condition27 = (_module25[\"success\"]); if (_condition27 !== __gameplayInvalid && _condition27) {  } else if (_condition27 !== __gameplayInvalid) { try { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (\"位移被阻挡，本次位移效果取消\" === __gameplayInvalid) || (\"位移被阻挡，本次位移效果取消\" === null)) { _module26 = __gameplayInvalid; } else { var _module26 = (({success: true, message: \"位移被阻挡，本次位移效果取消\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"blocked\", __gameplayError, \"result.action\"); _module26 = __gameplayInvalid; } try { if (!((((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26) === __gameplayInvalid))) { return ((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"blocked-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"move-check\", __gameplayError); _condition27 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module28 = __gameplayInvalid; } else { var _module28 = (flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)) && {x: flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).x, y: flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).y}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"center\", __gameplayError, \"spatial.piece-position\"); _module28 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module29 = __gameplayInvalid; } else { var _module29 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner\", __gameplayError, \"piece.field\"); _module29 = __gameplayInvalid; } try { if ((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"cell\")) ? _module28[\"cell\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"cell\")) ? _module28[\"cell\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"cell\")) ? _module28[\"cell\"] : _module28) === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29)))) { _module30 = __gameplayInvalid; } else { var _module30 = (flow.query.pieces({ownerId: ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29), relation: \"enemy\"}).filter(function(id) { var p = flow.query.piece(id), dx = Math.abs(p.x - ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"cell\")) ? _module28[\"cell\"] : _module28).x), dy = Math.abs(p.y - ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"cell\")) ? _module28[\"cell\"] : _module28).y), distance = Math.max(dx, dy); return distance >= 0 && distance <= 2; })); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"targets\", __gameplayError, \"query.pieces-around-cell\"); _module30 = __gameplayInvalid; } context.presentationQueue.push(\"statusAdded\", function() { var _loopRoot102 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _items32 = ((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"pieces\")) ? _module30[\"pieces\"] : _module30); if (_items32 !== __gameplayInvalid && _items32 != null) { if (!Array.isArray(_items32)) { throw new Error(\"gameplay foreach items must be an array\"); } if (_items32.length > 10000) { throw new Error(\"gameplay foreach iteration budget exceeded\"); } for (var _index31 = 0; _index31 < _items32.length; _index31 += 1) { __gameplayConsumeIteration(); var _item33 = _items32[_index31]; try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33))) { _module34 = __gameplayInvalid; } else { var _module34 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(_item33)[\"instanceId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-id\", __gameplayError, \"piece.field\"); _module34 = __gameplayInvalid; } try { if ((\"silenced-\" === __gameplayInvalid) || (\"silenced-\" === undefined) || (\"silenced-\" === null) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === undefined) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = ((\"silenced-\" + ((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"silenced-id\", __gameplayError, \"text.concat\"); _module35 = __gameplayInvalid; } try { var _record36 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"id\"] = __gameplayRecordValue0; __gameplayRecord[\"type\"] = __gameplayRecordValue1; __gameplayRecord[\"name\"] = __gameplayRecordValue2; __gameplayRecord[\"stacks\"] = __gameplayRecordValue3; __gameplayRecord[\"currentDuration\"] = __gameplayRecordValue4; __gameplayRecord[\"remainingDuration\"] = __gameplayRecordValue5; __gameplayRecord[\"relatedRules\"] = __gameplayRecordValue6; return __gameplayRecord; })(((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35), \"silenced\", \"沉默\", 1, 1, 1, JSON.parse(\"[\\\"rule-silenced-block\\\"]\"))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"silenced-record\", __gameplayError); _record36 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33)) || (_record36 === __gameplayInvalid) || (_record36 === undefined) || (_record36 === null)) { _module37 = __gameplayInvalid; } else { var _module37 = (flow.status.add(_item33, _record36, \"piece\", \"host\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"silenced-apply\", __gameplayError, \"status.apply-record\"); _module37 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33))) { _module38 = __gameplayInvalid; } else { var _module38 = (flow.rules.add(_item33, \"rule-silenced-block\", \"piece\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"silenced-rule\", __gameplayError, \"rule.apply-piece\"); _module38 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33))) { _module39 = __gameplayInvalid; } else { var _module39 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(_item33)[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"existing--status-tags\", __gameplayError, \"piece.field\"); _module39 = __gameplayInvalid; } var _loopRoot49 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection40 = __gameplayInvalid; var _items41 = ((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39); if (Array.isArray(_items41)) { if (_items41.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection40 = null;  for (var _index42 = 0; _index42 < _items41.length; _index42 += 1) { __gameplayConsumeIteration(); var _item43 = _items41[_index42]; var _collectionResult44 = __gameplayInvalid; _collectionDone45: { try { if ((_item43 === __gameplayInvalid) || (_item43 === undefined)) { _module46 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module46 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"type\");var value=(function(record){var value=record[\"type\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_item43)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"existing--tag-type\", __gameplayError, \"data.optional-field\"); _module46 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module46[\"value\"]) === __gameplayInvalid) || ((_module46[\"value\"]) === undefined) || (\"chidori-immobile\" === __gameplayInvalid) || (\"chidori-immobile\" === undefined)) { _module47 = __gameplayInvalid; } else { var _module47 = (((_module46[\"value\"]) === \"chidori-immobile\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"existing--type-match\", __gameplayError, \"compare.values\"); _module47 = __gameplayInvalid; } try { if (!((((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"value\")) ? _module47[\"value\"] : _module47) === __gameplayInvalid))) { _collectionResult44 = { \"value\": ((_module47 !== null && typeof _module47 === \"object\" && Object.prototype.hasOwnProperty.call(_module47, \"value\")) ? _module47[\"value\"] : _module47) }; break _collectionDone45; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"existing--find-return\", __gameplayError); } } if (_collectionResult44 !== __gameplayInvalid && _collectionResult44 != null && _collectionResult44[\"value\"]) { _collection40 = _item43; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot49) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"existing--status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection40 = __gameplayInvalid; } else { __gameplayRecordFault(\"existing--status\", __gameplayError); _collection40 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection40 === __gameplayInvalid) || (_collection40 === undefined)) { _module50 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module50 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"id\");var value=(function(record){var value=record[\"id\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_collection40)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"existing\", __gameplayError, \"data.optional-field\"); _module50 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33))) { _module51 = __gameplayInvalid; } else { var _module51 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(_item33)[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--statusTags\", __gameplayError, \"piece.field\"); _module51 = __gameplayInvalid; } var _loopRoot64 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection52 = __gameplayInvalid; var _items53 = ((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"value\")) ? _module51[\"value\"] : _module51); var _capture58 = (_module50[\"value\"]); if (Array.isArray(_items53) && _capture58 !== __gameplayInvalid && _capture58 !== undefined) { if (_items53.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues63 = [];  for (var _index54 = 0; _index54 < _items53.length; _index54 += 1) { __gameplayConsumeIteration(); var _item55 = _items53[_index54]; var _collectionResult56 = __gameplayInvalid; _collectionDone57: { try { if ((_item55 === __gameplayInvalid) || (_item55 === undefined) || (_item55 === null)) { _module59 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module59 = ((function(record){var result=({value:((function(record){if(record===__gameplayInvalid||record===null||typeof record!==\"object\")return __gameplayInvalid;var value=record[\"id\"];return value===undefined||value===null?null:(typeof value===\"string\"?value:__gameplayInvalid);})(record))});result.exists=record[\"id\"]!==undefined&&record[\"id\"]!==null;return result;})(_item55)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--field\", __gameplayError, \"data.field\"); _module59 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module59[\"value\"]) === __gameplayInvalid) || ((_module59[\"value\"]) === undefined) || (_capture58 === __gameplayInvalid) || (_capture58 === undefined)) { _module60 = __gameplayInvalid; } else { var _module60 = (((_module59[\"value\"]) === _capture58)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--matches\", __gameplayError, \"compare.values\"); _module60 = __gameplayInvalid; } try { if (((_module59[\"value\"]) === __gameplayInvalid) || ((_module59[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module61 = __gameplayInvalid; } else { var _module61 = (((_module59[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--present\", __gameplayError, \"compare.values\"); _module61 = __gameplayInvalid; } try { if ((((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"value\")) ? _module61[\"value\"] : _module61) === __gameplayInvalid) || (((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"value\")) ? _module61[\"value\"] : _module61) === undefined) || (((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"value\")) ? _module61[\"value\"] : _module61) === null) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"value\")) ? _module60[\"value\"] : _module60) === __gameplayInvalid) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"value\")) ? _module60[\"value\"] : _module60) === undefined) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"value\")) ? _module60[\"value\"] : _module60) === null)) { _module62 = __gameplayInvalid; } else { var _module62 = ((((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"value\")) ? _module61[\"value\"] : _module61) && ((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"value\")) ? _module60[\"value\"] : _module60))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--has-id\", __gameplayError, \"logic.and\"); _module62 = __gameplayInvalid; } try { if (!((((_module62 !== null && typeof _module62 === \"object\" && Object.prototype.hasOwnProperty.call(_module62, \"value\")) ? _module62[\"value\"] : _module62) === __gameplayInvalid))) { _collectionResult56 = { \"value\": ((_module62 !== null && typeof _module62 === \"object\" && Object.prototype.hasOwnProperty.call(_module62, \"value\")) ? _module62[\"value\"] : _module62) }; break _collectionDone57; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--filter-return\", __gameplayError); } } if (_collectionResult56 !== __gameplayInvalid && _collectionResult56 != null && _collectionResult56[\"value\"]) { _collectionValues63.push(_item55); } } var _collection52 = _collectionValues63; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot64) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"has-existing--filtered\", new Error(\"gameplay shared iteration budget exceeded\")); _collection52 = __gameplayInvalid; } else { __gameplayRecordFault(\"has-existing--filtered\", __gameplayError); _collection52 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection52 === __gameplayInvalid) || (_collection52 === undefined) || (_collection52 === null)) { _module65 = __gameplayInvalid; } else { var _module65 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection52)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing--count\", __gameplayError, \"collection.length\"); _module65 = __gameplayInvalid; } try { if ((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) === __gameplayInvalid) || (((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) === undefined) || (((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module66 = __gameplayInvalid; } else { var _module66 = ((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-existing\", __gameplayError, \"compare.greater-than\"); _module66 = __gameplayInvalid; } try { var _condition101 = ((_module66 !== null && typeof _module66 === \"object\" && Object.prototype.hasOwnProperty.call(_module66, \"value\")) ? _module66[\"value\"] : _module66); if (_condition101 !== __gameplayInvalid && _condition101) { try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && (typeof flow === \"undefined\" || flow === null || !flow.query || typeof flow.query.hasPiece !== \"function\" || typeof flow.query.piece !== \"function\" || !flow.query.hasPiece(_item33) || !flow.query.piece(_item33) || !(flow.query.piece(_item33).currentHp > 0)))) { _module67 = { \"statuses\": __gameplayInvalid, \"present\": __gameplayInvalid }; } else { var _module67 = (flow.status.instances(_item33)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-instances\", __gameplayError, \"status.instances\"); _module67 = { \"statuses\": __gameplayInvalid, \"present\": __gameplayInvalid }; } var _loopRoot80 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection68 = __gameplayInvalid; var _items69 = (_module67[\"statuses\"]); var _capture74 = (_module50[\"value\"]); if (Array.isArray(_items69) && _capture74 !== __gameplayInvalid && _capture74 !== undefined) { if (_items69.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection68 = null;  for (var _index70 = 0; _index70 < _items69.length; _index70 += 1) { __gameplayConsumeIteration(); var _item71 = _items69[_index70]; var _collectionResult72 = __gameplayInvalid; _collectionDone73: { try { if ((_item71 === __gameplayInvalid) || (_item71 === undefined) || (_item71 === null)) { _module75 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module75 = ((function(handle,field){var record=flow.status.fields(handle),value=record[field];return {value:value===undefined?null:value,defined:value!==undefined};})(_item71,\"id\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-id\", __gameplayError, \"status.instance-field\"); _module75 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module75[\"defined\"]) === __gameplayInvalid) || ((_module75[\"defined\"]) === undefined) || ((_module75[\"defined\"]) === null) || (true === __gameplayInvalid) || (true === undefined) || (true === null)) { _module76 = __gameplayInvalid; } else { var _module76 = (((_module75[\"defined\"]) === true)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-id-defined\", __gameplayError, \"compare.values\"); _module76 = __gameplayInvalid; } try { if (((_module75[\"value\"]) === __gameplayInvalid) || ((_module75[\"value\"]) === undefined) || (_capture74 === __gameplayInvalid) || (_capture74 === undefined)) { _module77 = __gameplayInvalid; } else { var _module77 = (((_module75[\"value\"]) === _capture74)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-id-matches\", __gameplayError, \"compare.values\"); _module77 = __gameplayInvalid; } try { if ((((_module76 !== null && typeof _module76 === \"object\" && Object.prototype.hasOwnProperty.call(_module76, \"value\")) ? _module76[\"value\"] : _module76) === __gameplayInvalid) || (((_module76 !== null && typeof _module76 === \"object\" && Object.prototype.hasOwnProperty.call(_module76, \"value\")) ? _module76[\"value\"] : _module76) === undefined) || (((_module76 !== null && typeof _module76 === \"object\" && Object.prototype.hasOwnProperty.call(_module76, \"value\")) ? _module76[\"value\"] : _module76) === null) || (((_module77 !== null && typeof _module77 === \"object\" && Object.prototype.hasOwnProperty.call(_module77, \"value\")) ? _module77[\"value\"] : _module77) === __gameplayInvalid) || (((_module77 !== null && typeof _module77 === \"object\" && Object.prototype.hasOwnProperty.call(_module77, \"value\")) ? _module77[\"value\"] : _module77) === undefined) || (((_module77 !== null && typeof _module77 === \"object\" && Object.prototype.hasOwnProperty.call(_module77, \"value\")) ? _module77[\"value\"] : _module77) === null)) { _module78 = __gameplayInvalid; } else { var _module78 = ((((_module76 !== null && typeof _module76 === \"object\" && Object.prototype.hasOwnProperty.call(_module76, \"value\")) ? _module76[\"value\"] : _module76) && ((_module77 !== null && typeof _module77 === \"object\" && Object.prototype.hasOwnProperty.call(_module77, \"value\")) ? _module77[\"value\"] : _module77))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-id-match\", __gameplayError, \"logic.and\"); _module78 = __gameplayInvalid; } try { if (!((((_module78 !== null && typeof _module78 === \"object\" && Object.prototype.hasOwnProperty.call(_module78, \"value\")) ? _module78[\"value\"] : _module78) === __gameplayInvalid))) { _collectionResult72 = { \"value\": ((_module78 !== null && typeof _module78 === \"object\" && Object.prototype.hasOwnProperty.call(_module78, \"value\")) ? _module78[\"value\"] : _module78) }; break _collectionDone73; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--status-match-return\", __gameplayError); } } if (_collectionResult72 !== __gameplayInvalid && _collectionResult72 != null && _collectionResult72[\"value\"]) { _collection68 = _item71; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot80) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"duration--selected-status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection68 = __gameplayInvalid; } else { __gameplayRecordFault(\"duration--selected-status\", __gameplayError); _collection68 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection68 === __gameplayInvalid) || (_collection68 === undefined) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module81 = __gameplayInvalid; } else { var _module81 = (flow.status.writeField(_collection68, \"currentDuration\", 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"duration--write-status-field\", __gameplayError, \"status.write-field\"); _module81 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && (typeof flow === \"undefined\" || flow === null || !flow.query || typeof flow.query.hasPiece !== \"function\" || typeof flow.query.piece !== \"function\" || !flow.query.hasPiece(_item33) || !flow.query.piece(_item33) || !(flow.query.piece(_item33).currentHp > 0)))) { _module82 = { \"statuses\": __gameplayInvalid, \"present\": __gameplayInvalid }; } else { var _module82 = (flow.status.instances(_item33)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-instances\", __gameplayError, \"status.instances\"); _module82 = { \"statuses\": __gameplayInvalid, \"present\": __gameplayInvalid }; } var _loopRoot95 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection83 = __gameplayInvalid; var _items84 = (_module82[\"statuses\"]); var _capture89 = (_module50[\"value\"]); if (Array.isArray(_items84) && _capture89 !== __gameplayInvalid && _capture89 !== undefined) { if (_items84.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection83 = null;  for (var _index85 = 0; _index85 < _items84.length; _index85 += 1) { __gameplayConsumeIteration(); var _item86 = _items84[_index85]; var _collectionResult87 = __gameplayInvalid; _collectionDone88: { try { if ((_item86 === __gameplayInvalid) || (_item86 === undefined) || (_item86 === null)) { _module90 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module90 = ((function(handle,field){var record=flow.status.fields(handle),value=record[field];return {value:value===undefined?null:value,defined:value!==undefined};})(_item86,\"id\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-id\", __gameplayError, \"status.instance-field\"); _module90 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module90[\"defined\"]) === __gameplayInvalid) || ((_module90[\"defined\"]) === undefined) || ((_module90[\"defined\"]) === null) || (true === __gameplayInvalid) || (true === undefined) || (true === null)) { _module91 = __gameplayInvalid; } else { var _module91 = (((_module90[\"defined\"]) === true)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-id-defined\", __gameplayError, \"compare.values\"); _module91 = __gameplayInvalid; } try { if (((_module90[\"value\"]) === __gameplayInvalid) || ((_module90[\"value\"]) === undefined) || (_capture89 === __gameplayInvalid) || (_capture89 === undefined)) { _module92 = __gameplayInvalid; } else { var _module92 = (((_module90[\"value\"]) === _capture89)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-id-matches\", __gameplayError, \"compare.values\"); _module92 = __gameplayInvalid; } try { if ((((_module91 !== null && typeof _module91 === \"object\" && Object.prototype.hasOwnProperty.call(_module91, \"value\")) ? _module91[\"value\"] : _module91) === __gameplayInvalid) || (((_module91 !== null && typeof _module91 === \"object\" && Object.prototype.hasOwnProperty.call(_module91, \"value\")) ? _module91[\"value\"] : _module91) === undefined) || (((_module91 !== null && typeof _module91 === \"object\" && Object.prototype.hasOwnProperty.call(_module91, \"value\")) ? _module91[\"value\"] : _module91) === null) || (((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === __gameplayInvalid) || (((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === undefined) || (((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === null)) { _module93 = __gameplayInvalid; } else { var _module93 = ((((_module91 !== null && typeof _module91 === \"object\" && Object.prototype.hasOwnProperty.call(_module91, \"value\")) ? _module91[\"value\"] : _module91) && ((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-id-match\", __gameplayError, \"logic.and\"); _module93 = __gameplayInvalid; } try { if (!((((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"value\")) ? _module93[\"value\"] : _module93) === __gameplayInvalid))) { _collectionResult87 = { \"value\": ((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"value\")) ? _module93[\"value\"] : _module93) }; break _collectionDone88; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--status-match-return\", __gameplayError); } } if (_collectionResult87 !== __gameplayInvalid && _collectionResult87 != null && _collectionResult87[\"value\"]) { _collection83 = _item86; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot95) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"remaining--selected-status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection83 = __gameplayInvalid; } else { __gameplayRecordFault(\"remaining--selected-status\", __gameplayError); _collection83 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection83 === __gameplayInvalid) || (_collection83 === undefined) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module96 = __gameplayInvalid; } else { var _module96 = (flow.status.writeField(_collection83, \"remainingDuration\", 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remaining--write-status-field\", __gameplayError, \"status.write-field\"); _module96 = __gameplayInvalid; } } else if (_condition101 !== __gameplayInvalid) { try { if ((\"immobile-\" === __gameplayInvalid) || (\"immobile-\" === undefined) || (\"immobile-\" === null) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === undefined) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === null)) { _module97 = __gameplayInvalid; } else { var _module97 = ((\"immobile-\" + ((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"immobile-id\", __gameplayError, \"text.concat\"); _module97 = __gameplayInvalid; } try { var _record98 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"id\"] = __gameplayRecordValue0; __gameplayRecord[\"type\"] = __gameplayRecordValue1; __gameplayRecord[\"name\"] = __gameplayRecordValue2; __gameplayRecord[\"stacks\"] = __gameplayRecordValue3; __gameplayRecord[\"currentDuration\"] = __gameplayRecordValue4; __gameplayRecord[\"remainingDuration\"] = __gameplayRecordValue5; __gameplayRecord[\"relatedRules\"] = __gameplayRecordValue6; return __gameplayRecord; })(((_module97 !== null && typeof _module97 === \"object\" && Object.prototype.hasOwnProperty.call(_module97, \"text\")) ? _module97[\"text\"] : _module97), \"chidori-immobile\", \"定身\", 1, 1, 1, JSON.parse(\"[\\\"rule-chidori-immobile\\\"]\"))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"immobile-record\", __gameplayError); _record98 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33)) || (_record98 === __gameplayInvalid) || (_record98 === undefined) || (_record98 === null)) { _module99 = __gameplayInvalid; } else { var _module99 = (flow.status.add(_item33, _record98, \"piece\", \"host\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"immobile-apply\", __gameplayError, \"status.apply-record\"); _module99 = __gameplayInvalid; } try { if ((_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null) || (_item33 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(_item33))) { _module100 = __gameplayInvalid; } else { var _module100 = (flow.rules.add(_item33, \"rule-chidori-immobile\", \"piece\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"immobile-rule\", __gameplayError, \"rule.apply-piece\"); _module100 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"refresh-or-apply\", __gameplayError); _condition101 = __gameplayInvalid; } } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot102) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"each\", new Error(\"gameplay shared iteration budget exceeded\")); _item33 = __gameplayInvalid; _index31 = __gameplayInvalid; } else { __gameplayRecordFault(\"each\", __gameplayError); _item33 = __gameplayInvalid; _index31 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } }); try { if ((((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"pieces\")) ? _module30[\"pieces\"] : _module30) === __gameplayInvalid) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"pieces\")) ? _module30[\"pieces\"] : _module30) === undefined) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"pieces\")) ? _module30[\"pieces\"] : _module30) === null)) { _module103 = __gameplayInvalid; } else { var _module103 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"pieces\")) ? _module30[\"pieces\"] : _module30))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count\", __gameplayError, \"collection.length\"); _module103 = __gameplayInvalid; } try { if ((((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"value\")) ? _module103[\"value\"] : _module103) === __gameplayInvalid) || (((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"value\")) ? _module103[\"value\"] : _module103) === undefined) || (((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"value\")) ? _module103[\"value\"] : _module103) === null)) { _module104 = __gameplayInvalid; } else { var _module104 = (String(((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"value\")) ? _module103[\"value\"] : _module103))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-text\", __gameplayError, \"text.from-value\"); _module104 = __gameplayInvalid; } try { if ((\"混沌控制生效，\" === __gameplayInvalid) || (\"混沌控制生效，\" === undefined) || (\"混沌控制生效，\" === null) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"text\")) ? _module104[\"text\"] : _module104) === __gameplayInvalid) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"text\")) ? _module104[\"text\"] : _module104) === undefined) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"text\")) ? _module104[\"text\"] : _module104) === null)) { _module105 = __gameplayInvalid; } else { var _module105 = ((\"混沌控制生效，\" + ((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"text\")) ? _module104[\"text\"] : _module104))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-start\", __gameplayError, \"text.concat\"); _module105 = __gameplayInvalid; } try { if ((((_module105 !== null && typeof _module105 === \"object\" && Object.prototype.hasOwnProperty.call(_module105, \"text\")) ? _module105[\"text\"] : _module105) === __gameplayInvalid) || (((_module105 !== null && typeof _module105 === \"object\" && Object.prototype.hasOwnProperty.call(_module105, \"text\")) ? _module105[\"text\"] : _module105) === undefined) || (((_module105 !== null && typeof _module105 === \"object\" && Object.prototype.hasOwnProperty.call(_module105, \"text\")) ? _module105[\"text\"] : _module105) === null) || (\"名敌人被沉默并定身1回合\" === __gameplayInvalid) || (\"名敌人被沉默并定身1回合\" === undefined) || (\"名敌人被沉默并定身1回合\" === null)) { _module106 = __gameplayInvalid; } else { var _module106 = ((((_module105 !== null && typeof _module105 === \"object\" && Object.prototype.hasOwnProperty.call(_module105, \"text\")) ? _module105[\"text\"] : _module105) + \"名敌人被沉默并定身1回合\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message\", __gameplayError, \"text.concat\"); _module106 = __gameplayInvalid; } try { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module106 !== null && typeof _module106 === \"object\" && Object.prototype.hasOwnProperty.call(_module106, \"text\")) ? _module106[\"text\"] : _module106) === __gameplayInvalid) || (((_module106 !== null && typeof _module106 === \"object\" && Object.prototype.hasOwnProperty.call(_module106, \"text\")) ? _module106[\"text\"] : _module106) === null)) { _module107 = __gameplayInvalid; } else { var _module107 = (({success: true, message: ((_module106 !== null && typeof _module106 === \"object\" && Object.prototype.hasOwnProperty.call(_module106, \"text\")) ? _module106[\"text\"] : _module106)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"done\", __gameplayError, \"result.action\"); _module107 = __gameplayInvalid; } try { if (!((((_module107 !== null && typeof _module107 === \"object\" && Object.prototype.hasOwnProperty.call(_module107, \"result\")) ? _module107[\"result\"] : _module107) === __gameplayInvalid))) { return ((_module107 !== null && typeof _module107 === \"object\" && Object.prototype.hasOwnProperty.call(_module107, \"result\")) ? _module107[\"result\"] : _module107); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"done-return\", __gameplayError); } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:shadow-chaos-control",
+    "links": []
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
             {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "schemas": [
+            {
+              "id": "control-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "remainingDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  }
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "choice",
+              "module": "choice.target-cell",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "range": 5,
+                "filter": "all"
               }
             },
             {
-              "key": "message",
-              "value": {
-                "kind": "binary",
-                "op": "+",
-                "left": {
-                  "kind": "binary",
-                  "op": "+",
-                  "left": {
-                    "kind": "literal",
-                    "value": "混沌控制生效，"
+              "kind": "call",
+              "id": "unresolved",
+              "module": "choice.is-unresolved",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "choice-check",
+              "condition": {
+                "kind": "output",
+                "node": "unresolved",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "pending",
+                  "module": "choice.as-result",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "choice",
+                      "port": "choice"
+                    }
                   },
-                  "right": {
-                    "kind": "ref",
-                    "name": "affected"
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "waiting",
+                  "value": {
+                    "kind": "output",
+                    "node": "pending",
+                    "port": "result"
                   }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "cell",
+              "module": "choice.cell",
+              "version": "1",
+              "inputs": {
+                "choice": {
+                  "kind": "output",
+                  "node": "choice",
+                  "port": "choice"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "walkable",
+              "module": "spatial.cell-walkable-safe",
+              "version": "1",
+              "inputs": {
+                "cell": {
+                  "kind": "output",
+                  "node": "cell",
+                  "port": "cell"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "terrain--terrain-type",
+              "module": "cell.field",
+              "version": "1",
+              "inputs": {
+                "cell": {
+                  "kind": "output",
+                  "node": "cell",
+                  "port": "cell"
+                }
+              },
+              "parameters": {
+                "field": "terrainType"
+              }
+            },
+            {
+              "kind": "collection",
+              "id": "terrain--terrain-match",
+              "method": "find",
+              "items": {
+                "kind": "literal",
+                "value": [
+                  "floor",
+                  "cover"
+                ]
+              },
+              "item": "item",
+              "inputs": {
+                "terrain": {
+                  "kind": "output",
+                  "node": "terrain--terrain-type",
+                  "port": "value"
+                }
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "terrain--terrain-equal",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "item"
+                    },
+                    "right": {
+                      "kind": "input",
+                      "name": "terrain"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "return",
+                  "id": "terrain--terrain-match-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "terrain--terrain-equal",
+                    "port": "value"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "terrain",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "terrain--terrain-match",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "vacant",
+              "module": "spatial.cell-unoccupied",
+              "version": "1",
+              "inputs": {
+                "cell": {
+                  "kind": "output",
+                  "node": "cell",
+                  "port": "cell"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "valid-terrain",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "walkable",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "terrain",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "valid",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "valid-terrain",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "vacant",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "valid-check",
+              "condition": {
+                "kind": "output",
+                "node": "valid",
+                "port": "value"
+              },
+              "then": [],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "invalid",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "目标必须是未被占据的空地或掩体"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "invalid-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "invalid",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "move",
+              "module": "effect.displace-one",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                },
+                "destination": {
+                  "kind": "output",
+                  "node": "cell",
+                  "port": "cell"
+                }
+              },
+              "parameters": {
+                "kind": "teleport"
+              }
+            },
+            {
+              "kind": "if",
+              "id": "move-check",
+              "condition": {
+                "kind": "output",
+                "node": "move",
+                "port": "success"
+              },
+              "then": [],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "blocked",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": true
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "位移被阻挡，本次位移效果取消"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "blocked-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "blocked",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "center",
+              "module": "spatial.piece-position",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "ownerPlayerId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "targets",
+              "module": "query.pieces-around-cell",
+              "version": "1",
+              "inputs": {
+                "center": {
+                  "kind": "output",
+                  "node": "center",
+                  "port": "cell"
+                },
+                "owner": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "relation": "enemy",
+                "metric": "chebyshev",
+                "maximum": 2
+              }
+            },
+            {
+              "kind": "foreach",
+              "id": "each",
+              "presentation": "statusAdded",
+              "items": {
+                "kind": "output",
+                "node": "targets",
+                "port": "pieces"
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "target-id",
+                  "module": "piece.field",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "each",
+                      "port": "item"
+                    }
+                  },
+                  "parameters": {
+                    "field": "instanceId"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "silenced-id",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "literal",
+                      "value": "silenced-"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "target-id",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "record.create",
+                  "id": "silenced-record",
+                  "schema": "control-status@1",
+                  "fields": {
+                    "id": {
+                      "kind": "output",
+                      "node": "silenced-id",
+                      "port": "text"
+                    },
+                    "type": {
+                      "kind": "literal",
+                      "value": "silenced"
+                    },
+                    "name": {
+                      "kind": "literal",
+                      "value": "沉默"
+                    },
+                    "stacks": {
+                      "kind": "literal",
+                      "value": 1
+                    },
+                    "currentDuration": {
+                      "kind": "literal",
+                      "value": 1
+                    },
+                    "remainingDuration": {
+                      "kind": "literal",
+                      "value": 1
+                    },
+                    "relatedRules": {
+                      "kind": "literal",
+                      "value": [
+                        "rule-silenced-block"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "silenced-apply",
+                  "module": "status.apply-record",
+                  "version": "1",
+                  "inputs": {
+                    "target": {
+                      "kind": "output",
+                      "node": "each",
+                      "port": "item"
+                    },
+                    "record": {
+                      "kind": "output",
+                      "node": "silenced-record",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "inputPolicy": "host"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "silenced-rule",
+                  "module": "rule.apply-piece",
+                  "version": "1",
+                  "inputs": {
+                    "target": {
+                      "kind": "output",
+                      "node": "each",
+                      "port": "item"
+                    }
+                  },
+                  "parameters": {
+                    "ruleId": "rule-silenced-block"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "existing--status-tags",
+                  "module": "piece.field",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "each",
+                      "port": "item"
+                    }
+                  },
+                  "parameters": {
+                    "field": "statusTags"
+                  }
+                },
+                {
+                  "kind": "collection",
+                  "id": "existing--status",
+                  "method": "find",
+                  "items": {
+                    "kind": "output",
+                    "node": "existing--status-tags",
+                    "port": "value"
+                  },
+                  "item": "item",
+                  "body": [
+                    {
+                      "kind": "call",
+                      "id": "existing--tag-type",
+                      "module": "data.optional-field",
+                      "version": "1",
+                      "inputs": {
+                        "record": {
+                          "kind": "input",
+                          "name": "item"
+                        }
+                      },
+                      "parameters": {
+                        "field": "type"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "existing--type-match",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "existing--tag-type",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "chidori-immobile"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                        "operator": "=="
+                      }
+                    },
+                    {
+                      "kind": "return",
+                      "id": "existing--find-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "existing--type-match",
+                        "port": "value"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "existing",
+                  "module": "data.optional-field",
+                  "version": "1",
+                  "inputs": {
+                    "record": {
+                      "kind": "output",
+                      "node": "existing--status",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "field": "id"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "has-existing--statusTags",
+                  "module": "piece.field",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "each",
+                      "port": "item"
+                    }
+                  },
+                  "parameters": {
+                    "field": "statusTags"
+                  }
+                },
+                {
+                  "kind": "collection",
+                  "id": "has-existing--filtered",
+                  "method": "filter",
+                  "items": {
+                    "kind": "output",
+                    "node": "has-existing--statusTags",
+                    "port": "value"
+                  },
+                  "inputs": {
+                    "expected": {
+                      "kind": "output",
+                      "node": "existing",
+                      "port": "value"
+                    }
+                  },
+                  "body": [
+                    {
+                      "kind": "call",
+                      "id": "has-existing--field",
+                      "module": "data.field",
+                      "version": "1",
+                      "inputs": {
+                        "record": {
+                          "kind": "input",
+                          "name": "item"
+                        }
+                      },
+                      "parameters": {
+                        "field": "id"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-existing--matches",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "has-existing--field",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "input",
+                          "name": "expected"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                        "operator": "=="
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-existing--present",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "has-existing--field",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": null
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                        "operator": "!="
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-existing--has-id",
+                      "module": "logic.and",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "has-existing--present",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "has-existing--matches",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "has-existing--filter-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "has-existing--has-id",
+                        "port": "value"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "has-existing--count",
+                  "module": "collection.length",
+                  "version": "1",
+                  "inputs": {
+                    "items": {
+                      "kind": "output",
+                      "node": "has-existing--filtered",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "has-existing",
+                  "module": "compare.greater-than",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "has-existing--count",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "refresh-or-apply",
+                  "condition": {
+                    "kind": "output",
+                    "node": "has-existing",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "duration--status-instances",
+                      "module": "status.instances",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "each",
+                          "port": "item"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "collection",
+                      "id": "duration--selected-status",
+                      "method": "find",
+                      "items": {
+                        "kind": "output",
+                        "node": "duration--status-instances",
+                        "port": "statuses"
+                      },
+                      "item": "item",
+                      "inputs": {
+                        "statusId": {
+                          "kind": "output",
+                          "node": "existing",
+                          "port": "value"
+                        }
+                      },
+                      "body": [
+                        {
+                          "kind": "call",
+                          "id": "duration--status-id",
+                          "module": "status.instance-field",
+                          "version": "1",
+                          "inputs": {
+                            "status": {
+                              "kind": "input",
+                              "name": "item"
+                            }
+                          },
+                          "parameters": {
+                            "field": "id"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "duration--status-id-defined",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "duration--status-id",
+                              "port": "defined"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": true
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "boolean",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "duration--status-id-matches",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "duration--status-id",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "input",
+                              "name": "statusId"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "duration--status-id-match",
+                          "module": "logic.and",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "duration--status-id-defined",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "duration--status-id-matches",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "duration--status-match-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "duration--status-id-match",
+                            "port": "value"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "duration--write-status-field",
+                      "module": "status.write-field",
+                      "version": "1",
+                      "inputs": {
+                        "status": {
+                          "kind": "output",
+                          "node": "duration--selected-status",
+                          "port": "value"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      },
+                      "parameters": {
+                        "field": "currentDuration",
+                        "valueType": "number"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "remaining--status-instances",
+                      "module": "status.instances",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "each",
+                          "port": "item"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "collection",
+                      "id": "remaining--selected-status",
+                      "method": "find",
+                      "items": {
+                        "kind": "output",
+                        "node": "remaining--status-instances",
+                        "port": "statuses"
+                      },
+                      "item": "item",
+                      "inputs": {
+                        "statusId": {
+                          "kind": "output",
+                          "node": "existing",
+                          "port": "value"
+                        }
+                      },
+                      "body": [
+                        {
+                          "kind": "call",
+                          "id": "remaining--status-id",
+                          "module": "status.instance-field",
+                          "version": "1",
+                          "inputs": {
+                            "status": {
+                              "kind": "input",
+                              "name": "item"
+                            }
+                          },
+                          "parameters": {
+                            "field": "id"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "remaining--status-id-defined",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "remaining--status-id",
+                              "port": "defined"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": true
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "boolean",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "remaining--status-id-matches",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "remaining--status-id",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "input",
+                              "name": "statusId"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "remaining--status-id-match",
+                          "module": "logic.and",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "remaining--status-id-defined",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "remaining--status-id-matches",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "remaining--status-match-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "remaining--status-id-match",
+                            "port": "value"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "remaining--write-status-field",
+                      "module": "status.write-field",
+                      "version": "1",
+                      "inputs": {
+                        "status": {
+                          "kind": "output",
+                          "node": "remaining--selected-status",
+                          "port": "value"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      },
+                      "parameters": {
+                        "field": "remainingDuration",
+                        "valueType": "number"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "immobile-id",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "literal",
+                          "value": "immobile-"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "target-id",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "record.create",
+                      "id": "immobile-record",
+                      "schema": "control-status@1",
+                      "fields": {
+                        "id": {
+                          "kind": "output",
+                          "node": "immobile-id",
+                          "port": "text"
+                        },
+                        "type": {
+                          "kind": "literal",
+                          "value": "chidori-immobile"
+                        },
+                        "name": {
+                          "kind": "literal",
+                          "value": "定身"
+                        },
+                        "stacks": {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        "currentDuration": {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        "remainingDuration": {
+                          "kind": "literal",
+                          "value": 1
+                        },
+                        "relatedRules": {
+                          "kind": "literal",
+                          "value": [
+                            "rule-chidori-immobile"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "immobile-apply",
+                      "module": "status.apply-record",
+                      "version": "1",
+                      "inputs": {
+                        "target": {
+                          "kind": "output",
+                          "node": "each",
+                          "port": "item"
+                        },
+                        "record": {
+                          "kind": "output",
+                          "node": "immobile-record",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "inputPolicy": "host"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "immobile-rule",
+                      "module": "rule.apply-piece",
+                      "version": "1",
+                      "inputs": {
+                        "target": {
+                          "kind": "output",
+                          "node": "each",
+                          "port": "item"
+                        }
+                      },
+                      "parameters": {
+                        "ruleId": "rule-chidori-immobile"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "count",
+              "module": "collection.length",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "targets",
+                  "port": "pieces"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "count-text",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "count",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "message-start",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": "混沌控制生效，"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "count-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "message",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "message-start",
+                  "port": "text"
                 },
                 "right": {
                   "kind": "literal",
                   "value": "名敌人被沉默并定身1回合"
                 }
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n2",
-        "kind": "call",
-        "capability": "array.push",
-        "args": [
-          {
-            "kind": "get",
-            "object": {
-              "kind": "ref",
-              "name": "context"
-            },
-            "key": "presentationQueue"
-          },
-          {
-            "kind": "literal",
-            "value": "statusAdded"
-          },
-          {
-            "kind": "function",
-            "parameters": [],
-            "body": {
-              "entry": "n16",
-              "end": "n3",
-              "nodes": [
-                {
-                  "id": "n3",
-                  "kind": "regionEnd"
-                },
-                {
-                  "id": "n4",
-                  "kind": "invoke",
-                  "target": {
-                    "kind": "array",
-                    "object": {
-                      "kind": "ref",
-                      "name": "__rvb_import_operand_0"
-                    },
-                    "method": "forEach"
-                  },
-                  "args": [
-                    {
-                      "kind": "function",
-                      "parameters": [
-                        "p"
-                      ],
-                      "body": {
-                        "entry": "n15",
-                        "end": "n5",
-                        "nodes": [
-                          {
-                            "id": "n5",
-                            "kind": "regionEnd"
-                          },
-                          {
-                            "id": "n6",
-                            "kind": "set",
-                            "target": {
-                              "kind": "ref",
-                              "name": "affected"
-                            },
-                            "operator": "=",
-                            "value": {
-                              "kind": "binary",
-                              "op": "+",
-                              "left": {
-                                "kind": "unary",
-                                "op": "+",
-                                "argument": {
-                                  "kind": "ref",
-                                  "name": "affected"
-                                }
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": 1
-                              }
-                            },
-                            "next": "n5"
-                          },
-                          {
-                            "id": "n7",
-                            "kind": "set",
-                            "target": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "immobilized"
-                              },
-                              "key": "remainingDuration"
-                            },
-                            "operator": "=",
-                            "value": {
-                              "kind": "literal",
-                              "value": 1
-                            },
-                            "next": "n6"
-                          },
-                          {
-                            "id": "n8",
-                            "kind": "set",
-                            "target": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "immobilized"
-                              },
-                              "key": "currentDuration"
-                            },
-                            "operator": "=",
-                            "value": {
-                              "kind": "literal",
-                              "value": 1
-                            },
-                            "next": "n7"
-                          },
-                          {
-                            "id": "n9",
-                            "kind": "call",
-                            "capability": "addRuleById",
-                            "args": [
-                              {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "instanceId"
-                              },
-                              {
-                                "kind": "literal",
-                                "value": "rule-chidori-immobile"
-                              }
-                            ],
-                            "next": "n6"
-                          },
-                          {
-                            "id": "n10",
-                            "kind": "call",
-                            "capability": "addStatusEffectById",
-                            "args": [
-                              {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "instanceId"
-                              },
-                              {
-                                "kind": "object",
-                                "entries": [
-                                  {
-                                    "key": "id",
-                                    "value": {
-                                      "kind": "binary",
-                                      "op": "+",
-                                      "left": {
-                                        "kind": "literal",
-                                        "value": "immobile-"
-                                      },
-                                      "right": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "p"
-                                        },
-                                        "key": "instanceId"
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "key": "type",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": "chidori-immobile"
-                                    }
-                                  },
-                                  {
-                                    "key": "name",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": "定身"
-                                    }
-                                  },
-                                  {
-                                    "key": "stacks",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "currentDuration",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "remainingDuration",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "relatedRules",
-                                    "value": {
-                                      "kind": "array",
-                                      "items": [
-                                        {
-                                          "kind": "literal",
-                                          "value": "rule-chidori-immobile"
-                                        }
-                                      ]
-                                    }
-                                  }
-                                ]
-                              }
-                            ],
-                            "next": "n9"
-                          },
-                          {
-                            "id": "n11",
-                            "kind": "branch",
-                            "condition": {
-                              "kind": "unary",
-                              "op": "!",
-                              "argument": {
-                                "kind": "unary",
-                                "op": "!",
-                                "argument": {
-                                  "kind": "ref",
-                                  "name": "immobilized"
-                                }
-                              }
-                            },
-                            "yes": "n8",
-                            "no": "n10"
-                          },
-                          {
-                            "id": "n12",
-                            "kind": "bind",
-                            "name": "immobilized",
-                            "expr": {
-                              "kind": "collection",
-                              "object": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "statusTags"
-                              },
-                              "method": "find",
-                              "args": [
-                                {
-                                  "kind": "lambda",
-                                  "parameters": [
-                                    "t"
-                                  ],
-                                  "body": {
-                                    "kind": "binary",
-                                    "op": "===",
-                                    "left": {
-                                      "kind": "get",
-                                      "object": {
-                                        "kind": "ref",
-                                        "name": "t"
-                                      },
-                                      "key": "type"
-                                    },
-                                    "right": {
-                                      "kind": "literal",
-                                      "value": "chidori-immobile"
-                                    }
-                                  }
-                                }
-                              ]
-                            },
-                            "next": "n11"
-                          },
-                          {
-                            "id": "n13",
-                            "kind": "call",
-                            "capability": "addRuleById",
-                            "args": [
-                              {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "instanceId"
-                              },
-                              {
-                                "kind": "literal",
-                                "value": "rule-silenced-block"
-                              }
-                            ],
-                            "next": "n12"
-                          },
-                          {
-                            "id": "n14",
-                            "kind": "call",
-                            "capability": "addStatusEffectById",
-                            "args": [
-                              {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "instanceId"
-                              },
-                              {
-                                "kind": "object",
-                                "entries": [
-                                  {
-                                    "key": "id",
-                                    "value": {
-                                      "kind": "binary",
-                                      "op": "+",
-                                      "left": {
-                                        "kind": "literal",
-                                        "value": "silenced-"
-                                      },
-                                      "right": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "p"
-                                        },
-                                        "key": "instanceId"
-                                      }
-                                    }
-                                  },
-                                  {
-                                    "key": "type",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": "silenced"
-                                    }
-                                  },
-                                  {
-                                    "key": "name",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": "沉默"
-                                    }
-                                  },
-                                  {
-                                    "key": "stacks",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "currentDuration",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "remainingDuration",
-                                    "value": {
-                                      "kind": "literal",
-                                      "value": 1
-                                    }
-                                  },
-                                  {
-                                    "key": "relatedRules",
-                                    "value": {
-                                      "kind": "array",
-                                      "items": [
-                                        {
-                                          "kind": "literal",
-                                          "value": "rule-silenced-block"
-                                        }
-                                      ]
-                                    }
-                                  }
-                                ]
-                              }
-                            ],
-                            "next": "n13"
-                          },
-                          {
-                            "id": "n15",
-                            "kind": "set",
-                            "target": {
-                              "kind": "get",
-                              "object": {
-                                "kind": "ref",
-                                "name": "p"
-                              },
-                              "key": "statusTags"
-                            },
-                            "operator": "=",
-                            "value": {
-                              "kind": "binary",
-                              "op": "||",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "statusTags"
-                              },
-                              "right": {
-                                "kind": "array",
-                                "items": []
-                              }
-                            },
-                            "next": "n14"
-                          }
-                        ]
-                      }
-                    }
-                  ],
-                  "next": "n3"
-                },
-                {
-                  "id": "n16",
-                  "kind": "bind",
-                  "name": "__rvb_import_operand_0",
-                  "expr": {
-                    "kind": "collection",
-                    "object": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "b"
-                      },
-                      "key": "pieces"
-                    },
-                    "method": "filter",
-                    "args": [
-                      {
-                        "kind": "lambda",
-                        "parameters": [
-                          "p"
-                        ],
-                        "body": {
-                          "kind": "binary",
-                          "op": "&&",
-                          "left": {
-                            "kind": "binary",
-                            "op": "&&",
-                            "left": {
-                              "kind": "binary",
-                              "op": ">",
-                              "left": {
-                                "kind": "get",
-                                "object": {
-                                  "kind": "ref",
-                                  "name": "p"
-                                },
-                                "key": "currentHp"
-                              },
-                              "right": {
-                                "kind": "literal",
-                                "value": 0
-                              }
-                            },
-                            "right": {
-                              "kind": "unary",
-                              "op": "!",
-                              "argument": {
-                                "kind": "call",
-                                "callee": "arePlayersAllied",
-                                "args": [
-                                  {
-                                    "kind": "ref",
-                                    "name": "battle"
-                                  },
-                                  {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "p"
-                                    },
-                                    "key": "ownerPlayerId"
-                                  },
-                                  {
-                                    "kind": "get",
-                                    "object": {
-                                      "kind": "ref",
-                                      "name": "c"
-                                    },
-                                    "key": "ownerPlayerId"
-                                  }
-                                ]
-                              }
-                            }
-                          },
-                          "right": {
-                            "kind": "binary",
-                            "op": "<=",
-                            "left": {
-                              "kind": "call",
-                              "callee": "Math.max",
-                              "args": [
-                                {
-                                  "kind": "call",
-                                  "callee": "Math.abs",
-                                  "args": [
-                                    {
-                                      "kind": "binary",
-                                      "op": "-",
-                                      "left": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "p"
-                                        },
-                                        "key": "x"
-                                      },
-                                      "right": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "c"
-                                        },
-                                        "key": "x"
-                                      }
-                                    }
-                                  ]
-                                },
-                                {
-                                  "kind": "call",
-                                  "callee": "Math.abs",
-                                  "args": [
-                                    {
-                                      "kind": "binary",
-                                      "op": "-",
-                                      "left": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "p"
-                                        },
-                                        "key": "y"
-                                      },
-                                      "right": {
-                                        "kind": "get",
-                                        "object": {
-                                          "kind": "ref",
-                                          "name": "c"
-                                        },
-                                        "key": "y"
-                                      }
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            "right": {
-                              "kind": "literal",
-                              "value": 2
-                            }
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "next": "n4"
-                }
-              ]
-            }
-          }
-        ],
-        "next": "n1"
-      },
-      {
-        "id": "n17",
-        "kind": "bind",
-        "name": "affected",
-        "expr": {
-          "kind": "literal",
-          "value": 0
-        },
-        "next": "n2"
-      },
-      {
-        "id": "n18",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": true
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "位移被阻挡，本次位移效果取消"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n19",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "unary",
-              "op": "!",
-              "argument": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "__rvb_import_effect_1"
-                },
-                "key": "success"
-              }
-            }
-          }
-        },
-        "yes": "n18",
-        "no": "n17"
-      },
-      {
-        "id": "n20",
-        "kind": "call",
-        "capability": "flow.effects.displace",
-        "args": [
-          {
-            "kind": "array",
-            "items": [
-              {
-                "kind": "object",
-                "entries": [
-                  {
-                    "key": "pieceId",
-                    "value": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "c"
-                      },
-                      "key": "instanceId"
-                    }
-                  },
-                  {
-                    "key": "x",
-                    "value": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "pos"
-                      },
-                      "key": "x"
-                    }
-                  },
-                  {
-                    "key": "y",
-                    "value": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "ref",
-                        "name": "pos"
-                      },
-                      "key": "y"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "kind": "literal",
-            "value": "teleport"
-          }
-        ],
-        "result": "__rvb_import_effect_1",
-        "next": "n19"
-      },
-      {
-        "id": "n21",
-        "kind": "return",
-        "value": {
-          "kind": "object",
-          "entries": [
-            {
-              "key": "success",
-              "value": {
-                "kind": "literal",
-                "value": false
-              }
-            },
-            {
-              "key": "message",
-              "value": {
-                "kind": "literal",
-                "value": "目标必须是未被占据的空地或掩体"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": "n22",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
-                  "kind": "binary",
-                  "op": "||",
-                  "left": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "ref",
-                      "name": "tile"
-                    }
-                  },
-                  "right": {
-                    "kind": "unary",
-                    "op": "!",
-                    "argument": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "tile"
-                        },
-                        "key": "props"
-                      },
-                      "key": "walkable"
-                    }
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "&&",
-                  "left": {
-                    "kind": "binary",
-                    "op": "!==",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "tile"
-                        },
-                        "key": "props"
-                      },
-                      "key": "type"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": "floor"
-                    }
-                  },
-                  "right": {
-                    "kind": "binary",
-                    "op": "!==",
-                    "left": {
-                      "kind": "get",
-                      "object": {
-                        "kind": "get",
-                        "object": {
-                          "kind": "ref",
-                          "name": "tile"
-                        },
-                        "key": "props"
-                      },
-                      "key": "type"
-                    },
-                    "right": {
-                      "kind": "literal",
-                      "value": "cover"
-                    }
-                  }
-                }
               },
-              "right": {
-                "kind": "collection",
-                "object": {
-                  "kind": "get",
-                  "object": {
-                    "kind": "ref",
-                    "name": "b"
-                  },
-                  "key": "pieces"
-                },
-                "method": "some",
-                "args": [
-                  {
-                    "kind": "lambda",
-                    "parameters": [
-                      "p"
-                    ],
-                    "body": {
-                      "kind": "binary",
-                      "op": "&&",
-                      "left": {
-                        "kind": "binary",
-                        "op": "&&",
-                        "left": {
-                          "kind": "binary",
-                          "op": ">",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "p"
-                            },
-                            "key": "currentHp"
-                          },
-                          "right": {
-                            "kind": "literal",
-                            "value": 0
-                          }
-                        },
-                        "right": {
-                          "kind": "binary",
-                          "op": "===",
-                          "left": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "p"
-                            },
-                            "key": "x"
-                          },
-                          "right": {
-                            "kind": "get",
-                            "object": {
-                              "kind": "ref",
-                              "name": "pos"
-                            },
-                            "key": "x"
-                          }
-                        }
-                      },
-                      "right": {
-                        "kind": "binary",
-                        "op": "===",
-                        "left": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "p"
-                          },
-                          "key": "y"
-                        },
-                        "right": {
-                          "kind": "get",
-                          "object": {
-                            "kind": "ref",
-                            "name": "pos"
-                          },
-                          "key": "y"
-                        }
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "yes": "n21",
-        "no": "n20"
-      },
-      {
-        "id": "n23",
-        "kind": "bind",
-        "name": "tile",
-        "expr": {
-          "kind": "collection",
-          "object": {
-            "kind": "get",
-            "object": {
-              "kind": "get",
-              "object": {
-                "kind": "ref",
-                "name": "b"
-              },
-              "key": "map"
+              "parameters": {}
             },
-            "key": "tiles"
-          },
-          "method": "find",
-          "args": [
             {
-              "kind": "lambda",
-              "parameters": [
-                "t"
-              ],
-              "body": {
-                "kind": "binary",
-                "op": "&&",
-                "left": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "t"
-                    },
-                    "key": "x"
-                  },
-                  "right": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "pos"
-                    },
-                    "key": "x"
-                  }
-                },
-                "right": {
-                  "kind": "binary",
-                  "op": "===",
-                  "left": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "t"
-                    },
-                    "key": "y"
-                  },
-                  "right": {
-                    "kind": "get",
-                    "object": {
-                      "kind": "ref",
-                      "name": "pos"
-                    },
-                    "key": "y"
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "next": "n22"
-      },
-      {
-        "id": "n24",
-        "kind": "return",
-        "value": {
-          "kind": "ref",
-          "name": "pos"
-        }
-      },
-      {
-        "id": "n25",
-        "kind": "branch",
-        "condition": {
-          "kind": "unary",
-          "op": "!",
-          "argument": {
-            "kind": "unary",
-            "op": "!",
-            "argument": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "unary",
-                "op": "!",
-                "argument": {
-                  "kind": "ref",
-                  "name": "pos"
-                }
-              },
-              "right": {
-                "kind": "get",
-                "object": {
-                  "kind": "ref",
-                  "name": "pos"
-                },
-                "key": "needsTargetSelection"
-              }
-            }
-          }
-        },
-        "yes": "n24",
-        "no": "n23"
-      },
-      {
-        "id": "n26",
-        "kind": "call",
-        "capability": "selectTarget",
-        "args": [
-          {
-            "kind": "object",
-            "entries": [
-              {
-                "key": "type",
-                "value": {
+              "kind": "call",
+              "id": "done",
+              "module": "result.action",
+              "version": "1",
+              "inputs": {
+                "success": {
                   "kind": "literal",
-                  "value": "grid"
+                  "value": true
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "message",
+                  "port": "text"
                 }
               },
-              {
-                "key": "range",
-                "value": {
-                  "kind": "literal",
-                  "value": 5
-                }
-              },
-              {
-                "key": "filter",
-                "value": {
-                  "kind": "literal",
-                  "value": "all"
-                }
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "done-return",
+              "value": {
+                "kind": "output",
+                "node": "done",
+                "port": "result"
               }
-            ]
-          }
-        ],
-        "result": "pos",
-        "next": "n25"
-      },
-      {
-        "id": "n27",
-        "kind": "bind",
-        "name": "b",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "battle"
+            }
+          ]
         },
-        "next": "n26"
-      },
-      {
-        "id": "n28",
-        "kind": "bind",
-        "name": "c",
-        "expr": {
-          "kind": "get",
-          "object": {
-            "kind": "ref",
-            "name": "context"
-          },
-          "key": "piece"
-        },
-        "next": "n27"
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
       }
-    ]
-  },
-  "contentGraphField": "code",
-  "contentGraphCompilerVersion": "rvb-content-graph-compiler/v1",
-  "cluster": {
-    "version": "rvb-skill-cluster/v1",
-    "id": "skills:shadow-chaos-control",
-    "links": []
+    }
   }
 }

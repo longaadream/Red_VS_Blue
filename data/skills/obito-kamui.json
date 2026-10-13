@@ -18,11 +18,499 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 1,
-  "code": "function executeSkill(context) { var caster = context.piece; var alreadyShielded = caster.statusTags && caster.statusTags.some(function(t) { return t.type === 'kamui-shield'; }); if (alreadyShielded) return { success: false, message: caster.name + '已处于神威护盾中' }; addStatusEffectById(caster.instanceId, { id: 'kamui-shield', name: '神威护盾', type: 'kamui-shield', currentDuration: -1, currentUses: 1, intensity: 1, stacks: 1 }); addRuleById(caster.instanceId, 'rule-obito-kamui-block'); return { success: true, message: caster.name + '激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹' }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"获得神威护盾：免疫下次伤害，并将该伤害以真实伤害反弹给攻击者。\", expectedValues: {} }; }",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"source-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"source\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = ({value:(flow.query.pieceText(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"source-name\", __gameplayError, \"piece.field\"); _module2 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module3 = __gameplayInvalid; } else { var _module3 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already--statusTags\", __gameplayError, \"piece.field\"); _module3 = __gameplayInvalid; } var _loopRoot14 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection4 = __gameplayInvalid; var _items5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3); var _capture10 = \"kamui-shield\"; if (Array.isArray(_items5) && _capture10 !== __gameplayInvalid && _capture10 !== undefined) { if (_items5.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues13 = [];  for (var _index6 = 0; _index6 < _items5.length; _index6 += 1) { __gameplayConsumeIteration(); var _item7 = _items5[_index6]; var _collectionResult8 = __gameplayInvalid; _collectionDone9: { try { if ((_item7 === __gameplayInvalid) || (_item7 === undefined) || (_item7 === null)) { _module11 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module11 = ((function(record){var result=({value:((function(record){if(record===__gameplayInvalid||record===null||typeof record!==\"object\")return __gameplayInvalid;var value=record[\"type\"];return value===undefined||value===null?null:(typeof value===\"string\"?value:__gameplayInvalid);})(record))});result.exists=record[\"type\"]!==undefined&&record[\"type\"]!==null;return result;})(_item7)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already--field\", __gameplayError, \"data.field\"); _module11 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module11[\"value\"]) === __gameplayInvalid) || ((_module11[\"value\"]) === undefined) || (_capture10 === __gameplayInvalid) || (_capture10 === undefined)) { _module12 = __gameplayInvalid; } else { var _module12 = (((_module11[\"value\"]) === _capture10)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already--matches\", __gameplayError, \"compare.values\"); _module12 = __gameplayInvalid; } try { if (!((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) === __gameplayInvalid))) { _collectionResult8 = { \"value\": ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) }; break _collectionDone9; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already--filter-return\", __gameplayError); } } if (_collectionResult8 !== __gameplayInvalid && _collectionResult8 != null && _collectionResult8[\"value\"]) { _collectionValues13.push(_item7); } } var _collection4 = _collectionValues13; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot14) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"already--filtered\", new Error(\"gameplay shared iteration budget exceeded\")); _collection4 = __gameplayInvalid; } else { __gameplayRecordFault(\"already--filtered\", __gameplayError); _collection4 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection4 === __gameplayInvalid) || (_collection4 === undefined) || (_collection4 === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection4)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already--count\", __gameplayError, \"collection.length\"); _module15 = __gameplayInvalid; } try { if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already\", __gameplayError, \"compare.greater-than\"); _module16 = __gameplayInvalid; } try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null)) { _module17 = __gameplayInvalid; } else { var _module17 = ((\"\" + ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already-message-0\", __gameplayError, \"text.concat\"); _module17 = __gameplayInvalid; } try { if ((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) === null) || (\"已处于神威护盾中\" === __gameplayInvalid) || (\"已处于神威护盾中\" === undefined) || (\"已处于神威护盾中\" === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"text\")) ? _module17[\"text\"] : _module17) + \"已处于神威护盾中\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already-message-1\", __gameplayError, \"text.concat\"); _module18 = __gameplayInvalid; } try { var _condition20 = ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16); if (_condition20 !== __gameplayInvalid && _condition20) { try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18) === null)) { _module19 = __gameplayInvalid; } else { var _module19 = (({success: false, message: ((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"text\")) ? _module18[\"text\"] : _module18)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already-result\", __gameplayError, \"result.action\"); _module19 = __gameplayInvalid; } try { if (!((((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"result\")) ? _module19[\"result\"] : _module19) === __gameplayInvalid))) { return ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"result\")) ? _module19[\"result\"] : _module19); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already-result-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"already-shielded\", __gameplayError); _condition20 = __gameplayInvalid; } try { var _record21 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"id\"] = __gameplayRecordValue0; __gameplayRecord[\"name\"] = __gameplayRecordValue1; __gameplayRecord[\"type\"] = __gameplayRecordValue2; __gameplayRecord[\"currentDuration\"] = __gameplayRecordValue3; __gameplayRecord[\"currentUses\"] = __gameplayRecordValue4; __gameplayRecord[\"intensity\"] = __gameplayRecordValue5; __gameplayRecord[\"stacks\"] = __gameplayRecordValue6; return __gameplayRecord; })(\"kamui-shield\", \"神威护盾\", \"kamui-shield\", -1, 1, 1, 1)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"shield-record\", __gameplayError); _record21 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))) || (_record21 === __gameplayInvalid) || (_record21 === undefined) || (_record21 === null)) { _module22 = __gameplayInvalid; } else { var _module22 = (flow.status.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), _record21, \"piece\", \"host\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"apply-shield\", __gameplayError, \"status.apply-record\"); _module22 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module23 = __gameplayInvalid; } else { var _module23 = (flow.rules.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"rule-obito-kamui-block\", \"piece\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"apply-rule\", __gameplayError, \"rule.apply-piece\"); _module23 = __gameplayInvalid; } try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = ((\"\" + ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-message-0\", __gameplayError, \"text.concat\"); _module24 = __gameplayInvalid; } try { if ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) === null) || (\"激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹\" === __gameplayInvalid) || (\"激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹\" === undefined) || (\"激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹\" === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"text\")) ? _module24[\"text\"] : _module24) + \"激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-message-1\", __gameplayError, \"text.concat\"); _module25 = __gameplayInvalid; } try { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) === __gameplayInvalid) || (((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25) === null)) { _module26 = __gameplayInvalid; } else { var _module26 = (({success: true, message: ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"text\")) ? _module25[\"text\"] : _module25)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success\", __gameplayError, \"result.action\"); _module26 = __gameplayInvalid; } try { if (!((((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26) === __gameplayInvalid))) { return ((_module26 !== null && typeof _module26 === \"object\" && Object.prototype.hasOwnProperty.call(_module26, \"result\")) ? _module26[\"result\"] : _module26); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-return\", __gameplayError); } }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; if (skillDef && typeof skillDef === \"object\") context[\"__gameplayModuleDiagnosticHost\"] = skillDef[\"__gameplayModuleDiagnosticHost\"]; var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _record0 = ((function(){ var __gameplayRecord = {};  return __gameplayRecord; })()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expected-values-0\", __gameplayError); _record0 = __gameplayInvalid; } try { var _record1 = ((function(__gameplayRecordValue0, __gameplayRecordValue1){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"description\"] = __gameplayRecordValue0; __gameplayRecord[\"expectedValues\"] = __gameplayRecordValue1; return __gameplayRecord; })(\"获得神威护盾：免疫下次伤害，并将该伤害以真实伤害反弹给攻击者。\", _record0)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"preview-result-1\", __gameplayError); _record1 = __gameplayInvalid; } try { if (!((_record1 === __gameplayInvalid))) { return _record1; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:obito-kamui",
     "links": []
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "schemas": [
+            {
+              "id": "remaining-kamui-shield@1",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "source-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "source-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source-name",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "name"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "already--statusTags",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "statusTags"
+              }
+            },
+            {
+              "kind": "collection",
+              "id": "already--filtered",
+              "method": "filter",
+              "items": {
+                "kind": "output",
+                "node": "already--statusTags",
+                "port": "value"
+              },
+              "inputs": {
+                "expected": {
+                  "kind": "literal",
+                  "value": "kamui-shield"
+                }
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "already--field",
+                  "module": "data.field",
+                  "version": "1",
+                  "inputs": {
+                    "record": {
+                      "kind": "input",
+                      "name": "item"
+                    }
+                  },
+                  "parameters": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "already--matches",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "already--field",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "input",
+                      "name": "expected"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "return",
+                  "id": "already--filter-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "already--matches",
+                    "port": "value"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "already--count",
+              "module": "collection.length",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "already--filtered",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "already",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "already--count",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "already-message-0",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": ""
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "source-name",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "already-message-1",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "already-message-0",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "已处于神威护盾中"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "already-shielded",
+              "condition": {
+                "kind": "output",
+                "node": "already",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "already-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "already-message-1",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "already-result-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "already-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "record.create",
+              "id": "shield-record",
+              "schema": "remaining-kamui-shield@1",
+              "fields": {
+                "id": {
+                  "kind": "literal",
+                  "value": "kamui-shield"
+                },
+                "name": {
+                  "kind": "literal",
+                  "value": "神威护盾"
+                },
+                "type": {
+                  "kind": "literal",
+                  "value": "kamui-shield"
+                },
+                "currentDuration": {
+                  "kind": "literal",
+                  "value": -1
+                },
+                "currentUses": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "intensity": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "stacks": {
+                  "kind": "literal",
+                  "value": 1
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "apply-shield",
+              "module": "status.apply-record",
+              "version": "1",
+              "inputs": {
+                "target": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                },
+                "record": {
+                  "kind": "output",
+                  "node": "shield-record",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "inputPolicy": "host"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "apply-rule",
+              "module": "rule.apply-piece",
+              "version": "1",
+              "inputs": {
+                "target": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "ruleId": "rule-obito-kamui-block"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "success-message-0",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": ""
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "source-name",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "success-message-1",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "success-message-0",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "激活神威，转移至异次元空间！下一次受到的伤害将被完全吸收并反弹"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "success",
+              "module": "result.action",
+              "version": "1",
+              "inputs": {
+                "success": {
+                  "kind": "literal",
+                  "value": true
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "success-message-1",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "success-return",
+              "value": {
+                "kind": "output",
+                "node": "success",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      },
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": {
+                "kind": "record",
+                "schema": "preview-result@1"
+              }
+            }
+          ],
+          "schemas": [
+            {
+              "id": "preview-expected-values",
+              "version": "1",
+              "fields": []
+            },
+            {
+              "id": "preview-result",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "description",
+                  "type": "string"
+                },
+                {
+                  "name": "expectedValues",
+                  "type": {
+                    "kind": "record",
+                    "schema": "preview-expected-values@1"
+                  }
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "record.create",
+              "id": "expected-values-0",
+              "schema": "preview-expected-values@1",
+              "fields": {}
+            },
+            {
+              "kind": "record.create",
+              "id": "preview-result-1",
+              "schema": "preview-result@1",
+              "fields": {
+                "description": {
+                  "kind": "literal",
+                  "value": "获得神威护盾：免疫下次伤害，并将该伤害以真实伤害反弹给攻击者。"
+                },
+                "expectedValues": {
+                  "kind": "output",
+                  "node": "expected-values-0",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview-result-1",
+                "port": "value"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
   }
 }

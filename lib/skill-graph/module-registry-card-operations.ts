@@ -39,6 +39,10 @@ const ownerPieceList = (ctx: LoweringContext, owner: string, relation: string) =
  */
 export const CARD_OPERATION_GAMEPLAY_MODULES: GameplayModuleDescriptor[] = [
   define({
+    id: 'card.hand-count', label: '读取手牌数量', inputs: [port('player', 'player')], outputs: [port('value', 'number')],
+    effects: read(['hand']), lower: ctx => `(function(hand) { return Array.isArray(hand) ? hand.length : 0; })(${runtime(ctx)}.cards.hand(${input(ctx, 'player')}))`,
+  }),
+  define({
     id: 'query.players', label: '按对局顺序查询玩家', inputs: [], outputs: [port('players', { kind: 'list', element: 'player' })],
     effects: read(['players']), lower: ctx => `${runtime(ctx)}.query.players()`,
   }),
@@ -58,6 +62,7 @@ export const CARD_OPERATION_GAMEPLAY_MODULES: GameplayModuleDescriptor[] = [
     parameters: [{ name: 'field', type: 'string', enum: ['sourcePiece', 'targetPiece', 'piece', 'rulePiece'] }],
     effects: write(['execution-context']),
     lower: ctx => `${runtime(ctx)}.effects.captureEventPiece(${ctx.emitLiteral(ctx.parameters.field)})`,
+    ui: { category: 'context', authoring: 'standard' },
   }),
   define({
     id: 'source.is-present', label: '事件来源存在', inputs: [port('source', 'record', { nullable: true })],

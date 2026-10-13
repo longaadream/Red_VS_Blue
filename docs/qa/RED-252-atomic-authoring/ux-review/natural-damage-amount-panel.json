@@ -1,0 +1,14 @@
+{
+  "projection": "编辑模块对【当前目标 · 棋子引用】造成【5】点【普通】伤害，来源为【持有者 · 棋子引用】→ 结果→ 是否成功→ 实际伤害",
+  "focused": {
+    "className": "sentence-inline-editor sentence-statement-editor sentence-slot-only-editor",
+    "text": "编辑输入：数量完成数量 · 数值请选择数据来源常量＋ 组合表达式下一项：伤害类型",
+    "moduleSelect": false,
+    "inputs": [
+      "amount"
+    ],
+    "parameters": [],
+    "slotEditor": "input:amount",
+    "chooser": false
+  }
+}

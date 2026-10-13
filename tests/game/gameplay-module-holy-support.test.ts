@@ -1,9 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- frozen host differential fixtures. */
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { applyContentGraph } from '@/electron-editor/content-graph'
+import { importContentGraph } from '@/electron-editor/content-graph-import'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyGameplayModuleGraph, assertGameplayModuleDocument, compileGameplayModuleGraph, GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-document'
-import { buildHolySupportGraph, HOLY_SUPPORT_SKILL_IDS } from '@/scripts/migrate-semantic-holy-support'
+import { buildHolySupportGraph, HOLY_SUPPORT_SKILL_IDS, migrateHolySupportSkills } from '@/scripts/migrate-semantic-holy-support'
 import { executeSkillFunction } from '@/lib/game/skills'
+import { recordBattlePresentation, recordedBattlePresentation } from '@/lib/game/battle-presentation-recording'
+import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import { makePiece as makeRawPiece, makeState } from '../helpers/minimal-state'
 
 const fixture = JSON.parse(readFileSync('tests/game/fixtures/RED-252-legacy-content.json', 'utf8')).entries as Record<string, any>
@@ -17,55 +23,32 @@ const makePiece = (overrides: Record<string, any> = {}): any => {
 function comparableState(battle: any) {
   const state = clone(battle)
   delete state.skillsById
-  state.pieces = state.pieces.map((piece: any) => ({
-    instanceId: piece.instanceId,
-    templateId: piece.templateId,
-    ownerPlayerId: piece.ownerPlayerId,
-    currentHp: piece.currentHp,
-    attack: piece.attack,
-    defense: piece.defense,
-    moveRange: piece.moveRange,
-    x: piece.x,
-    y: piece.y,
-    statusTags: piece.statusTags,
-    rules: (piece.rules || []).map((rule: any) => typeof rule === 'string' ? rule : rule.id),
-  }))
-  state.players = state.players.map((player: any) => ({
-    playerId: player.playerId,
-    hand: (player.hand || []).map((card: any) => ({ cardId: card.cardId, ownerPlayerId: card.ownerPlayerId, name: card.name })),
-    discardPile: player.discardPile,
-    statusEffects: player.statusEffects,
-    rules: (player.rules || []).map((rule: any) => typeof rule === 'string' ? rule : rule.id),
-  }))
-  state.actions = (state.actions || []).map((action: any) => {
-    const next = clone(action)
-    if (next.payload && typeof next.payload === 'object') {
-      delete next.payload.cardInstanceId
-      delete next.payload.instanceId
-    }
-    return next
-  })
   return state
 }
 
 function runSkill(definition: any, options: { source?: any; target?: any; pieces?: any[] } = {}) {
+  const runtime = new RuleRuntime({ rootSeed: 594 })
+  return withRuleRuntime(runtime, () => {
   const source = options.source ?? makePiece({ instanceId: 'source', templateId: 'anduin', name: '施法者', ownerPlayerId: 'player-red', x: 1, y: 1 })
   const target = options.target
   const pieces = options.pieces ?? [source, ...(target ? [target] : [])]
   const battle: any = makeState({ pieces })
   battle.skillsById[definition.id] = definition
-  const result = executeSkillFunction(definition, {
+  const result = recordBattlePresentation(battle, () => executeSkillFunction(definition, {
     piece: source,
     battle,
     skill: definition,
     target: target ?? null,
     targetPosition: null,
     targets: target ? [{ info: target, pos: null }] : [],
-  } as any, battle)
-  return { result: clone(result), state: comparableState(battle) }
+  } as any, battle), () => battle)
+  return { result: clone(result), state: comparableState(battle), presentation: recordedBattlePresentation(battle), runtime: runtime.snapshot() }
+  })
 }
 
 function runTriggered(definition: any, overrides: Record<string, unknown> = {}) {
+  const runtime = new RuleRuntime({ rootSeed: 594 })
+  return withRuleRuntime(runtime, () => {
   const source = (overrides.sourcePiece ?? overrides.piece ?? makePiece({ instanceId: 'event-source', templateId: 'ally', name: '失盾友军', ownerPlayerId: 'player-red', x: 2, y: 1 })) as any
   const rulePiece = makePiece({ instanceId: 'liadrin', templateId: 'liadrin', name: '莉亚德琳', ownerPlayerId: 'player-red', x: 1, y: 1 })
   const battle: any = makeState({ pieces: [source, rulePiece] })
@@ -84,7 +67,8 @@ function runTriggered(definition: any, overrides: Record<string, unknown> = {}) 
     ...overrides,
   }
   const result = executeSkillFunction(definition, context, battle, { context, surface: 'triggerSkill' })
-  return { result: clone(result), state: comparableState(battle) }
+  return { result: clone(result), state: comparableState(battle), runtime: runtime.snapshot() }
+  })
 }
 
 describe('semantic holy support migrations', () => {
@@ -144,6 +128,17 @@ describe('semantic holy support migrations', () => {
     expect(semanticResult.state.pieces.find((piece: any) => piece.instanceId === 'enemy').statusTags).toEqual([{ id: 'shield-enemy', type: 'divine-shield' }])
   })
 
+  it('replaces related rules on an existing damage buff', () => {
+    const original = fixture['skills/divine-blessing']
+    const semantic = applyGameplayModuleGraph(original, buildHolySupportGraph('divine-blessing'))
+    const roster = () => {
+      const source = makePiece({ instanceId: 'source', ownerPlayerId: 'player-red', name: '施法者', x: 1, y: 1 })
+      const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 2, y: 1, statusTags: [{ id: 'damage-buff', type: 'damage-buff', name: '强化', currentDuration: -1, currentUses: 1, intensity: 2, stacks: 1, relatedRules: ['old-rule'] }] })
+      return { source, pieces: [source, ally] }
+    }
+    expect(runSkill(semantic, roster())).toEqual(runSkill(original, roster()))
+  })
+
   it('preserves Blood Echo trigger guards and card generation', () => {
     const source = fixture['skills/blood-echo-trigger']
     const semantic = applyGameplayModuleGraph(source, buildHolySupportGraph('blood-echo-trigger'))
@@ -152,8 +147,34 @@ describe('semantic holy support migrations', () => {
     expect(runTriggered(semantic, { statusId: 'other-status', statusType: 'other-status' })).toEqual(runTriggered(source, { statusId: 'other-status', statusType: 'other-status' }))
     const enemySource = makePiece({ instanceId: 'enemy-source', templateId: 'enemy', name: '敌方', ownerPlayerId: 'player-blue', x: 2, y: 1 })
     expect(runTriggered(semantic, { piece: enemySource, sourcePiece: enemySource, statusId: 'divine-shield', statusType: 'divine-shield', playerId: 'player-blue' })).toEqual(runTriggered(source, { piece: enemySource, sourcePiece: enemySource, statusId: 'divine-shield', statusType: 'divine-shield', playerId: 'player-blue' }))
+    for (const context of [{ sourcePiece: null }, { rulePiece: undefined }]) {
+      expect(runTriggered(semantic, context)).toEqual(runTriggered(source, context))
+    }
+    expect(runTriggered(semantic, { sourcePiece: null }).result.success).toBe(true)
+    expect(runTriggered(semantic, { rulePiece: undefined }).result.success).toBe(false)
   })
 })
 
 afterEach(() => vi.restoreAllMocks())
 
+
+
+it('refuses to overwrite a valid compatibility graph with a different authored behavior', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'rvb-holy-provenance-'))
+  try {
+    mkdirSync(path.join(root, 'data/skills'), { recursive: true })
+    mkdirSync(path.join(root, 'tests/game/fixtures'), { recursive: true })
+    writeFileSync(path.join(root, 'tests/game/fixtures/RED-252-legacy-content.json'), JSON.stringify({ entries: fixture }))
+    for (const id of HOLY_SUPPORT_SKILL_IDS) {
+      const original = fixture['skills/' + id]
+      const modified = id === 'light-extraction' ? original.code.replace('range: 99', 'range: 1') : original.code
+      const graph = importContentGraph(modified, id === 'blood-echo-trigger' ? 'triggerSkill' : 'skill')
+      const artifact = applyContentGraph(original, graph, 'code')
+      writeFileSync(path.join(root, 'data/skills', id + '.json'), JSON.stringify(artifact))
+    }
+    const file = path.join(root, 'data/skills/light-extraction.json')
+    const before = readFileSync(file, 'utf8')
+    expect(() => migrateHolySupportSkills(root, true)).toThrow(/differs from frozen/)
+    expect(readFileSync(file, 'utf8')).toBe(before)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})

@@ -20,10 +20,48 @@ import { installedResourceVersion, resolvedResourceVersion } from '../../electro
 import type { BuildContentOperationV1, ContentPipelineOperationV1 } from '../../lib/content-pipeline/tooling/contracts'
 import type { PieceInstance } from '../../lib/game/piece'
 import type { BattleState } from '../../lib/game/turn'
+import { applyGameplayModuleGraph, assertGameplayModuleDocument } from '../../lib/skill-graph/module-document'
+import type { GameplayModuleGraph, GameplayStatement } from '../../lib/skill-graph/module-types'
 
 const roots: string[] = []
 const appRoot = process.cwd()
-afterEach(() => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }) })
+const scriptReleaseRootPrefix = 'rvb-script-release-'
+const cleanupConcurrency = 4
+function ownedScriptReleaseRoot(root: string): string {
+  const resolved = path.resolve(root)
+  const tempRoot = path.resolve(tmpdir())
+  if (path.dirname(resolved).toLowerCase() !== tempRoot.toLowerCase()
+    || !path.basename(resolved).startsWith(scriptReleaseRootPrefix)) {
+    throw new Error(`refusing to remove unexpected script-release temp root: ${resolved}`)
+  }
+  return resolved
+}
+async function removeScriptReleaseRoot(root: string): Promise<void> {
+  const resolved = ownedScriptReleaseRoot(root)
+  let entries: fs.Dirent[]
+  try {
+    entries = await fs.promises.readdir(resolved, { withFileTypes: true })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  const children = entries.map(entry => path.join(resolved, entry.name))
+  let next = 0
+  const worker = async () => {
+    while (next < children.length) {
+      const child = children[next++]!
+      await fs.promises.rm(child, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    }
+  }
+  const results = await Promise.allSettled(Array.from({ length: Math.min(cleanupConcurrency, children.length) }, worker))
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+  if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'script-release temporary cleanup failed')
+  await fs.promises.rm(resolved, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+}
+afterEach(async () => {
+  vi.unstubAllEnvs()
+  await Promise.all(roots.splice(0).map(removeScriptReleaseRoot))
+})
 const digest = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 function githubFixture() {
   const releases: { id: number; draft: boolean; html_url: string; assets: { name: string; size: number; digest: string; state: string; browser_download_url: string }[] }[] = []
@@ -75,6 +113,10 @@ it('imports current JSON SkillCode, publishes accepted edits, installs and runs 
   console.info('script-pack: current original imported')
   const host = path.join(root, 'host'); fs.mkdirSync(path.join(host, 'config'), { recursive: true })
   fs.cpSync(path.join(appRoot, 'data'), path.join(host, 'data'), { recursive: true })
+  // Patch verification rebuilds the bundled base from this isolated host.
+  // Include its actual art as well as JSON, just like a packaged client.
+  fs.mkdirSync(path.join(host, 'public'), { recursive: true })
+  fs.cpSync(path.join(appRoot, 'public/images'), path.join(host, 'public/images'), { recursive: true })
   const keyFile = path.join(root, 'publisher.key'); fs.writeFileSync(keyFile, '2'.repeat(64))
   const keyId = publicationKeyId(keyFile)
   const trust = (keys: string[]) => fs.writeFileSync(path.join(host, 'config/content-script-publishers.json'), JSON.stringify({ schema: 'rvb-script-publishers/v1', keyIds: keys }))
@@ -86,15 +128,52 @@ it('imports current JSON SkillCode, publishes accepted edits, installs and runs 
     const filename = path.join(importedRoot, relative), value = JSON.parse(fs.readFileSync(filename, 'utf8'))
     change(value); fs.writeFileSync(filename, JSON.stringify(value, null, 2) + '\n')
   }
-  edit(paths[0], value => { expect(value.stats.attack).toBe(4); value.stats.attack = 5 })
-  edit(paths[1], value => { value.description = '造成或受到伤害后，恢复1点生命。' })
-  for (const relative of paths.slice(2)) edit(relative, value => { expect(value.skillCode).toMatch(/heal:\s*2/); value.skillCode = value.skillCode.replace(/heal:\s*2/g, 'heal: 1') })
+  let editedAttack = 0
+  edit(paths[0], value => { expect(Number.isFinite(value.stats.attack)).toBe(true); editedAttack = value.stats.attack + 1; value.stats.attack = editedAttack })
+  edit(paths[1], value => { value.description = '造成或受到伤害后，恢复2点生命。' })
+  for (const relative of paths.slice(2)) {
+    const filename = path.join(importedRoot, relative), value = JSON.parse(fs.readFileSync(filename, 'utf8'))
+    assertGameplayModuleDocument(value)
+    const graph: GameplayModuleGraph = value.gameplayModules.entries.skillCode.graph
+    let changedAmounts = 0
+    const changeHeal = (body: readonly GameplayStatement[]): GameplayStatement[] => body.map(node => {
+      if (node.kind === 'call' && node.id === 'heal' && node.module === 'effect.queue-heal') {
+        expect(node.inputs?.amount).toEqual({ kind: 'literal', value: 1 })
+        changedAmounts++
+        return { ...node, inputs: { ...node.inputs, amount: { kind: 'literal', value: 2 } } }
+      }
+      if (node.kind === 'if') return { ...node, then: changeHeal(node.then), ...(node.else ? { else: changeHeal(node.else) } : {}) }
+      return node
+    })
+    const edited = applyGameplayModuleGraph(value, { ...graph, body: changeHeal(graph.body) }, 'skillCode')
+    expect(changedAmounts).toBe(1)
+    fs.writeFileSync(filename, JSON.stringify(edited, null, 2) + '\n')
+  }
+  // Carry an actual targeting edit through admission, archive and client
+  // loading. Checking only the saved graph missed stale targeting metadata.
+  const targetingPath = 'data/skills/naruto-shadow-clone.json'
+  const targetingFile = path.join(importedRoot, targetingPath)
+  const targetDefinition = JSON.parse(fs.readFileSync(targetingFile, 'utf8'))
+  assertGameplayModuleDocument(targetDefinition)
+  const targetGraph: GameplayModuleGraph = targetDefinition.gameplayModules.entries.code.graph
+  let editedTargets = 0
+  const targetBody = targetGraph.body.map(statement => {
+    if (statement.kind !== 'call' || statement.id !== 'target' || statement.module !== 'author.choice.target-cell') return statement
+    expect(statement.parameters?.range).toBe(5)
+    editedTargets++
+    return { ...statement, parameters: { ...statement.parameters, range: 6 } }
+  })
+  const updatedTargetDefinition = applyGameplayModuleGraph(targetDefinition, { ...targetGraph, body: targetBody }, 'code')
+  expect(editedTargets).toBe(1)
+  expect(updatedTargetDefinition.targetText).toBe('地格（6）')
+  fs.writeFileSync(targetingFile, JSON.stringify(updatedTargetDefinition, null, 2) + '\n')
+  paths.push(targetingPath)
   const changed = workbench.inspect(imported.taskId)
   expect(changed.changes.map(item => item.path).sort()).toEqual([...paths].sort())
   const accepted = workbench.accept(imported.taskId, { paths, expectedHash: changed.contentHash, expectedAcceptedHash: changed.acceptedHash })
-  console.info('script-pack: four edits accepted')
+  console.info('script-pack: five edits accepted, including targeting metadata')
   const service = new ResourceRelease(imported.root, host, path.join(root, 'private'), input => runContentPipelineOperationV1(input as ContentPipelineOperationV1))
-  const exported = await service.export(imported.taskId, accepted.acceptedHash, '攻击 5，回血 1')
+  const exported = await service.export(imported.taskId, accepted.acceptedHash, `攻击 ${editedAttack}，回血 2`)
   expect(exported.published).toBe(false)
   const remote = githubFixture(), settings = { repository: 'owner/game', token: 'fixture-only', keyFile }
   trust([])
@@ -120,11 +199,34 @@ it('imports current JSON SkillCode, publishes accepted edits, installs and runs 
   expect(newStore().readState().stable.resolvedProfileHash).toBe(installed.reference.resolvedProfileHash)
   const installedRoot = store.profileRoot(installed.reference)!
   vi.stubEnv('RVB_PROFILE_ROOT', installedRoot); vi.stubEnv('APP_ROOT_DIR', appRoot); vi.stubEnv('USER_DATA_DIR', path.join(root, 'userdata'))
-  expect(JSON.parse(fs.readFileSync(path.join(installedRoot, paths[0]), 'utf8')).stats.attack).toBe(5)
+  expect(JSON.parse(fs.readFileSync(path.join(installedRoot, paths[0]), 'utf8')).stats.attack).toBe(editedAttack)
   const { RuleRuntime, withRuleRuntime } = await import('../../lib/game/rule-runtime')
-  const { dealDamage, loadRuleById } = await import('../../lib/game/skills')
+  const { dealDamage, loadRuleById, loadSkillById } = await import('../../lib/game/skills')
+  const { prepareAction } = await import('../../lib/game/targeting')
   const { globalTriggerSystem } = await import('../../lib/game/triggers')
   const { makePiece, makeState } = await import('../helpers/minimal-state')
+  const installedTargetSkill = loadSkillById('naruto-shadow-clone', true)!
+  expect(installedTargetSkill).toMatchObject({ targetText: '地格（6）' })
+  expect(installedTargetSkill.description).toContain('地格（6）')
+  assertGameplayModuleDocument(installedTargetSkill)
+  const targetSource = makePiece({
+    instanceId: 'installed-naruto', ownerPlayerId: 'player-red', x: 0, y: 0,
+    skills: [{ skillId: 'naruto-shadow-clone', currentCooldown: 0, usesRemaining: -1 }],
+  })
+  const targetState = makeState({ pieces: [targetSource], width: 8, height: 2 })
+  targetState.skillsById['naruto-shadow-clone'] = installedTargetSkill
+  const targetAction = { type: 'useBasicSkill', playerId: 'player-red', pieceId: targetSource.instanceId, skillId: 'naruto-shadow-clone' }
+  const optionPreparation = prepareAction(targetState, targetAction)
+  expect(optionPreparation.kind).toBe('needOption')
+  const installedTargetPreparation = prepareAction(targetState, {
+    ...targetAction, selectedOption: 'summon',
+    selectionId: optionPreparation.kind === 'needOption' ? optionPreparation.selectionId : undefined,
+    stateRevision: optionPreparation.kind === 'needOption' ? optionPreparation.stateRevision : undefined,
+  })
+  expect(installedTargetPreparation).toMatchObject({ kind: 'needTarget', range: 6 })
+  if (installedTargetPreparation.kind === 'needTarget') {
+    expect(installedTargetPreparation.candidates).toContainEqual({ type: 'cell', x: 6, y: 0 })
+  }
   globalTriggerSystem.clearRules()
   try {
     const piece = makePiece({ instanceId: 'ulquiorra', templateId: 'dark-ulquiorra', ownerPlayerId: 'player-red', x: 0, y: 0, currentHp: 6, maxHp: 12, attack: 4, moveRange: 3 }) as unknown as PieceInstance
@@ -134,16 +236,16 @@ it('imports current JSON SkillCode, publishes accepted edits, installs and runs 
     const enemy = makePiece({ instanceId: 'enemy', ownerPlayerId: 'player-blue', x: 1, y: 0, currentHp: 30, maxHp: 30 }) as unknown as PieceInstance
     const state = makeState({ pieces: [piece, enemy] }) as unknown as BattleState
     withRuleRuntime(new RuleRuntime({ rootSeed: 202, tick: 1 }), () => {
-      dealDamage(piece, enemy, 1, 'true', state, 'outgoing'); expect(piece.currentHp).toBe(7)
-      dealDamage(enemy, piece, 1, 'true', state, 'incoming'); expect(piece.currentHp).toBe(7)
-      dealDamage(piece, enemy, 1, 'true', state, 'outgoing-2'); expect(piece.currentHp).toBe(8)
+      dealDamage(piece, enemy, 1, 'true', state, 'outgoing'); expect(piece.currentHp).toBe(8)
+      dealDamage(enemy, piece, 1, 'true', state, 'incoming'); expect(piece.currentHp).toBe(9)
+      dealDamage(piece, enemy, 1, 'true', state, 'outgoing-2'); expect(piece.currentHp).toBe(11)
     })
     expect(piece.statusTags.find(tag => tag.type === 'ulquiorra-resurreccion-progress')?.intensity).toBe(3)
     globalTriggerSystem.checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' })
-    expect([piece.attack, piece.moveRange, piece.currentHp]).toEqual([5, 4, 8])
+    expect([piece.attack, piece.moveRange, piece.currentHp]).toEqual([5, 4, 11])
   } finally { globalTriggerSystem.clearRules() }
   console.info('script-pack: installed gameplay verified')
-  edit(paths[0], value => { value.stats.attack = 6 })
+  edit(paths[0], value => { value.stats.attack = editedAttack + 1 })
   const draft = workbench.inspect(imported.taskId), next = workbench.accept(imported.taskId, { paths: [paths[0]], expectedHash: draft.contentHash, expectedAcceptedHash: draft.acceptedHash })
   const second = await service.publish(imported.taskId, next.acceptedHash, 'second', settings, remote.fetcher, () => {})
   console.info('script-pack: automatic patch verified and uploaded to mock')
@@ -179,15 +281,16 @@ it('imports current JSON SkillCode, publishes accepted edits, installs and runs 
     },
     applied: () => {},
   })
-  expect((await newUpdater().check()).phase).toBe('current')
+  const firstUpdate = await newUpdater().check()
+  expect(firstUpdate.phase, JSON.stringify(firstUpdate)).toBe('current')
   expect(installations).toBe(1)
   expect((await newUpdater().check()).phase).toBe('current') // Fresh process, no memory or receipt.
   expect(installations).toBe(1)
   expect(patched).toBeTruthy()
-  expect(JSON.parse(Buffer.from(store.openVerifiedSnapshot(patched!.reference).readFile(paths[0])!).toString()).stats.attack).toBe(6)
+  expect(JSON.parse(Buffer.from(store.openVerifiedSnapshot(patched!.reference).readFile(paths[0])!).toString()).stats.attack).toBe(editedAttack + 1)
   store.selectRollbackCandidate('previous-stable')
   const rollback = store.beginActivation(installed.reference.resolvedProfileHash); store.commitActivation(rollback.activationId, rollback.targetProfileHash)
-  expect(JSON.parse(Buffer.from(store.openVerifiedSnapshot(store.readState().stable).readFile(paths[0])!).toString()).stats.attack).toBe(5)
+  expect(JSON.parse(Buffer.from(store.openVerifiedSnapshot(store.readState().stable).readFile(paths[0])!).toString()).stats.attack).toBe(editedAttack)
   const tampered = readProfileArchiveV1(signed), badArchive = path.join(root, 'tampered.rvbpack')
   writeArchiveFileV1(badArchive, { ...tampered, entries: tampered.entries.map(entry => entry.path === paths[0] ? { ...entry, bytes: Buffer.from('{}') } : entry) })
   const before = store.readState()

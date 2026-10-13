@@ -1,0 +1,44 @@
+{
+  "task": "authority-skillsbyid-cpu-diagnosis",
+  "generatedAt": "2026-10-12T13:16:00+08:00",
+  "command": "node --import tsx %TEMP%\\rvb-red252-authority-probe-20261012.mts",
+  "fixture": {
+    "transitions": 100,
+    "initialPersistedSkillsByIdEntries": 0,
+    "hydratedSkillsByIdEntries": 184,
+    "hydratedStateJsonChars": 8253180
+  },
+  "observedTimingsMs": {
+    "allTransitionsP50": 130.9152,
+    "allTransitionsP95": 157.6842,
+    "allTransitionsMax": 484.8283,
+    "beginPhaseP50": 138.9989,
+    "beginPhaseP95": 168.8898,
+    "endTurnP50": 73.3258,
+    "endTurnP95": 89.8072
+  },
+  "cloneOperations": {
+    "jsonStringify": {
+      "count": 304,
+      "withSkillsById": 303,
+      "totalMs": 6087.252,
+      "maxMs": 31.3595,
+      "skillsByIdCharsObserved": 2476031474
+    },
+    "jsonParse": {
+      "count": 300,
+      "totalMs": 4071.3924,
+      "maxMs": 61.2273
+    }
+  },
+  "cpuProfile": {
+    "directory": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-authority-standalone-cpu-20261012b",
+    "runBattleActionInclusiveMs": 10019.08,
+    "safeCloneBattleStateInclusiveMs": 6353.31,
+    "withServerSkillsInclusiveMs": 365.23,
+    "loadAllSkillsByIdInclusiveMs": 363.71,
+    "profileNote": "safeCloneBattleState has two profiled call sites; inclusive values overlap and must not be summed. The dominant samples are inside hydrated-state cloning."
+  },
+  "conclusion": "The authority regression is dominated by repeated JSON stringify/parse of the hydrated 184-definition skillsById map inside safeCloneBattleState and its effect-execution clone path. loadSkillById/file parsing is a secondary cost.",
+  "minimalRecommendation": "Keep canonical persistence and strict validation unchanged. Optimize only the hydrated skillsById clone path with a dedicated per-transition clone/cache that returns independent mutable definitions; do not share caller-visible definition objects or change hash/persistence semantics."
+}

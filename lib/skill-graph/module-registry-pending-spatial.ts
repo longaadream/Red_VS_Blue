@@ -28,6 +28,8 @@ const choiceType: GameplayValueType = 'choice'
 const pieceListType: GameplayValueType = { kind: 'list', element: pieceType }
 const cellListType: GameplayValueType = { kind: 'list', element: cellType }
 const choiceListType: GameplayValueType = { kind: 'list', element: choiceType }
+const MARKER_STORAGE_KEYS = ['minatoAnchors'] as const
+const TURN_STORAGE_KEYS = ['turalyonLightforgedTurns'] as const
 
 const port = (name: string, type: GameplayValueType, options: Omit<GameplayPort, 'name' | 'type'> = {}): GameplayPort => ({ name, type, ...options })
 const parameter = (name: string, type: GameplayValueType, options: Omit<GameplayParameter, 'name' | 'type'> = {}) => ({ name, type, ...options })
@@ -38,6 +40,16 @@ const input = (ctx: GameplayNativeLoweringContext, name: string, fallback?: stri
     throw new Error(`module ${ctx.moduleId}: missing input ${name}`)
   }
   return value
+}
+/**
+ * Piece ports are deliberately usable with both the host's piece records and
+ * the stable instance IDs produced by query/choice primitives.  The latter is
+ * what the runtime query/effect APIs accept, so normalize at each host
+ * boundary instead of relying on a particular graph's intermediate shape.
+ */
+const pieceId = (ctx: GameplayNativeLoweringContext, name: string, fallback = 'null'): string => {
+  const value = input(ctx, name, fallback)
+  return `(function(value) { return value && typeof value === "object" ? value.instanceId : value; })(${value})`
 }
 const runtime = (ctx: GameplayNativeLoweringContext): string => ctx.surface === 'pending' ? 'ctx.flow' : 'flow'
 const battle = (ctx: GameplayNativeLoweringContext): string => ctx.surface === 'pending' ? 'ctx.battle' : 'battle'
@@ -117,7 +129,7 @@ const CHOICE_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'choice.from-pieces', label: '棋子候选集合', description: '把已查询并按实例标识排序的棋子集合转换为目标候选。',
     inputs: [port('pieces', pieceListType)], outputs: [port('choices', choiceListType)], effects: pure(['pieces']),
-    lower: ctx => `((${input(ctx, 'pieces')} || []).map(function(id) { return {type: "piece", pieceId: id}; }).sort(function(a, b) { return String(a.pieceId).localeCompare(String(b.pieceId)); }))`,
+    lower: ctx => `((${input(ctx, 'pieces')} || []).map(function(value) { var id = value && typeof value === "object" ? value.instanceId : value; return {type: "piece", pieceId: id}; }).sort(function(a, b) { return String(a.pieceId).localeCompare(String(b.pieceId)); }))`,
     ui: { category: 'choice' },
   }),
   define({
@@ -166,19 +178,19 @@ const QUERY_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'piece.is-core', label: '核心棋子', description: '读取内容数据声明的核心棋子标记。',
     inputs: [port('piece', pieceType)], outputs: [port('value', booleanType)], effects: pure(['pieces']),
-    lower: ctx => `Boolean(${runtime(ctx)}.query.piece(${input(ctx, 'piece')}).isCore === true)`,
+    lower: ctx => `(function(pieceId) { var piece = ${runtime(ctx)}.query.piece(pieceId); return Boolean(piece && piece.isCore === true); })(${pieceId(ctx, 'piece')})`,
     ui: { category: 'query' },
   }),
   define({
     id: 'piece.has-position', label: '棋子具有地格', description: '判断棋子当前具有可用于移动的有限地格坐标。',
     inputs: [port('piece', pieceType)], outputs: [port('value', booleanType)], effects: pure(['pieces', 'position']),
-    lower: ctx => `(function(pieceId) { var piece = ${runtime(ctx)}.query.piece(pieceId); return Boolean(piece && Number.isFinite(piece.x) && Number.isFinite(piece.y)); })(${input(ctx, 'piece')})`,
+    lower: ctx => `(function(pieceId) { var piece = ${runtime(ctx)}.query.piece(pieceId); return Boolean(piece && Number.isFinite(piece.x) && Number.isFinite(piece.y)); })(${pieceId(ctx, 'piece')})`,
     ui: { category: 'query' },
   }),
   define({
     id: 'piece.require', label: '解析可空棋子', description: '把已经通过存活或存在检查的可空棋子引用解析为统一棋子 ID。',
     inputs: [port('piece', pieceType, { nullable: true })], outputs: [port('piece', pieceType)], effects: pure(['pieces']),
-    lower: ctx => `(function(pieceId) { return pieceId && ${runtime(ctx)}.query.hasPiece(pieceId) ? pieceId : null; })(${input(ctx, 'piece')})`,
+    lower: ctx => `(function(pieceId) { return pieceId && ${runtime(ctx)}.query.hasPiece(pieceId) ? pieceId : null; })(${pieceId(ctx, 'piece')})`,
     ui: { category: 'query' },
   }),
   define({
@@ -197,8 +209,17 @@ const QUERY_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'spatial.formation-selection-valid', label: '编队选择有效', description: '验证编队选择数量、存活、友方关系和核心标记。',
     inputs: [port('source', pieceType), port('selected', pieceListType)], outputs: [port('value', booleanType)], effects: pure(['pieces', 'players']),
     lower: ctx => {
-      const source = input(ctx, 'source'), selected = input(ctx, 'selected'), state = battle(ctx), query = runtime(ctx)
-      return `(function(sourceId, selectedIds) { if (!Array.isArray(selectedIds) || selectedIds.length < 1 || selectedIds.length > 3 || new Set(selectedIds.map(String)).size !== selectedIds.length) return false; var allies = ${query}.query.pieces({originId:sourceId, relation:"ally", includeDead:false}); return selectedIds.every(function(id) { var piece = (${state}.pieces || []).find(function(candidate) { return candidate && candidate.instanceId === id; }); return Boolean(piece && allies.indexOf(id) >= 0 && piece.isCore === true && piece.currentHp > 0); }); })(${source}, ${selected})`
+      const selected = input(ctx, 'selected'), state = battle(ctx), query = runtime(ctx)
+      return `(function(sourceId, selectedValues) { var selectedIds = Array.isArray(selectedValues) ? selectedValues.map(function(value) { return value && typeof value === "object" ? value.instanceId : value; }) : []; if (selectedIds.length < 1 || selectedIds.length > 3 || new Set(selectedIds.map(String)).size !== selectedIds.length) return false; var allies = ${query}.query.pieces({originId:sourceId, relation:"ally", includeDead:false}); return selectedIds.every(function(id) { var piece = (${state}.pieces || []).find(function(candidate) { return candidate && candidate.instanceId === id; }); return Boolean(piece && allies.indexOf(id) >= 0 && piece.isCore === true && piece.currentHp > 0); }); })(${pieceId(ctx, 'source')}, ${selected})`
+    },
+    ui: { category: 'query' },
+  }),
+  define({
+    id: 'query.adventure-allies', label: '远征可影响友方', description: '按远征边界、友方关系和可影响规则读取稳定排序的存活友方棋子。',
+    inputs: [port('source', pieceType)], outputs: [port('pieces', pieceListType)], effects: pure(['pieces', 'players', 'position']),
+    lower: ctx => {
+      const state = battle(ctx), query = runtime(ctx)
+      return `(function(sourceId) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; return (${state}.pieces || []).filter(function(piece) { return piece && piece.currentHp > 0 && piece.x !== null && piece.y !== null && canAffectAdventureTarget(${state}, source.ownerPlayerId, piece, source) && ${query}.query.alliedPlayers(piece.ownerPlayerId, source.ownerPlayerId); }).sort(function(a, b) { return a.instanceId < b.instanceId ? -1 : (a.instanceId > b.instanceId ? 1 : 0); }).map(function(piece) { return piece.instanceId; }); })(${pieceId(ctx, 'source')})`
     },
     ui: { category: 'query' },
   }),
@@ -206,6 +227,12 @@ const QUERY_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'list.count-pieces', label: '棋子集合数量', description: '读取有界棋子列表的数量。',
     inputs: [port('items', pieceListType)], outputs: [port('value', numberType)], effects: pure(),
     lower: ctx => `Array.isArray(${input(ctx, 'items')}) ? ${input(ctx, 'items')}.length : 0`,
+    ui: { category: 'query' },
+  }),
+  define({
+    id: 'list.sort-pieces', label: '棋子稳定排序', description: '复制棋子标识集合并按实例标识稳定排序。',
+    inputs: [port('items', pieceListType)], outputs: [port('sorted', pieceListType)], effects: pure(['pieces']),
+    lower: ctx => `(Array.isArray(${input(ctx, 'items')}) ? ${input(ctx, 'items')}.map(function(value) { return value && typeof value === "object" ? value.instanceId : value; }).slice().sort(function(left, right) { return String(left).localeCompare(String(right)); }) : [])`,
     ui: { category: 'query' },
   }),
   define({
@@ -254,7 +281,7 @@ const QUERY_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'status.has-source-mark', label: '来源标记存在', description: '查询目标身上由指定来源施加的状态标记。',
     inputs: [port('target', pieceType, { nullable: true }), port('source', pieceType, { nullable: true })], outputs: [port('value', booleanType)],
     parameters: [parameter('statusType', stringType)], effects: pure(['statuses']),
-    lower: ctx => `(function(targetId, sourceId) { if (!targetId || !sourceId) return false; return ((${runtime(ctx)}.query.piece(targetId).statusTags || []).some(function(tag) { return tag && tag.type === ${stringLiteral(ctx, 'statusType')} && tag.sourceId === sourceId.toString() && (tag.stacks || 1) > 0; })); })(${input(ctx, 'target')}, ${input(ctx, 'source')})`,
+    lower: ctx => `(function(targetId, sourceId) { if (!targetId || !sourceId) return false; var target = ${runtime(ctx)}.query.piece(targetId); return Boolean(target && (target.statusTags || []).some(function(tag) { return tag && tag.type === ${stringLiteral(ctx, 'statusType')} && tag.sourceId === sourceId.toString() && (tag.stacks || 1) > 0; })); })(${pieceId(ctx, 'target')}, ${pieceId(ctx, 'source')})`,
     ui: { category: 'status' },
   }),
 ]
@@ -281,7 +308,7 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'spatial.cell-unoccupied', label: '地格无存活棋子', description: '读取地格是否没有存活占位，可忽略一个棋子。',
     inputs: [port('cell', cellType, { nullable: true }), port('ignore', pieceType, { nullable: true, optional: true })], outputs: [port('value', booleanType)], effects: pure(['position', 'pieces']),
-    lower: ctx => `(function(cell, ignore) { if (!cell) return false; return !(${battle(ctx)}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); })(${input(ctx, 'cell')}, ${input(ctx, 'ignore', 'null')})`,
+    lower: ctx => `(function(cell, ignore) { if (!cell) return false; return !(${battle(ctx)}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); })(${input(ctx, 'cell')}, ${pieceId(ctx, 'ignore')})`,
     ui: { category: 'position' },
   }),
   define({
@@ -289,8 +316,8 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     inputs: [port('source', pieceType), port('selected', pieceListType)], outputs: [port('cells', cellListType)],
     parameters: [parameter('range', numberType, { default: 6, minimum: 0 })], effects: pure(['position', 'pieces']),
     lower: ctx => {
-      const source = input(ctx, 'source'), selected = input(ctx, 'selected'), radius = numberLiteral(ctx, 'range', 6), state = battle(ctx)
-      return `(function(sourceId, selectedIds, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; var chosen = Array.isArray(selectedIds) ? selectedIds.map(String) : []; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; var slots = function(x, y) { var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; return offsets.map(function(offset) { return {x:x + offset[0], y:y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }); }; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { return tile && tile.props && tile.props.walkable && !livingAt(tile.x, tile.y) && Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) <= radius && slots(tile.x, tile.y).length >= chosen.length; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${source}, ${selected}, ${radius})`
+      const selected = input(ctx, 'selected'), radius = numberLiteral(ctx, 'range', 6), state = battle(ctx)
+      return `(function(sourceId, selectedIds, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; var chosen = Array.isArray(selectedIds) ? selectedIds.map(function(value) { return String(value && typeof value === "object" ? value.instanceId : value); }) : []; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; var slots = function(x, y) { var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; return offsets.map(function(offset) { return {x:x + offset[0], y:y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }); }; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { return tile && tile.props && tile.props.walkable && !livingAt(tile.x, tile.y) && Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) <= radius && slots(tile.x, tile.y).length >= chosen.length; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${pieceId(ctx, 'source')}, ${selected}, ${radius})`
     },
     ui: { category: 'position' },
   }),
@@ -299,7 +326,7 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     inputs: [port('center', cellType), port('selected', pieceListType)], outputs: [port('cells', cellListType)], effects: pure(['position', 'pieces']),
     lower: ctx => {
       const center = input(ctx, 'center'), selected = input(ctx, 'selected'), state = battle(ctx)
-      return `(function(center, selectedIds) { var chosen = (selectedIds || []).map(String); var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; return offsets.map(function(offset) { return {x:center.x + offset[0], y:center.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }).slice(0, chosen.length); })(${center}, ${selected})`
+      return `(function(center, selectedIds) { var chosen = (selectedIds || []).map(function(value) { return String(value && typeof value === "object" ? value.instanceId : value); }); var offsets = [[0,0],[0,-1],[-1,0],[1,0],[0,1]]; var livingAt = function(x, y) { return (${state}.pieces || []).find(function(piece) { return piece && piece.currentHp > 0 && piece.x === x && piece.y === y; }); }; return offsets.map(function(offset) { return {x:center.x + offset[0], y:center.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return false; var occupant = livingAt(cell.x, cell.y); return !occupant || chosen.indexOf(String(occupant.instanceId)) >= 0; }).slice(0, chosen.length); })(${center}, ${selected})`
     },
     ui: { category: 'position' },
   }),
@@ -307,8 +334,8 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'movement.adventure-destinations', label: '远征移动落点', description: '沿四个正交方向追踪可经过友军的远征路径并读取合法落点。',
     inputs: [port('mover', pieceType)], outputs: [port('cells', cellListType)], effects: pure(['position', 'pieces']),
     lower: ctx => {
-      const mover = input(ctx, 'mover'), query = runtime(ctx), state = battle(ctx)
-      return `(function(moverId) { var mover = ${query}.query.piece(moverId); if (!mover) return []; var maxDistance = Math.min(((${state}.map && ${state}.map.width) || 0) + ((${state}.map && ${state}.map.height) || 0), Math.max(0, Math.floor((mover.moveRange || 0) + 2))); var directions = [{x:0,y:-1},{x:-1,y:0},{x:1,y:0},{x:0,y:1}]; var result = []; var seen = {}; directions.forEach(function(direction) { var trace = ${query}.query.tracePath(mover, direction, {excludePieceId:mover.instanceId, maxDistance:maxDistance, passAllies:true}); ${query}.query.landingCells(trace.cells, [mover.instanceId]).forEach(function(cell) { var key = cell.x + "," + cell.y; if (!seen[key]) { seen[key] = true; result.push({x:cell.x,y:cell.y}); } }); }); return result; })(${mover})`
+      const query = runtime(ctx), state = battle(ctx)
+      return `(function(moverId) { var mover = ${query}.query.piece(moverId); if (!mover) return []; return (${query}.query.normalMoveTargets(moverId) || []).filter(function(cell) { return cell && canPlaceAdventurePiece(${state}, mover, cell.x, cell.y); }).map(function(cell) { return {x:cell.x, y:cell.y}; }); })(${pieceId(ctx, 'mover')})`
     },
     ui: { category: 'position' },
   }),
@@ -317,8 +344,8 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     inputs: [port('target', pieceType), port('reference', cellType, { nullable: true }), port('ignore', pieceType, { nullable: true, optional: true })], outputs: [port('cell', cellType, { nullable: true })],
     parameters: [parameter('diagonal', booleanType, { default: true })], effects: pure(['position', 'pieces']),
     lower: ctx => {
-      const target = input(ctx, 'target'), reference = input(ctx, 'reference'), ignore = input(ctx, 'ignore', 'null'), state = battle(ctx), diagonal = booleanLiteral(ctx, 'diagonal', true)
-      return `(function(targetId, reference, ignore, diagonal) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !reference) return null; var offsets = diagonal ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] : [[1,0],[-1,0],[0,1],[0,-1]]; var best = null; var bestDistance = Infinity; offsets.forEach(function(offset) { var cell = {x:target.x + offset[0], y:target.y + offset[1]}; var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return; var occupied = (${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); if (occupied) return; var distance = Math.abs(cell.x - reference.x) + Math.abs(cell.y - reference.y); if (distance < bestDistance) { bestDistance = distance; best = cell; } }); return best; })(${target}, ${reference}, ${ignore}, ${diagonal})`
+      const reference = input(ctx, 'reference'), state = battle(ctx), diagonal = booleanLiteral(ctx, 'diagonal', true)
+      return `(function(targetId, reference, ignore, diagonal) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !reference) return null; var offsets = diagonal ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]] : [[1,0],[-1,0],[0,1],[0,-1]]; var best = null; var bestDistance = Infinity; offsets.forEach(function(offset) { var cell = {x:target.x + offset[0], y:target.y + offset[1]}; var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable) return; var occupied = (${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); if (occupied) return; var distance = Math.abs(cell.x - reference.x) + Math.abs(cell.y - reference.y); if (distance < bestDistance) { bestDistance = distance; best = cell; } }); return best; })(${pieceId(ctx, 'target')}, ${reference}, ${pieceId(ctx, 'ignore')}, ${diagonal})`
     },
     ui: { category: 'position' },
   }),
@@ -326,8 +353,8 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'spatial.random-adjacent-landing', label: '随机相邻落点', description: '按权威随机源从目标的正交合法落点中选择一格。',
     inputs: [port('target', pieceType), port('ignore', pieceType, { nullable: true, optional: true })], outputs: [port('cell', cellType, { nullable: true })], effects: { ...pure(['position', 'pieces', 'random']), random: true },
     lower: ctx => {
-      const target = input(ctx, 'target'), ignore = input(ctx, 'ignore', 'null'), state = battle(ctx), query = runtime(ctx), context = host(ctx)
-      return `(function(targetId, ignoreId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target) return null; var reserved = Array.isArray(${context}.reservedCells) ? ${context}.reservedCells : []; var offsets = [[1,0],[-1,0],[0,1],[0,-1]]; var cells = offsets.map(function(offset) { return {x:target.x + offset[0], y:target.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable || reserved.some(function(reservedCell) { return reservedCell && reservedCell.x === cell.x && reservedCell.y === cell.y; })) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && String(piece.instanceId) !== String(ignoreId || "") && piece.x === cell.x && piece.y === cell.y; }); }); return ${query}.query.random(cells); })(${target}, ${ignore})`
+      const state = battle(ctx), query = runtime(ctx), context = host(ctx)
+      return `(function(targetId, ignoreId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target) return null; var reserved = Array.isArray(${context}.reservedCells) ? ${context}.reservedCells : []; var offsets = [[1,0],[-1,0],[0,1],[0,-1]]; var cells = offsets.map(function(offset) { return {x:target.x + offset[0], y:target.y + offset[1]}; }).filter(function(cell) { var tile = (${state}.map && ${state}.map.tiles || []).find(function(item) { return item && item.x === cell.x && item.y === cell.y; }); if (!tile || !tile.props || !tile.props.walkable || reserved.some(function(reservedCell) { return reservedCell && reservedCell.x === cell.x && reservedCell.y === cell.y; })) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && String(piece.instanceId) !== String(ignoreId || "") && piece.x === cell.x && piece.y === cell.y; }); }); return ${query}.query.random(cells); })(${pieceId(ctx, 'target')}, ${pieceId(ctx, 'ignore')})`
     },
     ui: { category: 'position' },
   }),
@@ -335,7 +362,7 @@ const CELL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'movement.adventure-move', label: '远征位移', description: '按远征动作提交一名棋子的统一位移。',
     inputs: [port('mover', pieceType), port('destination', cellType, { nullable: true })], outputs: [port('success', booleanType)],
     effects: writes(['position', 'events'], ['beforePiecePositionChange', 'afterPiecePositionChange', 'afterPiecePathContact']),
-    lower: ctx => `(function(destination) { return destination ? ${runtime(ctx)}.effects.move([{pieceId:${input(ctx, 'mover')}, x:destination.x, y:destination.y}], "dash").success : false; })(${input(ctx, 'destination')})`,
+    lower: ctx => `(function(moverId, destination) { return destination ? ${runtime(ctx)}.effects.freeMove(moverId, {x:destination.x, y:destination.y}).success : false; })(${pieceId(ctx, 'mover')}, ${input(ctx, 'destination')})`,
     ui: { category: 'effect' },
   }),
 ]
@@ -347,51 +374,64 @@ const EFFECT_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     parameters: [parameter('kind', stringType, { enum: ['teleport', 'dash'], default: 'teleport' })], effects: writes(['position', 'events'], ['beforePiecePositionChange', 'afterPiecePositionChange', 'afterPiecePathContact']),
     lower: ctx => {
       const pieces = input(ctx, 'pieces'), destinations = input(ctx, 'destinations'), kind = literal(ctx, 'kind', 'teleport'), query = runtime(ctx)
-      return `(function(pieces, destinations) { if (!Array.isArray(pieces) || !Array.isArray(destinations) || pieces.length !== destinations.length || pieces.length === 0) return false; var changes = pieces.map(function(pieceId, index) { return {pieceId:pieceId, x:destinations[index].x, y:destinations[index].y}; }); return Boolean(${query}.effects.displace(changes, ${kind}).success); })(${pieces}, ${destinations})`
+      return `(function(pieceValues, destinations) { if (!Array.isArray(pieceValues) || !Array.isArray(destinations) || pieceValues.length !== destinations.length || pieceValues.length === 0) return false; var changes = pieceValues.map(function(value, index) { var pieceId = value && typeof value === "object" ? value.instanceId : value; return {pieceId:pieceId, x:destinations[index].x, y:destinations[index].y}; }); return Boolean(${query}.effects.displace(changes, ${kind}).success); })(${pieces}, ${destinations})`
     },
     ui: { category: 'effect' },
+  }),
+]
+
+const RULE_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
+  define({
+    id: 'rule.append-reference', label: '追加规则引用', description: '以稳定的规则标识引用记录追加棋子规则，保持旧内容的轻量规则存储形状。',
+    inputs: [port('target', pieceType)], outputs: [port('success', booleanType)],
+    parameters: [parameter('ruleId', stringType)], effects: writes(['rule']),
+    lower: ctx => {
+      const state = battle(ctx), target = input(ctx, 'target'), ruleId = stringLiteral(ctx, 'ruleId')
+      return `(function(targetId, ruleId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || typeof ruleId !== "string" || ruleId.length === 0) return false; target.rules = Array.isArray(target.rules) ? target.rules : []; if (target.rules.some(function(rule) { return rule && rule.id === ruleId; })) return true; target.rules.push({id:ruleId}); return true; })(${target}, ${ruleId})`
+    },
+    ui: { category: 'rule' },
   }),
 ]
 
 const MARKER_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'marker.anchor-cells', label: '现有锚点地格', description: '读取指定来源仍存在的空间锚点。',
-    inputs: [port('source', pieceType)], outputs: [port('cells', cellListType)], parameters: [parameter('storageKey', stringType)], effects: pure(['extensions', 'position']),
-    lower: ctx => `(function(sourceId, storageKey) { var records = ${battle(ctx)}.extensions && Array.isArray(${battle(ctx)}.extensions[storageKey]) ? ${battle(ctx)}.extensions[storageKey] : []; return records.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).map(function(anchor) { return {x:anchor.x, y:anchor.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }); })(${input(ctx, 'source')}, ${stringLiteral(ctx, 'storageKey')})`,
+    inputs: [port('source', pieceType)], outputs: [port('cells', cellListType)], parameters: [parameter('storageKey', stringType, { enum: MARKER_STORAGE_KEYS })], effects: pure(['extensions', 'position']),
+    lower: ctx => `(function(sourceId, storageKey) { var records = ${battle(ctx)}.extensions && Array.isArray(${battle(ctx)}.extensions[storageKey]) ? ${battle(ctx)}.extensions[storageKey] : []; return records.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).map(function(anchor) { return {x:anchor.x, y:anchor.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }); })(${pieceId(ctx, 'source')}, ${stringLiteral(ctx, 'storageKey')})`,
     ui: { category: 'position' },
   }),
   define({
     id: 'marker.anchor-exists', label: '锚点存在', description: '查询指定来源在指定地格是否有空间锚点。',
-    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('value', booleanType)], parameters: [parameter('storageKey', stringType)], effects: pure(['extensions']),
-    lower: ctx => `(function(sourceId, cell, storageKey) { return Boolean(cell) && (${battle(ctx)}.extensions && Array.isArray(${battle(ctx)}.extensions[storageKey]) ? ${battle(ctx)}.extensions[storageKey] : []).some(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); })(${input(ctx, 'source')}, ${input(ctx, 'cell')}, ${stringLiteral(ctx, 'storageKey')})`,
+    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('value', booleanType)], parameters: [parameter('storageKey', stringType, { enum: MARKER_STORAGE_KEYS })], effects: pure(['extensions']),
+    lower: ctx => `(function(sourceId, cell, storageKey) { return Boolean(cell) && (${battle(ctx)}.extensions && Array.isArray(${battle(ctx)}.extensions[storageKey]) ? ${battle(ctx)}.extensions[storageKey] : []).some(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); })(${pieceId(ctx, 'source')}, ${input(ctx, 'cell')}, ${stringLiteral(ctx, 'storageKey')})`,
     ui: { category: 'position' },
   }),
   define({
     id: 'marker.anchor-candidates', label: '可标记锚点地格', description: '读取范围内、可行走且无存活占位的锚点候选。',
-    inputs: [port('source', pieceType, { nullable: true })], outputs: [port('cells', cellListType)], parameters: [parameter('range', numberType, { default: 7, minimum: 0 })], effects: pure(['extensions', 'position', 'pieces']),
+    inputs: [port('source', pieceType, { nullable: true })], outputs: [port('cells', cellListType)], parameters: [parameter('range', numberType, { default: 7, minimum: 0 }), parameter('order', stringType, { enum: ['map', 'yx'], default: 'yx' })], effects: pure(['extensions', 'position', 'pieces']),
     lower: ctx => {
-      const source = input(ctx, 'source'), state = battle(ctx), radius = numberLiteral(ctx, 'range', 7)
-      return `(function(sourceId, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { if (!tile || !tile.props || !tile.props.walkable || Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) > radius) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === tile.x && piece.y === tile.y; }); }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${source}, ${radius})`
+      const state = battle(ctx), radius = numberLiteral(ctx, 'range', 7)
+      return `(function(sourceId, radius) { var source = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source) return []; return ((${state}.map && ${state}.map.tiles) || []).filter(function(tile) { if (!tile || !tile.props || !tile.props.walkable || Math.abs(tile.x - source.x) + Math.abs(tile.y - source.y) > radius) return false; return !(${state}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === tile.x && piece.y === tile.y; }); })${ctx.parameters.order === 'map' ? '' : '.sort(function(a, b) { return a.y - b.y || a.x - b.x; })'}.map(function(tile) { return {x:tile.x, y:tile.y}; }); })(${pieceId(ctx, 'source')}, ${radius})`
     },
     ui: { category: 'position' },
   }),
   define({
     id: 'marker.anchor-place', label: '放置空间锚点', description: '写入既有空间锚点和对应地格表现，并按来源保留最近三个。',
-    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType), parameter('tileType', stringType), parameter('maxAnchors', numberType, { default: 3, minimum: 1 })],
+    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType, { enum: MARKER_STORAGE_KEYS }), parameter('tileType', stringType), parameter('maxAnchors', numberType, { default: 3, minimum: 1 })],
     effects: writes(['extensions', 'tile-effects'], ['tileEffectAdded', 'tileEffectRemoved']),
     lower: ctx => {
-      const source = input(ctx, 'source'), cell = input(ctx, 'cell'), state = battle(ctx), storageKey = stringLiteral(ctx, 'storageKey'), tileType = stringLiteral(ctx, 'tileType'), max = numberLiteral(ctx, 'maxAnchors', 3)
-      return `(function(sourceId, cell, storageKey, tileType, maxAnchors) { var source = (${state}.pieces || []).concat(${state}.graveyard || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source || !cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return false; ${state}.extensions = ${state}.extensions || {}; var anchors = Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []; var tileEffects = Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []; var now = Date.now(); var existing = anchors.find(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); if (existing) existing.createdAt = now; else anchors.push({x:cell.x, y:cell.y, sourceId:sourceId, ownerPlayerId:source.ownerPlayerId, createdAt:now}); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); tileEffects.push({x:cell.x, y:cell.y, sourceId:sourceId, tileType:tileType, icon:"⚡", bgColor:"rgba(250, 204, 21, 0.14)", boxShadow:"inset 0 0 0 2px rgba(250, 204, 21, 0.75)", iconPosition:"top-left"}); while (anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).length > maxAnchors) { var own = anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); }); var oldest = own[0]; anchors = anchors.filter(function(anchor) { return anchor !== oldest; }); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === oldest.x && effect.y === oldest.y); }); } ${state}.extensions[storageKey] = anchors; ${state}.extensions.tileEffects = tileEffects; return true; })(${source}, ${cell}, ${storageKey}, ${tileType}, ${max})`
+      const cell = input(ctx, 'cell'), state = battle(ctx), storageKey = stringLiteral(ctx, 'storageKey'), tileType = stringLiteral(ctx, 'tileType'), max = numberLiteral(ctx, 'maxAnchors', 3)
+      return `(function(sourceId, cell, storageKey, tileType, maxAnchors) { var source = (${state}.pieces || []).concat(${state}.graveyard || []).find(function(piece) { return piece && piece.instanceId === sourceId; }); if (!source || !cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return false; ${state}.extensions = ${state}.extensions || {}; var anchors = Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []; var tileEffects = Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []; var now = Date.now(); var existing = anchors.find(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); if (existing) existing.createdAt = now; else anchors.push({x:cell.x, y:cell.y, sourceId:sourceId, ownerPlayerId:source.ownerPlayerId, createdAt:now}); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); tileEffects.push({x:cell.x, y:cell.y, sourceId:sourceId, tileType:tileType, icon:"⚡", bgColor:"rgba(250, 204, 21, 0.14)", boxShadow:"inset 0 0 0 2px rgba(250, 204, 21, 0.75)", iconPosition:"top-left"}); while (anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).length > maxAnchors) { var own = anchors.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); }); var oldest = own[0]; anchors = anchors.filter(function(anchor) { return anchor !== oldest; }); tileEffects = tileEffects.filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === oldest.x && effect.y === oldest.y); }); } ${state}.extensions[storageKey] = anchors; ${state}.extensions.tileEffects = tileEffects; return true; })(${pieceId(ctx, 'source')}, ${cell}, ${storageKey}, ${tileType}, ${max})`
     },
     ui: { category: 'effect' },
   }),
   define({
     id: 'marker.anchor-remove', label: '移除空间锚点', description: '移除指定来源和地格的锚点及其地格表现。',
-    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType), parameter('tileType', stringType)], effects: writes(['extensions', 'tile-effects'], ['tileEffectRemoved']),
+    inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType, { enum: MARKER_STORAGE_KEYS }), parameter('tileType', stringType)], effects: writes(['extensions', 'tile-effects'], ['tileEffectRemoved']),
     lower: ctx => {
-      const source = input(ctx, 'source'), cell = input(ctx, 'cell'), state = battle(ctx)
+      const cell = input(ctx, 'cell'), state = battle(ctx)
       const storageKey = stringLiteral(ctx, 'storageKey'), tileType = stringLiteral(ctx, 'tileType')
-      return `(function(sourceId, cell, storageKey, tileType) { if (!sourceId || !cell || !${state}.extensions) return true; ${state}.extensions[storageKey] = (Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []).filter(function(anchor) { return !(anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y); }); ${state}.extensions.tileEffects = (Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []).filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); return true; })(${source}, ${cell}, ${storageKey}, ${tileType})`
+      return `(function(sourceId, cell, storageKey, tileType) { if (!sourceId || !cell || !${state}.extensions) return true; ${state}.extensions[storageKey] = (Array.isArray(${state}.extensions[storageKey]) ? ${state}.extensions[storageKey] : []).filter(function(anchor) { return !(anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y); }); ${state}.extensions.tileEffects = (Array.isArray(${state}.extensions.tileEffects) ? ${state}.extensions.tileEffects : []).filter(function(effect) { return !(effect && effect.tileType === tileType && effect.sourceId === sourceId && effect.x === cell.x && effect.y === cell.y); }); return true; })(${pieceId(ctx, 'source')}, ${cell}, ${storageKey}, ${tileType})`
     },
     ui: { category: 'effect' },
   }),
@@ -399,8 +439,8 @@ const MARKER_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'marker.nearby-enemies', label: '锚点附近敌人', description: '按锚点地格和来源棋子的敌我关系读取宿主顺序敌人集合。',
     inputs: [port('source', pieceType, { nullable: true }), port('cell', cellType, { nullable: true })], outputs: [port('pieces', pieceListType)], parameters: [parameter('range', numberType, { default: 3, minimum: 0 })], effects: pure(['pieces', 'position']),
     lower: ctx => {
-      const source = input(ctx, 'source'), cell = input(ctx, 'cell'), radius = numberLiteral(ctx, 'range', 3), state = battle(ctx)
-      return `(function(sourceId, cell, radius) { if (!cell) return []; var candidates = ${runtime(ctx)}.query.pieces({originId: sourceId, relation: "enemy", includeDead: false}); return candidates.filter(function(id) { var piece = (${state}.pieces || []).find(function(item) { return item && item.instanceId === id; }); return piece && Math.abs(piece.x - cell.x) + Math.abs(piece.y - cell.y) <= radius; }); })(${source}, ${cell}, ${radius})`
+      const cell = input(ctx, 'cell'), radius = numberLiteral(ctx, 'range', 3), state = battle(ctx)
+      return `(function(sourceId, cell, radius) { if (!cell) return []; var candidates = ${runtime(ctx)}.query.pieces({originId: sourceId, relation: "enemy", includeDead: false}); return candidates.filter(function(id) { var piece = (${state}.pieces || []).find(function(item) { return item && item.instanceId === id; }); return piece && Math.abs(piece.x - cell.x) + Math.abs(piece.y - cell.y) <= radius; }); })(${pieceId(ctx, 'source')}, ${cell}, ${radius})`
     },
     ui: { category: 'query' },
   }),
@@ -408,8 +448,8 @@ const MARKER_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     id: 'marker.trigger-target', label: '飞雷神触发目标', description: '按标记者的敌我关系解析施法者或被指向目标。',
     inputs: [port('source', pieceType, { nullable: true }), port('marked', pieceType, { nullable: true }), port('origin', pieceType, { nullable: true })], outputs: [port('target', pieceType, { nullable: true })], effects: pure(['pieces', 'players']),
     lower: ctx => {
-      const source = input(ctx, 'source'), marked = input(ctx, 'marked'), origin = input(ctx, 'origin'), query = runtime(ctx)
-      return `(function(sourceId, markedId, originId) { if (!sourceId || !markedId || !originId) return null; var allies = ${query}.query.pieces({originId:originId, relation:"ally", includeDead:false}); var enemies = ${query}.query.pieces({originId:originId, relation:"enemy", includeDead:false}); if (allies.indexOf(markedId) >= 0) return enemies.indexOf(sourceId) >= 0 ? sourceId : null; return enemies.indexOf(markedId) >= 0 ? markedId : null; })(${source}, ${marked}, ${origin})`
+      const query = runtime(ctx)
+      return `(function(sourceId, markedId, originId) { if (!sourceId || !markedId || !originId) return null; var allies = ${query}.query.pieces({originId:originId, relation:"ally", includeDead:false}); var enemies = ${query}.query.pieces({originId:originId, relation:"enemy", includeDead:false}); if (allies.indexOf(markedId) >= 0) return enemies.indexOf(sourceId) >= 0 ? sourceId : null; return enemies.indexOf(markedId) >= 0 ? markedId : null; })(${pieceId(ctx, 'source')}, ${pieceId(ctx, 'marked')}, ${pieceId(ctx, 'origin')})`
     },
     ui: { category: 'query' },
   }),
@@ -422,9 +462,9 @@ const MARK_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     parameters: [parameter('statusType', stringType), parameter('statusName', stringType), parameter('statusIdPrefix', stringType)],
     effects: writes(['status', 'events'], ['afterStatusApplied']),
     lower: ctx => {
-      const target = input(ctx, 'target'), source = input(ctx, 'source'), query = runtime(ctx), state = battle(ctx)
+      const query = runtime(ctx), state = battle(ctx)
       const type = stringLiteral(ctx, 'statusType'), name = stringLiteral(ctx, 'statusName'), prefix = stringLiteral(ctx, 'statusIdPrefix')
-      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = Array.isArray(target.statusTags) ? target.statusTags : []; var existing = target.statusTags.find(function(tag) { return tag && tag.type === ${type} && tag.sourceId === sourceId; }); if (existing) { existing.stacks = (existing.stacks || 1) + 1; existing.currentDuration = -1; return true; } var id = ${prefix} + "-" + sourceId + "-" + targetId + "-" + Date.now(); return Boolean(${query}.status.add(targetId, {id:id, type:${type}, name:${name}, visible:true, currentDuration:-1, currentUses:-1, intensity:1, stacks:1, sourceId:sourceId}, "piece", "host")); })(${target}, ${source})`
+      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = Array.isArray(target.statusTags) ? target.statusTags : []; var existing = target.statusTags.find(function(tag) { return tag && tag.type === ${type} && tag.sourceId === sourceId; }); if (existing) { existing.stacks = (existing.stacks || 1) + 1; existing.currentDuration = -1; return true; } var id = ${prefix} + "-" + sourceId + "-" + targetId + "-" + Date.now(); return Boolean(${query}.status.add(targetId, {id:id, type:${type}, name:${name}, visible:true, currentDuration:-1, currentUses:-1, intensity:1, stacks:1, sourceId:sourceId}, "piece", "host")); })(${pieceId(ctx, 'target')}, ${pieceId(ctx, 'source')})`
     },
     ui: { category: 'status' },
   }),
@@ -433,8 +473,8 @@ const MARK_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
     inputs: [port('target', pieceType, { nullable: true }), port('source', pieceType, { nullable: true })], outputs: [port('success', booleanType)], parameters: [parameter('statusType', stringType)],
     effects: writes(['status'], ['afterStatusRemoved']),
     lower: ctx => {
-      const target = input(ctx, 'target'), source = input(ctx, 'source'), state = battle(ctx), type = stringLiteral(ctx, 'statusType')
-      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = (target.statusTags || []).filter(function(tag) { return !(tag && tag.type === ${type} && tag.sourceId === sourceId); }); return true; })(${target}, ${source})`
+      const state = battle(ctx), type = stringLiteral(ctx, 'statusType')
+      return `(function(targetId, sourceId) { var target = (${state}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = (target.statusTags || []).filter(function(tag) { return !(tag && tag.type === ${type} && tag.sourceId === sourceId); }); return true; })(${pieceId(ctx, 'target')}, ${pieceId(ctx, 'source')})`
     },
     ui: { category: 'status' },
   }),
@@ -443,13 +483,13 @@ const MARK_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
 const TURN_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'turn.once-read', label: '回合旗标查询', description: '读取指定棋子在当前回合是否已经使用过一次性事件。',
-    inputs: [port('source', pieceType), port('turn', numberType)], outputs: [port('used', booleanType)], parameters: [parameter('storageKey', stringType)], effects: pure(['extensions', 'turn']),
+    inputs: [port('source', pieceType), port('turn', numberType)], outputs: [port('used', booleanType)], parameters: [parameter('storageKey', stringType, { enum: TURN_STORAGE_KEYS })], effects: pure(['extensions', 'turn']),
     lower: ctx => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; return Boolean(${battle(ctx)}.extensions && ${battle(ctx)}.extensions[storageKey] && ${battle(ctx)}.extensions[storageKey][sourceId] === turn); })(${input(ctx, 'source')}, ${input(ctx, 'turn')}, ${stringLiteral(ctx, 'storageKey')})`,
     ui: { category: 'state' },
   }),
   define({
     id: 'turn.once-mark', label: '记录回合旗标', description: '记录指定棋子在当前回合的一次性事件。',
-    inputs: [port('source', pieceType), port('turn', numberType)], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType)], effects: writes(['extensions', 'turn']),
+    inputs: [port('source', pieceType), port('turn', numberType)], outputs: [port('success', booleanType)], parameters: [parameter('storageKey', stringType, { enum: TURN_STORAGE_KEYS })], effects: writes(['extensions', 'turn']),
     lower: ctx => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; ${battle(ctx)}.extensions = ${battle(ctx)}.extensions || {}; ${battle(ctx)}.extensions[storageKey] = ${battle(ctx)}.extensions[storageKey] || {}; ${battle(ctx)}.extensions[storageKey][sourceId] = turn; return true; })(${input(ctx, 'source')}, ${input(ctx, 'turn')}, ${stringLiteral(ctx, 'storageKey')})`,
     ui: { category: 'state' },
   }),
@@ -461,6 +501,7 @@ export const PENDING_SPATIAL_GAMEPLAY_MODULES: readonly GameplayModuleDescriptor
   ...QUERY_PRIMITIVES,
   ...CELL_PRIMITIVES,
   ...EFFECT_PRIMITIVES,
+  ...RULE_PRIMITIVES,
   ...MARKER_PRIMITIVES,
   ...MARK_PRIMITIVES,
   ...TURN_PRIMITIVES,

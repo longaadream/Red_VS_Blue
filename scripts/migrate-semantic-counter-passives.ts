@@ -288,10 +288,10 @@ function buildMomentumGraph(): GameplayModuleGraph {
   )
   requireCondition(body, 'require-moved', out('moved', 'value'))
   body.push(
-    call('core-id', 'status.find-id', { piece }, { statusType: 'momentum-core' }),
-    call('old', 'status.read-number', { piece, statusId: out('core-id', 'id'), fallback: literal(0) }, { field: 'stacks' }),
+    call('core-instance', 'status.find-instance', { piece }, { statusType: 'momentum-core' }),
+    call('old', 'status.read-number-instance', { status: out('core-instance', 'status'), fallback: literal(0) }, { field: 'stacks' }),
     call('next', 'math.add', { left: out('old', 'value'), right: out('distance', 'distance') }),
-    call('save-core', 'status.set-number', { piece, statusId: out('core-id', 'id'), value: out('next', 'value') }, { field: 'stacks' }),
+    call('save-core', 'status.set-number-instance', { status: out('core-instance', 'status'), value: out('next', 'value') }, { field: 'stacks' }),
     call('save-momentum', 'attribute.set-momentum', { piece, value: out('next', 'value') }),
     call('name', 'attribute.text', { piece }, { attribute: 'name' }),
     call('distance-text', 'text.from-number', { value: out('distance', 'distance') }),

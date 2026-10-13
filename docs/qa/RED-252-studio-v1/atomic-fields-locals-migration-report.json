@@ -1,0 +1,293 @@
+{
+  "write": true,
+  "documents": 293,
+  "entries": 381,
+  "changedEntries": 47,
+  "rewrittenGraphs": 47,
+  "changed": [
+    {
+      "file": "data/skills/alfonso-water-dash.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-guidance-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-protection-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-sage-buddha.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/itachi-totsuka-blade.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/max-speed-shot.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-kunai-formula.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-spiral-barrage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-indra-arrow.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-kagutsuchi.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-flame-spirit.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/turalyon-grand-crusade.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-expire.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-rewrite.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-chidori-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-colt-zone-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-elune-guidance.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-mangekyo-friendly-death.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-minato-anchor-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-momentum-consume.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-momentum-gain.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-end.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-block-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-damage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-stack.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shadow-chaos-spear-restore.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-silenced-block.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune-target.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-resolve.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-venom-corrosion-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-5.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-nature-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-thousand-hands.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/rafaam-curse-sample.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/watcher-calm.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/watcher-rage.json",
+      "entries": [
+        "code"
+      ]
+    }
+  ],
+  "guards": [],
+  "errors": []
+}

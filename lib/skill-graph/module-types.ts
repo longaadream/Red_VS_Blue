@@ -3,13 +3,20 @@
  *
  * This file is deliberately data-only.  A graph can refer to named inputs and
  * outputs, registered module calls, and structured control flow, but it never
- * carries JavaScript source, object paths, or callable values.  Trusted native
+ * carries JavaScript source, arbitrary host-object paths, or callable values.
+ * Custom extension paths remain validated data within their named store. Trusted native
  * lowering lives on the registry descriptor and is only invoked by the
  * compiler.
  */
 
 export const GAMEPLAY_MODULE_GRAPH_VERSION = 'rvb-gameplay-modules/v1' as const
-export const GAMEPLAY_MODULE_COMPILER_VERSION = 'rvb-gameplay-module-compiler/v1' as const
+/** The v1 emitter is retained for validating and replaying existing artifacts. */
+export const GAMEPLAY_MODULE_COMPILER_V1_VERSION = 'rvb-gameplay-module-compiler/v1' as const
+/** New documents use the fault-isolating v2 emitter. */
+export const GAMEPLAY_MODULE_COMPILER_V2_VERSION = 'rvb-gameplay-module-compiler/v2' as const
+export const GAMEPLAY_MODULE_COMPILER_V3_VERSION = 'rvb-gameplay-module-compiler/v3' as const
+export const GAMEPLAY_MODULE_COMPILER_VERSION = GAMEPLAY_MODULE_COMPILER_V3_VERSION
+export type GameplayModuleCompilerVersion = typeof GAMEPLAY_MODULE_COMPILER_V1_VERSION | typeof GAMEPLAY_MODULE_COMPILER_V2_VERSION | typeof GAMEPLAY_MODULE_COMPILER_V3_VERSION
 
 /** Compatibility aliases used by callers that call this format simply a graph. */
 export const GAMEPLAY_GRAPH_VERSION = GAMEPLAY_MODULE_GRAPH_VERSION
@@ -59,6 +66,8 @@ export type GameplayValueTypeName =
 export type GameplayValueType =
   | GameplayValueTypeName
   | { readonly kind: 'list'; readonly element: GameplayValueType }
+  | { readonly kind: 'set'; readonly element: GameplayValueType }
+  | { readonly kind: 'map'; readonly key: GameplayValueType; readonly value: GameplayValueType }
   | { readonly kind: 'nullable'; readonly value: GameplayValueType }
   /** A record whose shape is declared by the containing graph schema table. */
   | { readonly kind: 'record'; readonly schema: string }
@@ -130,6 +139,7 @@ export type GameplayNativeLoweringContext = {
   readonly inputs: Readonly<Record<string, string>>
   readonly parameters: Readonly<Record<string, GameplayLiteral>>
   readonly outputPorts: readonly GameplayPort[]
+  readonly recordSchemas?: readonly GameplayRecordSchema[]
   readonly emitLiteral: (value: GameplayLiteral) => string
 }
 
@@ -162,18 +172,50 @@ export type GameplayModuleDescriptor = {
   readonly uiDescription?: string
   readonly inputs: readonly GameplayPort[]
   readonly outputs: readonly GameplayPort[]
+  /** Trusted generic output bindings; author content cannot override them. */
+  readonly outputTypeBindings?: Readonly<Record<string, {
+    readonly input: string
+    readonly projection: 'same' | 'element' | 'singleton'
+  }>>
+  /** Closed author-declared record schemas, selected by a string parameter. */
+  readonly outputSchemaBindings?: Readonly<Record<string, { readonly parameter: string; readonly list?: boolean }>>
+  readonly inputSchemaBindings?: Readonly<Record<string, { readonly parameter: string; readonly list?: boolean }>>
+  /** Closed value type chosen by the type editor; never a script or arbitrary runtime type. */
+  readonly outputValueTypeBindings?: Readonly<Record<string, { readonly parameter: string }>>
+  readonly inputValueTypeBindings?: Readonly<Record<string, { readonly parameter: string; readonly nullable?: boolean }>>
+  /**
+   * Trusted closed field selectors.  A literal parameter selects one of the
+   * registered value types; authors cannot provide a runtime property path or
+   * alter this table from a graph.
+   */
+  readonly outputParameterTypeBindings?: Readonly<Record<string, {
+    readonly parameter: string
+    readonly types: Readonly<Record<string, GameplayValueType>>
+  }>>
   readonly parameters?: readonly GameplayParameter[]
   /**
    * Native query inputs that inspect reference validity themselves.  This is
    * trusted registry metadata; author graphs and composites cannot declare it.
    */
   readonly inspectReferences?: readonly string[]
+  /**
+   * Native inputs that require a currently present, living piece.  This is
+   * trusted registry metadata; author graphs and composites cannot declare it.
+   */
+  readonly livingReferences?: readonly string[]
   readonly allowedSurfaces: readonly GameplayModuleSurface[]
   readonly effects: GameplayEffectMetadata
   readonly ui?: {
     readonly description?: string
     readonly category?: string
     readonly icon?: string
+    /** Compatibility adapters load old resources internally; never offer them for new authoring. */
+    readonly authoring?: 'standard' | 'compatibility'
+    /** Derive a hidden type parameter from a trusted closed field selector. */
+    readonly parameterTypeBindings?: Readonly<Record<string, {
+      readonly parameter: string
+      readonly types: Readonly<Record<string, GameplayValueType>>
+    }>>
   }
   /** Trusted adapter owned by the host registry, never supplied by authors. */
   readonly lower: GameplayNativeLowering
@@ -230,6 +272,34 @@ export type GameplayForeachStatement = {
   readonly item?: string
   /** The loop index is available in the body as output `{ node: id, port: "index" }`. */
   readonly index?: string
+  /** Group matching visual facts without changing effect order. No escaping return or pending choice is allowed in this scope. */
+  readonly presentation?: 'statusAdded' | 'statusRemoved' | 'tileEffectAdded' | 'tileEffectRemoved'
+  readonly body: readonly GameplayStatement[]
+  readonly layout?: Readonly<Record<string, GameplayJsonValue>>
+}
+
+/**
+ * A closed, data-only condition subprocess for a bounded while statement.
+ * Values from the surrounding graph must be passed explicitly through
+ * `inputs`; the subprocess returns its boolean through a scalar return.
+ */
+export type GameplayWhileCondition = {
+  readonly inputs?: Readonly<Record<string, GameplayValue>>
+  readonly body: readonly GameplayStatement[]
+}
+
+/**
+ * A bounded native while loop.  The condition is re-evaluated before every
+ * iteration and may only call pure/query modules.  `index` is an optional
+ * body input name; the loop output `{ node: id, port: "index" }` is always
+ * available to body statements.
+ */
+export type GameplayWhileStatement = {
+  readonly kind: 'while'
+  readonly id: string
+  readonly condition: GameplayWhileCondition
+  readonly index?: string
+  readonly budget: number
   readonly body: readonly GameplayStatement[]
   readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
@@ -274,7 +344,7 @@ export type GameplayRecordWithStatement = {
   readonly fields?: Readonly<Record<string, GameplayValue>>
 }
 
-export type GameplayCollectionMethod = 'map' | 'filter' | 'reduce'
+export type GameplayCollectionMethod = 'map' | 'filter' | 'reduce' | 'find'
 
 /**
  * A bounded, data-only collection subprocess.  `inputs` are the only values
@@ -302,6 +372,9 @@ export type GameplayCollectionMapStatement = Omit<GameplayCollectionStatement, '
 export type GameplayCollectionFilterStatement = Omit<GameplayCollectionStatement, 'kind' | 'method' | 'accumulator' | 'initial'> & {
   readonly kind: 'collection.filter'
 }
+export type GameplayCollectionFindStatement = Omit<GameplayCollectionStatement, 'kind' | 'method' | 'accumulator' | 'initial'> & {
+  readonly kind: 'collection.find'
+}
 export type GameplayCollectionReduceStatement = Omit<GameplayCollectionStatement, 'kind' | 'method'> & {
   readonly kind: 'collection.reduce'
 }
@@ -326,6 +399,9 @@ export type GameplayDeferChoiceStatement = {
   readonly player?: GameplayValue
   readonly title?: GameplayValue
   readonly targetType?: GameplayValue
+  /** Optional host target protocol constraints retained in the pending envelope. */
+  readonly range?: GameplayValue
+  readonly filter?: GameplayValue
   readonly candidates?: GameplayValue
   readonly selectionMode?: GameplayValue
   readonly min?: GameplayValue
@@ -351,12 +427,14 @@ export type GameplayStatement =
   | GameplayCallStatement
   | GameplayIfStatement
   | GameplayForeachStatement
+  | GameplayWhileStatement
   | GameplayRecordCreateStatement
   | GameplayRecordGetStatement
   | GameplayRecordWithStatement
   | GameplayCollectionStatement
   | GameplayCollectionMapStatement
   | GameplayCollectionFilterStatement
+  | GameplayCollectionFindStatement
   | GameplayCollectionReduceStatement
   | GameplayDeferChoiceStatement
   | GameplayReturnStatement
@@ -412,7 +490,7 @@ export type GameplayExpandedModuleGraph = {
 }
 
 export type GameplayModuleCompileResult = {
-  readonly compilerVersion: typeof GAMEPLAY_MODULE_COMPILER_VERSION
+  readonly compilerVersion: GameplayModuleCompilerVersion
   readonly graphVersion: typeof GAMEPLAY_MODULE_GRAPH_VERSION
   readonly surface: GameplayModuleSurface
   readonly code: string
@@ -431,6 +509,8 @@ export type GameplayModuleCompilerOptions = {
   readonly maxLiteralBytes?: number
   /** Maximum number of iterations a structured collection may execute. */
   readonly maxCollectionIterations?: number
+  /** Maximum explicit budget accepted by a structured while statement. */
+  readonly maxWhileIterations?: number
 }
 
 export type ModuleCompilerOptions = GameplayModuleCompilerOptions

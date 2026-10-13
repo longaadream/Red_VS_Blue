@@ -1,10 +1,14 @@
+import { CONTEXT_FACT_MODULES } from './module-registry-context-facts'
+import { SAGE_TOTSUKA_GAMEPLAY_MODULES } from './module-registry-sage-totsuka'
+import { TERRAIN_FACT_MODULES } from './module-registry-terrain-facts'
 /**
  * The first author-facing gameplay module catalogue.
  *
  * Module definitions are deliberately boring data plus trusted host lowering.
  * A content document can name one of these descriptors and provide typed
- * literals/refs, but it cannot provide a function, an object path, or a
- * source-code fragment.  The lowerers below only call the existing flow
+ * literals/refs, but it cannot provide a function, arbitrary host-object path,
+ * or source code. Extension paths are validated data within the named store.
+ * The lowerers below only call the existing flow
  * facade (or the existing rule queue writer for queued healing), so generated
  * modules remain on the current authoritative execution path.
  */
@@ -24,6 +28,22 @@ import type {
 } from './module-types'
 
 import { QUERY_GAMEPLAY_MODULES } from './module-registry-query'
+import { COLLECTION_GAMEPLAY_MODULES } from './module-registry-collections'
+import { AUTHOR_COLLECTION_GAMEPLAY_MODULES } from './module-registry-author-collections'
+import { AUTHOR_BOARD_VALUE_MODULES } from './module-registry-author-board'
+import { AUTHOR_CARD_MODULES } from './module-registry-author-cards'
+import { UNIFIED_AUTHOR_EFFECT_MODULES } from './module-registry-author-effects'
+import { AUTHOR_SUMMON_MODULES } from './module-registry-author-summon'
+import { AUTHOR_SKILL_INSTANCE_MODULES } from './module-registry-author-skill-instance'
+import { AUTHOR_CLUSTER_MODULES } from './module-registry-author-clusters'
+import { AUTHOR_CODE_BLOCK_GAMEPLAY_MODULES } from './module-registry-author-code-block'
+import { AUTHOR_CONTAINER_MODULES } from './module-registry-author-containers'
+import { ATOMIC_COMMIT_GAMEPLAY_MODULES } from './module-registry-atomic-commit'
+import { FLIGHT_STATUS_HOST_GAMEPLAY_MODULES } from './module-registry-flight-status'
+import { AUTHOR_ENTITY_EXTENSION_MODULES } from './module-registry-author-entity-extension'
+import { AUTHOR_RULE_INSTANCE_MODULES } from './module-registry-author-rule-instance'
+import { PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES } from './module-registry-projectile-queries'
+import { DAMAGE_REDIRECT_GAMEPLAY_MODULES } from './module-registry-damage-redirect'
 import { PREVIEW_GAMEPLAY_MODULES } from './module-registry-preview'
 import { FLIGHT_GAMEPLAY_MODULES } from './module-registry-flight-primitives'
 import { SUMMON_GAMEPLAY_MODULES } from './module-registry-summon-primitives'
@@ -39,6 +59,43 @@ import { PROJECTILE_GAMEPLAY_MODULES } from './module-registry-projectiles'
 import { COUNTER_PASSIVE_GAMEPLAY_MODULES } from './module-registry-counter-passives'
 import { EXECUTION_LOCAL_GAMEPLAY_MODULES } from './module-registry-execution-locals'
 import { MOVEMENT_FAMILY_GAMEPLAY_MODULES } from './module-registry-movement-family'
+import { HOLY_SUPPORT_GAMEPLAY_MODULES } from './module-registry-holy-support'
+import { SHISHIO_VELEN_COLT_GAMEPLAY_MODULES } from './module-registry-shishio-velen-colt'
+import { AUTHORING_COMPLETION_GAMEPLAY_MODULES } from './module-registry-authoring-completion'
+import { FOLLOWUP_RULE_GAMEPLAY_MODULES } from './module-registry-followup-rules'
+import { STRUCTURED_ACTION_LOG_GAMEPLAY_MODULES } from './module-registry-followup-structured-log'
+import { FOLLOWUP_STATUS_RULES_GAMEPLAY_MODULES } from './module-registry-followup-status-rules'
+import { FOLLOWUP_COMPOSITION_GAMEPLAY_MODULES } from './module-registry-followup-compositions'
+import { VELEN_SKILLS_GAMEPLAY_MODULES } from './module-registry-velen-skills'
+import { KENSHIN_GAMEPLAY_MODULES } from './module-registry-kenshin'
+import { AMATERASU_GAMEPLAY_MODULES } from './module-registry-amaterasu'
+import { STORED_ATTRIBUTE_MODULES } from './module-registry-stored-attributes'
+import { TOXIN_GAMEPLAY_MODULES } from './module-registry-toxin'
+import { RECALL_GAMEPLAY_MODULES } from './module-registry-recall'
+import { LAMENT_GAMEPLAY_MODULES } from './module-registry-lament'
+import { SHISHIO_FLAME_SPIRIT_GAMEPLAY_MODULES } from './module-registry-shishio-flame-spirit'
+import { ICHIGO_GAMEPLAY_MODULES } from './module-registry-ichigo'
+import { KYOKA_GAMEPLAY_MODULES } from './module-registry-kyoka'
+import { RAFAAM_CURSE_GAMEPLAY_MODULES } from './module-registry-rafaam-curse'
+import { PASSIVE_SETUP_GAMEPLAY_MODULES } from './module-registry-passive-setup'
+import { authorModuleUi } from './author-module-catalog'
+import { AUTHOR_STATE_MODULES, ROOT_AUTHOR_STATE_MODULES, ROOT_AUTHOR_STATE_REMOVE_MODULES, ROOT_AUTHOR_STATE_SUCCESS_MODULES } from './module-registry-author-state'
+import { AUTHOR_CHOICE_GAMEPLAY_MODULES } from './module-registry-author-choice'
+import { FIELD_GAMEPLAY_MODULES } from './module-registry-fields'
+import { GENERIC_VALUE_GAMEPLAY_MODULES } from './module-registry-generic-values'
+import { OPTIONAL_FIELD_GAMEPLAY_MODULES } from './module-registry-optional-fields'
+import { SCALAR_VALUE_MODULES } from './module-registry-scalar-values'
+import { OBSERVATION_FIELD_MODULES } from './module-registry-observation-fields'
+import { CONTEXT_FIELD_GAMEPLAY_MODULES } from './module-registry-context-fields'
+import { PREVIEW_FIELD_GAMEPLAY_MODULES } from './module-registry-preview-fields'
+import { GENERIC_READ_GAMEPLAY_MODULES } from './module-registry-generic-reads'
+import { RECORD_VALUE_GAMEPLAY_MODULES } from './module-registry-record-values'
+import { RECORD_KEY_GAMEPLAY_MODULES } from './module-registry-record-key'
+import { GENERIC_ABILITY_WRITE_GAMEPLAY_MODULES } from './module-registry-generic-ability-writes'
+import { BATTLE_FIELD_GAMEPLAY_MODULES } from './module-registry-battle-fields'
+import { CONTENT_FIELD_GAMEPLAY_MODULES } from './module-registry-content-fields'
+import { SKILL_DEFINITION_FIELD_GAMEPLAY_MODULES } from './module-registry-skill-definition-fields'
+import { GENERIC_CARD_FIELD_GAMEPLAY_MODULES } from './module-registry-generic-card-fields'
 
 export const GAMEPLAY_MODULE_VERSION = '1' as const
 
@@ -163,6 +220,25 @@ function freezeParameter(value: GameplayParameter): GameplayParameter {
     : Object.freeze({ ...value })
 }
 
+function freezeValueType(value: GameplayValueType): GameplayValueType {
+  if (typeof value === 'string') return value
+  if (value.kind === 'list') return Object.freeze({ kind: 'list', element: freezeValueType(value.element) })
+  if (value.kind === 'set') return Object.freeze({ kind: 'set', element: freezeValueType(value.element) })
+  if (value.kind === 'map') return Object.freeze({ kind: 'map', key: freezeValueType(value.key), value: freezeValueType(value.value) })
+  if (value.kind === 'nullable') return Object.freeze({ kind: 'nullable', value: freezeValueType(value.value) })
+  return Object.freeze({ kind: 'record', schema: value.schema })
+}
+
+function freezeOutputParameterTypeBindings(value: NonNullable<Descriptor['outputParameterTypeBindings']>): NonNullable<Descriptor['outputParameterTypeBindings']> {
+  const result: Record<string, { parameter: string; types: Readonly<Record<string, GameplayValueType>> }> = Object.create(null)
+  for (const [output, binding] of Object.entries(value)) {
+    const types: Record<string, GameplayValueType> = Object.create(null)
+    for (const [field, type] of Object.entries(binding.types)) types[field] = freezeValueType(type)
+    result[output] = Object.freeze({ parameter: binding.parameter, types: Object.freeze(types) })
+  }
+  return Object.freeze(result)
+}
+
 function freezeEffects(value: GameplayEffectMetadata): GameplayEffectMetadata {
   return Object.freeze({
     ...value,
@@ -180,8 +256,10 @@ function descriptor(
     ...value,
     inputs: Object.freeze(value.inputs.map(freezePort)),
     outputs: Object.freeze(value.outputs.map(freezePort)),
+    outputParameterTypeBindings: value.outputParameterTypeBindings ? freezeOutputParameterTypeBindings(value.outputParameterTypeBindings) : undefined,
     parameters: value.parameters ? Object.freeze(value.parameters.map(freezeParameter)) : undefined,
     inspectReferences: value.inspectReferences ? Object.freeze([...value.inspectReferences]) : undefined,
+    livingReferences: value.livingReferences ? Object.freeze([...value.livingReferences]) : undefined,
     allowedSurfaces: Object.freeze([...value.allowedSurfaces]),
     effects: freezeEffects(value.effects),
     ui: value.ui ? Object.freeze({ ...value.ui }) : undefined,
@@ -325,7 +403,30 @@ const queries: readonly Descriptor[] = [
       const attr = enumLiteral(ctx, 'attribute', ['name'] as const)
       return expression(`String(${runtime(ctx.surface)}.query.piece(${input(ctx, 'piece')})[${attr}])`)
     },
-    ui: { category: 'query' },
+    ui: { category: 'query', authoring: 'compatibility' },
+  }),
+  descriptor({
+    id: 'attribute.text', version: '2', label: '读取棋子文本属性', description: '读取棋子的封闭文本属性；阵营值由权威队伍或所属玩家身份生成可比较键。',
+    inputs: [port('piece', pieceType)], outputs: [port('text', stringType)],
+    livingReferences: ['piece'],
+    parameters: [parameter('attribute', stringType, { enum: ['name', 'faction'] })],
+    allowedSurfaces: QUERY_SURFACES, effects: pure(['pieces', 'players']),
+    lower: ctx => {
+      const attr = enumLiteral(ctx, 'attribute', ['name', 'faction'] as const)
+      return flowCall(ctx, 'query.pieceText', [input(ctx, 'piece'), attr])
+    },
+    ui: { category: 'query', authoring: 'standard' },
+  }),
+  descriptor({
+    id: 'attribute.player-text', label: '读取玩家文本属性', description: '读取玩家的封闭文本属性；阵营值使用与棋子阵营相同的权威可比较键。',
+    inputs: [port('player', playerType)], outputs: [port('text', stringType)],
+    parameters: [parameter('attribute', stringType, { enum: ['name', 'faction'] })],
+    allowedSurfaces: QUERY_SURFACES, effects: pure(['players']),
+    lower: ctx => {
+      const attr = enumLiteral(ctx, 'attribute', ['name', 'faction'] as const)
+      return flowCall(ctx, 'query.playerText', [input(ctx, 'player'), attr])
+    },
+    ui: { category: 'query', authoring: 'compatibility' },
   }),
   descriptor({
     id: 'resource.read', label: '读取玩家资源', description: '读取登记过的行动点或充能点。',
@@ -383,6 +484,25 @@ const arithmetic: readonly Descriptor[] = [
   binaryDescriptor('logic.or', '或者', '||', booleanType, booleanType),
 ]
 
+const nullableComparisons: readonly Descriptor[] = [
+  descriptor({
+    id: 'compare.equal-string-nullable', version: '2', label: '可空文本相等',
+    description: '按严格相等规则比较两个可空文本字段；不将缺失值转换为文本。',
+    inputs: [port('left', stringType, { nullable: true }), port('right', stringType, { nullable: true })],
+    outputs: [port('value', booleanType)], allowedSurfaces: PURE_SURFACES, effects: pure(),
+    lower: ctx => expression(`(${input(ctx, 'left')} === ${input(ctx, 'right')})`),
+    ui: { category: 'logic', authoring: 'standard' },
+  }),
+  descriptor({
+    id: 'compare.text', version: '2', label: '比较文本是否相同',
+    description: '按严格相等规则比较两个可空文本字段；旧版 compare.text@1 保持兼容。',
+    inputs: [port('left', stringType, { nullable: true }), port('right', stringType, { nullable: true })],
+    outputs: [port('value', booleanType)], allowedSurfaces: PURE_SURFACES, effects: pure(),
+    lower: ctx => expression(`(${input(ctx, 'left')} === ${input(ctx, 'right')})`),
+    ui: { category: 'logic', authoring: 'standard' },
+  }),
+]
+
 const unary: readonly Descriptor[] = [
   descriptor({
     id: 'math.floor', label: '向下取整', description: '向负无穷取整。',
@@ -426,12 +546,12 @@ const choices: readonly Descriptor[] = [
   descriptor({
     id: 'choice.target-piece', label: '选择棋子目标',
     description: '使用现有 selectTarget 协议选择一名棋子；挂起、取消和候选校验由权威宿主处理。',
-    inputs: [], outputs: [port('choice', choiceType)],
+    inputs: [], outputs: [port('choice', choiceType, { label: '选择结果' })],
     parameters: [
-      parameter('range', numberType, { default: 5, minimum: 0 }),
-      parameter('filter', stringType, { enum: ['enemy', 'ally', 'all'], default: 'enemy' }),
-      parameter('title', stringType, { optional: true }),
-      parameter('canCancel', booleanType, { optional: true }),
+      parameter('range', numberType, { label: '范围（格）', default: 5, minimum: 0 }),
+      parameter('filter', stringType, { label: '阵营筛选', enum: ['enemy', 'ally', 'all'], default: 'enemy' }),
+      parameter('title', stringType, { label: '选择提示', optional: true }),
+      parameter('canCancel', booleanType, { label: '允许取消', optional: true }),
     ],
     allowedSurfaces: ['skill', 'card', 'pending'], effects: writes(['pending'], { pending: true }),
     lower: ctx => {
@@ -502,20 +622,26 @@ const effects: readonly Descriptor[] = [
   descriptor({
     id: 'effect.damage', label: '造成伤害', description: '通过现有 DamageBatch/queue 入口造成伤害并返回权威结果。',
     inputs: [port('source', pieceType), port('target', pieceType), port('amount', numberType)],
+    inputValueTypeBindings: { source: { parameter: 'sourceType' } },
     outputs: [port('result', recordType), port('success', booleanType), port('damage', numberType)],
     // Author content has one ordinary damage kind.  The legacy host still
     // receives its frozen spelling for event/log compatibility. Both legacy
     // spellings use the same normal-damage defense calculation.
-    parameters: [parameter('damageType', stringType, { enum: ['normal', 'true', 'toxin'], default: 'normal' }), parameter('skillId', stringType, { optional: true }),
+    parameters: [parameter('sourceType', stringType, { enum: ['piece', 'player'], default: 'piece', label: '来源类型' }), parameter('damageType', stringType, { enum: ['normal', 'true', 'toxin'], default: 'normal' }), parameter('skillId', stringType, { optional: true }),
       parameter('legacyNormalSpelling', stringType, { enum: ['physical', 'magical'], optional: true, label: '旧内容普通伤害日志兼容', description: '仅保留迁移前日志和事件中的旧称呼，不新增伤害分类。' }),
+      parameter('legacySkipBefore', booleanType, { optional: true, label: '旧内容前置事件兼容' }),
       parameter('inputPolicy', stringType, { enum: ['floor', 'host'], optional: true, label: '伤害输入时机', description: 'host 将原始数值交给权威伤害流程，保留旧内容触发后取整的顺序。' })],
     allowedSurfaces: EFFECT_SURFACES, effects: writes(['damage', 'events'], { events: ['beforeDamageDealt', 'afterDamageDealt'] }),
     lower: ctx => {
       const kind = enumLiteral(ctx, 'damageType', ['normal', 'true', 'toxin'] as const, 'normal')
       const engineKind = kind === '"normal"' ? enumLiteral(ctx, 'legacyNormalSpelling', ['physical', 'magical'] as const, 'physical') : kind
       const id = Object.prototype.hasOwnProperty.call(ctx.parameters, 'skillId') ? stringLiteral(ctx, 'skillId') : `${context(ctx.surface)}.skill?.id || ${context(ctx.surface)}.ruleId || "flow"`
-      const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, 'inputPolicy') ? ', ' + enumLiteral(ctx, 'inputPolicy', ['floor', 'host'] as const) : ''
-      const call = `${runtime(ctx.surface)}.effects.damage(${input(ctx, 'source')}, ${input(ctx, 'target')}, ${input(ctx, 'amount')}, ${engineKind}, ${id}${policy})`
+      const policy = ctx.parameters.legacySkipBefore === true ? ', ' + enumLiteral(ctx, 'inputPolicy', ['floor', 'host'] as const, 'floor') + ', true'
+        : Object.prototype.hasOwnProperty.call(ctx.parameters, 'inputPolicy') ? ', ' + enumLiteral(ctx, 'inputPolicy', ['floor', 'host'] as const) : ''
+      const source = ctx.parameters.sourceType === 'player'
+        ? `(function(id){var owner=${runtime(ctx.surface)}.query.player(id);return {kind:"player",instanceId:owner.playerId,ownerPlayerId:owner.playerId,name:owner.name||owner.playerId};})(${input(ctx, 'source')})`
+        : input(ctx, 'source')
+      const call = `${runtime(ctx.surface)}.effects.damage(${source}, ${input(ctx, 'target')}, ${input(ctx, 'amount')}, ${engineKind}, ${id}${policy})`
       return wrappedEffectResult(call, ['success', 'damage'])
     },
     ui: { category: 'effect' },
@@ -729,7 +855,28 @@ const results: readonly Descriptor[] = [
 ]
 
 const ALL_DESCRIPTORS: readonly Descriptor[] = [
+  ...AUTHOR_CHOICE_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHOR_STATE_MODULES.map(descriptor),
+  ...ROOT_AUTHOR_STATE_MODULES.map(descriptor),
+  ...ROOT_AUTHOR_STATE_SUCCESS_MODULES.map(descriptor),
+  ...ROOT_AUTHOR_STATE_REMOVE_MODULES.map(descriptor),
   ...QUERY_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHOR_COLLECTION_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHOR_BOARD_VALUE_MODULES.map(descriptor),
+  ...AUTHOR_CARD_MODULES.map(descriptor),
+  ...UNIFIED_AUTHOR_EFFECT_MODULES.map(descriptor),
+  ...AUTHOR_SUMMON_MODULES.map(descriptor),
+  ...AUTHOR_SKILL_INSTANCE_MODULES.map(descriptor),
+  ...AUTHOR_CLUSTER_MODULES.map(descriptor),
+  ...AUTHOR_CODE_BLOCK_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHOR_CONTAINER_MODULES.map(descriptor),
+  ...ATOMIC_COMMIT_GAMEPLAY_MODULES.map(descriptor),
+  ...FLIGHT_STATUS_HOST_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHOR_ENTITY_EXTENSION_MODULES.map(descriptor),
+  ...AUTHOR_RULE_INSTANCE_MODULES.map(descriptor),
+  ...PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES.map(descriptor),
+  ...COLLECTION_GAMEPLAY_MODULES.map(descriptor),
+  ...DAMAGE_REDIRECT_GAMEPLAY_MODULES.map(descriptor),
   ...PREVIEW_GAMEPLAY_MODULES.map(descriptor),
   ...FLIGHT_GAMEPLAY_MODULES.map(descriptor),
   ...SUMMON_GAMEPLAY_MODULES.map(descriptor),
@@ -738,6 +885,9 @@ const ALL_DESCRIPTORS: readonly Descriptor[] = [
   ...PREVIEW_VALUE_GAMEPLAY_MODULES.map(descriptor),
   ...AREA_EFFECT_GAMEPLAY_MODULES.map(descriptor),
   ...STATUS_TIMER_GAMEPLAY_MODULES.map(descriptor),
+  // Keep the direct status-choice descriptor loadable while historical
+  // documents are admitted; the migration catalog retires it from new author
+  // graphs and expands it into status instance primitives.
   ...CONTENT_GENERATION_GAMEPLAY_MODULES.map(descriptor),
   ...PENDING_SPATIAL_GAMEPLAY_MODULES.map(descriptor),
   ...CARD_OPERATION_GAMEPLAY_MODULES.map(descriptor),
@@ -745,9 +895,50 @@ const ALL_DESCRIPTORS: readonly Descriptor[] = [
   ...COUNTER_PASSIVE_GAMEPLAY_MODULES.map(descriptor),
   ...EXECUTION_LOCAL_GAMEPLAY_MODULES.map(descriptor),
   ...MOVEMENT_FAMILY_GAMEPLAY_MODULES.map(descriptor),
+  ...HOLY_SUPPORT_GAMEPLAY_MODULES.map(descriptor),
+  ...SHISHIO_VELEN_COLT_GAMEPLAY_MODULES.map(descriptor),
+  ...AUTHORING_COMPLETION_GAMEPLAY_MODULES.map(descriptor),
+  // Preserve the historical v1 action-record adapter.  The generic typed
+  // structured-log boundary is additive at v2, so old graphs retain their
+  // original descriptor and generated-code proof.
+  ...FOLLOWUP_RULE_GAMEPLAY_MODULES.map(descriptor),
+  ...STRUCTURED_ACTION_LOG_GAMEPLAY_MODULES.map(descriptor),
+  ...FOLLOWUP_STATUS_RULES_GAMEPLAY_MODULES.map(descriptor),
+  ...FOLLOWUP_COMPOSITION_GAMEPLAY_MODULES.map(descriptor),
+  ...VELEN_SKILLS_GAMEPLAY_MODULES.map(descriptor),
+  ...KENSHIN_GAMEPLAY_MODULES.map(descriptor),
+  ...TOXIN_GAMEPLAY_MODULES.map(descriptor),
+  ...STORED_ATTRIBUTE_MODULES.map(descriptor),
+  ...TERRAIN_FACT_MODULES.map(descriptor),
+  ...CONTEXT_FACT_MODULES.map(descriptor),
+  ...SAGE_TOTSUKA_GAMEPLAY_MODULES.map(descriptor),
+  ...AMATERASU_GAMEPLAY_MODULES.map(descriptor),
+  ...RECALL_GAMEPLAY_MODULES.map(descriptor),
+  ...LAMENT_GAMEPLAY_MODULES.map(descriptor),
+  ...SHISHIO_FLAME_SPIRIT_GAMEPLAY_MODULES.map(descriptor),
+  ...ICHIGO_GAMEPLAY_MODULES.map(descriptor),
+  ...KYOKA_GAMEPLAY_MODULES.map(descriptor),
+  ...RAFAAM_CURSE_GAMEPLAY_MODULES.map(descriptor),
+  ...PASSIVE_SETUP_GAMEPLAY_MODULES.map(descriptor),
+  ...FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...GENERIC_VALUE_GAMEPLAY_MODULES.map(descriptor),
+  ...OPTIONAL_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...SCALAR_VALUE_MODULES.map(descriptor),
+  ...OBSERVATION_FIELD_MODULES.map(descriptor),
+  ...CONTEXT_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...PREVIEW_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...GENERIC_READ_GAMEPLAY_MODULES.map(descriptor),
+  ...RECORD_VALUE_GAMEPLAY_MODULES.map(descriptor),
+  ...RECORD_KEY_GAMEPLAY_MODULES.map(descriptor),
+  ...GENERIC_ABILITY_WRITE_GAMEPLAY_MODULES.map(descriptor),
+  ...BATTLE_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...CONTENT_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...SKILL_DEFINITION_FIELD_GAMEPLAY_MODULES.map(descriptor),
+  ...GENERIC_CARD_FIELD_GAMEPLAY_MODULES.map(descriptor),
   ...allRefs,
   ...queries,
   ...arithmetic,
+  ...nullableComparisons,
   ...unary,
   ...choices,
   ...effects,
@@ -756,10 +947,19 @@ const ALL_DESCRIPTORS: readonly Descriptor[] = [
   ...results,
 ]
 
-const descriptorById = new Map<string, Descriptor>()
+const descriptorsById = new Map<string, Descriptor[]>()
 for (const item of ALL_DESCRIPTORS) {
-  if (descriptorById.has(item.id)) throw new Error(`duplicate gameplay module id: ${item.id}`)
-  descriptorById.set(item.id, item)
+  const versions = descriptorsById.get(item.id) ?? []
+  if (versions.some(entry => entry.version === item.version)) throw new Error(`duplicate gameplay module id/version: ${item.id}@${item.version}`)
+  versions.push(item)
+  descriptorsById.set(item.id, versions)
+}
+function lookupDescriptor(id: string, version?: string): Descriptor | undefined {
+  const versions = descriptorsById.get(id)
+  if (!versions || versions.length === 0) return undefined
+  return version === undefined
+    ? versions.find(item => item.version === GAMEPLAY_MODULE_VERSION) ?? versions[versions.length - 1]
+    : versions.find(item => item.version === version)
 }
 
 /**
@@ -773,17 +973,15 @@ export type GameplayModuleCatalog = Readonly<Record<string, Descriptor>> & {
   readonly resolve: (id: string, version?: string) => Descriptor | undefined
 } & GameplayModuleRegistry
 
-const directEntries = Object.fromEntries(ALL_DESCRIPTORS.map(item => [item.id, item])) as Record<string, Descriptor>
+const directEntries = Object.fromEntries([...new Set(ALL_DESCRIPTORS.map(item => item.id))].map(id => [id, lookupDescriptor(id)])) as Record<string, Descriptor>
 export const GAMEPLAY_MODULE_REGISTRY: GameplayModuleCatalog = Object.freeze({
   ...directEntries,
   descriptors: Object.freeze(ALL_DESCRIPTORS),
   get: (id: string, version?: string) => {
-    const item = descriptorById.get(id)
-    return item && (version === undefined || version === item.version) ? item : undefined
+    return lookupDescriptor(id, version)
   },
   resolve: (id: string, version?: string) => {
-    const item = descriptorById.get(id)
-    return item && (version === undefined || version === item.version) ? item : undefined
+    return lookupDescriptor(id, version)
   },
 }) as GameplayModuleCatalog
 
@@ -819,17 +1017,23 @@ export function getGameplayModuleCatalog(): readonly GameplayModuleCatalogEntry[
     uiDescription: item.uiDescription,
     inputs: item.inputs,
     outputs: item.outputs,
+    outputTypeBindings: item.outputTypeBindings,
+    outputSchemaBindings: item.outputSchemaBindings,
+    inputSchemaBindings: item.inputSchemaBindings,
+    outputValueTypeBindings: item.outputValueTypeBindings,
+    inputValueTypeBindings: item.inputValueTypeBindings,
+    outputParameterTypeBindings: item.outputParameterTypeBindings,
     parameters: item.parameters,
     inspectReferences: item.inspectReferences,
+    livingReferences: item.livingReferences,
     allowedSurfaces: item.allowedSurfaces,
     effects: item.effects,
-    ui: item.ui,
+    ui: authorModuleUi(item),
   }) as GameplayModuleCatalogEntry)
 }
 
 export function getGameplayModule(id: string, version?: string): Descriptor | undefined {
-  const item = descriptorById.get(id)
-  return item && (version === undefined || version === item.version) ? item : undefined
+  return lookupDescriptor(id, version)
 }
 
 // Keep this export strongly typed for editor/test consumers.  The structural

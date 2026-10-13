@@ -374,6 +374,16 @@ export function createPublicRuleSource(
       return null
     }
 
+    // Armor definitions can also be present in the static authoring library.
+    // A generated instance still has to match the trusted generator before
+    // targeting reads any of its metadata, even when that ID is now static.
+    if (candidate !== undefined && armorModulesForCardId(cardId)) {
+      const expected = generatedArmorCard(state, viewerId, cardId)
+      if (expected && sameCardDefinition(candidate, expected)) return expected
+      unsupported = true
+      return null
+    }
+
     try {
       // Static cards are always loaded from the canonical content root. A
       // same-ID snapshot replacement can never override their executable

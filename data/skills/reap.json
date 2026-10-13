@@ -16,7 +16,7 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var _composite0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; if ((\"收割被动技能已激活\" === __gameplayInvalid) || (\"收割被动技能已激活\" === undefined) || (\"收割被动技能已激活\" === null)) { _composite0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { _done1: { if ((\"收割被动技能已激活\" === __gameplayInvalid) || (\"收割被动技能已激活\" === undefined) || (\"收割被动技能已激活\" === null)) { _module2 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module2 = ({success: true, message: \"收割被动技能已激活\"}); } if (!(((_module2[\"success\"]) === __gameplayInvalid) || ((_module2[\"message\"]) === __gameplayInvalid))) { _composite0 = { \"success\": (_module2[\"success\"]), \"message\": (_module2[\"message\"]) }; break _done1; } } } if (!(((_composite0[\"success\"]) === __gameplayInvalid) || ((_composite0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite0[\"success\"]), \"message\": (_composite0[\"message\"]) }; } }",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { if ((\"收割被动技能已激活\" === __gameplayInvalid) || (\"收割被动技能已激活\" === undefined) || (\"收割被动技能已激活\" === null)) { _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module0 = ({success: true, message: \"收割被动技能已激活\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message--result-message\", __gameplayError, \"result.message\"); _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module0[\"success\"]) === __gameplayInvalid) || ((_module0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module0[\"success\"]), \"message\": (_module0[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",
     "entries": {
@@ -35,73 +35,12 @@
               "optional": true
             }
           ],
-          "composites": [
-            {
-              "id": "shared.result-message",
-              "version": "1",
-              "label": "成功消息",
-              "description": "将一段已计算文本转换为统一的成功消息结果。",
-              "inputs": [
-                {
-                  "name": "message",
-                  "type": "string"
-                }
-              ],
-              "outputs": [
-                {
-                  "name": "success",
-                  "type": "boolean"
-                },
-                {
-                  "name": "message",
-                  "type": "string"
-                }
-              ],
-              "allowedSurfaces": [
-                "skill",
-                "card",
-                "rule",
-                "triggerSkill",
-                "pending"
-              ],
-              "body": [
-                {
-                  "kind": "call",
-                  "id": "result-message",
-                  "module": "result.message",
-                  "version": "1",
-                  "inputs": {
-                    "message": {
-                      "kind": "input",
-                      "name": "message"
-                    }
-                  },
-                  "parameters": {}
-                },
-                {
-                  "kind": "return",
-                  "id": "return-result-message",
-                  "values": {
-                    "success": {
-                      "kind": "output",
-                      "node": "result-message",
-                      "port": "success"
-                    },
-                    "message": {
-                      "kind": "output",
-                      "node": "result-message",
-                      "port": "message"
-                    }
-                  }
-                }
-              ]
-            }
-          ],
+          "composites": [],
           "body": [
             {
               "kind": "call",
-              "id": "message",
-              "module": "shared.result-message",
+              "id": "message--result-message",
+              "module": "result.message",
               "version": "1",
               "inputs": {
                 "message": {
@@ -117,19 +56,20 @@
               "values": {
                 "success": {
                   "kind": "output",
-                  "node": "message",
+                  "node": "message--result-message",
                   "port": "success"
                 },
                 "message": {
                   "kind": "output",
-                  "node": "message",
+                  "node": "message--result-message",
                   "port": "message"
                 }
               }
             }
-          ]
+          ],
+          "schemas": []
         },
-        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
       }
     }
   },

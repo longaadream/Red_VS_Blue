@@ -18,9 +18,17 @@
     cell: '地格引用', path: '路径', card: '卡牌实例', content: '内容定义', status: '状态实例',
     event: '事件事实', choice: '选择结果', record: '记录句柄', null: '空值', unknown: '未知值', any: '任意值',
   }
-  const statementLabels = { call: '调用模块', if: '条件分支', foreach: '逐项执行', return: '返回结果' }
+  const statementLabels = { call: '调用模块', if: '条件分支', foreach: '逐项执行', while: '条件循环', return: '返回结果' }
+  const presentationBatchLabels = {
+    statusAdded: '状态添加',
+    statusRemoved: '状态移除',
+    tileEffectAdded: '地格效果添加',
+    tileEffectRemoved: '地格效果移除',
+  }
   const categoryFields = { skills: 'code', cards: 'code', rules: 'skillCode', triggerSkills: 'code', pending: 'effectCode', preview: 'previewCode' }
   const paletteCategoryLabels = {
+    data: '变量与数据', calculation: '计算与容器', selection: '查询与选择', control: '流程控制',
+    combat: '战斗效果', board: '棋盘与召唤', 'status-rule': '状态与规则', 'card-ability': '卡牌与能力',
     all: '全部', context: '上下文', query: '查询', math: '数值', logic: '逻辑', text: '文本',
     choice: '选择', effect: '效果', card: '卡牌', status: '状态', rule: '规则', event: '事件', result: '结果', other: '其他',
   }
@@ -118,6 +126,10 @@
 
   function descriptorFor(core, graph, id, version) {
     return catalog(core, graph).find(item => item.id === id && (!version || item.version === version)) || null
+  }
+
+  function authorCatalog(core, graph) {
+    return catalog(core, graph).filter(item => item.__composite || item.ui?.authoring === 'standard')
   }
 
   function surfaceFor(category, field, graph) {
@@ -249,7 +261,7 @@
     const search = statements => {
       for (const statement of Array.isArray(statements) ? statements : []) {
         if (statement?.id === id) return statement
-        const nested = search(statement?.then) || search(statement?.else) || search(statement?.body)
+        const nested = search(statement?.then) || search(statement?.else) || search(statement?.condition?.body) || search(statement?.body)
         if (nested) return nested
       }
       return null
@@ -257,9 +269,59 @@
     return search(graph?.body) || (Array.isArray(graph?.composites) ? graph.composites.reduce((found, item) => found || search(item?.body), null) : null)
   }
 
-  function callOutputs(statement, graph, core) {
+  function callOutputs(statement, graph, core, active = new Set()) {
     if (!statement || statement.kind !== 'call') return []
-    return descriptorFor(core, graph, statement.module, statement.version)?.outputs || []
+    if (active.has(statement.id)) return []
+    const next = new Set(active); next.add(statement.id)
+    const descriptor = descriptorFor(core, graph, statement.module, statement.version)
+    return (descriptor?.outputs || []).map(output => {
+      const fieldBinding = descriptor?.outputParameterTypeBindings?.[output.name]
+      const field = fieldBinding && (statement?.parameters?.[fieldBinding.parameter] ?? descriptor?.parameters?.find(item => item.name === fieldBinding.parameter)?.default)
+      const selected = fieldBinding ? fieldBinding.types?.[field] || 'unknown' : parameterBoundType(output, descriptor?.outputValueTypeBindings?.[output.name], descriptor?.outputSchemaBindings?.[output.name], statement, descriptor)
+      const binding = descriptor?.outputTypeBindings?.[output.name]
+      if (!binding) return { ...output, type: selected }
+      const type = valueTypeFor(statement.inputs?.[binding.input], graph, core, next)
+      const input = descriptor?.inputs?.find(port => port.name === binding.input)
+      const singletonType = binding.projection === 'singleton' ? parameterBoundType(input, descriptor.inputValueTypeBindings?.[binding.input], descriptor.inputSchemaBindings?.[binding.input], statement, descriptor) : type
+      const inferred = binding.projection === 'element' ? (type?.kind === 'list' ? type.element : 'unknown') : binding.projection === 'singleton' ? { kind: 'list', element: singletonType } : type
+      return { ...output, type: output.nullable && inferred?.kind !== 'nullable' ? { kind: 'nullable', value: inferred } : inferred }
+    })
+  }
+
+  function parameterBoundType(port, valueBinding, schemaBinding, statement, descriptor) {
+    const parameter = name => statement.parameters?.[name] ?? descriptor?.parameters?.find(item => item.name === name)?.default
+    if (valueBinding) {
+      const value = parameter(valueBinding.parameter)
+      if (typeof value !== 'string') return 'unknown'
+      try {
+        const type = value.trimStart().startsWith('{') ? JSON.parse(value) : value
+        return valueBinding.nullable && type?.kind !== 'nullable' ? { kind: 'nullable', value: type } : type
+      } catch { return 'unknown' }
+    }
+    if (schemaBinding) {
+      const schema = parameter(schemaBinding.parameter)
+      if (typeof schema !== 'string' || !schema) return 'unknown'
+      const type = { kind: 'record', schema }
+      return schemaBinding.list ? { kind: 'list', element: type } : type
+    }
+    return portType(port)
+  }
+
+  function literalValueType(value) {
+    if (value === null) return 'null'
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return typeof value
+    if (Array.isArray(value)) return { kind: 'list', element: value.length ? literalValueType(value[0]) : 'unknown' }
+    return 'record'
+  }
+
+  function valueTypeFor(value, graph, core, active = new Set()) {
+    if (value?.kind === 'literal') return literalValueType(value.value)
+    if (value?.kind === 'input') return graph?.inputs?.find(input => input?.name === value.name)?.type || 'unknown'
+    if (value?.kind === 'output') {
+      const statement = statementById(graph, value.node)
+      return callOutputs(statement, graph, core, active).find(output => output.name === value.port)?.type || 'unknown'
+    }
+    return 'unknown'
   }
 
   function collectRefs(graph, core, statements, beforeIndex, path) {
@@ -289,7 +351,12 @@
           if (owner.item) refs.push({ value: { kind: 'output', node: owner.id, port: 'item' }, type: 'unknown', label: `循环项 · ${owner.item}` })
           if (owner.index) refs.push({ value: { kind: 'output', node: owner.id, port: 'index' }, type: 'number', label: `循环序号 · ${owner.index}` })
         }
-        body = Array.isArray(owner[frame.slot]) ? owner[frame.slot] : []
+        if (owner?.kind === 'while' && frame.slot === 'body') refs.push({ value: { kind: 'output', node: owner.id, port: 'index' }, type: 'number', label: `循环序号 · ${owner.index || 'iteration'}` })
+        if (owner?.kind === 'while' && frame.slot === 'condition') {
+          refs.length = 0
+          for (const [name, value] of Object.entries(owner.condition?.inputs || {})) refs.push({ value: { kind: 'input', name }, type: valueTypeFor(value, graph, core), label: `条件输入 · ${name}` })
+          body = Array.isArray(owner.condition?.body) ? owner.condition.body : []
+        } else body = Array.isArray(owner[frame.slot]) ? owner[frame.slot] : []
       }
     }
     addOutputs(Array.isArray(statements) ? statements.slice(0, Math.max(0, beforeIndex)) : body.slice(0, Math.max(0, beforeIndex)))
@@ -411,6 +478,7 @@
       let expandedScrollTop = 0
       let expandedWindowScroll = { x: 0, y: 0 }
       let escapeListener = null
+      let lastValidation = ''
 
       const editingLocked = () => locked || Boolean(container.closest('[data-saving="true"]'))
       const core = () => getCore()
@@ -543,8 +611,14 @@
           } else if (frame.kind === 'child') {
             const owner = scope.body.find(item => item?.id === frame.id)
             if (!owner) return { body: [], label: frame.slot, frame, composite: scope.composite }
-            if (!Array.isArray(owner[frame.slot]) && createMissing) owner[frame.slot] = []
-            scope = { body: Array.isArray(owner[frame.slot]) ? owner[frame.slot] : [], label: frame.slot === 'then' ? '条件成立' : frame.slot === 'else' ? '条件不成立' : '循环体', frame, composite: scope.composite }
+            if (owner.kind === 'while' && frame.slot === 'condition') {
+              if (!record(owner.condition) && createMissing) owner.condition = { inputs: {}, body: [] }
+              if (record(owner.condition) && !Array.isArray(owner.condition.body) && createMissing) owner.condition.body = []
+              scope = { body: record(owner.condition) && Array.isArray(owner.condition.body) ? owner.condition.body : [], label: '循环条件', frame, composite: scope.composite }
+            } else {
+              if (!Array.isArray(owner[frame.slot]) && createMissing) owner[frame.slot] = []
+              scope = { body: Array.isArray(owner[frame.slot]) ? owner[frame.slot] : [], label: frame.slot === 'then' ? '条件成立' : frame.slot === 'else' ? '条件不成立' : '循环体', frame, composite: scope.composite }
+            }
           }
         }
         return scope
@@ -566,6 +640,68 @@
         modules.entries[selectedField] = { ...prior, graph: clone(value) }
         delete modules.entries[selectedField].compilerVersion
         next.gameplayModules = modules
+        return next
+      }
+
+      // The full document apply is the save boundary, but it cannot be used
+      // while a sibling entry is still an incomplete draft: the compiler
+      // rejects that sibling before it can accept the entry currently being
+      // repaired. Compile the selected entry in isolation so its generated
+      // code/compilerVersion can recover in memory; the document save gate
+      // continues to reject the whole draft until every entry is valid.
+      function partiallyApplyCompiledGraph(value) {
+        const compiler = core()
+        if (typeof compiler?.compileGameplayModuleGraph !== 'function') return null
+        const compiled = compiler.compileGameplayModuleGraph(value, compilerRegistrySource(compiler) || undefined)
+        const fields = {
+          skill: ['code', 'skillCode'],
+          card: ['code'],
+          rule: ['code', 'skillCode'],
+          triggerSkill: ['code', 'skillCode', 'triggerSkill'],
+          pending: ['code', 'effectCode'],
+          preview: ['code', 'previewCode'],
+        }
+        if (!fields[compiled.surface]?.includes(selectedField)) throw new Error(`字段 ${selectedField} 与 ${compiled.surface} 流程图不兼容。`)
+
+        const next = clone(draft())
+        const legacyDefaults = { skill: 'code', card: 'code', rule: 'skillCode', triggerSkill: 'code', pending: 'effectCode', preview: 'previewCode' }
+        const legacyEntries = record(next.contentGraphEntries) ? { ...next.contentGraphEntries } : {}
+        const legacyPrimary = record(next.contentGraph)
+          ? (typeof next.contentGraphField === 'string' ? next.contentGraphField : legacyDefaults[next.contentGraph.surface] || '')
+          : ''
+        if (legacyPrimary === selectedField) {
+          delete next.contentGraph
+          delete next.contentGraphField
+          delete next.contentGraphCompilerVersion
+          const first = Object.keys(legacyEntries).sort()[0]
+          if (first) {
+            const entry = legacyEntries[first]
+            if (record(entry)) {
+              next.contentGraph = clone(entry.graph)
+              next.contentGraphField = first
+              next.contentGraphCompilerVersion = entry.compilerVersion
+            }
+            delete legacyEntries[first]
+          }
+        } else {
+          delete legacyEntries[selectedField]
+        }
+        if (Object.keys(legacyEntries).length) next.contentGraphEntries = legacyEntries
+        else delete next.contentGraphEntries
+
+        const modules = record(next.gameplayModules) ? next.gameplayModules : {
+          version: compiler.GAMEPLAY_MODULE_DOCUMENT_VERSION || DOCUMENT_VERSION,
+          entries: {},
+        }
+        modules.version = compiler.GAMEPLAY_MODULE_DOCUMENT_VERSION || modules.version || DOCUMENT_VERSION
+        modules.entries = record(modules.entries) ? modules.entries : {}
+        const prior = record(modules.entries[selectedField]) ? modules.entries[selectedField] : {}
+        modules.entries[selectedField] = { ...prior, graph: clone(value), compilerVersion: compiled.compilerVersion }
+        next.gameplayModules = modules
+        next[selectedField] = compiled.code
+        if (modules.textBindings !== undefined && typeof compiler.renderGameplayModuleText === 'function') {
+          try { Object.assign(next, compiler.renderGameplayModuleText(modules.entries, modules.textBindings)) } catch { /* keep text binding diagnostics for the save boundary */ }
+        }
         return next
       }
 
@@ -595,8 +731,19 @@
             message = '模块图已更新。'
           }
         } catch (error) {
-          onChange(rawGraphDraft(value))
-          message = errorText(error)
+          try {
+            const partial = partiallyApplyCompiledGraph(value)
+            if (partial) {
+              onChange(partial)
+              message = '当前入口已更新；请修复其他入口后再保存。'
+            } else {
+              onChange(rawGraphDraft(value))
+              message = errorText(error)
+            }
+          } catch (compileError) {
+            onChange(rawGraphDraft(value))
+            message = errorText(compileError)
+          }
         }
         render()
       }
@@ -619,7 +766,7 @@
 
       function nextId(graph, kind) {
         const all = []
-        const gather = body => { for (const item of Array.isArray(body) ? body : []) { all.push(item.id); gather(item.then); gather(item.else); gather(item.body) } }
+        const gather = body => { for (const item of Array.isArray(body) ? body : []) { all.push(item.id); gather(item.then); gather(item.else); gather(item.condition?.body); gather(item.body) } }
         gather(graph.body); for (const composite of Array.isArray(graph.composites) ? graph.composites : []) gather(composite.body)
         const prefix = `${kind}-`
         let index = 1; while (all.includes(`${prefix}${index}`)) index++
@@ -638,6 +785,7 @@
             for (const parameter of Array.isArray(descriptor?.parameters) ? descriptor.parameters : []) if (own(parameter, 'default')) statement.parameters[parameter.name] = clone(parameter.default)
           } else if (kind === 'if') statement = { kind, id, condition: { kind: 'literal', value: true }, then: [], else: [] }
           else if (kind === 'foreach') statement = { kind, id, items: { kind: 'literal', value: [] }, item: 'item', index: 'index', body: [] }
+          else if (kind === 'while') statement = { kind, id, condition: { inputs: {}, body: [{ kind: 'return', id: `${id}-condition`, value: { kind: 'literal', value: false } }] }, index: 'iteration', budget: 10, body: [] }
           else if (outputs.length === 1) statement = { kind: 'return', id, value: { kind: 'literal', value: defaultForType(outputs[0]) } }
           else if (outputs.length > 1) statement = { kind: 'return', id, values: {} }
           else statement = { kind: 'return', id }
@@ -655,6 +803,7 @@
         const visit = (statement, action) => {
           action(statement)
           for (const key of ['then', 'else', 'body']) for (const child of statement[key] || []) visit(child, action)
+          if (statement.kind === 'while') for (const child of statement.condition?.body || []) visit(child, action)
         }
         visit(copy, statement => {
           const id = nextId(reserved, statement.kind || 'node')
@@ -669,6 +818,7 @@
           for (const value of Object.values(statement.inputs || {})) remap(value)
           for (const value of Object.values(statement.values || {})) remap(value)
           for (const key of ['condition', 'items', 'value']) remap(statement[key])
+          if (statement.kind === 'while') for (const value of Object.values(statement.condition?.inputs || {})) remap(value)
         })
         return copy
       }
@@ -708,7 +858,7 @@
       }
 
       function renderCallInspector(parent, statement, graph, scope, statementIndex) {
-        const descriptors = catalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(surfaceFor(category, selectedField, graph)))
+        const descriptors = authorCatalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(surfaceFor(category, selectedField, graph)))
         const current = descriptorFor(core(), graph, statement.module, statement.version)
         const moduleSelect = document.createElement('select')
         moduleSelect.setAttribute('aria-label', '模块引用')
@@ -728,7 +878,8 @@
         if (inputs.length) parent.append(node('h4', '输入端口'))
         for (const input of inputs) {
           const value = statement.inputs?.[input.name]
-          renderValueEditor(parent, `${input.label || input.name} · ${typeLabel(portType(input))}`, value, portType(input), graph, scope, statementIndex, next => updateStatement(statement.id, item => { item.inputs = { ...(item.inputs || {}) }; if (next) item.inputs[input.name] = next; else delete item.inputs[input.name] }), input)
+          const inputType = parameterBoundType(input, current.inputValueTypeBindings?.[input.name], current.inputSchemaBindings?.[input.name], statement, current)
+          renderValueEditor(parent, `${input.label || input.name} · ${typeLabel(inputType)}`, value, inputType, graph, scope, statementIndex, next => updateStatement(statement.id, item => { item.inputs = { ...(item.inputs || {}) }; if (next) item.inputs[input.name] = next; else delete item.inputs[input.name] }), { ...input, type: inputType })
         }
         const unknownInputs = Object.keys(statement.inputs || {}).filter(name => !inputs.some(input => input.name === name))
         for (const name of unknownInputs) {
@@ -768,6 +919,60 @@
           parent.append(label('循环项名称', item))
           const loopIndex = document.createElement('input'); loopIndex.type = 'text'; loopIndex.value = statement.index || ''; loopIndex.maxLength = 48; loopIndex.disabled = editingLocked(); loopIndex.onchange = () => updateStatement(statement.id, value => { value.index = loopIndex.value })
           parent.append(label('循环序号名称', loopIndex))
+          const currentSurface = surfaceFor(category, selectedField, graph)
+          const hasPresentation = own(statement, 'presentation')
+          const rawPresentation = hasPresentation ? statement.presentation : undefined
+          const presentation = typeof rawPresentation === 'string' ? rawPresentation : hasPresentation ? jsonValue(rawPresentation) : undefined
+          const knownPresentation = typeof rawPresentation === 'string' && Object.hasOwn(presentationBatchLabels, rawPresentation)
+          if (currentSurface === 'skill') {
+            const control = document.createElement('select')
+            control.dataset.gameplayModulePresentation = 'true'
+            control.append(node('option', '不指定统一动画批次'))
+            control.firstChild.value = ''
+            for (const [value, title] of Object.entries(presentationBatchLabels)) {
+              const option = node('option', title); option.value = value; control.append(option)
+            }
+            if (presentation !== undefined && !knownPresentation) {
+              const invalid = node('option', `当前值不可保存 · ${presentation}`); invalid.value = presentation; control.append(invalid)
+            }
+            control.value = presentation ?? ''
+            control.disabled = editingLocked()
+            control.onchange = () => updateStatement(statement.id, value => {
+              if (control.value) value.presentation = control.value
+              else delete value.presentation
+            })
+            parent.append(label('统一动画批次', control))
+            if (presentation !== undefined && !knownPresentation) {
+              const error = node('p', `统一动画批次“${presentation}”无效；请改为受支持的枚举值。`, 'gameplay-module-error')
+              error.dataset.gameplayModulePresentationError = 'true'
+              parent.append(error)
+            }
+          } else if (presentation !== undefined) {
+            const error = node('p', `当前逐项执行包含统一动画批次“${presentation}”，但该字段仅技能入口可用；请在技能图中修复后再保存。`, 'gameplay-module-error')
+            error.dataset.gameplayModulePresentationError = 'true'
+            parent.append(error)
+          }
+          parent.append(button('进入循环体', () => { path.push({ kind: 'child', id: statement.id, slot: 'body' }); selectedId = null; render() }, 'gameplay-module-button secondary'))
+        } else if (statement.kind === 'while') {
+          const budget = document.createElement('input'); budget.type = 'number'; budget.min = '1'; budget.step = '1'; budget.value = Number.isSafeInteger(statement.budget) ? String(statement.budget) : ''; budget.disabled = editingLocked(); budget.onchange = () => updateStatement(statement.id, value => { const next = Number(budget.value); if (Number.isSafeInteger(next) && next > 0) value.budget = next })
+          parent.append(label('最大循环次数', budget))
+          const loopIndex = document.createElement('input'); loopIndex.type = 'text'; loopIndex.value = statement.index || ''; loopIndex.maxLength = 48; loopIndex.disabled = editingLocked(); loopIndex.onchange = () => updateStatement(statement.id, value => { value.index = loopIndex.value })
+          parent.append(label('循环序号名称', loopIndex))
+          const captures = Object.entries(statement.condition?.inputs || {})
+          if (captures.length) {
+            parent.append(node('h4', '条件输入来源'))
+            for (const [name, value] of captures) {
+              const expected = valueTypeFor(value, graph, core())
+              renderValueEditor(parent, `条件输入 · ${name}`, value, expected, graph, scope, index, next => updateStatement(statement.id, item => {
+                item.condition = record(item.condition) ? item.condition : { inputs: {}, body: [] }
+                item.condition.inputs = { ...(item.condition.inputs || {}) }
+                if (next) item.condition.inputs[name] = next
+                else delete item.condition.inputs[name]
+              }), { type: expected })
+            }
+          }
+          parent.append(node('p', '条件子流程只允许查询和纯数据模块，并必须返回布尔值；达到预算且条件仍为真时会明确拒绝执行。', 'gameplay-module-muted'))
+          parent.append(button('进入循环条件', () => { path.push({ kind: 'child', id: statement.id, slot: 'condition' }); selectedId = null; render() }, 'gameplay-module-button secondary'))
           parent.append(button('进入循环体', () => { path.push({ kind: 'child', id: statement.id, slot: 'body' }); selectedId = null; render() }, 'gameplay-module-button secondary'))
         } else if (statement.kind === 'return') {
           const outputs = interfaceOwner(graph).outputs || []
@@ -905,7 +1110,7 @@
 
       function renderPalette(parent, graph) {
         const currentSurface = surfaceFor(category, selectedField, graph)
-        const descriptors = catalog(core(), graph)
+        const descriptors = authorCatalog(core(), graph)
           .filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface))
           .filter(item => paletteCategory === 'all' || descriptorCategory(item) === paletteCategory)
           .filter(item => {
@@ -926,7 +1131,7 @@
         }
         palette.append(query)
         const categories = node('div', undefined, 'gameplay-module-category-tabs'); categories.setAttribute('role', 'tablist'); categories.setAttribute('aria-label', '模块分类')
-        const availableCategories = ['all', ...new Set(catalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface)).map(descriptorCategory))]
+        const availableCategories = ['all', ...new Set(authorCatalog(core(), graph).filter(item => !Array.isArray(item.allowedSurfaces) || item.allowedSurfaces.includes(currentSurface)).map(descriptorCategory))]
         for (const currentCategory of availableCategories) {
           const tab = button(paletteCategoryLabels[currentCategory] || currentCategory, () => { paletteCategory = currentCategory; render() }, 'gameplay-module-category-tab')
           tab.dataset.gameplayModuleCategory = currentCategory
@@ -968,10 +1173,11 @@
         }
         const structure = document.createElement('details'); structure.className = 'gameplay-module-palette-group gameplay-module-structure-group'; structure.open = !collapsedPaletteCategories.has('structure')
         structure.ontoggle = () => { if (structure.open) collapsedPaletteCategories.delete('structure'); else collapsedPaletteCategories.add('structure') }
-        const structureSummary = node('summary', undefined, 'gameplay-module-palette-group-summary'); structureSummary.append(node('span', '流程结构'), node('small', '3'))
+        const structureSummary = node('summary', undefined, 'gameplay-module-palette-group-summary'); structureSummary.append(node('span', '流程结构'), node('small', '4'))
         structure.append(structureSummary)
         structure.append(button('新增条件分支', () => addStatement('if'), 'gameplay-module-palette-item'))
         structure.append(button('新增逐项执行', () => addStatement('foreach'), 'gameplay-module-palette-item'))
+        structure.append(button('新增条件循环', () => addStatement('while'), 'gameplay-module-palette-item'))
         structure.append(button('新增返回结果', () => addStatement('return'), 'gameplay-module-palette-item'))
         palette.append(structure)
         if (!path.length) palette.append(button('新增组合模块', addComposite, 'gameplay-module-palette-item'))
@@ -1042,6 +1248,9 @@
           } else if (statement.kind === 'foreach') {
             copy.append(node('span', `遍历 ${statement.item || 'item'} · 进入循环体子流程`, 'gameplay-module-summary'))
             copy.append(node('span', 'body', 'gameplay-module-flow-ports'))
+          } else if (statement.kind === 'while') {
+            copy.append(node('span', `条件循环 · 预算 ${Number.isSafeInteger(statement.budget) ? statement.budget : '无效'} · 进入条件或循环体`, 'gameplay-module-summary'))
+            copy.append(node('span', 'condition  /  body', 'gameplay-module-flow-ports'))
           } else if (statement.kind === 'return') copy.append(node('span', '图流程结束或返回值', 'gameplay-module-summary'))
           else copy.append(node('span', `待支持语句 · ${statement.kind || '未知类型'}，请在检查器中修复`, 'gameplay-module-error'))
           main.append(marker, copy)
@@ -1064,7 +1273,7 @@
         for (let index = 0; index < path.length; index++) {
           const frame = path[index]
           nav.append(node('span', ' / ', 'gameplay-module-breadcrumb-separator'))
-          const title = frame.kind === 'composite' ? `组合 · ${frame.id}` : frame.slot === 'then' ? '条件成立' : frame.slot === 'else' ? '条件不成立' : '循环体'
+          const title = frame.kind === 'composite' ? `组合 · ${frame.id}` : frame.slot === 'then' ? '条件成立' : frame.slot === 'else' ? '条件不成立' : frame.slot === 'condition' ? '循环条件' : '循环体'
           const crumb = button(title, () => { path = path.slice(0, index + 1); selectedId = null; render() }, 'gameplay-module-breadcrumb')
           if (index === path.length - 1) crumb.setAttribute('aria-current', 'page')
           nav.append(crumb)
@@ -1108,6 +1317,8 @@
         container.append(topbar)
         if (!current) { container.append(node('section', undefined, 'gameplay-module-empty-state')); const empty = container.lastChild; empty.append(node('h3', '这个内容还没有作者层模块图'), node('p', '建立后可从模块目录加入调用、分支、逐项执行和返回语句。旧脚本字段不会在这里编辑。')); return }
         const validation = validateGraph(current)
+        if (!validation && lastValidation) openConfigurationSections.clear()
+        lastValidation = validation
         const notice = node('p', message || validation || '图已载入 · 选择节点编辑参数。', message && validation ? 'gameplay-module-error' : validation ? 'gameplay-module-error' : 'gameplay-module-notice'); notice.setAttribute('role', 'status'); container.append(notice)
         breadcrumbs(container)
         const configuration = node('div', undefined, 'gameplay-module-configuration')

@@ -1,0 +1,14 @@
+{
+  "projection": "对当前目标造成5点普通伤害，来源为当前棋子",
+  "focused": {
+    "className": "sentence-inline-editor sentence-statement-editor sentence-slot-only-editor",
+    "text": "编辑输入：数量关闭编辑数量数值数量5展开绘制相对范围Tab 补全 · Ctrl / ⌘ + Enter 应用应用下一项：伤害类型",
+    "moduleSelect": false,
+    "inputs": [
+      "amount"
+    ],
+    "parameters": [],
+    "slotEditor": "input:amount",
+    "chooser": false
+  }
+}

@@ -1,9 +1,11 @@
 import type { BattleState } from "./turn"
+import type { CardInstance } from './battle-types'
 import { normalizePendingResult } from './pending-result'
 import { executeRuleContinuation } from './pending-continuation'
 import { adventureRuleSourceAllowed } from './adventure-boundary'
 import { checkpointBattlePresentation, withBattlePresentationSource } from './battle-presentation-recording'
 import type { PieceInstance, PieceStatusTag } from "./piece"
+import type { AuthorEntityExtensionDeclarations } from './author-entity-extension'
 import { executeCardFunction, loadCardForBattle, loadRuleForBattle } from './skills'
 import type { PendingReactiveCardRef } from './pending-interaction'
 import {
@@ -181,10 +183,16 @@ export type EffectFunction = (
 // 触发-效果规则
 export interface TriggerRule {
   id: string
+  /** Stable identity for this concrete mounted Rule instance. */
+  instanceId?: string
   name: string
   description: string
   trigger: TriggerCondition
   effect: EffectFunction
+  /** Per-instance author extension values; persisted with the mounted rule. */
+  extension?: Record<string, unknown>
+  /** Typed declarations for the mounted rule extension. */
+  authorExtensionDeclarations?: AuthorEntityExtensionDeclarations
   /** Pure target gate referenced by data-authored skill status tags. */
   targetValidation?: {
     type: 'comparePieceNumber'
@@ -221,6 +229,7 @@ export interface TriggerContext {
   legalPrimaryTargetPieceIds?: string[]
   cardId?: string
   cardInstanceId?: string
+  cardInstance?: CardInstance
   pieceTemplateId?: string
   /** 伤害值，可以在 beforeDamageDealt/beforeDamageTaken 中被修改 */
   damage?: number
@@ -947,7 +956,11 @@ export class TriggerSystem {
         let continuationAnswerIndex = 0
         const continuationMessages: string[] = []
         while (true) {
-          ruleCtx = item.buildCtx(context)
+          // Author choices use the suspendable interaction key as their
+          // persisted source identity.  Carry the concrete rule consumer ID
+          // into that context so an authored choice remains attributable to
+          // the rule that requested it instead of falling back to "author".
+          ruleCtx = { ...item.buildCtx(context), ruleId: item.ruleId }
           applyTransactionInputs(ruleCtx, transactionInputs, battle)
           // Answers belong to this consumer. Snapshot after injecting them so
           // replay input is not written back as an effect for the next rule.
@@ -1139,7 +1152,7 @@ export class TriggerSystem {
             // Keep reactive-card answers local; only explicit card mutations
             // after input injection are propagated to the shared event.
             const mutableBeforeEffect = mutableTriggerContextSnapshot(cardContext)
-            result = executeCardFunction(cardDef, player.playerId, battle, cardContext) as any
+            result = executeCardFunction(cardDef, player.playerId, battle, cardContext, undefined, undefined, undefined, undefined, cardInstance) as any
             writeBackMutableTriggerContext(cardContext, context, mutableBeforeEffect)
             if (!result?.needsOptionSelection && !result?.needsTargetSelection) break
             if (previewReactionPolicy?.onPendingConsumer?.('reactiveCard', cardRef.cardId, cardRef.cardInstanceId, context.type)) {

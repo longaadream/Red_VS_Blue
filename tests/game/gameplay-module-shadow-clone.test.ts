@@ -15,11 +15,12 @@ import {
   SHADOW_CLONE_GAMEPLAY_REGISTRY,
   runSemanticShadowCloneMigrations,
 } from '@/scripts/migrate-semantic-shadow-clone'
-import { compileGameplayModuleGraph } from '@/lib/skill-graph/module-compiler'
+import { compileGameplayModuleGraph, GAMEPLAY_MODULE_COMPILER_VERSION } from '@/lib/skill-graph/module-compiler'
 import { GAMEPLAY_MODULE_GRAPH_VERSION } from '@/lib/skill-graph/module-types'
 import { applyBattleAction, type BattleAction, type BattleState } from '@/lib/game/turn'
 import { dealDamage, clearRuleCache } from '@/lib/game/skills'
 import { globalTriggerSystem } from '@/lib/game/triggers'
+import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
 import * as preview from '@/lib/game/skill-preview'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -83,7 +84,7 @@ function withProfile<T>(semantic: boolean, callback: (root: string) => T): T {
     writeCloneEntries(root, semantic)
     process.env.RVB_PROFILE_ROOT = root
     clearRuleCache()
-    return callback(root)
+    return withRuleRuntime(new RuleRuntime({ rootSeed: 594 }), () => callback(root))
   } finally {
     clearRuleCache()
     if (previousRoot === undefined) delete process.env.RVB_PROFILE_ROOT
@@ -131,26 +132,9 @@ function completeCloneAction(initial: BattleState, option: 'summon' | 'teleport'
 }
 
 function stateSnapshot(state: BattleState): unknown {
-  return {
-    actionPoints: state.players.map(player => [player.playerId, player.actionPoints]),
-    pendingOption: state.pendingOptionSelection ? {
-      title: state.pendingOptionSelection.title,
-      options: state.pendingOptionSelection.options,
-    } : undefined,
-    pendingTarget: state.pendingTargetSelection ? {
-      targetType: state.pendingTargetSelection.targetType,
-      range: state.pendingTargetSelection.range,
-      candidates: state.pendingTargetSelection.candidates,
-    } : undefined,
-    pieces: state.pieces.map(piece => ({
-      instanceId: piece.instanceId.startsWith('naruto-clone-') ? 'clone' : piece.instanceId, x: piece.x, y: piece.y, currentHp: piece.currentHp,
-      skills: (piece.skills ?? []).map(skill => ({ skillId: skill.skillId, currentCooldown: skill.currentCooldown, usesRemaining: skill.usesRemaining })),
-      rules: (piece.rules ?? []).map(rule => rule.id).sort(),
-      statusTags: (piece.statusTags ?? []).map(tag => ({ id: String(tag.id ?? '').startsWith('naruto-clone-tag-') ? 'clone-tag' : tag.id, type: tag.type, visible: tag.visible })).sort((a, b) => String(a.id).localeCompare(String(b.id))),
-    })).sort((a, b) => a.instanceId.localeCompare(b.instanceId)),
-    graveyard: (state.graveyard ?? []).map(piece => ({ instanceId: piece.instanceId.startsWith('naruto-clone-') ? 'clone' : piece.instanceId, currentHp: piece.currentHp })).sort((a, b) => a.instanceId.localeCompare(b.instanceId)),
-    messages: (state.actions ?? []).map(action => action?.payload?.message).filter(Boolean),
-  }
+  const copy = clone(state)
+  delete (copy as any).skillsById
+  return copy
 }
 
 function zeroHealthProbeGraph() {
@@ -220,7 +204,7 @@ describe('RED-252 Naruto shadow-clone semantic module graph', () => {
     expect(next.summonCapability).toEqual(legacy.summonCapability)
     expect(next.description).toBe(legacy.description)
     expect(next.cluster).toEqual(legacy.cluster)
-    expect(next.gameplayModules.entries.code.compilerVersion).toBe('rvb-gameplay-module-compiler/v1')
+    expect(next.gameplayModules.entries.code.compilerVersion).toBe(GAMEPLAY_MODULE_COMPILER_VERSION)
   })
 
   it('dry-runs all four migrations against production-shaped files without writing', () => {

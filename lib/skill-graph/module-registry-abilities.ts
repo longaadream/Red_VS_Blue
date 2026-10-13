@@ -69,6 +69,28 @@ export const ABILITY_GAMEPLAY_MODULES: readonly Descriptor[] = [
     ui: { category: 'skill' },
   })),
   define({
+    id: 'ref.skill-definition', label: '技能定义',
+    description: '从内容库选择技能定义；此引用不代表已持有的技能实例，不能修改实例冷却或次数。',
+    inputs: [], outputs: [{ name: 'skill', type: 'content', label: '技能定义' }],
+    parameters: [{ name: 'skillId', type: 'string', label: '技能' }],
+    effects: { pure: true, previewSafe: false, reads: ['skills'] },
+    lower: ctx => `({skill:${flow(ctx)}.skills.definitionReference(${ctx.emitLiteral(ctx.parameters.skillId)})})`,
+    ui: { category: 'card-ability', authoring: 'standard' },
+  }),
+  ...(['add', 'remove'] as const).map(operation => ({
+    ...define({
+      id: `skill.${operation}`, label: operation === 'add' ? '获得技能' : '移除技能',
+      description: '为棋子或玩家调整技能；使用内容库中的技能定义引用，由既有生命周期处理实例与去重。',
+      inputs: [{ name: 'owner', type: 'piece', label: '对象' }, { name: 'skill', type: 'content', label: '技能' }],
+      inputValueTypeBindings: { owner: { parameter: 'ownerType' } },
+      outputs: [{ name: 'success', type: 'boolean', label: '成功' }],
+      parameters: [{ name: 'ownerType', type: 'string', label: '对象类型', enum: ['piece', 'player'], default: 'piece' }],
+      effects: { writes: ['skills'], pure: false, previewSafe: false },
+      lower: ctx => `({success:Boolean(${flow(ctx)}.skills.${operation}(${ctx.inputs.owner},${ctx.inputs.skill},${ctx.emitLiteral(ctx.parameters.ownerType)}))})`,
+      ui: { category: 'card-ability', authoring: 'standard' },
+    }), version: '2',
+  })),
+  define({
     id: 'rule.has-piece', label: '棋子具有规则',
     inputs: [{ name: 'piece', type: 'piece' }], outputs: [{ name: 'value', type: 'boolean' }],
     parameters: [{ name: 'ruleId', type: 'string' }], effects: { reads: ['rules'], pure: true, previewSafe: false },
@@ -84,9 +106,9 @@ export const ABILITY_GAMEPLAY_MODULES: readonly Descriptor[] = [
     ui: { category: 'effect' },
   }),
   define({
-    id: 'identity.host-time', label: '宿主标识时间',
-    description: '读取现役 SkillCode 宿主绑定的 Date.now，保持既有标识生成及回放语义；不访问外部时钟。',
+    id: 'identity.host-time', label: '本次执行时间',
+    description: '在正式规则执行绑定下读取确定性宿主时钟数值；只读，保持既有标识和回放语义，不直接访问全局真实时钟。',
     inputs: [], outputs: [{ name: 'value', type: 'number' }], effects: { reads: ['runtime-identity'], pure: false, previewSafe: false },
-    lower: () => 'Date.now()', ui: { category: 'context' },
+    lower: () => 'Date.now()', ui: { category: 'context', authoring: 'standard' },
   }),
 ]

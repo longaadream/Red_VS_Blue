@@ -39,7 +39,6 @@ describe('semantic status event recipes', () => {
           context.statusId = scenario === 'missing-status' ? 'other' : scenario === 'id-only' ? 'divine-shield' : 'custom-shield'
           const result = rule.effect(state, context)
           const plain = JSON.parse(JSON.stringify(state))
-          for (const piece of plain.pieces) piece.rules = piece.rules.map((r: any) => r.id)
           return { result, state: plain, damage: context.damage, heal: context.heal }
         }
         for (const damage of [0, 0.5, 1, 2, 9, 10, 10.5, 21]) for (const scenario of ['active', 'dead', 'missing-status', 'missing-subject', 'wrong-subject', 'missing-holder', 'wrong-turn', 'spent', 'has-shield', 'id-only']) {
@@ -47,7 +46,7 @@ describe('semantic status event recipes', () => {
         }
         expect(run(true, 2, 'active').result).toMatchObject({ success: true })
         if (id === 'rule-tirion-divine-shield-start') {
-          expect(run(true, 2, 'active').state.pieces[0].rules).toContain('rule-divine-shield')
+          expect(run(true, 2, 'active').state.pieces[0].rules).toContainEqual(expect.objectContaining({ id: 'rule-divine-shield' }))
           expect(run(true, 2, 'has-shield').result.success).toBe(false)
         }
       } finally {

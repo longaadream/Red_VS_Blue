@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { areMatchAllies, matchCapacity, nextTeamSlot, orderedMatchPlayers, TEAM_TURN_ORDER } from '@/lib/game/match-teams'
+import { areMatchAllies, getMatchFactionKey, matchCapacity, nextTeamSlot, orderedMatchPlayers, TEAM_TURN_ORDER } from '@/lib/game/match-teams'
 import type { Room } from '@/lib/game/room-model'
 
 describe('2v2 team contract', () => {
@@ -17,5 +17,17 @@ describe('2v2 team contract', () => {
     expect(matchCapacity('2v2')).toBe(4)
     expect(matchCapacity(undefined)).toBe(2)
     expect(() => matchCapacity('3v3')).toThrow()
+  })
+  it('derives namespace-safe faction keys from teams, then normalized ownership', () => {
+    const teams = { players: [
+      { playerId: 'RedOwner', teamId: 'red' as const },
+      { playerId: 'red-partner', teamId: 'red' as const },
+      { playerId: 'blue-owner', teamId: 'blue' as const },
+    ] }
+    expect(getMatchFactionKey(teams, 'RedOwner')).toBe('team:red')
+    expect(getMatchFactionKey(teams, 'red-partner')).toBe('team:red')
+    expect(getMatchFactionKey(teams, 'blue-owner')).toBe('team:blue')
+    expect(getMatchFactionKey({ players: [{ playerId: 'Alice' }] }, 'ALICE')).toBe('owner:alice')
+    expect(getMatchFactionKey({ players: [{ playerId: 'Alice' }] }, 'unknown')).toBe('owner:unknown')
   })
 })

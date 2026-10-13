@@ -5,5 +5,1792 @@
   "trigger": {
     "type": "endTurn"
   },
-  "skillCode": "if (battle.extensions && battle.extensions.amaterasuOwnerPlayerId && context.playerId !== battle.extensions.amaterasuOwnerPlayerId) return { success: false, message: '' }; var currentPlayerId = battle.turn.currentPlayerId; var amaterasuOwnerPlayerId = (battle.extensions && battle.extensions.amaterasuOwnerPlayerId) || null; var msgs = []; battle.pieces.forEach(function(p) { if (p.currentHp <= 0 || p.ownerPlayerId !== currentPlayerId) return; var tag = p.statusTags && p.statusTags.find(function(t) { return t.type === 'amaterasu-burn'; }); if (!tag) return; var stacks = tag.stacks || 1; var dmg = 2 * stacks; var sourcePlayerId = context.ruleOwnerPlayerId || context.playerId || amaterasuOwnerPlayerId; var amaterasuPlayerSource = sourcePlayerId ? { kind: 'player', instanceId: sourcePlayerId, ownerPlayerId: sourcePlayerId, name: sourcePlayerId } : null; var amaterasuAttacker = tag.sourcePieceId ? battle.pieces.find(function(pc) { return pc.instanceId === tag.sourcePieceId && pc.currentHp > 0; }) : null; var result = dealDamage(amaterasuAttacker || amaterasuPlayerSource, p, dmg, 'true', battle, 'amaterasu-burn-tick'); var actualDmg = (result && result.damage != null) ? result.damage : 0; if (actualDmg > 0) { msgs.push(p.name + '受天照灼烧(' + stacks + '层)，失去' + actualDmg + '点生命值'); } else if (result && result.success === false && result.message && result.message !== '') { msgs.push(p.name + '天照灼烧被抵挡'); } }); if (msgs.length === 0) return { success: false, message: '' }; return { success: true, message: msgs.join('；') };"
+  "skillCode": "var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = ((function(battle){if(battle===__gameplayInvalid)return __gameplayInvalid;var extensions=battle&&battle.extensions;if(extensions==null)return {value:null,defined:false};if(typeof extensions!==\"object\"||Array.isArray(extensions))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(extensions,\"amaterasuOwnerPlayerId\");var value=extensions[\"amaterasuOwnerPlayerId\"];if(value===undefined||value===null)return {value:null,defined:defined};if (typeof value !== \"string\") return __gameplayInvalid;return {value:value,defined:defined};})(battle)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--extensions\", __gameplayError, \"battle.field\"); _module0 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module0[\"value\"]) === __gameplayInvalid) || ((_module0[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module1 = __gameplayInvalid; } else { var _module1 = (((_module0[\"value\"]) === null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--owner-missing\", __gameplayError, \"compare.values\"); _module1 = __gameplayInvalid; } try { if (((_module0[\"value\"]) === __gameplayInvalid) || ((_module0[\"value\"]) === undefined) || (\"\" === __gameplayInvalid) || (\"\" === undefined)) { _module2 = __gameplayInvalid; } else { var _module2 = (((_module0[\"value\"]) === \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--owner-empty\", __gameplayError, \"compare.values\"); _module2 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null)) { _module3 = __gameplayInvalid; } else { var _module3 = ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) || ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--unrestricted\", __gameplayError, \"logic.or\"); _module3 = __gameplayInvalid; } try { var _module4 = ((function(record,key){var defined=record!=null&&Object.prototype.hasOwnProperty.call(record,key)&&record[key]!==undefined;var raw=defined?record[key]:undefined;return {value:raw==null?null:String(raw),defined:defined};})(context,\"playerId\")); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--event-player\", __gameplayError, \"context.field\"); _module4 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module0[\"value\"]) === __gameplayInvalid) || ((_module0[\"value\"]) === undefined) || ((_module4[\"value\"]) === __gameplayInvalid) || ((_module4[\"value\"]) === undefined)) { _module5 = __gameplayInvalid; } else { var _module5 = (((_module0[\"value\"]) === (_module4[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized--same-owner\", __gameplayError, \"compare.values\"); _module5 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) || ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorized\", __gameplayError, \"logic.or\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null)) { _module7 = __gameplayInvalid; } else { var _module7 = (!(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"unauthorized\", __gameplayError, \"logic.not\"); _module7 = __gameplayInvalid; } try { var _condition8 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7); if (_condition8 !== __gameplayInvalid && _condition8) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"unauthorized-result\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"authorization-guard\", __gameplayError); _condition8 = __gameplayInvalid; } try { var _module9 = ({value:(battle.turn)[\"currentPlayerId\"]}); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"current-player\", __gameplayError, \"battle.field\"); _module9 = __gameplayInvalid; } try { var _module10 = (flow.query.pieces({originId: undefined, ownerId: undefined, relation: undefined, range: undefined, includeDead: true})); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-count--pieces\", __gameplayError, \"query.pieces\"); _module10 = __gameplayInvalid; } try { if ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"pieces\")) ? _module10[\"pieces\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"pieces\")) ? _module10[\"pieces\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"pieces\")) ? _module10[\"pieces\"] : _module10) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"pieces\")) ? _module10[\"pieces\"] : _module10))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-count\", __gameplayError, \"collection.length\"); _module11 = __gameplayInvalid; } try { if ((0 === __gameplayInvalid) || (0 === null)) { _module12 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module12 = ((flow.execution.declare(\"number\",[],0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index\", __gameplayError, \"local.declare\"); _module12 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((JSON.parse(\"[]\") === __gameplayInvalid) || (JSON.parse(\"[]\") === null)) { _module13 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module13 = ((flow.execution.declare({\"kind\":\"list\",\"element\":\"string\"},[],JSON.parse(\"[]\")))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"messages--text-list-declare\", __gameplayError, \"local.declare\"); _module13 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } var _loopRoot126 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _whileIterations14 = 0; while (true) { var _whileCondition16 = __gameplayInvalid; var _whileCapture18 = (_module12[\"handle\"]); var _whileCapture19 = ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11); if (_whileCapture18 !== __gameplayInvalid && _whileCapture18 !== undefined && _whileCapture19 !== __gameplayInvalid && _whileCapture19 !== undefined) { _whileConditionDone17: { try { if ((_whileCapture18 === __gameplayInvalid) || (_whileCapture18 === undefined) || (_whileCapture18 === null)) { _module20 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module20 = ((flow.execution.read(_whileCapture18,\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-value\", __gameplayError, \"local.read\"); _module20 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module20[\"value\"]) === __gameplayInvalid) || ((_module20[\"value\"]) === undefined) || ((_module20[\"value\"]) === null) || (_whileCapture19 === __gameplayInvalid) || (_whileCapture19 === undefined) || (_whileCapture19 === null)) { _module21 = __gameplayInvalid; } else { var _module21 = (((_module20[\"value\"]) < _whileCapture19)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-continue\", __gameplayError, \"compare.less-than\"); _module21 = __gameplayInvalid; } try { if (!((((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === __gameplayInvalid))) { _whileCondition16 = { \"value\": ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) }; break _whileConditionDone17; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-loop-condition-return\", __gameplayError); } } } if (!(_whileCondition16 !== __gameplayInvalid && _whileCondition16 != null && _whileCondition16[\"value\"] === true)) break; if (_whileIterations14 >= 128) { throw new Error(\"gameplay while iteration budget exceeded: damage-pieces-loop\"); } __gameplayConsumeIteration(); var _whileIndex15 = _whileIterations14; try { if ((_whileIndex15 === __gameplayInvalid) || (_whileIndex15 === undefined) || (_whileIndex15 === null)) { _module22 = __gameplayInvalid; } else { var _module22 = ((function(pieces,index){if(!Array.isArray(pieces)||!Number.isInteger(index)||index<0||index>=pieces.length)return null;var piece=pieces[index];return piece&&typeof piece.instanceId===\"string\"?piece.instanceId:null;})(battle.pieces,_whileIndex15)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"live-target\", __gameplayError, \"collection.live-piece-at\"); _module22 = __gameplayInvalid; } try { if ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"piece\")) ? _module22[\"piece\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"piece\")) ? _module22[\"piece\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"piece\")) ? _module22[\"piece\"] : _module22) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"piece\")) ? _module22[\"piece\"] : _module22)))) { _module23 = __gameplayInvalid; } else { var _module23 = ((function(pieceId) { return pieceId && flow.query.hasPiece(pieceId) ? pieceId : null; })((function(value) { return value && typeof value === \"object\" ? value.instanceId : value; })(((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"piece\")) ? _module22[\"piece\"] : _module22)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target\", __gameplayError, \"piece.require\"); _module23 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module24 = __gameplayInvalid; } else { var _module24 = (flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)) ? flow.query.piece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive--reference\", __gameplayError, \"query.piece\"); _module24 = __gameplayInvalid; } try { var _module25 = (flow.query.pieces({originId: undefined, ownerId: undefined, relation: undefined, range: undefined, includeDead: false})); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive--items\", __gameplayError, \"query.pieces\"); _module25 = __gameplayInvalid; } var _loopRoot35 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection26 = __gameplayInvalid; var _items27 = ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"pieces\")) ? _module25[\"pieces\"] : _module25); var _capture32 = ((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"piece\")) ? _module24[\"piece\"] : _module24); if (Array.isArray(_items27) && _capture32 !== __gameplayInvalid && _capture32 !== undefined) { if (_items27.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues34 = [];  for (var _index28 = 0; _index28 < _items27.length; _index28 += 1) { __gameplayConsumeIteration(); var _item29 = _items27[_index28]; var _collectionResult30 = __gameplayInvalid; _collectionDone31: { try { if ((_item29 === __gameplayInvalid) || (_item29 === undefined) || (_capture32 === __gameplayInvalid) || (_capture32 === undefined)) { _module33 = __gameplayInvalid; } else { var _module33 = ((_item29 === _capture32)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive--compare\", __gameplayError, \"compare.values\"); _module33 = __gameplayInvalid; } try { if (!((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33) === __gameplayInvalid))) { _collectionResult30 = { \"value\": ((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33) }; break _collectionDone31; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive--return\", __gameplayError); } } if (_collectionResult30 !== __gameplayInvalid && _collectionResult30 != null && _collectionResult30[\"value\"]) { _collectionValues34.push(_item29); } } var _collection26 = _collectionValues34; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot35) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"target-alive--matches\", new Error(\"gameplay shared iteration budget exceeded\")); _collection26 = __gameplayInvalid; } else { __gameplayRecordFault(\"target-alive--matches\", __gameplayError); _collection26 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection26 === __gameplayInvalid) || (_collection26 === undefined) || (_collection26 === null)) { _module36 = __gameplayInvalid; } else { var _module36 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection26)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive--count\", __gameplayError, \"collection.length\"); _module36 = __gameplayInvalid; } try { if ((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === undefined) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module37 = __gameplayInvalid; } else { var _module37 = ((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive\", __gameplayError, \"compare.greater-than\"); _module37 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module38 = __gameplayInvalid; } else { var _module38 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-owner\", __gameplayError, \"piece.field\"); _module38 = __gameplayInvalid; } try { if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === undefined) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === null) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === null)) { _module39 = __gameplayInvalid; } else { var _module39 = ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === ((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-own-turn\", __gameplayError, \"compare.values\"); _module39 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"value\")) ? _module37[\"value\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"value\")) ? _module37[\"value\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"value\")) ? _module37[\"value\"] : _module37) === null) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === null)) { _module40 = __gameplayInvalid; } else { var _module40 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"value\")) ? _module37[\"value\"] : _module37) && ((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-eligible\", __gameplayError, \"logic.and\"); _module40 = __gameplayInvalid; } try { var _condition121 = ((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40); if (_condition121 !== __gameplayInvalid && _condition121) { try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module41 = __gameplayInvalid; } else { var _module41 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status-id--status-tags\", __gameplayError, \"piece.field\"); _module41 = __gameplayInvalid; } var _loopRoot51 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection42 = __gameplayInvalid; var _items43 = ((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41); if (Array.isArray(_items43)) { if (_items43.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection42 = null;  for (var _index44 = 0; _index44 < _items43.length; _index44 += 1) { __gameplayConsumeIteration(); var _item45 = _items43[_index44]; var _collectionResult46 = __gameplayInvalid; _collectionDone47: { try { if ((_item45 === __gameplayInvalid) || (_item45 === undefined)) { _module48 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module48 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"type\");var value=(function(record){var value=record[\"type\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_item45)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status-id--tag-type\", __gameplayError, \"data.optional-field\"); _module48 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module48[\"value\"]) === __gameplayInvalid) || ((_module48[\"value\"]) === undefined) || (\"amaterasu-burn\" === __gameplayInvalid) || (\"amaterasu-burn\" === undefined)) { _module49 = __gameplayInvalid; } else { var _module49 = (((_module48[\"value\"]) === \"amaterasu-burn\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status-id--type-match\", __gameplayError, \"compare.values\"); _module49 = __gameplayInvalid; } try { if (!((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"value\")) ? _module49[\"value\"] : _module49) === __gameplayInvalid))) { _collectionResult46 = { \"value\": ((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"value\")) ? _module49[\"value\"] : _module49) }; break _collectionDone47; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status-id--find-return\", __gameplayError); } } if (_collectionResult46 !== __gameplayInvalid && _collectionResult46 != null && _collectionResult46[\"value\"]) { _collection42 = _item45; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot51) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"status-id--status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection42 = __gameplayInvalid; } else { __gameplayRecordFault(\"status-id--status\", __gameplayError); _collection42 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection42 === __gameplayInvalid) || (_collection42 === undefined)) { _module52 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module52 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"id\");var value=(function(record){var value=record[\"id\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_collection42)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status-id\", __gameplayError, \"data.optional-field\"); _module52 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module52[\"value\"]) === __gameplayInvalid) || ((_module52[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module53 = __gameplayInvalid; } else { var _module53 = (((_module52[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"present\", __gameplayError, \"compare.values\"); _module53 = __gameplayInvalid; } try { var _condition120 = ((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"value\")) ? _module53[\"value\"] : _module53); if (_condition120 !== __gameplayInvalid && _condition120) { try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module54 = __gameplayInvalid; } else { var _module54 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--status-tags\", __gameplayError, \"piece.field\"); _module54 = __gameplayInvalid; } var _loopRoot67 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection55 = __gameplayInvalid; var _items56 = ((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"value\")) ? _module54[\"value\"] : _module54); var _capture61 = (_module52[\"value\"]); if (Array.isArray(_items56) && _capture61 !== __gameplayInvalid && _capture61 !== undefined) { if (_items56.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection55 = null;  for (var _index57 = 0; _index57 < _items56.length; _index57 += 1) { __gameplayConsumeIteration(); var _item58 = _items56[_index57]; var _collectionResult59 = __gameplayInvalid; _collectionDone60: { try { if ((_item58 === __gameplayInvalid) || (_item58 === undefined)) { _module62 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module62 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"id\");var value=(function(record){var value=record[\"id\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_item58)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--tag-id\", __gameplayError, \"data.optional-field\"); _module62 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module62[\"defined\"]) === __gameplayInvalid) || ((_module62[\"defined\"]) === undefined) || ((_module62[\"defined\"]) === null) || (true === __gameplayInvalid) || (true === undefined) || (true === null)) { _module63 = __gameplayInvalid; } else { var _module63 = (((_module62[\"defined\"]) === true)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--id-defined\", __gameplayError, \"compare.values\"); _module63 = __gameplayInvalid; } try { if (((_module62[\"value\"]) === __gameplayInvalid) || ((_module62[\"value\"]) === undefined) || (_capture61 === __gameplayInvalid) || (_capture61 === undefined)) { _module64 = __gameplayInvalid; } else { var _module64 = (((_module62[\"value\"]) === _capture61)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--id-match\", __gameplayError, \"compare.values\"); _module64 = __gameplayInvalid; } try { if ((((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === __gameplayInvalid) || (((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === undefined) || (((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === null) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === __gameplayInvalid) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === undefined) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === null)) { _module65 = __gameplayInvalid; } else { var _module65 = ((((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) && ((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--id-and-match\", __gameplayError, \"logic.and\"); _module65 = __gameplayInvalid; } try { if (!((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) === __gameplayInvalid))) { _collectionResult59 = { \"value\": ((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"value\")) ? _module65[\"value\"] : _module65) }; break _collectionDone60; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--find-return\", __gameplayError); } } if (_collectionResult59 !== __gameplayInvalid && _collectionResult59 != null && _collectionResult59[\"value\"]) { _collection55 = _item58; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot67) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"stacks--status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection55 = __gameplayInvalid; } else { __gameplayRecordFault(\"stacks--status\", __gameplayError); _collection55 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection55 === __gameplayInvalid) || (_collection55 === undefined)) { _module68 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module68 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"stacks\");var value=(function(record){var value=record[\"stacks\"];if(value===undefined||value===null)return null;if (typeof value !== \"number\" || !Number.isFinite(value)) return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_collection55)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--raw\", __gameplayError, \"data.optional-field\"); _module68 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module68[\"value\"]) === __gameplayInvalid) || ((_module68[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module69 = __gameplayInvalid; } else { var _module69 = (((_module68[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--present\", __gameplayError, \"compare.values\"); _module69 = __gameplayInvalid; } try { if ((((_module69 !== null && typeof _module69 === \"object\" && Object.prototype.hasOwnProperty.call(_module69, \"value\")) ? _module69[\"value\"] : _module69) === __gameplayInvalid) || (((_module69 !== null && typeof _module69 === \"object\" && Object.prototype.hasOwnProperty.call(_module69, \"value\")) ? _module69[\"value\"] : _module69) === undefined) || (((_module69 !== null && typeof _module69 === \"object\" && Object.prototype.hasOwnProperty.call(_module69, \"value\")) ? _module69[\"value\"] : _module69) === null) || ((_module68[\"value\"]) === __gameplayInvalid) || ((_module68[\"value\"]) === undefined) || (1 === __gameplayInvalid) || (1 === undefined)) { _module70 = __gameplayInvalid; } else { var _module70 = (({value:(((_module69 !== null && typeof _module69 === \"object\" && Object.prototype.hasOwnProperty.call(_module69, \"value\")) ? _module69[\"value\"] : _module69) ? (_module68[\"value\"]) : 1)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks--selected\", __gameplayError, \"logic.select\"); _module70 = __gameplayInvalid; } try { if ((((_module70 !== null && typeof _module70 === \"object\" && Object.prototype.hasOwnProperty.call(_module70, \"value\")) ? _module70[\"value\"] : _module70) === __gameplayInvalid) || (((_module70 !== null && typeof _module70 === \"object\" && Object.prototype.hasOwnProperty.call(_module70, \"value\")) ? _module70[\"value\"] : _module70) === undefined) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module71 = __gameplayInvalid; } else { var _module71 = ((function(value, defaultValue){if(value===__gameplayInvalid||defaultValue===__gameplayInvalid)return __gameplayInvalid;var result=value==null?defaultValue:value;return {value:result};})(((_module70 !== null && typeof _module70 === \"object\" && Object.prototype.hasOwnProperty.call(_module70, \"value\")) ? _module70[\"value\"] : _module70), 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"stacks\", __gameplayError, \"value.coalesce\"); _module71 = __gameplayInvalid; } try { if ((2 === __gameplayInvalid) || (2 === undefined) || (2 === null) || (((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === __gameplayInvalid) || (((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === undefined) || (((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === null)) { _module72 = __gameplayInvalid; } else { var _module72 = ((2 * ((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"amount\", __gameplayError, \"math.multiply\"); _module72 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module73 = __gameplayInvalid; } else { var _module73 = ({value:(flow.query.pieceText(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-name\", __gameplayError, \"piece.field\"); _module73 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23)))) { _module74 = __gameplayInvalid; } else { var _module74 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--status-tags\", __gameplayError, \"piece.field\"); _module74 = __gameplayInvalid; } var _loopRoot87 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection75 = __gameplayInvalid; var _items76 = ((_module74 !== null && typeof _module74 === \"object\" && Object.prototype.hasOwnProperty.call(_module74, \"value\")) ? _module74[\"value\"] : _module74); var _capture81 = (_module52[\"value\"]); if (Array.isArray(_items76) && _capture81 !== __gameplayInvalid && _capture81 !== undefined) { if (_items76.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collection75 = null;  for (var _index77 = 0; _index77 < _items76.length; _index77 += 1) { __gameplayConsumeIteration(); var _item78 = _items76[_index77]; var _collectionResult79 = __gameplayInvalid; _collectionDone80: { try { if ((_item78 === __gameplayInvalid) || (_item78 === undefined)) { _module82 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module82 = ((function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!==\"object\"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,\"id\");var value=(function(record){var value=record[\"id\"];if(value===undefined||value===null)return null;if (typeof value !== \"string\") return __gameplayInvalid; return value;})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(_item78)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--tag-id\", __gameplayError, \"data.optional-field\"); _module82 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module82[\"defined\"]) === __gameplayInvalid) || ((_module82[\"defined\"]) === undefined) || ((_module82[\"defined\"]) === null) || (true === __gameplayInvalid) || (true === undefined) || (true === null)) { _module83 = __gameplayInvalid; } else { var _module83 = (((_module82[\"defined\"]) === true)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--id-defined\", __gameplayError, \"compare.values\"); _module83 = __gameplayInvalid; } try { if (((_module82[\"value\"]) === __gameplayInvalid) || ((_module82[\"value\"]) === undefined) || (_capture81 === __gameplayInvalid) || (_capture81 === undefined)) { _module84 = __gameplayInvalid; } else { var _module84 = (((_module82[\"value\"]) === _capture81)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--id-match\", __gameplayError, \"compare.values\"); _module84 = __gameplayInvalid; } try { if ((((_module83 !== null && typeof _module83 === \"object\" && Object.prototype.hasOwnProperty.call(_module83, \"value\")) ? _module83[\"value\"] : _module83) === __gameplayInvalid) || (((_module83 !== null && typeof _module83 === \"object\" && Object.prototype.hasOwnProperty.call(_module83, \"value\")) ? _module83[\"value\"] : _module83) === undefined) || (((_module83 !== null && typeof _module83 === \"object\" && Object.prototype.hasOwnProperty.call(_module83, \"value\")) ? _module83[\"value\"] : _module83) === null) || (((_module84 !== null && typeof _module84 === \"object\" && Object.prototype.hasOwnProperty.call(_module84, \"value\")) ? _module84[\"value\"] : _module84) === __gameplayInvalid) || (((_module84 !== null && typeof _module84 === \"object\" && Object.prototype.hasOwnProperty.call(_module84, \"value\")) ? _module84[\"value\"] : _module84) === undefined) || (((_module84 !== null && typeof _module84 === \"object\" && Object.prototype.hasOwnProperty.call(_module84, \"value\")) ? _module84[\"value\"] : _module84) === null)) { _module85 = __gameplayInvalid; } else { var _module85 = ((((_module83 !== null && typeof _module83 === \"object\" && Object.prototype.hasOwnProperty.call(_module83, \"value\")) ? _module83[\"value\"] : _module83) && ((_module84 !== null && typeof _module84 === \"object\" && Object.prototype.hasOwnProperty.call(_module84, \"value\")) ? _module84[\"value\"] : _module84))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--id-and-match\", __gameplayError, \"logic.and\"); _module85 = __gameplayInvalid; } try { if (!((((_module85 !== null && typeof _module85 === \"object\" && Object.prototype.hasOwnProperty.call(_module85, \"value\")) ? _module85[\"value\"] : _module85) === __gameplayInvalid))) { _collectionResult79 = { \"value\": ((_module85 !== null && typeof _module85 === \"object\" && Object.prototype.hasOwnProperty.call(_module85, \"value\")) ? _module85[\"value\"] : _module85) }; break _collectionDone80; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref--find-return\", __gameplayError); } } if (_collectionResult79 !== __gameplayInvalid && _collectionResult79 != null && _collectionResult79[\"value\"]) { _collection75 = _item78; break; } }  } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot87) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"damage-source-player-ref--status\", new Error(\"gameplay shared iteration budget exceeded\")); _collection75 = __gameplayInvalid; } else { __gameplayRecordFault(\"damage-source-player-ref--status\", __gameplayError); _collection75 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection75 === __gameplayInvalid) || (_collection75 === undefined)) { _module88 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module88 = ((function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!==\"object\")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,\"constructor\");if(!constructor||!hasOwn.call(constructor,\"value\")||typeof constructor.value!==\"function\")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,\"name\");return !!name&&hasOwn.call(name,\"value\")&&name.value===\"Object\";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,\"value\"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,\"value\")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind===\"string\"||kind===\"boolean\")return true;if(kind===\"number\")return Number.isFinite(value);if(kind!==\"object\")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!==\"string\"){arrayValid=false;break;}if(arrayKey===\"length\"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name===\"__proto__\"||name===\"prototype\"||name===\"constructor\"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected===\"object\"){if(expected.kind===\"nullable\")return value===null||valid(value,expected.value,depth);if(expected.kind===\"list\"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!==\"string\"){listValid=false;break;}if(listKey===\"length\")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind===\"record\")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected===\"string\"||expected===\"piece\"||expected===\"player\")return typeof value===\"string\";if(expected===\"number\")return typeof value===\"number\"&&Number.isFinite(value);if(expected===\"boolean\")return typeof value===\"boolean\";if(expected===\"cell\"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,\"x\"),yDescriptor=Object.getOwnPropertyDescriptor(value,\"y\");return !!xDescriptor&&hasOwn.call(xDescriptor,\"value\")&&!!yDescriptor&&hasOwn.call(yDescriptor,\"value\")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected===\"choice\")return plain(value)&&validRecord(value,depth);if(expected===\"record\")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!==\"object\")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,\"value\"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,\"value\"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})(_collection75,\"ownerPlayerId\",{\"kind\":\"nullable\",\"value\":\"player\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player-ref\", __gameplayError, \"data.read-key\"); _module88 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module88[\"value\"]) === __gameplayInvalid) || ((_module88[\"value\"]) === undefined) || ((_module88[\"value\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer((_module88[\"value\"])))) { _module89 = __gameplayInvalid; } else { var _module89 = (flow.query.hasPlayer((_module88[\"value\"])) ? flow.query.player((_module88[\"value\"])).playerId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-source-player\", __gameplayError, \"query.player\"); _module89 = __gameplayInvalid; } try { if ((((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89) === __gameplayInvalid) || (((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89) === undefined) || (((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89) === null) || (((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89))) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) === null) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23))) || (((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"value\")) ? _module72[\"value\"] : _module72) === __gameplayInvalid) || (((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"value\")) ? _module72[\"value\"] : _module72) === undefined) || (((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"value\")) ? _module72[\"value\"] : _module72) === null)) { _module90 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid, \"damage\": __gameplayInvalid }; } else { var _module90 = ((function(value){return {result: value, success: value.success, damage: value.damage}})(flow.effects.damage((function(id){var owner=flow.query.player(id);return {kind:\"player\",instanceId:owner.playerId,ownerPlayerId:owner.playerId,name:owner.name||owner.playerId};})(((_module89 !== null && typeof _module89 === \"object\" && Object.prototype.hasOwnProperty.call(_module89, \"player\")) ? _module89[\"player\"] : _module89)), ((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"piece\")) ? _module23[\"piece\"] : _module23), ((_module72 !== null && typeof _module72 === \"object\" && Object.prototype.hasOwnProperty.call(_module72, \"value\")) ? _module72[\"value\"] : _module72), \"true\", \"amaterasu-burn-tick\", \"host\"))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-damage\", __gameplayError, \"effect.damage\"); _module90 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid, \"damage\": __gameplayInvalid }; } try { if (((_module90[\"result\"]) === __gameplayInvalid) || ((_module90[\"result\"]) === undefined)) { _module91 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module91 = ((function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!==\"object\")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,\"constructor\");if(!constructor||!hasOwn.call(constructor,\"value\")||typeof constructor.value!==\"function\")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,\"name\");return !!name&&hasOwn.call(name,\"value\")&&name.value===\"Object\";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,\"value\"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,\"value\")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind===\"string\"||kind===\"boolean\")return true;if(kind===\"number\")return Number.isFinite(value);if(kind!==\"object\")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!==\"string\"){arrayValid=false;break;}if(arrayKey===\"length\"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name===\"__proto__\"||name===\"prototype\"||name===\"constructor\"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected===\"object\"){if(expected.kind===\"nullable\")return value===null||valid(value,expected.value,depth);if(expected.kind===\"list\"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!==\"string\"){listValid=false;break;}if(listKey===\"length\")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind===\"record\")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected===\"string\"||expected===\"piece\"||expected===\"player\")return typeof value===\"string\";if(expected===\"number\")return typeof value===\"number\"&&Number.isFinite(value);if(expected===\"boolean\")return typeof value===\"boolean\";if(expected===\"cell\"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,\"x\"),yDescriptor=Object.getOwnPropertyDescriptor(value,\"y\");return !!xDescriptor&&hasOwn.call(xDescriptor,\"value\")&&!!yDescriptor&&hasOwn.call(yDescriptor,\"value\")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected===\"choice\")return plain(value)&&validRecord(value,depth);if(expected===\"record\")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!==\"object\")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,\"value\"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,\"value\"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})((_module90[\"result\"]),\"message\",\"string\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-damage-message--field\", __gameplayError, \"data.read-key\"); _module91 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module91[\"value\"]) === __gameplayInvalid) || ((_module91[\"value\"]) === undefined) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module92 = __gameplayInvalid; } else { var _module92 = ((function(value, defaultValue){if(value===__gameplayInvalid||defaultValue===__gameplayInvalid)return __gameplayInvalid;var result=value==null?defaultValue:value;return {value:result};})((_module91[\"value\"]), \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-damage-message--value\", __gameplayError, \"value.coalesce\"); _module92 = __gameplayInvalid; } try { if ((((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === __gameplayInvalid) || (((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === undefined) || (((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71) === null)) { _module93 = __gameplayInvalid; } else { var _module93 = (String(((_module71 !== null && typeof _module71 === \"object\" && Object.prototype.hasOwnProperty.call(_module71, \"value\")) ? _module71[\"value\"] : _module71))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-stacks-text\", __gameplayError, \"text.from-value\"); _module93 = __gameplayInvalid; } try { if (((_module90[\"damage\"]) === __gameplayInvalid) || ((_module90[\"damage\"]) === undefined) || ((_module90[\"damage\"]) === null)) { _module94 = __gameplayInvalid; } else { var _module94 = (String((_module90[\"damage\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-damage-text\", __gameplayError, \"text.from-value\"); _module94 = __gameplayInvalid; } try { if (((_module90[\"damage\"]) === __gameplayInvalid) || ((_module90[\"damage\"]) === undefined) || ((_module90[\"damage\"]) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module95 = __gameplayInvalid; } else { var _module95 = (((_module90[\"damage\"]) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-positive\", __gameplayError, \"compare.greater-than\"); _module95 = __gameplayInvalid; } try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null) || (((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === __gameplayInvalid) || (((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === undefined) || (((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === null)) { _module96 = __gameplayInvalid; } else { var _module96 = ((\"\" + ((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-0\", __gameplayError, \"text.concat\"); _module96 = __gameplayInvalid; } try { if ((((_module96 !== null && typeof _module96 === \"object\" && Object.prototype.hasOwnProperty.call(_module96, \"text\")) ? _module96[\"text\"] : _module96) === __gameplayInvalid) || (((_module96 !== null && typeof _module96 === \"object\" && Object.prototype.hasOwnProperty.call(_module96, \"text\")) ? _module96[\"text\"] : _module96) === undefined) || (((_module96 !== null && typeof _module96 === \"object\" && Object.prototype.hasOwnProperty.call(_module96, \"text\")) ? _module96[\"text\"] : _module96) === null) || (\"受天照灼烧(\" === __gameplayInvalid) || (\"受天照灼烧(\" === undefined) || (\"受天照灼烧(\" === null)) { _module97 = __gameplayInvalid; } else { var _module97 = ((((_module96 !== null && typeof _module96 === \"object\" && Object.prototype.hasOwnProperty.call(_module96, \"text\")) ? _module96[\"text\"] : _module96) + \"受天照灼烧(\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-1\", __gameplayError, \"text.concat\"); _module97 = __gameplayInvalid; } try { if ((((_module97 !== null && typeof _module97 === \"object\" && Object.prototype.hasOwnProperty.call(_module97, \"text\")) ? _module97[\"text\"] : _module97) === __gameplayInvalid) || (((_module97 !== null && typeof _module97 === \"object\" && Object.prototype.hasOwnProperty.call(_module97, \"text\")) ? _module97[\"text\"] : _module97) === undefined) || (((_module97 !== null && typeof _module97 === \"object\" && Object.prototype.hasOwnProperty.call(_module97, \"text\")) ? _module97[\"text\"] : _module97) === null) || (((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"text\")) ? _module93[\"text\"] : _module93) === __gameplayInvalid) || (((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"text\")) ? _module93[\"text\"] : _module93) === undefined) || (((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"text\")) ? _module93[\"text\"] : _module93) === null)) { _module98 = __gameplayInvalid; } else { var _module98 = ((((_module97 !== null && typeof _module97 === \"object\" && Object.prototype.hasOwnProperty.call(_module97, \"text\")) ? _module97[\"text\"] : _module97) + ((_module93 !== null && typeof _module93 === \"object\" && Object.prototype.hasOwnProperty.call(_module93, \"text\")) ? _module93[\"text\"] : _module93))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-2\", __gameplayError, \"text.concat\"); _module98 = __gameplayInvalid; } try { if ((((_module98 !== null && typeof _module98 === \"object\" && Object.prototype.hasOwnProperty.call(_module98, \"text\")) ? _module98[\"text\"] : _module98) === __gameplayInvalid) || (((_module98 !== null && typeof _module98 === \"object\" && Object.prototype.hasOwnProperty.call(_module98, \"text\")) ? _module98[\"text\"] : _module98) === undefined) || (((_module98 !== null && typeof _module98 === \"object\" && Object.prototype.hasOwnProperty.call(_module98, \"text\")) ? _module98[\"text\"] : _module98) === null) || (\"层)，失去\" === __gameplayInvalid) || (\"层)，失去\" === undefined) || (\"层)，失去\" === null)) { _module99 = __gameplayInvalid; } else { var _module99 = ((((_module98 !== null && typeof _module98 === \"object\" && Object.prototype.hasOwnProperty.call(_module98, \"text\")) ? _module98[\"text\"] : _module98) + \"层)，失去\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-3\", __gameplayError, \"text.concat\"); _module99 = __gameplayInvalid; } try { if ((((_module99 !== null && typeof _module99 === \"object\" && Object.prototype.hasOwnProperty.call(_module99, \"text\")) ? _module99[\"text\"] : _module99) === __gameplayInvalid) || (((_module99 !== null && typeof _module99 === \"object\" && Object.prototype.hasOwnProperty.call(_module99, \"text\")) ? _module99[\"text\"] : _module99) === undefined) || (((_module99 !== null && typeof _module99 === \"object\" && Object.prototype.hasOwnProperty.call(_module99, \"text\")) ? _module99[\"text\"] : _module99) === null) || (((_module94 !== null && typeof _module94 === \"object\" && Object.prototype.hasOwnProperty.call(_module94, \"text\")) ? _module94[\"text\"] : _module94) === __gameplayInvalid) || (((_module94 !== null && typeof _module94 === \"object\" && Object.prototype.hasOwnProperty.call(_module94, \"text\")) ? _module94[\"text\"] : _module94) === undefined) || (((_module94 !== null && typeof _module94 === \"object\" && Object.prototype.hasOwnProperty.call(_module94, \"text\")) ? _module94[\"text\"] : _module94) === null)) { _module100 = __gameplayInvalid; } else { var _module100 = ((((_module99 !== null && typeof _module99 === \"object\" && Object.prototype.hasOwnProperty.call(_module99, \"text\")) ? _module99[\"text\"] : _module99) + ((_module94 !== null && typeof _module94 === \"object\" && Object.prototype.hasOwnProperty.call(_module94, \"text\")) ? _module94[\"text\"] : _module94))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-4\", __gameplayError, \"text.concat\"); _module100 = __gameplayInvalid; } try { if ((((_module100 !== null && typeof _module100 === \"object\" && Object.prototype.hasOwnProperty.call(_module100, \"text\")) ? _module100[\"text\"] : _module100) === __gameplayInvalid) || (((_module100 !== null && typeof _module100 === \"object\" && Object.prototype.hasOwnProperty.call(_module100, \"text\")) ? _module100[\"text\"] : _module100) === undefined) || (((_module100 !== null && typeof _module100 === \"object\" && Object.prototype.hasOwnProperty.call(_module100, \"text\")) ? _module100[\"text\"] : _module100) === null) || (\"点生命值\" === __gameplayInvalid) || (\"点生命值\" === undefined) || (\"点生命值\" === null)) { _module101 = __gameplayInvalid; } else { var _module101 = ((((_module100 !== null && typeof _module100 === \"object\" && Object.prototype.hasOwnProperty.call(_module100, \"text\")) ? _module100[\"text\"] : _module100) + \"点生命值\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-actual-message-5\", __gameplayError, \"text.concat\"); _module101 = __gameplayInvalid; } try { var _condition119 = ((_module95 !== null && typeof _module95 === \"object\" && Object.prototype.hasOwnProperty.call(_module95, \"value\")) ? _module95[\"value\"] : _module95); if (_condition119 !== __gameplayInvalid && _condition119) { try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module102 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module102 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--current--text-list-read\", __gameplayError, \"local.read\"); _module102 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((((_module101 !== null && typeof _module101 === \"object\" && Object.prototype.hasOwnProperty.call(_module101, \"text\")) ? _module101[\"text\"] : _module101) === __gameplayInvalid) || (((_module101 !== null && typeof _module101 === \"object\" && Object.prototype.hasOwnProperty.call(_module101, \"text\")) ? _module101[\"text\"] : _module101) === undefined) || (((_module101 !== null && typeof _module101 === \"object\" && Object.prototype.hasOwnProperty.call(_module101, \"text\")) ? _module101[\"text\"] : _module101) === null)) { _module103 = __gameplayInvalid; } else { var _module103 = ([((_module101 !== null && typeof _module101 === \"object\" && Object.prototype.hasOwnProperty.call(_module101, \"text\")) ? _module101[\"text\"] : _module101)]); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--text-list-item\", __gameplayError, \"collection.singleton\"); _module103 = __gameplayInvalid; } try { if (((_module102[\"value\"]) === __gameplayInvalid) || ((_module102[\"value\"]) === undefined) || ((_module102[\"value\"]) === null) || (((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"items\")) ? _module103[\"items\"] : _module103) === __gameplayInvalid) || (((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"items\")) ? _module103[\"items\"] : _module103) === undefined) || (((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"items\")) ? _module103[\"items\"] : _module103) === null)) { _module104 = __gameplayInvalid; } else { var _module104 = ((function(left,right){if(!Array.isArray(left)||!Array.isArray(right))throw new Error(\"collection.concat requires two tuples\");return left.concat(right);})((_module102[\"value\"]),((_module103 !== null && typeof _module103 === \"object\" && Object.prototype.hasOwnProperty.call(_module103, \"items\")) ? _module103[\"items\"] : _module103))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--text-list-append\", __gameplayError, \"collection.concat\"); _module104 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"items\")) ? _module104[\"items\"] : _module104) === __gameplayInvalid) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"items\")) ? _module104[\"items\"] : _module104) === undefined) || (((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"items\")) ? _module104[\"items\"] : _module104) === null)) { _module105 = __gameplayInvalid; } else { var _module105 = ((flow.execution.write((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[],((_module104 !== null && typeof _module104 === \"object\" && Object.prototype.hasOwnProperty.call(_module104, \"items\")) ? _module104[\"items\"] : _module104)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--text-list-write\", __gameplayError, \"local.write\"); _module105 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module106 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module106 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--text-list-read-after-write\", __gameplayError, \"local.read\"); _module106 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module106[\"value\"]) === __gameplayInvalid) || ((_module106[\"value\"]) === undefined) || ((_module106[\"value\"]) === null)) { _module107 = __gameplayInvalid; } else { var _module107 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })((_module106[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-actual--text-list-count\", __gameplayError, \"collection.length\"); _module107 = __gameplayInvalid; } } else if (_condition119 !== __gameplayInvalid) { try { if (((_module90[\"success\"]) === __gameplayInvalid) || ((_module90[\"success\"]) === undefined) || ((_module90[\"success\"]) === null)) { _module108 = __gameplayInvalid; } else { var _module108 = (!((_module90[\"success\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-failed\", __gameplayError, \"logic.not\"); _module108 = __gameplayInvalid; } try { if ((((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === __gameplayInvalid) || (((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === undefined) || (((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) === null) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module109 = __gameplayInvalid; } else { var _module109 = ((((_module92 !== null && typeof _module92 === \"object\" && Object.prototype.hasOwnProperty.call(_module92, \"value\")) ? _module92[\"value\"] : _module92) !== \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-blocked\", __gameplayError, \"compare.values\"); _module109 = __gameplayInvalid; } try { if ((((_module108 !== null && typeof _module108 === \"object\" && Object.prototype.hasOwnProperty.call(_module108, \"value\")) ? _module108[\"value\"] : _module108) === __gameplayInvalid) || (((_module108 !== null && typeof _module108 === \"object\" && Object.prototype.hasOwnProperty.call(_module108, \"value\")) ? _module108[\"value\"] : _module108) === undefined) || (((_module108 !== null && typeof _module108 === \"object\" && Object.prototype.hasOwnProperty.call(_module108, \"value\")) ? _module108[\"value\"] : _module108) === null) || (((_module109 !== null && typeof _module109 === \"object\" && Object.prototype.hasOwnProperty.call(_module109, \"value\")) ? _module109[\"value\"] : _module109) === __gameplayInvalid) || (((_module109 !== null && typeof _module109 === \"object\" && Object.prototype.hasOwnProperty.call(_module109, \"value\")) ? _module109[\"value\"] : _module109) === undefined) || (((_module109 !== null && typeof _module109 === \"object\" && Object.prototype.hasOwnProperty.call(_module109, \"value\")) ? _module109[\"value\"] : _module109) === null)) { _module110 = __gameplayInvalid; } else { var _module110 = ((((_module108 !== null && typeof _module108 === \"object\" && Object.prototype.hasOwnProperty.call(_module108, \"value\")) ? _module108[\"value\"] : _module108) && ((_module109 !== null && typeof _module109 === \"object\" && Object.prototype.hasOwnProperty.call(_module109, \"value\")) ? _module109[\"value\"] : _module109))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-blocked-condition\", __gameplayError, \"logic.and\"); _module110 = __gameplayInvalid; } try { var _condition118 = ((_module110 !== null && typeof _module110 === \"object\" && Object.prototype.hasOwnProperty.call(_module110, \"value\")) ? _module110[\"value\"] : _module110); if (_condition118 !== __gameplayInvalid && _condition118) { try { if ((((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === __gameplayInvalid) || (((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === undefined) || (((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) === null) || (\"天照灼烧被抵挡\" === __gameplayInvalid) || (\"天照灼烧被抵挡\" === undefined) || (\"天照灼烧被抵挡\" === null)) { _module111 = __gameplayInvalid; } else { var _module111 = ((((_module73 !== null && typeof _module73 === \"object\" && Object.prototype.hasOwnProperty.call(_module73, \"value\")) ? _module73[\"value\"] : _module73) + \"天照灼烧被抵挡\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-blocked-message\", __gameplayError, \"text.concat\"); _module111 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module112 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module112 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--current--text-list-read\", __gameplayError, \"local.read\"); _module112 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((((_module111 !== null && typeof _module111 === \"object\" && Object.prototype.hasOwnProperty.call(_module111, \"text\")) ? _module111[\"text\"] : _module111) === __gameplayInvalid) || (((_module111 !== null && typeof _module111 === \"object\" && Object.prototype.hasOwnProperty.call(_module111, \"text\")) ? _module111[\"text\"] : _module111) === undefined) || (((_module111 !== null && typeof _module111 === \"object\" && Object.prototype.hasOwnProperty.call(_module111, \"text\")) ? _module111[\"text\"] : _module111) === null)) { _module113 = __gameplayInvalid; } else { var _module113 = ([((_module111 !== null && typeof _module111 === \"object\" && Object.prototype.hasOwnProperty.call(_module111, \"text\")) ? _module111[\"text\"] : _module111)]); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--text-list-item\", __gameplayError, \"collection.singleton\"); _module113 = __gameplayInvalid; } try { if (((_module112[\"value\"]) === __gameplayInvalid) || ((_module112[\"value\"]) === undefined) || ((_module112[\"value\"]) === null) || (((_module113 !== null && typeof _module113 === \"object\" && Object.prototype.hasOwnProperty.call(_module113, \"items\")) ? _module113[\"items\"] : _module113) === __gameplayInvalid) || (((_module113 !== null && typeof _module113 === \"object\" && Object.prototype.hasOwnProperty.call(_module113, \"items\")) ? _module113[\"items\"] : _module113) === undefined) || (((_module113 !== null && typeof _module113 === \"object\" && Object.prototype.hasOwnProperty.call(_module113, \"items\")) ? _module113[\"items\"] : _module113) === null)) { _module114 = __gameplayInvalid; } else { var _module114 = ((function(left,right){if(!Array.isArray(left)||!Array.isArray(right))throw new Error(\"collection.concat requires two tuples\");return left.concat(right);})((_module112[\"value\"]),((_module113 !== null && typeof _module113 === \"object\" && Object.prototype.hasOwnProperty.call(_module113, \"items\")) ? _module113[\"items\"] : _module113))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--text-list-append\", __gameplayError, \"collection.concat\"); _module114 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null) || (((_module114 !== null && typeof _module114 === \"object\" && Object.prototype.hasOwnProperty.call(_module114, \"items\")) ? _module114[\"items\"] : _module114) === __gameplayInvalid) || (((_module114 !== null && typeof _module114 === \"object\" && Object.prototype.hasOwnProperty.call(_module114, \"items\")) ? _module114[\"items\"] : _module114) === undefined) || (((_module114 !== null && typeof _module114 === \"object\" && Object.prototype.hasOwnProperty.call(_module114, \"items\")) ? _module114[\"items\"] : _module114) === null)) { _module115 = __gameplayInvalid; } else { var _module115 = ((flow.execution.write((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[],((_module114 !== null && typeof _module114 === \"object\" && Object.prototype.hasOwnProperty.call(_module114, \"items\")) ? _module114[\"items\"] : _module114)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--text-list-write\", __gameplayError, \"local.write\"); _module115 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module116 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module116 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--text-list-read-after-write\", __gameplayError, \"local.read\"); _module116 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module116[\"value\"]) === __gameplayInvalid) || ((_module116[\"value\"]) === undefined) || ((_module116[\"value\"]) === null)) { _module117 = __gameplayInvalid; } else { var _module117 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })((_module116[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-append-blocked--text-list-count\", __gameplayError, \"collection.length\"); _module117 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-blocked-branch\", __gameplayError); _condition118 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-message-branch\", __gameplayError); _condition119 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-burn\", __gameplayError); _condition120 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-eligible-guard\", __gameplayError); _condition121 = __gameplayInvalid; } try { if (((_module12[\"handle\"]) === __gameplayInvalid) || ((_module12[\"handle\"]) === undefined) || ((_module12[\"handle\"]) === null)) { _module122 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module122 = ((flow.execution.read((_module12[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-add--counter-read\", __gameplayError, \"local.read\"); _module122 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module122[\"value\"]) === __gameplayInvalid) || ((_module122[\"value\"]) === undefined) || ((_module122[\"value\"]) === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module123 = __gameplayInvalid; } else { var _module123 = (((_module122[\"value\"]) + 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-add--counter-add\", __gameplayError, \"math.add\"); _module123 = __gameplayInvalid; } try { if (((_module12[\"handle\"]) === __gameplayInvalid) || ((_module12[\"handle\"]) === undefined) || ((_module12[\"handle\"]) === null) || (((_module123 !== null && typeof _module123 === \"object\" && Object.prototype.hasOwnProperty.call(_module123, \"value\")) ? _module123[\"value\"] : _module123) === __gameplayInvalid) || (((_module123 !== null && typeof _module123 === \"object\" && Object.prototype.hasOwnProperty.call(_module123, \"value\")) ? _module123[\"value\"] : _module123) === undefined) || (((_module123 !== null && typeof _module123 === \"object\" && Object.prototype.hasOwnProperty.call(_module123, \"value\")) ? _module123[\"value\"] : _module123) === null)) { _module124 = __gameplayInvalid; } else { var _module124 = ((flow.execution.write((_module12[\"handle\"]),\"number\",[],((_module123 !== null && typeof _module123 === \"object\" && Object.prototype.hasOwnProperty.call(_module123, \"value\")) ? _module123[\"value\"] : _module123)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-add--counter-write\", __gameplayError, \"local.write\"); _module124 = __gameplayInvalid; } try { if (((_module12[\"handle\"]) === __gameplayInvalid) || ((_module12[\"handle\"]) === undefined) || ((_module12[\"handle\"]) === null)) { _module125 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module125 = ((flow.execution.read((_module12[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"damage-index-add\", __gameplayError, \"local.read\"); _module125 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } _whileIterations14 += 1; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot126) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"damage-pieces-loop\", new Error(\"gameplay shared iteration budget exceeded\")); } else { __gameplayRecordFault(\"damage-pieces-loop\", __gameplayError); } } finally { __gameplayLoopDepth -= 1; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module127 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module127 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message--items--text-list-read\", __gameplayError, \"local.read\"); _module127 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module127[\"value\"]) === __gameplayInvalid) || ((_module127[\"value\"]) === undefined) || ((_module127[\"value\"]) === null)) { _module128 = __gameplayInvalid; } else { var _module128 = ((_module127[\"value\"]).join(\"；\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message\", __gameplayError, \"text.join-list\"); _module128 = __gameplayInvalid; } try { if (((_module13[\"handle\"]) === __gameplayInvalid) || ((_module13[\"handle\"]) === undefined) || ((_module13[\"handle\"]) === null)) { _module129 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module129 = ((flow.execution.read((_module13[\"handle\"]),{\"kind\":\"list\",\"element\":\"string\"},[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-count--items--text-list-read\", __gameplayError, \"local.read\"); _module129 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module129[\"value\"]) === __gameplayInvalid) || ((_module129[\"value\"]) === undefined) || ((_module129[\"value\"]) === null)) { _module130 = __gameplayInvalid; } else { var _module130 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })((_module129[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-count\", __gameplayError, \"collection.length\"); _module130 = __gameplayInvalid; } try { if ((((_module130 !== null && typeof _module130 === \"object\" && Object.prototype.hasOwnProperty.call(_module130, \"value\")) ? _module130[\"value\"] : _module130) === __gameplayInvalid) || (((_module130 !== null && typeof _module130 === \"object\" && Object.prototype.hasOwnProperty.call(_module130, \"value\")) ? _module130[\"value\"] : _module130) === undefined) || (((_module130 !== null && typeof _module130 === \"object\" && Object.prototype.hasOwnProperty.call(_module130, \"value\")) ? _module130[\"value\"] : _module130) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module131 = __gameplayInvalid; } else { var _module131 = ((((_module130 !== null && typeof _module130 === \"object\" && Object.prototype.hasOwnProperty.call(_module130, \"value\")) ? _module130[\"value\"] : _module130) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-message\", __gameplayError, \"compare.greater-than\"); _module131 = __gameplayInvalid; } try { var _condition132 = ((_module131 !== null && typeof _module131 === \"object\" && Object.prototype.hasOwnProperty.call(_module131, \"value\")) ? _module131[\"value\"] : _module131); if (_condition132 !== __gameplayInvalid && _condition132) { try { if (!((true === __gameplayInvalid) || (((_module128 !== null && typeof _module128 === \"object\" && Object.prototype.hasOwnProperty.call(_module128, \"text\")) ? _module128[\"text\"] : _module128) === __gameplayInvalid))) { return { \"success\": true, \"message\": ((_module128 !== null && typeof _module128 === \"object\" && Object.prototype.hasOwnProperty.call(_module128, \"text\")) ? _module128[\"text\"] : _module128) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-result\", __gameplayError); } } else if (_condition132 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"empty-result\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-result\", __gameplayError); _condition132 = __gameplayInvalid; }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "schemas": [
+            {
+              "id": "amaterasu-burn@1",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "name",
+                  "type": "string"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number"
+                },
+                {
+                  "name": "sourcePieceId",
+                  "type": "string",
+                  "nullable": true,
+                  "optional": true
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "player",
+                  "nullable": true,
+                  "optional": true
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "authorized--extensions",
+              "module": "battle.field",
+              "version": "4",
+              "inputs": {},
+              "parameters": {
+                "field": "amaterasuOwnerPlayerId",
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized--owner-missing",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "authorized--extensions",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                "operator": "=="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized--owner-empty",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "authorized--extensions",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                "operator": "=="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized--unrestricted",
+              "module": "logic.or",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "authorized--owner-missing",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "authorized--owner-empty",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized--event-player",
+              "module": "context.field",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "field": "playerId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized--same-owner",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "authorized--extensions",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "authorized--event-player",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                "operator": "=="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "authorized",
+              "module": "logic.or",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "authorized--unrestricted",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "authorized--same-owner",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "unauthorized",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "authorized",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "authorization-guard",
+              "condition": {
+                "kind": "output",
+                "node": "unauthorized",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "unauthorized-result",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "current-player",
+              "module": "battle.field",
+              "version": "3",
+              "inputs": {},
+              "parameters": {
+                "field": "currentPlayerId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "target-count--pieces",
+              "module": "query.pieces",
+              "version": "1",
+              "parameters": {
+                "relation": "all",
+                "includeDead": true
+              }
+            },
+            {
+              "kind": "call",
+              "id": "target-count",
+              "module": "collection.length",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "target-count--pieces",
+                  "port": "pieces"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "damage-index",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {
+                "initial": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "messages--text-list-declare",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {
+                "initial": {
+                  "kind": "literal",
+                  "value": []
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+              }
+            },
+            {
+              "kind": "while",
+              "id": "damage-pieces-loop",
+              "index": "damage-loop-index",
+              "budget": 128,
+              "condition": {
+                "inputs": {
+                  "damageIndex": {
+                    "kind": "output",
+                    "node": "damage-index",
+                    "port": "handle"
+                  },
+                  "targetCount": {
+                    "kind": "output",
+                    "node": "target-count",
+                    "port": "value"
+                  }
+                },
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "damage-index-value",
+                    "module": "local.read",
+                    "version": "1",
+                    "inputs": {
+                      "handle": {
+                        "kind": "input",
+                        "name": "damageIndex"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number"
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "damage-index-continue",
+                    "module": "compare.less-than",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "damage-index-value",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "input",
+                        "name": "targetCount"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "damage-loop-condition-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "damage-index-continue",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "live-target",
+                  "module": "collection.live-piece-at",
+                  "version": "1",
+                  "inputs": {
+                    "index": {
+                      "kind": "input",
+                      "name": "damage-loop-index"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "target",
+                  "module": "piece.require",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "live-target",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "target-alive--reference",
+                  "module": "query.piece",
+                  "version": "1",
+                  "inputs": {
+                    "pieceId": {
+                      "kind": "output",
+                      "node": "target",
+                      "port": "piece"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "target-alive--items",
+                  "module": "query.pieces",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {
+                    "relation": "all",
+                    "includeDead": false
+                  }
+                },
+                {
+                  "kind": "collection",
+                  "id": "target-alive--matches",
+                  "method": "filter",
+                  "items": {
+                    "kind": "output",
+                    "node": "target-alive--items",
+                    "port": "pieces"
+                  },
+                  "inputs": {
+                    "target": {
+                      "kind": "output",
+                      "node": "target-alive--reference",
+                      "port": "piece"
+                    }
+                  },
+                  "body": [
+                    {
+                      "kind": "call",
+                      "id": "target-alive--compare",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "input",
+                          "name": "item"
+                        },
+                        "right": {
+                          "kind": "input",
+                          "name": "target"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"piece\"}",
+                        "operator": "=="
+                      }
+                    },
+                    {
+                      "kind": "return",
+                      "id": "target-alive--return",
+                      "value": {
+                        "kind": "output",
+                        "node": "target-alive--compare",
+                        "port": "value"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "target-alive--count",
+                  "module": "collection.length",
+                  "version": "1",
+                  "inputs": {
+                    "items": {
+                      "kind": "output",
+                      "node": "target-alive--matches",
+                      "port": "value"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "target-alive",
+                  "module": "compare.greater-than",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "target-alive--count",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "target-owner",
+                  "module": "piece.field",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "target",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "field": "ownerPlayerId"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "target-own-turn",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "target-owner",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "current-player",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "player",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "target-eligible",
+                  "module": "logic.and",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "target-alive",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "target-own-turn",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "target-eligible-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "target-eligible",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "status-id--status-tags",
+                      "module": "piece.field",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "target",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "field": "statusTags"
+                      }
+                    },
+                    {
+                      "kind": "collection",
+                      "id": "status-id--status",
+                      "method": "find",
+                      "items": {
+                        "kind": "output",
+                        "node": "status-id--status-tags",
+                        "port": "value"
+                      },
+                      "item": "item",
+                      "body": [
+                        {
+                          "kind": "call",
+                          "id": "status-id--tag-type",
+                          "module": "data.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "input",
+                              "name": "item"
+                            }
+                          },
+                          "parameters": {
+                            "field": "type"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "status-id--type-match",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "status-id--tag-type",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "amaterasu-burn"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "return",
+                          "id": "status-id--find-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "status-id--type-match",
+                            "port": "value"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "status-id",
+                      "module": "data.optional-field",
+                      "version": "1",
+                      "inputs": {
+                        "record": {
+                          "kind": "output",
+                          "node": "status-id--status",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "field": "id"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "present",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "status-id",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": null
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                        "operator": "!="
+                      }
+                    },
+                    {
+                      "kind": "if",
+                      "id": "has-burn",
+                      "condition": {
+                        "kind": "output",
+                        "node": "present",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "stacks--status-tags",
+                          "module": "piece.field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "target",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "statusTags"
+                          }
+                        },
+                        {
+                          "kind": "collection",
+                          "id": "stacks--status",
+                          "method": "find",
+                          "items": {
+                            "kind": "output",
+                            "node": "stacks--status-tags",
+                            "port": "value"
+                          },
+                          "item": "item",
+                          "inputs": {
+                            "statusId": {
+                              "kind": "output",
+                              "node": "status-id",
+                              "port": "value"
+                            }
+                          },
+                          "body": [
+                            {
+                              "kind": "call",
+                              "id": "stacks--tag-id",
+                              "module": "data.optional-field",
+                              "version": "1",
+                              "inputs": {
+                                "record": {
+                                  "kind": "input",
+                                  "name": "item"
+                                }
+                              },
+                              "parameters": {
+                                "field": "id"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "stacks--id-defined",
+                              "module": "compare.values",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "stacks--tag-id",
+                                  "port": "defined"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": true
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "boolean",
+                                "operator": "=="
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "stacks--id-match",
+                              "module": "compare.values",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "stacks--tag-id",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "input",
+                                  "name": "statusId"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                                "operator": "=="
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "stacks--id-and-match",
+                              "module": "logic.and",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "stacks--id-defined",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "stacks--id-match",
+                                  "port": "value"
+                                }
+                              }
+                            },
+                            {
+                              "kind": "return",
+                              "id": "stacks--find-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "stacks--id-and-match",
+                                "port": "value"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "call",
+                          "id": "stacks--raw",
+                          "module": "data.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "output",
+                              "node": "stacks--status",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "field": "stacks"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "stacks--present",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "stacks--raw",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": null
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}",
+                            "operator": "!="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "stacks--selected",
+                          "module": "logic.select",
+                          "version": "2",
+                          "inputs": {
+                            "condition": {
+                              "kind": "output",
+                              "node": "stacks--present",
+                              "port": "value"
+                            },
+                            "whenTrue": {
+                              "kind": "output",
+                              "node": "stacks--raw",
+                              "port": "value"
+                            },
+                            "whenFalse": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "stacks",
+                          "module": "value.coalesce",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "stacks--selected",
+                              "port": "value"
+                            },
+                            "defaultValue": {
+                              "kind": "literal",
+                              "value": 1
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "amount",
+                          "module": "math.multiply",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "literal",
+                              "value": 2
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "stacks",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-name",
+                          "module": "piece.field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "target",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "name"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-source-player-ref--status-tags",
+                          "module": "piece.field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "target",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "statusTags"
+                          }
+                        },
+                        {
+                          "kind": "collection",
+                          "id": "damage-source-player-ref--status",
+                          "method": "find",
+                          "items": {
+                            "kind": "output",
+                            "node": "damage-source-player-ref--status-tags",
+                            "port": "value"
+                          },
+                          "item": "item",
+                          "inputs": {
+                            "statusId": {
+                              "kind": "output",
+                              "node": "status-id",
+                              "port": "value"
+                            }
+                          },
+                          "body": [
+                            {
+                              "kind": "call",
+                              "id": "damage-source-player-ref--tag-id",
+                              "module": "data.optional-field",
+                              "version": "1",
+                              "inputs": {
+                                "record": {
+                                  "kind": "input",
+                                  "name": "item"
+                                }
+                              },
+                              "parameters": {
+                                "field": "id"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-source-player-ref--id-defined",
+                              "module": "compare.values",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-source-player-ref--tag-id",
+                                  "port": "defined"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": true
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "boolean",
+                                "operator": "=="
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-source-player-ref--id-match",
+                              "module": "compare.values",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-source-player-ref--tag-id",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "input",
+                                  "name": "statusId"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                                "operator": "=="
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-source-player-ref--id-and-match",
+                              "module": "logic.and",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-source-player-ref--id-defined",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "damage-source-player-ref--id-match",
+                                  "port": "value"
+                                }
+                              }
+                            },
+                            {
+                              "kind": "return",
+                              "id": "damage-source-player-ref--find-return",
+                              "value": {
+                                "kind": "output",
+                                "node": "damage-source-player-ref--id-and-match",
+                                "port": "value"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-source-player-ref",
+                          "module": "data.read-key",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "output",
+                              "node": "damage-source-player-ref--status",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "key": "ownerPlayerId",
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"player\"}"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-source-player",
+                          "module": "query.player",
+                          "version": "1",
+                          "inputs": {
+                            "playerId": {
+                              "kind": "output",
+                              "node": "damage-source-player-ref",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-damage",
+                          "module": "effect.damage",
+                          "version": "1",
+                          "inputs": {
+                            "source": {
+                              "kind": "output",
+                              "node": "damage-source-player",
+                              "port": "player"
+                            },
+                            "target": {
+                              "kind": "output",
+                              "node": "target",
+                              "port": "piece"
+                            },
+                            "amount": {
+                              "kind": "output",
+                              "node": "amount",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "sourceType": "player",
+                            "damageType": "true",
+                            "skillId": "amaterasu-burn-tick",
+                            "inputPolicy": "host"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-damage-message--field",
+                          "module": "data.read-key",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "output",
+                              "node": "damage-damage",
+                              "port": "result"
+                            }
+                          },
+                          "parameters": {
+                            "key": "message",
+                            "valueType": "string"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-damage-message--value",
+                          "module": "value.coalesce",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "damage-damage-message--field",
+                              "port": "value"
+                            },
+                            "defaultValue": {
+                              "kind": "literal",
+                              "value": ""
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "string"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-stacks-text",
+                          "module": "text.from-value",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "stacks",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-damage-text",
+                          "module": "text.from-value",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "damage-damage",
+                              "port": "damage"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-positive",
+                          "module": "compare.greater-than",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-damage",
+                              "port": "damage"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": 0
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-0",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "literal",
+                              "value": ""
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "damage-name",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-1",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-actual-message-0",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "受天照灼烧("
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-2",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-actual-message-1",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "damage-stacks-text",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-3",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-actual-message-2",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "层)，失去"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-4",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-actual-message-3",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "damage-damage-text",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "damage-actual-message-5",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "damage-actual-message-4",
+                              "port": "text"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "点生命值"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "if",
+                          "id": "damage-message-branch",
+                          "condition": {
+                            "kind": "output",
+                            "node": "damage-actual-positive",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--current--text-list-read",
+                              "module": "local.read",
+                              "version": "1",
+                              "inputs": {
+                                "handle": {
+                                  "kind": "output",
+                                  "node": "messages--text-list-declare",
+                                  "port": "handle"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--text-list-item",
+                              "module": "collection.singleton",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "damage-actual-message-5",
+                                  "port": "text"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "string"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--text-list-append",
+                              "module": "collection.concat",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-append-actual--current--text-list-read",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "damage-append-actual--text-list-item",
+                                  "port": "items"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--text-list-write",
+                              "module": "local.write",
+                              "version": "1",
+                              "inputs": {
+                                "handle": {
+                                  "kind": "output",
+                                  "node": "messages--text-list-declare",
+                                  "port": "handle"
+                                },
+                                "value": {
+                                  "kind": "output",
+                                  "node": "damage-append-actual--text-list-append",
+                                  "port": "items"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--text-list-read-after-write",
+                              "module": "local.read",
+                              "version": "1",
+                              "inputs": {
+                                "handle": {
+                                  "kind": "output",
+                                  "node": "messages--text-list-declare",
+                                  "port": "handle"
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-append-actual--text-list-count",
+                              "module": "collection.length",
+                              "version": "1",
+                              "inputs": {
+                                "items": {
+                                  "kind": "output",
+                                  "node": "damage-append-actual--text-list-read-after-write",
+                                  "port": "value"
+                                }
+                              }
+                            }
+                          ],
+                          "else": [
+                            {
+                              "kind": "call",
+                              "id": "damage-failed",
+                              "module": "logic.not",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "damage-damage",
+                                  "port": "success"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-blocked",
+                              "module": "compare.values",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-damage-message--value",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": ""
+                                }
+                              },
+                              "parameters": {
+                                "valueType": "string",
+                                "operator": "!="
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "damage-blocked-condition",
+                              "module": "logic.and",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "damage-failed",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "damage-blocked",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "if",
+                              "id": "damage-blocked-branch",
+                              "condition": {
+                                "kind": "output",
+                                "node": "damage-blocked-condition",
+                                "port": "value"
+                              },
+                              "then": [
+                                {
+                                  "kind": "call",
+                                  "id": "damage-blocked-message",
+                                  "module": "text.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "damage-name",
+                                      "port": "value"
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": "天照灼烧被抵挡"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--current--text-list-read",
+                                  "module": "local.read",
+                                  "version": "1",
+                                  "inputs": {
+                                    "handle": {
+                                      "kind": "output",
+                                      "node": "messages--text-list-declare",
+                                      "port": "handle"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--text-list-item",
+                                  "module": "collection.singleton",
+                                  "version": "1",
+                                  "inputs": {
+                                    "value": {
+                                      "kind": "output",
+                                      "node": "damage-blocked-message",
+                                      "port": "text"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "valueType": "string"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--text-list-append",
+                                  "module": "collection.concat",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "damage-append-blocked--current--text-list-read",
+                                      "port": "value"
+                                    },
+                                    "right": {
+                                      "kind": "output",
+                                      "node": "damage-append-blocked--text-list-item",
+                                      "port": "items"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--text-list-write",
+                                  "module": "local.write",
+                                  "version": "1",
+                                  "inputs": {
+                                    "handle": {
+                                      "kind": "output",
+                                      "node": "messages--text-list-declare",
+                                      "port": "handle"
+                                    },
+                                    "value": {
+                                      "kind": "output",
+                                      "node": "damage-append-blocked--text-list-append",
+                                      "port": "items"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--text-list-read-after-write",
+                                  "module": "local.read",
+                                  "version": "1",
+                                  "inputs": {
+                                    "handle": {
+                                      "kind": "output",
+                                      "node": "messages--text-list-declare",
+                                      "port": "handle"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "damage-append-blocked--text-list-count",
+                                  "module": "collection.length",
+                                  "version": "1",
+                                  "inputs": {
+                                    "items": {
+                                      "kind": "output",
+                                      "node": "damage-append-blocked--text-list-read-after-write",
+                                      "port": "value"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "damage-index-add--counter-read",
+                  "module": "local.read",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "damage-index",
+                      "port": "handle"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "number"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "damage-index-add--counter-add",
+                  "module": "math.add",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "damage-index-add--counter-read",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "damage-index-add--counter-write",
+                  "module": "local.write",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "damage-index",
+                      "port": "handle"
+                    },
+                    "value": {
+                      "kind": "output",
+                      "node": "damage-index-add--counter-add",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "number"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "damage-index-add",
+                  "module": "local.read",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "damage-index",
+                      "port": "handle"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "number"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "message--items--text-list-read",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "messages--text-list-declare",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "message",
+              "module": "text.join-list",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "message--items--text-list-read",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "separator": "；"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "message-count--items--text-list-read",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "messages--text-list-declare",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"list\",\"element\":\"string\"}"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "message-count",
+              "module": "collection.length",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "message-count--items--text-list-read",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "has-message",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "message-count",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "message-result",
+              "condition": {
+                "kind": "output",
+                "node": "has-message",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "success-result",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": true
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "message",
+                      "port": "text"
+                    }
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "kind": "return",
+                  "id": "empty-result",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

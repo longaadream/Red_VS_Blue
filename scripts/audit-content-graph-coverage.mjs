@@ -47,6 +47,15 @@ export const REGISTERED_GRAPH_PROOF_KEYS = [
   'skills/minato-spiral-barrage',
   'skills/turalyon-grand-crusade',
 ]
+const REGISTERED_GENERATED_FAMILY_KEYS = [
+  'rules/rule-rafaam-curse-ward',
+  'skills/rafaam-curse-amplify',
+  'skills/tails-armor-assembly',
+]
+const REGISTERED_PENDING_SOURCE_KEYS = [
+  'skills/minato-spiral-barrage',
+  'skills/turalyon-grand-crusade',
+]
 export const DISPLAY_FIELDS = new Set([
   'name', 'description', 'targetText', 'keywords', 'effectTags', 'icon', 'image',
 ])
@@ -55,7 +64,7 @@ const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const DEFAULT_OUTPUT = resolve(SCRIPT_ROOT, 'docs/qa/RED-252-content-coverage.json')
 
 const ID_PATTERN = /(?<![a-z0-9_-])(?:skill|rule|card|piece|pve)-[a-z0-9][a-z0-9-]*(?![a-z0-9_-])/gi
-const CONTENT_CALL_PATTERN = /(?:add|remove)(?:skill|rule|card)|addcardtohand|(?:summon|spawn)(?:piece|byid)?|(?:create|register)(?:skill|rule|card|piece|template)|\.skills?\.add|\.rules?\.add|\.cards?\.(?:add|hand)/i
+const CONTENT_CALL_PATTERN = /(?:add|remove)(?:player)?(?:skill|rule|card)|addcardtohand|(?:summon|spawn)(?:piece|byid)?|(?:create|register)(?:skill|rule|card|piece|template)|\.skills?\.add|\.rules?\.add|\.cards?\.(?:add|hand)/i
 const DYNAMIC_PROOF_VERSION = 1
 const PENDING_SOURCE_FIELDS = new Set(['effectCode'])
 
@@ -70,6 +79,7 @@ const BASELINE_MISSING_DYNAMIC_CANDIDATES = new Map([
     sourceSha256: '46105653d5e4d1ef10ee3828026a5d5d5ede7bd8d340e6e01e4ff173954ff4ac',
     compiledSourceSha256: '6636f77940a01ed628dcd938c86c4f96b8cc74b16cc526cc2a84ac0a3ed1f05c',
     candidateIds: ['sample-active-card'],
+    observedValues: ['sample-active-card', 'sample-reactive-card'],
     fixture: 'tests/game/fixtures/RED-252-legacy-content.json',
   }],
 ])
@@ -578,6 +588,104 @@ function generatedFamilies(sourceFile, source, dynamicName = null, options = {})
   return families
 }
 
+/**
+ * Semantic Rafaam ward graphs no longer contain a legacy `Date.now()` string
+ * expression.  The typed materialization module owns that ID construction and
+ * snapshots the verified card source, so the source audit must recognize that
+ * closed shape from the independently registered graph proof.
+ */
+function hasTypedRafaamCurseMaterialization(entry, registeredProof, options = {}) {
+  const graph = graphForField(entry?.definition, 'skillCode')
+  const compiledSource = entry?.definition?.skillCode
+  if (registeredProof?.status !== 'graph-source-validated'
+    || !graph
+    || typeof compiledSource !== 'string'
+    || registeredProof.expectedGraphSha256 !== sha256(graph)
+    || registeredProof.expectedCompiledSourceSha256 !== sha256(compiledSource)) return false
+  let found = false
+  const visit = value => {
+    if (found || !value || typeof value !== 'object') return
+    const legacyShape = value.kind === 'call'
+      && value.module === 'content.materialize-curse-template'
+      && value.inputs?.templateId?.kind === 'literal'
+      && value.inputs.templateId.value === 'rafaam-curse-sample'
+      && value.inputs?.cardId?.kind === 'output'
+      && value.inputs?.damageAmount?.kind === 'output'
+      && value.inputs?.sourcePieceId?.kind === 'output'
+    const genericShape = value.kind === 'call'
+      && value.module === 'content.materialize-template'
+      && value.parameters?.kind === 'card'
+      && value.inputs?.templateId?.kind === 'literal'
+      && value.inputs.templateId.value === 'rafaam-curse-sample'
+      && value.inputs?.cardId?.kind === 'output'
+      && value.inputs?.name?.kind === 'output'
+      && value.inputs?.description?.kind === 'output'
+      && value.inputs?.owner?.kind === 'output'
+      && value.inputs.owner.node === 'enemy-player'
+      && value.inputs.owner.port === 'player'
+      && value.inputs?.fields?.kind === 'output'
+      && value.inputs?.extension?.kind === 'output'
+      && value.inputs?.omitFields?.kind === 'literal'
+      && Array.isArray(value.inputs.omitFields.value)
+      && value.inputs.omitFields.value.length === 5
+      && new Set(value.inputs.omitFields.value).size === 5
+      && ['isSample', 'image', 'effectTags', 'targetText', 'keywords'].every(field => value.inputs.omitFields.value.includes(field))
+    const targetCallMatches = !options.materializationCall || value === options.materializationCall
+    if (targetCallMatches && (legacyShape || genericShape)) {
+      found = true
+      return
+    }
+    for (const child of Object.values(value)) visit(child)
+  }
+  visit(graph)
+  return found
+}
+
+function hasRegisteredRafaamCurseTemplate(state, registeredProof) {
+  if (registeredProof?.status !== 'graph-source-validated'
+    || !Array.isArray(registeredProof.templateProofs)
+    || registeredProof.templateProofs.length !== 1) return false
+  const templateProof = registeredProof.templateProofs[0]
+  if (!templateProof || templateProof.id !== 'rafaam-curse-sample') return false
+  const template = state.catalogs?.cards?.get?.(templateProof.id)
+  const graph = graphForField(template?.definition, 'code')
+  return template?.scope === 'ordinary'
+    && typeof template?.definition?.code === 'string'
+    && graph
+    && templateProof.graphSha256 === sha256(graph)
+    && templateProof.sourceSha256 === sha256(template.definition.code)
+}
+
+function hasSemanticRafaamCurseMaterialization(state, owner, registeredProof, sourceCall, sink, calls) {
+  if (!sourceCall || !sink || sourceCall.graphScope !== sink.graphScope) return false
+  const materialization = sourceCall.call
+  const sinkCardId = sink.call.inputs?.cardId
+  if (materialization?.module !== 'content.materialize-template'
+    || sinkCardId?.kind !== 'output'
+    || sinkCardId.node !== materialization.id
+    || sinkCardId.port !== 'cardId') return false
+
+  const ownerInput = materialization.inputs?.owner
+  const sinkPlayer = sink.call.inputs?.player
+  if (ownerInput?.kind !== 'output'
+    || ownerInput.node !== 'enemy-player'
+    || ownerInput.port !== 'player'
+    || sinkPlayer?.kind !== 'output'
+    || sinkPlayer.node !== ownerInput.node
+    || sinkPlayer.port !== ownerInput.port) return false
+  const ownerCall = semanticGraphCallForNode(calls, ownerInput.node, sourceCall.scope)
+  const ownerPlayerId = ownerCall?.call?.inputs?.playerId
+  if (ownerCall?.call?.module !== 'query.player'
+    || ownerCall.call.id !== 'enemy-player'
+    || ownerPlayerId?.kind !== 'output'
+    || ownerPlayerId.node !== 'enemy--enemy-result'
+    || ownerPlayerId.port !== 'value') return false
+
+  return hasTypedRafaamCurseMaterialization(owner, registeredProof, {
+    materializationCall: materialization,
+  }) && hasRegisteredRafaamCurseTemplate(state, registeredProof)
+}
+
 function dynamicResolution(state, sourceFile, source, owner, fieldPath, argument) {
   const expression = argument.getText(sourceFile).slice(0, 240)
   const sourceSha256 = sha256(source)
@@ -639,14 +747,17 @@ function dynamicResolution(state, sourceFile, source, owner, fieldPath, argument
       const wardFile = ts.createSourceFile('rafaam-curse-ward-copy-proof.js', wardSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
       const family = generatedFamilies(wardFile, wardSource, 'cardId', { allowNormalizedCompilerAssignments: true })
         .find(candidate => candidate.familyPattern === '^rafaam-curse-[0-9]+$')
-      if (family) generatedSourceProof = inspectSourceField(wardEntry.definition, 'skillCode', wardEntry.migration, 1, {
-        registeredProof: registeredGraphProofFor(
-          state.registeredGraphProofs,
-          wardEntry.nodeKey,
-          'skillCode',
-          wardEntry.definition,
-        ),
-      })
+      const wardRegisteredProof = registeredGraphProofFor(
+        state.registeredGraphProofs,
+        wardEntry.nodeKey,
+        'skillCode',
+        wardEntry.definition,
+      )
+      if (family || hasTypedRafaamCurseMaterialization(wardEntry, wardRegisteredProof)) {
+        generatedSourceProof = inspectSourceField(wardEntry.definition, 'skillCode', wardEntry.migration, 1, {
+          registeredProof: wardRegisteredProof,
+        })
+      }
     }
     return inspectRafaamCopySource(owner.definition, owner.migration, {
       staticSourceEntry,
@@ -689,6 +800,35 @@ function dynamicResolution(state, sourceFile, source, owner, fieldPath, argument
       },
     }
   })
+  const wardRegisteredProof = REGISTERED_GRAPH_PROOF_KEYS.includes(owner.nodeKey)
+    ? registeredGraphProofFor(state.registeredGraphProofs, owner.nodeKey, fieldPath, owner.definition)
+    : null
+  if (familyEvidence.length === 0
+    && owner.nodeKey === 'rules/rule-rafaam-curse-ward'
+    && fieldPath === 'skillCode'
+    && hasTypedRafaamCurseMaterialization(owner, wardRegisteredProof)) {
+    const generatedSource = inspectSourceField(owner.definition, fieldPath, owner.migration, 1, {
+      registeredProof: wardRegisteredProof,
+    })
+    familyEvidence.push({
+      familyPattern: '^rafaam-curse-[0-9]+$',
+      expression: 'typed content.materialize-curse-template cardId',
+      line: sourceFile.getLineAndCharacterOfPosition(argument.getStart(sourceFile)).line + 1,
+      column: sourceFile.getLineAndCharacterOfPosition(argument.getStart(sourceFile)).character + 1,
+      generatedExecutableStatus: generatedSource.status,
+      generatedExecutableField: 'customCards.code',
+      generatedSourceStatus: generatedSource.status,
+      generatedSourceProof: generatedSource,
+      sourceProof: {
+        version: DYNAMIC_PROOF_VERSION,
+        kind: 'recognized-typed-materialization',
+        sourceSha256,
+        expression: 'typed content.materialize-curse-template cardId',
+        typedMaterialization: true,
+        registeredGraphProof: wardRegisteredProof,
+      },
+    })
+  }
   if (familyEvidence.length > 0 && candidateIds.length === 0 && generatedCandidateIds.length === 0) {
     proofKind = familyEvidence.some(family => family.sourceProof.normalizedCompilerAssignments)
       ? 'recognized-normalized-compiler-assignment'
@@ -878,9 +1018,14 @@ function scanIdentifierText(state, owner, fieldPath, text, evidenceKind, locatio
   }
 }
 
-function dynamicArgumentIndices(callee, argumentCount) {
+export function dynamicArgumentIndices(callee, argumentCount) {
+  // hand(playerId) is a query, not a reference to a card definition.
+  if (/\.cards?\.hand$/i.test(callee)) return []
   if (/addcardtohand/i.test(callee)) return argumentCount > 0 ? [0] : []
-  if (/(?:add|remove)(?:skill|rule)|\.skills?\.add|\.rules?\.add|\.cards?\.(?:add|hand)/i.test(callee)) {
+  // These flow APIs take owner/target first, content ID second, then an
+  // optional scope. A trailing scope must never hide a dynamic rule ID.
+  if (/\.(?:skills?|rules?|cards?)\.add$/i.test(callee)) return argumentCount > 1 ? [1] : []
+  if (/(?:add|remove)(?:player)?(?:skill|rule)|\.skills?\.add|\.rules?\.add|\.cards?\.(?:add|hand)/i.test(callee)) {
     return argumentCount > 0 ? [argumentCount - 1] : []
   }
   return [...Array(argumentCount).keys()]
@@ -1053,6 +1198,469 @@ function scanCode(state, owner, fieldPath, source) {
   visit(sourceFile)
 }
 
+/*
+ * Semantic module fields are compiled into deliberately repetitive wrapper
+ * code.  That wrapper is an execution artifact, so looking for dynamic
+ * content calls in it re-discovers compiler temporaries (and JSON encoded
+ * arrays) instead of the author's dependency edges.  The author graph is the
+ * bounded source for those edges.  Keep this walker intentionally small: a
+ * module which is not one of the closed content/reference forms below is
+ * reported as unresolved rather than being guessed from arbitrary strings.
+ */
+const AUTHOR_DYNAMIC_CONTENT_SINKS = new Set(['card.hand-add-ref'])
+
+// Keep this list closed over the registry's card/hand/content writers.  An
+// unknown module is deliberately not treated as a card writer: this audit is
+// checking a verified graph, not guessing from arbitrary module names.  When
+// a known writer is not one of the small static forms below, preserve the
+// legacy source proof instead of claiming that the graph contains every card
+// dependency.
+const AUTHOR_STATIC_CARD_SINKS = new Set([
+  'card.hand-add',
+  'card.hand-add-controlled',
+  'card.hand-add-player-id-text',
+  'card.bind-latest-unbound',
+])
+const AUTHOR_DYNAMIC_CARD_SINKS = new Set([
+  'author.card.gain',
+  'card.hand-add-ref',
+  'content.copy-card',
+  'content.materialize-template',
+  'content.materialize-curse-template',
+  'card.discard-instance',
+  'card.remove-field',
+  'card.write-field',
+  'card.set-content-record',
+  'card.clear-content-records',
+  'card.set-content-boolean',
+  'card.clear-content-field',
+  'card.set-effect-modifier',
+  'card.set-presentation',
+])
+const AUTHOR_CARD_WRITE_SINKS = new Set([
+  ...AUTHOR_STATIC_CARD_SINKS,
+  ...AUTHOR_DYNAMIC_CARD_SINKS,
+])
+const AUTHOR_CODE_BLOCK_SINKS = new Set(['code-block.invoke'])
+
+function semanticGraphCardWriteAnalysis(graph) {
+  const calls = semanticGraphCalls(graph)
+    .filter(({ call }) => AUTHOR_CARD_WRITE_SINKS.has(call.module))
+  const staticCardIds = []
+  const dynamicCalls = []
+  for (const entry of calls) {
+    const call = entry.call
+    if (AUTHOR_DYNAMIC_CARD_SINKS.has(call.module)) {
+      dynamicCalls.push(entry)
+      continue
+    }
+    const hasParameterCardId = isPlainObject(call.parameters)
+      && Object.prototype.hasOwnProperty.call(call.parameters, 'cardId')
+    const hasInputCardId = isPlainObject(call.inputs)
+      && Object.prototype.hasOwnProperty.call(call.inputs, 'cardId')
+    const parameterCardId = call.parameters?.cardId
+    const inputCardId = call.inputs?.cardId
+    const inputIsStatic = !hasInputCardId
+      || (inputCardId?.kind === 'literal' && typeof inputCardId.value === 'string')
+    const cardId = hasParameterCardId && typeof parameterCardId === 'string'
+      && inputIsStatic
+      ? parameterCardId
+      : !hasParameterCardId && inputCardId?.kind === 'literal' && typeof inputCardId.value === 'string'
+        ? inputCardId.value
+        : null
+    if (cardId === null) dynamicCalls.push(entry)
+    else staticCardIds.push(cardId)
+  }
+  return {
+    cardWriteCount: calls.length,
+    staticCardIds: [...new Set(staticCardIds)].sort(compareCodePoints),
+    dynamicCalls,
+    allStatic: calls.length > 0 && dynamicCalls.length === 0,
+  }
+}
+
+/**
+ * A verified graph can replace legacy dynamic card-source evidence only when
+ * it carries the same graph/source proof and every authored card write is a
+ * literal branch.  `choice.raw-string-value` is required because option-id
+ * choices (for example watcher form) select an option key that is not itself
+ * a card ID; their legacy dynamic evidence remains meaningful.
+ */
+export function hasVerifiedStaticCardWrites(graph, compiledSource, registeredProof) {
+  if (registeredProof?.status !== 'graph-source-validated'
+    || registeredProof.graphMatches !== true
+    || registeredProof.compiledMatches !== true
+    || registeredProof.actualGraphSha256 !== sha256(graph)
+    || registeredProof.expectedGraphSha256 !== sha256(graph)
+    || typeof compiledSource !== 'string'
+    || registeredProof.actualCompiledSourceSha256 !== sha256(compiledSource)
+    || registeredProof.expectedCompiledSourceSha256 !== sha256(compiledSource)) return false
+  // A code block can call an arbitrary host-facing operation behind its
+  // structured boundary.  Its presence therefore prevents the closed sink
+  // table above from being a complete card dependency proof.
+  if (semanticGraphCalls(graph).some(({ call }) => AUTHOR_CODE_BLOCK_SINKS.has(call.module))) return false
+  const analysis = semanticGraphCardWriteAnalysis(graph)
+  if (!analysis.allStatic) return false
+  return semanticGraphCalls(graph).some(({ call }) => call.module === 'choice.raw-string-value')
+}
+
+function semanticGraphCalls(graph) {
+  const calls = []
+
+  // The compiler gives every graph, composite, and continuation its own
+  // lexical root.  Control bodies inherit the bindings visible when they are
+  // entered, while collection bodies and while conditions are closed
+  // subgraphs.  Keep a snapshot of those bindings on each body scope so a
+  // later producer cannot accidentally become visible to an earlier nested
+  // consumer.
+  const makeScope = (parent, graphScope, inherit = true) => ({
+    parent,
+    graphScope,
+    bindings: inherit && parent ? new Map(parent.bindings) : new Map(),
+  })
+  const walkBody = (body, scope, path) => {
+    for (const [index, node] of (Array.isArray(body) ? body : []).entries()) {
+      if (!node || typeof node !== 'object') continue
+      const nodePath = `${path}.${index}`
+      if (node.kind === 'call' && typeof node.module === 'string') {
+        const entry = { call: node, path: nodePath, scope, graphScope: scope.graphScope }
+        calls.push(entry)
+        scope.graphScope.entries.push(entry)
+        if (typeof node.id === 'string') scope.bindings.set(node.id, entry)
+      }
+
+      if (node.kind === 'if') {
+        walkBody(node.then, makeScope(scope, scope.graphScope), `${nodePath}.then`)
+        walkBody(node.else, makeScope(scope, scope.graphScope), `${nodePath}.else`)
+      } else if (node.kind === 'foreach') {
+        walkBody(node.body, makeScope(scope, scope.graphScope), `${nodePath}.body`)
+      } else if (node.kind === 'while') {
+        walkBody(node.condition?.body, makeScope(null, scope.graphScope, false), `${nodePath}.condition.body`)
+        walkBody(node.body, makeScope(scope, scope.graphScope), `${nodePath}.body`)
+      } else if (node.kind === 'collection' || String(node.kind).startsWith('collection.')) {
+        walkBody(node.body, makeScope(null, scope.graphScope, false), `${nodePath}.body`)
+      }
+    }
+  }
+  const walkGraph = (current, prefix) => {
+    if (!current || typeof current !== 'object') return
+    const graphScope = { path: `${prefix}.body`, entries: [] }
+    walkBody(current.body, makeScope(null, graphScope, false), graphScope.path)
+    for (const [index, composite] of (Array.isArray(current.composites) ? current.composites : []).entries()) {
+      if (!composite || typeof composite !== 'object') continue
+      const compositeScope = { path: `${prefix}.composites.${index}.body`, entries: [] }
+      walkBody(composite.body, makeScope(null, compositeScope, false), compositeScope.path)
+    }
+    for (const [index, continuation] of (Array.isArray(current.continuations) ? current.continuations : []).entries()) {
+      if (continuation?.graph && typeof continuation.graph === 'object') {
+        walkGraph(continuation.graph, `${prefix}.continuations.${index}.graph`)
+      }
+    }
+  }
+  walkGraph(graph, '$')
+  return calls
+}
+
+function semanticGraphCallForNode(calls, nodeId, scope) {
+  if (!scope || typeof nodeId !== 'string') return null
+  return scope.bindings.get(nodeId) ?? null
+}
+
+function semanticGraphLiteralList(value) {
+  return value?.kind === 'literal'
+    && Array.isArray(value.value)
+    && value.value.every(item => typeof item === 'string')
+    ? [...value.value]
+    : null
+}
+
+function semanticGraphLiteralStrings(value, calls, scope, seen = new Set()) {
+  if (!value || typeof value !== 'object') return []
+  if (value.kind === 'literal') return typeof value.value === 'string' ? [value.value] : []
+  if (value.kind !== 'output' || typeof value.node !== 'string') return []
+  const callEntry = semanticGraphCallForNode(calls, value.node, scope)
+  if (!callEntry || seen.has(callEntry)) return []
+  const nextSeen = new Set(seen)
+  nextSeen.add(callEntry)
+  if (callEntry.call.module === 'text.concat') {
+    return [
+      ...semanticGraphLiteralStrings(callEntry.call.inputs?.left, calls, callEntry.scope, nextSeen),
+      ...semanticGraphLiteralStrings(callEntry.call.inputs?.right, calls, callEntry.scope, nextSeen),
+    ]
+  }
+  return []
+}
+
+function semanticGraphOutputCall(value, calls, scope) {
+  return value?.kind === 'output' && typeof value.node === 'string'
+    ? semanticGraphCallForNode(calls, value.node, scope)
+    : null
+}
+
+function semanticGraphSourceProof(owner, fieldPath, source, graph, graphPath, kind, expression) {
+  return {
+    version: DYNAMIC_PROOF_VERSION,
+    kind,
+    sourceSha256: sha256(source),
+    authorGraphSha256: sha256(graph),
+    authorGraphVersion: graph?.version ?? null,
+    fieldPath,
+    graphPath,
+    expression,
+    sourceOwner: owner.nodeKey,
+  }
+}
+
+function semanticGraphGeneratedFamily(state, owner, fieldPath, source, graph, graphPath, familyPattern, expression, registeredProof = null) {
+  const generatedSource = inspectSourceField(owner.definition, fieldPath, owner.migration, 1,
+    registeredProof ? { registeredProof } : {})
+  return {
+    familyPattern,
+    expression,
+    line: 1,
+    column: 1,
+    generatedExecutableStatus: generatedSource.status,
+    generatedExecutableField: 'customCards.code',
+    generatedSourceStatus: generatedSource.status,
+    generatedSourceProof: generatedSource,
+    sourceProof: semanticGraphSourceProof(
+      owner,
+      fieldPath,
+      source,
+      graph,
+      graphPath,
+      'recognized-author-graph-generated-family',
+      expression,
+    ),
+  }
+}
+
+function semanticGraphResolution(state, owner, fieldPath, source, graph, calls, sink, registeredProof = null) {
+  const graphPath = sink.path
+  const expression = `${sink.call.module}.${sink.call.id ?? 'sink'}.inputs.cardId`
+  const sourceProof = semanticGraphSourceProof(
+    owner,
+    fieldPath,
+    source,
+    graph,
+    graphPath,
+    'recognized-author-graph-dynamic-sink',
+    expression,
+  )
+  const cardId = sink.call.inputs?.cardId
+  const sourceCall = semanticGraphOutputCall(cardId, calls, sink.scope)
+  let observedValues = null
+  let candidateIds = []
+  let generatedCandidateIds = []
+  let generatedFamilies = []
+  let proofKind = 'unresolved-author-graph-output'
+
+  if (cardId?.kind === 'literal' && typeof cardId.value === 'string') {
+    observedValues = [cardId.value]
+    proofKind = 'recognized-static-card-id'
+  } else if (sourceCall?.call.module === 'query.random-string') {
+    observedValues = semanticGraphLiteralList(sourceCall.call.inputs?.items)
+    if (observedValues) {
+      candidateIds = knownCandidateIds(state, observedValues)
+      proofKind = 'recognized-author-graph-options'
+    }
+  } else if (sourceCall?.call.module === 'content.copy-card') {
+    const prefix = sourceCall.call.parameters?.idPrefix
+    if (typeof prefix === 'string' && prefix.length > 0) {
+      generatedFamilies.push(semanticGraphGeneratedFamily(
+        state,
+        owner,
+        fieldPath,
+        source,
+        graph,
+        graphPath,
+        `^${escapeRegexLiteral(prefix)}[0-9]+-[0-9]+$`,
+        `${sourceCall.call.module}.${sourceCall.call.id ?? 'copy'}.parameters.idPrefix`,
+        registeredProof,
+      ))
+      candidateIds = [...state.catalogs.cards.values()]
+        .filter(entry => entry.scope === 'ordinary' && entry.id.startsWith('rafaam-curse-'))
+        .map(entry => entry.id)
+        .sort(compareCodePoints)
+      proofKind = 'recognized-author-graph-copy-family'
+    }
+  } else if (sourceCall?.call.module === 'content.materialize-template') {
+    if (hasSemanticRafaamCurseMaterialization(state, owner, registeredProof, sourceCall, sink, calls)) {
+      generatedFamilies.push(semanticGraphGeneratedFamily(
+        state,
+        owner,
+        fieldPath,
+        source,
+        graph,
+        graphPath,
+        '^rafaam-curse-[0-9]+$',
+        `${sourceCall.call.module}.${sourceCall.call.id ?? 'materialize'}.inputs.cardId`,
+        registeredProof,
+      ))
+      proofKind = 'recognized-author-graph-curse-family'
+    } else {
+      const prefixes = semanticGraphLiteralStrings(sourceCall.call.inputs?.cardId, calls, sourceCall.scope)
+        .filter(value => value.startsWith('armor-'))
+      const choice = sourceCall.graphScope.entries
+        .map(entry => entry.call)
+        .find(call => call.module === 'choice.string-options'
+          && Array.isArray(call.parameters?.options)
+          && call.parameters.options.length === 4
+          && call.parameters.options.every(item => ['attack', 'defense', 'heal', 'speed'].includes(item)))
+      if (prefixes.length > 0 && choice) {
+        const values = [...new Set(choice.parameters.options)].sort(compareCodePoints)
+        for (let left = 0; left < values.length; left += 1) {
+          for (let right = left + 1; right < values.length; right += 1) {
+            generatedCandidateIds.push(`armor-${values[left]}-${values[right]}`)
+          }
+        }
+        proofKind = 'recognized-author-graph-pair-combinations'
+      }
+    }
+  } else if (sourceCall?.call.module === 'content.materialize-curse-template') {
+    const prefixes = semanticGraphLiteralStrings(sourceCall.call.inputs?.cardId, calls, sourceCall.scope)
+      .filter(value => value.startsWith('rafaam-curse-'))
+    if (prefixes.length > 0) {
+      generatedFamilies.push(semanticGraphGeneratedFamily(
+        state,
+        owner,
+        fieldPath,
+        source,
+        graph,
+        graphPath,
+        '^rafaam-curse-[0-9]+$',
+        `${sourceCall.call.module}.${sourceCall.call.id ?? 'materialize'}.inputs.cardId`,
+        registeredProof,
+      ))
+      proofKind = 'recognized-author-graph-curse-family'
+    }
+  }
+
+  const baseline = BASELINE_MISSING_DYNAMIC_CANDIDATES.get(`${owner.nodeKey}|${fieldPath}`)
+  const sourceSha256 = sha256(source)
+  const fixtureSource = state.legacyFixture?.entries?.get(owner.nodeKey)?.[fieldPath]
+  const fixtureBaselineVerified = Boolean(baseline
+    && fixtureSource
+    && sha256(fixtureSource) === baseline.sourceSha256
+    && Array.isArray(baseline.observedValues)
+    && JSON.stringify([...(observedValues ?? [])].sort(compareCodePoints)) === JSON.stringify([...baseline.observedValues].sort(compareCodePoints)))
+  const baselineVerified = Boolean(baseline
+    && owner.migration?.fields?.[fieldPath]?.status === 'graph-validated'
+    && (baseline.sourceSha256 === sourceSha256 || baseline.compiledSourceSha256 === sourceSha256 || fixtureBaselineVerified))
+  const baselineMatches = baselineVerified
+    ? (observedValues ?? []).filter(value => baseline.candidateIds.includes(value) && !state.knownIds.has(value)).sort(compareCodePoints)
+    : []
+  const unknownCandidateIds = [...new Set((observedValues ?? [])
+    .filter(value => !state.knownIds.has(value)
+      && !baselineMatches.includes(value)
+      && !generatedCandidateIds.includes(value))
+    .sort(compareCodePoints))]
+  sourceProof.kind = proofKind
+  if (observedValues?.length) sourceProof.observedValues = [...new Set(observedValues)].sort(compareCodePoints)
+  const status = generatedCandidateIds.length > 0
+    ? 'generated-candidate-set'
+    : generatedFamilies.length > 0 && candidateIds.length > 0
+      ? 'resolved-with-generated-family'
+      : generatedFamilies.length > 0
+        ? 'resolved-generated-family'
+        : baselineMatches.length > 0
+          ? 'resolved-with-baseline-missing'
+          : candidateIds.length > 0
+            ? 'resolved-finite-candidates'
+            : 'unresolved'
+  return {
+    status,
+    ...(candidateIds.length > 0 ? { candidateIds } : {}),
+    ...(generatedCandidateIds.length > 0 ? { generatedCandidateIds } : {}),
+    ...(baselineMatches.length > 0 ? { baselineMissingCandidateIds: baselineMatches } : {}),
+    ...(unknownCandidateIds.length > 0 ? { unknownCandidateIds } : {}),
+    ...(generatedFamilies.length > 0 ? { generatedFamilies } : {}),
+    sourceProof,
+    ...(baselineVerified ? { baselineFixture: baseline.fixture, baselineSourceSha256: baseline.sourceSha256 } : {}),
+  }
+}
+
+function semanticGraphHasDynamicChoice(calls) {
+  const hasOptionChoice = calls.some(({ call }) => (
+    call.module === 'choice.string-options' || call.module === 'choice.required-option-pair'
+  ))
+  if (hasOptionChoice) return true
+  return calls.some(({ call }) => call.module === 'card.hand-count' || call.module === 'card.hand-instances')
+}
+
+export function scanSemanticGraphDynamic(state, owner, fieldPath, source, graph, registeredProof = null) {
+  const callEntries = semanticGraphCalls(graph)
+  const dynamicSinks = callEntries.filter(({ call }) => AUTHOR_DYNAMIC_CONTENT_SINKS.has(call.module)
+    && call.inputs?.cardId?.kind !== 'literal')
+  for (const sink of dynamicSinks) {
+    const resolution = semanticGraphResolution(state, owner, fieldPath, source, graph, callEntries, sink, registeredProof)
+    const dynamic = {
+      from: owner.nodeKey,
+      fromGroup: owner.group,
+      fromId: owner.id,
+      fieldPath,
+      line: 1,
+      column: 1,
+      graphPath: sink.path,
+      expression: `${sink.call.module}.${sink.call.id ?? 'sink'}.inputs.cardId`,
+      candidatePrefixes: [],
+      call: sink.call.module,
+      reason: 'dynamic-content-id-argument',
+      resolution,
+    }
+    addDynamic(state, dynamic)
+    registerDynamicResolution(state, owner, fieldPath, { line: 1, column: 1 }, resolution)
+  }
+
+  // Some author graphs select among fixed hand definitions through a typed
+  // choice or a bounded fill loop.  The static branch literals are the
+  // candidate set; the runtime choice itself is the dynamic dependency.
+  if (dynamicSinks.length === 0) {
+    const graphScopes = [...new Set(callEntries.map(entry => entry.graphScope))]
+    for (const graphScope of graphScopes) {
+      if (!semanticGraphHasDynamicChoice(graphScope.entries)) continue
+      const candidates = [...new Set(graphScope.entries
+        .filter(({ call }) => AUTHOR_STATIC_CARD_SINKS.has(call.module) && typeof call.parameters?.cardId === 'string')
+        .map(({ call }) => call.parameters.cardId))]
+        .sort(compareCodePoints)
+      if (candidates.length <= 1) continue
+      const sourceProof = semanticGraphSourceProof(
+        owner,
+        fieldPath,
+        source,
+        graph,
+        graphScope.path,
+        'recognized-author-graph-choice-sink',
+        'typed card hand-add branches',
+      )
+      const candidateIds = candidates.filter(candidate => contentIdFromValue(candidate, state.catalogs))
+      const unknownCandidateIds = candidates.filter(candidate => !contentIdFromValue(candidate, state.catalogs))
+      const resolution = {
+        status: candidateIds.length > 0 && unknownCandidateIds.length === 0 ? 'resolved-finite-candidates' : 'unresolved',
+        ...(candidateIds.length > 0 ? { candidateIds } : {}),
+        ...(unknownCandidateIds.length > 0 ? { unknownCandidateIds } : {}),
+        sourceProof,
+      }
+      const dynamic = {
+        from: owner.nodeKey,
+        fromGroup: owner.group,
+        fromId: owner.id,
+        fieldPath,
+        line: 1,
+        column: 1,
+        graphPath: graphScope.path,
+        expression: 'typed card hand-add branches',
+        candidatePrefixes: [],
+        call: 'card.hand-add',
+        reason: 'dynamic-content-id-branch-selection',
+        resolution,
+      }
+      addDynamic(state, dynamic)
+      registerDynamicResolution(state, owner, fieldPath, { line: 1, column: 1 }, resolution)
+    }
+  }
+}
+
 function shouldScanDataString(key) {
   if (DISPLAY_FIELDS.has(key)) return false
   if (key === 'id') return false
@@ -1081,18 +1689,35 @@ function scanData(state, owner, value, path = '') {
     if (CODE_FIELDS.has(key) && typeof child === 'string') {
       const expected = state.registeredGraphProofs.entries[owner.nodeKey]
       const semantic = owner.definition.gameplayModules?.entries?.[childPath]?.graph
-      const proof = semantic && expected?.legacySource ? registeredGraphProofFor(state.registeredGraphProofs, owner.nodeKey, childPath, owner.definition) : null
-      if (proof?.status === 'graph-source-validated') {
+      const semanticValidated = semantic && owner.migration?.fields?.[childPath]?.graphArtifact === 'semantic-module-validated'
+      const proof = semanticValidated
+        ? registeredGraphProofFor(state.registeredGraphProofs, owner.nodeKey, childPath, owner.definition)
+        : null
+      if (semanticValidated && proof?.status === 'graph-source-validated' && expected?.legacySource) {
         // Frozen analysis is permitted only after independently rebuilding and
         // matching both the current author graph and its executable bytes.
+        // A verified graph whose card writes are all literal branches already
+        // carries the complete dependency set in its graph data.  Re-scanning
+        // the frozen source here would resurrect a superseded dynamic sink
+        // such as addCardToHand(choice), so leave that source out of this one
+        // closed shape.  Other validated graphs retain the legacy proof path
+        // below because their generated-family evidence still depends on it.
+        if (hasVerifiedStaticCardWrites(semantic, child, proof)) continue
         const starts = [state.dynamic.length, state.generatedFamilies.length, state.baselineMissingCandidates.length]
         scanCode(state, owner, childPath, expected.legacySource)
         for (const [items, start] of [[state.dynamic, starts[0]], [state.generatedFamilies, starts[1]], [state.baselineMissingCandidates, starts[2]]]) {
           for (const item of items.slice(start)) {
             const sourceProof = item.resolution?.sourceProof ?? item.sourceProof
-            if (sourceProof) { sourceProof.legacySourceSha256 = sourceProof.sourceSha256; sourceProof.sourceSha256 = sha256(child); sourceProof.registeredGraphProof = proof }
+            if (sourceProof) {
+              sourceProof.legacySourceSha256 = sourceProof.sourceSha256
+              sourceProof.sourceSha256 = sha256(child)
+              sourceProof.authorGraphSha256 = sha256(semantic)
+              sourceProof.registeredGraphProof = proof
+            }
           }
         }
+      } else if (semanticValidated) {
+        scanSemanticGraphDynamic(state, owner, childPath, child, semantic, proof)
       } else scanCode(state, owner, childPath, child)
       continue
     }
@@ -1219,12 +1844,18 @@ export function loadRegisteredGraphProofs(root) {
     registeredGraphProofCache.set(root, result)
     return result
   }
+  if (!existsSync(resolve(root, 'scripts/migrate-generated-content-graphs.ts'))
+    || !existsSync(resolve(root, 'scripts/migrate-semantic-pending-skills.ts'))) {
+    return unavailable('Registered graph builder sources are not present.')
+  }
   const source = [
     "import fs from 'node:fs'",
     "import * as generatedModule from './scripts/migrate-generated-content-graphs.ts'",
     "import * as pendingModule from './scripts/migrate-semantic-pending-skills.ts'",
     "import * as documentModule from './lib/skill-graph/module-document.ts'",
+    "import * as atomicModule from './scripts/migrate-atomic-author-modules.ts'",
     "import * as semanticGeneratedModule from './scripts/migrate-semantic-generated-content.ts'",
+    "import * as rafaamCurseModule from './scripts/migrate-semantic-rafaam-curse.ts'",
     "import * as grantsModule from './scripts/migrate-semantic-hand-grants.ts'",
     "import * as timersModule from './scripts/migrate-semantic-status-timers.ts'",
     "import * as cardsModule from './scripts/migrate-semantic-cards.ts'",
@@ -1232,9 +1863,12 @@ export function loadRegisteredGraphProofs(root) {
     'const grants = grantsModule.default ?? grantsModule',
     'const timers = timersModule.default ?? timersModule',
     'const cards = cardsModule.default ?? cardsModule',
+    'const rafaamCurse = rafaamCurseModule.default ?? rafaamCurseModule',
     'const generated = generatedModule.default ?? generatedModule',
     'const pending = pendingModule.default ?? pendingModule',
     'const document = documentModule.default ?? documentModule',
+    'const atomic = atomicModule.default ?? atomicModule',
+    'const normalizeGameplayGraph = graph => atomic.migrateAtomicAuthorGraph(graph)',
     "const fixture = JSON.parse(fs.readFileSync('./tests/game/fixtures/RED-252-legacy-content.json', 'utf8'))",
     'const result = {}',
     'for (const id of generated.GENERATED_CONTENT_IDS) {',
@@ -1244,7 +1878,7 @@ export function loadRegisteredGraphProofs(root) {
     '}',
     "for (const id of ['skills/minato-spiral-barrage', 'skills/turalyon-grand-crusade']) {",
     '  const legacy = fixture.entries[id]',
-    '  const graph = pending.SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === id && entry.field === \'code\').build()',
+    '  const graph = normalizeGameplayGraph(pending.SEMANTIC_PENDING_MIGRATIONS.find(entry => entry.id === id && entry.field === \'code\').build())',
     "  const migrated = document.applyGameplayModuleGraph(legacy, graph, 'code')",
     "  result[id] = { field: 'code', graph, compiled: migrated.code }",
     '}',
@@ -1259,14 +1893,27 @@ export function loadRegisteredGraphProofs(root) {
     '}',
     'for (const [id, [field, graph]] of Object.entries(semantic)) {',
     '  const legacy = fixture.entries[id]',
-    '  const migrated = document.applyGameplayModuleGraph(legacy, graph, field)',
-    '  result[id] = { ...(result[id] ?? {}), field, graph, compiled: migrated[field], legacySource: legacy[field] }',
+    '  const normalized = normalizeGameplayGraph(graph)',
+    '  const migrated = document.applyGameplayModuleGraph(legacy, normalized, field)',
+    '  result[id] = { ...(result[id] ?? {}), field, graph: normalized, compiled: migrated[field], legacySource: legacy[field] }',
     '}',
+    "const rafaamWardLegacy = fixture.entries['rules/rule-rafaam-curse-ward']",
+    "const rafaamWardGraph = normalizeGameplayGraph(rafaamCurse.buildRafaamCurseWardGraph())",
+    "const rafaamWardMigrated = document.applyGameplayModuleGraph(rafaamWardLegacy, rafaamWardGraph, 'skillCode')",
+    "const rafaamCardLegacy = fixture.entries['cards/rafaam-curse-sample']",
+    "const rafaamCardGraph = normalizeGameplayGraph(rafaamCurse.buildRafaamCurseCardGraph())",
+    "const rafaamCardMigrated = document.applyGameplayModuleGraph(rafaamCardLegacy, rafaamCardGraph, 'code')",
+    "const rafaamCardCurrent = JSON.parse(fs.readFileSync('./data/cards/rafaam-curse-sample.json', 'utf8'))",
+    "document.assertGameplayModuleDocument(rafaamCardCurrent)",
+    "if (rafaamCardCurrent.code !== rafaamCardMigrated.code || JSON.stringify(rafaamCardCurrent.gameplayModules.entries.code.graph) !== JSON.stringify(rafaamCardMigrated.gameplayModules.entries.code.graph)) throw new Error('Rafaam curse sample differs from registered card builder')",
+    "result['rules/rule-rafaam-curse-ward'] = { field: 'skillCode', graph: rafaamWardGraph, compiled: rafaamWardMigrated.skillCode, templateProofs: [{ id: 'rafaam-curse-sample', graph: rafaamCardMigrated.gameplayModules.entries.code.graph, compiled: rafaamCardMigrated.code }] }",
     "result['skills/tails-armor-assembly'].templateProofs = semanticGenerated.buildGeneratedCardDefinitions().map(expected => {",
     '  const current = JSON.parse(fs.readFileSync(`./data/cards/${expected.id}.json`, \'utf8\'))',
     '  document.assertGameplayModuleDocument(current)',
-    "  if (current.code !== expected.code || JSON.stringify(current.gameplayModules.entries.code.graph) !== JSON.stringify(expected.gameplayModules.entries.code.graph)) throw new Error('Generated template differs from registered builder: ' + expected.id)",
-    '  return { id: expected.id, graph: expected.gameplayModules.entries.code.graph, compiled: expected.code }',
+    '  const graph = normalizeGameplayGraph(expected.gameplayModules.entries.code.graph)',
+    '  const migrated = document.applyGameplayModuleGraph(expected, graph, \'code\')',
+    "  if (current.code !== migrated.code || JSON.stringify(current.gameplayModules.entries.code.graph) !== JSON.stringify(graph)) throw new Error('Generated template differs from registered builder: ' + expected.id)",
+    '  return { id: expected.id, graph, compiled: migrated.code }',
     '})',
     'process.stdout.write(JSON.stringify(result))',
   ].join('\n')
@@ -2427,6 +3074,7 @@ function makeReport(root) {
   const allCatalogIds = new Set(catalog.entries.map(entry => entry.id))
   const state = {
     catalogs: catalog.catalogs,
+    legacyFixture,
     registeredGraphProofs,
     knownIds: allCatalogIds,
     references: [],
@@ -2630,16 +3278,146 @@ function makeReport(root) {
   const fieldMigrationCounts = Object.fromEntries(FIELD_MIGRATION_STATUSES.map(status => [status, fieldEntries.filter(field => field.status === status).length]))
   const ordinaryFieldMigrationCounts = Object.fromEntries(FIELD_MIGRATION_STATUSES.map(status => [status, ordinaryFieldEntries.filter(field => field.status === status).length]))
   const semanticFields = ordinaryFieldEntries.filter(field => field.graphArtifact === 'semantic-module-validated')
+  const reachableFields = ordinaryFieldEntries.filter(field => ordinaryReachable.has(field.nodeKey))
+  const reachableSemanticFields = reachableFields.filter(field => field.graphArtifact === 'semantic-module-validated')
+  const declarativeEntries = ordinaryEntries.filter(entry => entry.migration.sourceKind === 'declarative')
+  const declarativeEntryKeys = new Set(declarativeEntries.map(entry => entry.nodeKey))
+  const ordinaryExcludedReferences = references.filter(reference => {
+    const target = byNode.get(`${reference.toGroup}/${reference.toId}`)
+    const source = byNode.get(reference.from)
+    return source?.scope === 'ordinary' && target?.scope === 'excluded'
+  })
+  const declarativeUnknownReferences = unknownReferences.filter(reference => declarativeEntryKeys.has(reference.from))
+  const declarativeExcludedReferences = ordinaryExcludedReferences.filter(reference => declarativeEntryKeys.has(reference.from))
+  const declarativeDependencyIssueKeys = new Set([
+    ...declarativeUnknownReferences.map(reference => reference.from),
+    ...declarativeExcludedReferences.map(reference => reference.from),
+  ])
+  const declarativeDependencyValidation = {
+    totalEntries: declarativeEntries.length,
+    reachableEntries: declarativeEntries.filter(entry => ordinaryReachable.has(entry.nodeKey)).length,
+    validatedEntries: declarativeEntries.filter(entry => !declarativeDependencyIssueKeys.has(entry.nodeKey)).length,
+    remainingEntries: [...declarativeDependencyIssueKeys].sort(compareCodePoints),
+    unknownReferenceCount: declarativeUnknownReferences.length,
+    excludedReferenceCount: declarativeExcludedReferences.length,
+    complete: declarativeDependencyIssueKeys.size === 0,
+  }
+  const unreachableOrdinaryFields = ordinaryFieldEntries.filter(field => !ordinaryReachable.has(field.nodeKey))
+  const unreachableSemanticFields = unreachableOrdinaryFields.filter(field => field.graphArtifact === 'semantic-module-validated')
+  const unreachableOrdinaryEntries = ordinaryEntries.filter(entry => !ordinaryReachable.has(entry.nodeKey))
+  const manifestUnknownReferences = unknownReferences.filter(reference => byNode.has(reference.from))
+  const nonManifestUnknownReferences = unknownReferences.filter(reference => !byNode.has(reference.from))
+  const generatedFamilySources = new Set(generatedFamilyReferences.map(family => family.from))
+  const missingGeneratedFamilySources = REGISTERED_GENERATED_FAMILY_KEYS
+    .filter(nodeKey => !generatedFamilySources.has(nodeKey))
+  const pendingSourcesByNode = new Set(pendingSourceReferences.map(pending => pending.from))
+  const missingPendingSources = REGISTERED_PENDING_SOURCE_KEYS
+    .filter(nodeKey => !pendingSourcesByNode.has(nodeKey))
+  const generatedStructuralEvidence = {
+    familyCount: generatedFamilyReferences.length,
+    candidateIdCount: generatedCandidateCount,
+    sourceValidatedCount: generatedFamilyReferences.filter(family => family.generatedSourceStatus === 'graph-source-validated').length,
+    executableValidatedCount: generatedFamilyReferences.filter(family => family.generatedExecutableStatus === 'graph-source-validated').length,
+    outsideManifestCandidateIds: [...new Set(generatedFamilyReferences.flatMap(family => family.candidateIds ?? [])
+      .filter(candidateId => !state.knownIds.has(candidateId)))].sort(compareCodePoints),
+    expectedFamilySources: REGISTERED_GENERATED_FAMILY_KEYS,
+    missingFamilySources: missingGeneratedFamilySources,
+    complete: generatedFamilyReferences.every(family => (
+      family.generatedSourceStatus === 'graph-source-validated'
+        && family.generatedExecutableStatus === 'graph-source-validated'
+        && /^[a-f0-9]{64}$/.test(family.sourceProof?.sourceSha256 ?? '')
+        && /^[a-f0-9]{64}$/.test(family.sourceProof?.authorGraphSha256 ?? '')
+    )) && missingGeneratedFamilySources.length === 0,
+  }
+  const continuationStructuralEvidence = {
+    fieldCount: pendingSourceReferences.length,
+    occurrenceCount: pendingSourceOccurrenceCount,
+    sourceValidatedCount: pendingSourceReferences.filter(pending => pending.status === 'graph-source-validated').length,
+    expectedSourceFields: REGISTERED_PENDING_SOURCE_KEYS,
+    missingSourceFields: missingPendingSources,
+    complete: pendingSourceReferences.every(pending => pending.status === 'graph-source-validated'
+      && typeof pending.typedSourceCount === 'number'
+      && typeof pending.candidateCount === 'number')
+      && missingPendingSources.length === 0,
+  }
+  const semanticFieldKeys = new Set(semanticFields.map(field => `${field.nodeKey}:${field.field}`))
+  const semanticDynamicReferences = dynamicReferences.filter(reference => semanticFieldKeys.has(`${reference.from}:${reference.fieldPath}`))
+  const graphBoundDynamicReferences = semanticDynamicReferences.filter(reference => (
+    /^[a-f0-9]{64}$/.test(reference.resolution?.sourceProof?.authorGraphSha256 ?? '')
+      || reference.resolution?.sourceProof?.registeredGraphProof?.status === 'graph-source-validated'
+  ))
+  const dynamicStructuralEvidence = {
+    referenceCount: dynamicReferences.length,
+    resolvedCount: dynamicResolvedCount,
+    unresolvedCount: dynamicUnresolvedCount,
+    sourceBoundCount: dynamicReferences.filter(reference => /^[a-f0-9]{64}$/.test(reference.resolution?.sourceProof?.sourceSha256 ?? '')).length,
+    semanticReferenceCount: semanticDynamicReferences.length,
+    authorGraphBoundCount: graphBoundDynamicReferences.length,
+    complete: dynamicUnresolvedCount === 0
+      && dynamicReferences.every(reference => /^[a-f0-9]{64}$/.test(reference.resolution?.sourceProof?.sourceSha256 ?? ''))
+      && graphBoundDynamicReferences.length === semanticDynamicReferences.length,
+  }
+  const semanticReachabilityComplete = reachableFields.every(field => field.graphArtifact === 'semantic-module-validated')
+  const structuralComplete = semanticFields.length > 0
+    && semanticReachabilityComplete
+    && declarativeDependencyValidation.complete
+    && generatedStructuralEvidence.complete
+    && continuationStructuralEvidence.complete
+    && dynamicStructuralEvidence.complete
+  const manifestExceptionCount = unreachableOrdinaryEntries.length + unreachableOrdinaryFields.length + manifestUnknownReferences.length
+  const nonManifestExceptionCount = nonManifestUnknownReferences.length + dynamicUnresolvedCount + baselineMissingCandidates.length
   return {
     schemaVersion: 1,
     reportKind: 'content-graph-coverage',
-    assessmentScope: 'compiler-ir-and-behavior-compatibility',
+    assessmentScope: 'semantic-author-graph-and-dependency-structure',
     semanticModuleCoverage: {
-      status: semanticFields.length ? 'partial' : 'not-assessed',
-      complete: false,
+      status: semanticFields.length === 0 ? 'not-assessed' : (structuralComplete ? 'complete' : 'partial'),
+      complete: structuralComplete,
+      overallComplete: structuralComplete && manifestExceptionCount === 0 && nonManifestExceptionCount === 0,
+      structuralComplete,
       validatedInlineFields: semanticFields.length,
       fields: semanticFields.map(field => `${field.nodeKey}:${field.field}`).sort(compareCodePoints),
-      reason: 'Only registered gameplay-module entries count here. Compatibility graphs, declarative content and generated/pending child content do not establish complete semantic-module coverage.',
+      reachableInlineFields: reachableFields.length,
+      validatedReachableInlineFields: reachableSemanticFields.length,
+      remainingReachableFields: reachableFields.filter(field => field.graphArtifact !== 'semantic-module-validated')
+        .map(field => `${field.nodeKey}:${field.field}`).sort(compareCodePoints),
+      manifestExceptions: {
+        entryCount: unreachableOrdinaryEntries.length,
+        fieldCount: unreachableOrdinaryFields.length,
+        semanticFieldCount: unreachableSemanticFields.length,
+        unknownReferenceCount: manifestUnknownReferences.length,
+        entries: unreachableOrdinaryEntries.map(entry => entry.nodeKey).sort(compareCodePoints),
+        fields: unreachableOrdinaryFields.map(field => `${field.nodeKey}:${field.field}`).sort(compareCodePoints),
+        reason: 'Unreachable ordinary manifest entries and their legacy fields are tracked as manifest exceptions; they do not inflate reachable semantic completion.',
+      },
+      nonManifestExceptions: {
+        count: nonManifestExceptionCount,
+        unknownReferenceCount: nonManifestUnknownReferences.length,
+        unresolvedDynamicCount: dynamicUnresolvedCount,
+        baselineMissingCandidateCount: baselineMissingCandidates.length,
+        reason: 'Unknown, unresolved, or frozen-baseline-missing dynamic IDs remain outside manifest completion and are reported separately.',
+      },
+      declarativeDependencyValidation,
+      generatedStructuralEvidence,
+      continuationStructuralEvidence,
+      dynamicStructuralEvidence,
+      verificationGates: {
+        compilerArtifact: {
+          status: validator.available && validator.documentAvailable ? 'assessed-per-field' : 'not-assessed',
+          reason: 'Compiler/document acceptance is used to classify graph artifacts; it is kept separate from semantic dependency completion.',
+        },
+        runtime: {
+          status: 'not-assessed',
+          reason: 'This audit does not execute runtime gameplay or verify runtime-only references.',
+        },
+        editor: {
+          status: 'not-assessed',
+          reason: 'This audit does not exercise the editor UI, preview, or authoring workflow.',
+        },
+      },
+      reason: structuralComplete
+        ? 'All reachable inline fields have independently accepted semantic author graphs; declarative dependencies, generated families, continuations, and dynamic graph sinks pass their structural gates. Manifest and non-manifest exceptions remain explicit, and runtime/editor verification is not assessed here.'
+        : 'Reachable semantic fields, declarative dependencies, generated families, continuations, or dynamic graph sinks still have an unresolved structural gate.',
     },
     baseBranch: BASE_BRANCH,
     baseSha: BASE_SHA,
@@ -2689,6 +3467,8 @@ function makeReport(root) {
         'the Rafaam copy family additionally requires a validated hand-card filter, customCards lookup, JSON clone preserving code, and a closed ordinary source set',
         'pending effectCode occurrences are counted independently and require matching compiler-validated typed source graphs',
         'the registered generated/pending corpus must exactly match an independently rebuilt frozen graph and compiler output; the sink walker is diagnostic only',
+        'validated gameplay-module fields use author graph sinks and typed choice branches for dynamic dependency evidence; generated wrapper temporaries are not treated as author intent',
+        'semantic completion is structural and does not assert runtime gameplay, editor UI, or preview verification',
       ],
     },
     scope: {
@@ -2725,6 +3505,42 @@ function makeReport(root) {
       ordinarySourceKind: ordinarySourceKindCounts,
       inlineCodeFields: fieldEntries.length,
       ordinaryInlineCodeFields: ordinaryFieldEntries.length,
+      semanticInlineFields: semanticFields.length,
+      semanticReachableInlineFields: reachableSemanticFields.length,
+      semanticUnreachableInlineFields: unreachableSemanticFields.length,
+      manifestExceptions: {
+        ordinaryEntries: unreachableOrdinaryEntries.length,
+        ordinaryFields: unreachableOrdinaryFields.length,
+        semanticFields: unreachableSemanticFields.length,
+        unknownReferences: manifestUnknownReferences.length,
+      },
+      nonManifestExceptions: {
+        unknownReferences: nonManifestUnknownReferences.length,
+        dynamicUnresolved: dynamicUnresolvedCount,
+        baselineMissingCandidates: baselineMissingCandidates.length,
+      },
+      declarativeDependencyValidation: {
+        totalEntries: declarativeDependencyValidation.totalEntries,
+        validatedEntries: declarativeDependencyValidation.validatedEntries,
+        remainingEntries: declarativeDependencyValidation.remainingEntries.length,
+      },
+      generatedStructuralEvidence: {
+        families: generatedStructuralEvidence.familyCount,
+        candidateIds: generatedStructuralEvidence.candidateIdCount,
+        sourceValidated: generatedStructuralEvidence.sourceValidatedCount,
+      },
+      continuationStructuralEvidence: {
+        fields: continuationStructuralEvidence.fieldCount,
+        occurrences: continuationStructuralEvidence.occurrenceCount,
+        sourceValidated: continuationStructuralEvidence.sourceValidatedCount,
+      },
+      dynamicStructuralEvidence: {
+        references: dynamicStructuralEvidence.referenceCount,
+        resolved: dynamicStructuralEvidence.resolvedCount,
+        unresolved: dynamicStructuralEvidence.unresolvedCount,
+        semanticReferences: dynamicStructuralEvidence.semanticReferenceCount,
+        authorGraphBound: dynamicStructuralEvidence.authorGraphBoundCount,
+      },
       fieldMigration: fieldMigrationCounts,
       ordinaryFieldMigration: ordinaryFieldMigrationCounts,
       migration: migrationCounts,
@@ -2756,7 +3572,9 @@ function makeReport(root) {
       allOrdinaryInlineFieldsLegacyUntilValidated: ordinaryFieldEntries.every(field => field.status !== 'graph-validated'),
       allOrdinaryEntriesClassifiedBySourceKind: ordinaryEntries.every(entry => SOURCE_KINDS.includes(entry.migration.sourceKind)),
       allDynamicProofsSourceBound: dynamicReferences.every(reference => /^[a-f0-9]{64}$/.test(reference.resolution?.sourceProof?.sourceSha256 ?? '')),
+      allSemanticDynamicProofsAuthorGraphBound: dynamicStructuralEvidence.authorGraphBoundCount === dynamicStructuralEvidence.semanticReferenceCount,
       allGeneratedFamiliesSourceBound: generatedFamilyReferences.every(family => /^[a-f0-9]{64}$/.test(family.sourceProof?.sourceSha256 ?? '')),
+      allGeneratedFamiliesAuthorGraphBound: generatedFamilyReferences.every(family => /^[a-f0-9]{64}$/.test(family.sourceProof?.authorGraphSha256 ?? '')),
       allGeneratedSourceProofsActual: generatedFamilyReferences.every(family => (
         SOURCE_GRAPH_STATUSES.includes(family.generatedSourceStatus)
           && (family.generatedSourceProof?.copySourceProof?.status === 'graph-source-validated'
@@ -2777,6 +3595,13 @@ function makeReport(root) {
         .every(item => item.generatedSourceProof?.registeredGraphProof?.status === 'graph-source-validated'
           || item.registeredGraphProof?.status === 'graph-source-validated'),
       baselineMissingCandidatesAreExplicit: baselineMissingCandidates.every(candidate => candidate.reason === 'frozen-baseline-candidate-missing-from-manifest'),
+      semanticStructuralCoverageComplete: structuralComplete,
+      declarativeDependenciesComplete: declarativeDependencyValidation.complete,
+      generatedStructuralEvidenceComplete: generatedStructuralEvidence.complete,
+      continuationStructuralEvidenceComplete: continuationStructuralEvidence.complete,
+      dynamicStructuralEvidenceComplete: dynamicStructuralEvidence.complete,
+      runtimeVerificationAssessed: false,
+      editorVerificationAssessed: false,
     },
   }
 }
@@ -2792,6 +3617,12 @@ export function writeCoverageReport(options = {}) {
   const report = makeReport(root)
   writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
   return { output, report }
+}
+
+/** A partial structural audit is a failed verification, even when parsing found no catalog errors. */
+export function coverageAuditFailed(report) {
+  return (report?.validation?.errors?.length ?? 0) > 0
+    || report?.semanticModuleCoverage?.structuralComplete !== true
 }
 
 function gitBaseSha(root) {
@@ -2816,7 +3647,7 @@ function runCli() {
   } else {
     process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`)
   }
-  if (result.report.validation.errors.length > 0) process.exitCode = 1
+  if (coverageAuditFailed(result.report)) process.exitCode = 1
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) runCli()

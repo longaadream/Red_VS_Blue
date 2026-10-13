@@ -1,7 +1,7 @@
 import type { GameplayModuleDescriptor as Descriptor, GameplayModuleSurface } from './module-types'
 
 const surfaces: readonly GameplayModuleSurface[] = Object.freeze(['preview'] as const)
-const define = (item: Omit<Descriptor, 'version' | 'allowedSurfaces'>): Descriptor => ({ version: '1', allowedSurfaces: surfaces, ...item })
+const define = (item: Omit<Descriptor, 'version' | 'allowedSurfaces'>, allowedSurfaces = surfaces): Descriptor => ({ version: '1', allowedSurfaces, ...item })
 
 /**
  * Pure preview readers and selectors used by the ordinary preview migration.
@@ -78,7 +78,7 @@ export const PREVIEW_VALUE_GAMEPLAY_MODULES: readonly Descriptor[] = [
     effects: { pure: true, previewSafe: true },
     lower: ctx => `(${ctx.inputs.condition} ? ${ctx.inputs.whenTrue} : ${ctx.inputs.whenFalse})`,
     ui: { category: 'logic' },
-  }),
+  }, ['skill', 'card', 'rule', 'triggerSkill', 'pending', 'preview']),
 ]
 
 export default PREVIEW_VALUE_GAMEPLAY_MODULES

@@ -34,8 +34,6 @@ describe('semantic lethal protection and queued reflection', () => {
         const context: any = { type: frozen['rules/' + id].trigger.type, rulePiece: holder, piece: scenario === 'wrong-subject' ? enemy : holder, target: scenario === 'missing-attacker' ? null : enemy, damage, damageQueue: [] }
         const result = scenario === 'combat' ? dealDamage(enemy, holder, damage, 'true', battle, 'guard-parity') : rule.effect(battle, context)
         const plain = JSON.parse(JSON.stringify({ battle, result, queue: context.damageQueue }))
-        for (const piece of [...plain.battle.pieces, ...(plain.battle.graveyard || [])]) piece.rules = piece.rules.map((rule: any) => rule.id)
-        for (const queued of plain.queue) for (const piece of [queued.attacker, queued.target]) piece.rules = piece.rules.map((rule: any) => rule.id)
         return plain
       }
       for (const damage of [0, 0.5, 7, 8, 20]) for (const scenario of ['normal', 'missing-status', 'wrong-subject', 'spent', 'used-tag', 'dying', 'no-oath', 'missing-attacker', 'dead-attacker']) {

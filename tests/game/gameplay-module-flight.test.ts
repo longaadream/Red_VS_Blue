@@ -99,22 +99,9 @@ type LandingScenario = 'both-valid' | 'tails-invalid' | 'ally-invalid' | 'both-i
 type RuleScenario = LandingScenario | 'ally-dead'
 
 function landingSnapshot(state: any, result?: unknown): unknown {
-  return JSON.parse(JSON.stringify({
-    result,
-    pieces: state.pieces.map((piece: any) => ({
-      instanceId: piece.instanceId,
-      x: piece.x,
-      y: piece.y,
-      currentHp: piece.currentHp,
-      ruleIds: (piece.rules ?? []).map((rule: any) => rule.id).sort(),
-      statusTags: (piece.statusTags ?? []).map((tag: any) => ({
-        id: tag.id, type: tag.type, flightId: tag.flightId, currentDuration: tag.currentDuration,
-      })),
-    })).sort((left: any, right: any) => left.instanceId.localeCompare(right.instanceId)),
-    tileEffects: (state.extensions?.tileEffects ?? []).filter((effect: any) => effect.type === 'tails-flight-reservation'),
-    extensions: state.extensions ?? null,
-    messages: (state.actions ?? []).map((action: any) => action?.payload?.message ?? action?.message).filter(Boolean),
-  }))
+  const copy = clone(state)
+  delete copy.skillsById
+  return { state: copy, result }
 }
 
 function assertFlightCommitted(state: any): void {
@@ -269,6 +256,23 @@ describe('RED-252 semantic delayed flight modules', () => {
       expect(reports).toHaveLength(2)
       expect(reports.every(report => report.status === 'ready')).toBe(true)
       expect(reports.every(report => report.document)).toBe(true)
+    })
+  })
+
+  it('preserves valid authored graphs and rejects changed legacy executables', () => {
+    withProfile(root => {
+      const authored = migratedDocument(FLIGHT_SKILL_ID)
+      authored.description = '作者定制说明'
+      writeJson(root, 'skills/tails-twin-flight.json', authored)
+      const retained = runSemanticFlightMigrations(root, fixture, [FLIGHT_SKILL_ID])[0]
+      expect(retained.status).toBe('ready')
+      expect(retained.document).toEqual(authored)
+      writeJson(root, 'skills/tails-twin-flight.json', {
+        ...fixture.entries[FLIGHT_SKILL_ID], code: 'function executeSkill() { return { success: false }; }',
+      })
+      const rejected = runSemanticFlightMigrations(root, fixture, [FLIGHT_SKILL_ID])[0]
+      expect(rejected.status).toBe('blocked')
+      expect(rejected.error).toContain('author executable differs')
     })
   })
 

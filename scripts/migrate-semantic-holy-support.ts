@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { assertFrozenExecutable } from './semantic-migration-source'
-import { assertContentGraphArtifact } from '../electron-editor/content-graph'
 import {
   applyGameplayModuleGraph,
   assertGameplayModuleDocument,
@@ -46,23 +45,6 @@ const holyStatusFields: readonly GameplayPort[] = [
   { name: 'relatedRules', type: { kind: 'list', element: 'string' } },
 ]
 
-/**
- * The holy support documents already carry a validated legacy content graph
- * from the preceding content-graph migration.  That graph is an authored
- * compatibility artifact and its generated source may differ from the
- * frozen pre-migration fixture after compiler normalization.  Validate that
- * artifact in place before replacing the executable with the gameplay module;
- * otherwise fall back to the frozen-source provenance check for untouched
- * documents.
- */
-function assertExecutableProvenance(current: Record<string, unknown>, original: Record<string, unknown>, surface: 'skill' | 'triggerSkill', id: string): void {
-  if (current.contentGraph !== undefined) {
-    if (current.contentGraphField !== 'code') throw new Error(`${id}: existing contentGraph does not own code`)
-    assertContentGraphArtifact(current)
-    return
-  }
-  assertFrozenExecutable(current, original, 'code', surface, id)
-}
 
 function buildLightExtractionGraph(): GameplayModuleGraph {
   const body: GameplayStatement[] = [
@@ -114,7 +96,7 @@ function buildDivineBlessingGraph(): GameplayModuleGraph {
     call('shield-bonus', 'math.add', { left: literal(2), right: output('shield-count', 'value') }),
     call('allies', 'query.pieces', { originId: output('source', 'piece') }, { relation: 'ally', includeDead: false }),
     {
-      kind: 'foreach', id: 'apply-to-allies', items: output('allies', 'pieces'), item: 'ally', body: [
+      kind: 'foreach', id: 'apply-to-allies', presentation: 'statusAdded', items: output('allies', 'pieces'), item: 'ally', body: [
         { kind: 'record.create', id: 'damage-buff-record', schema: 'damage-buff@1', fields: {
           id: literal('damage-buff'),
           type: literal('damage-buff'),
@@ -129,6 +111,7 @@ function buildDivineBlessingGraph(): GameplayModuleGraph {
         call('has-rule', 'rule.has-piece', { piece: input('ally') }, { ruleId: 'rule-damage-buff' }),
         call('missing-rule', 'logic.not', { value: output('has-rule', 'value') }),
         branch('install-rule', output('missing-rule', 'value'), [call('apply-rule', 'rule.apply-piece', { target: input('ally') }, { ruleId: 'rule-damage-buff' })]),
+        call('replace-related-rules', 'status.replace-related-rules', { piece: input('ally'), rules: literal(['rule-damage-buff']) }, { statusId: 'damage-buff', statusType: 'damage-buff' }),
       ],
     },
     call('source-name', 'attribute.text', { piece: output('source', 'piece') }, { attribute: 'name' }),
@@ -158,21 +141,29 @@ function buildBloodEchoTriggerGraph(): GameplayModuleGraph {
     call('status-id', 'event.status-text', {}, { field: 'statusId' }),
     call('is-shield', 'compare.text', { left: output('status-id', 'value'), right: literal('divine-shield') }),
     branch('status-check', { kind: 'output', node: 'is-shield', port: 'value' }, [], failure('wrong-status')),
-    call('source-ref', 'source.capture-event-piece', {}, { field: 'sourcePiece' }),
-    call('source-present', 'source.is-present', { source: output('source-ref', 'source') }),
+    call('event-source', 'source.capture-event-piece', {}, { field: 'sourcePiece' }),
+    call('fallback-source', 'source.capture-event-piece', {}, { field: 'piece' }),
+    call('source-ref', 'value.coalesce-record', { first: output('event-source', 'source'), fallback: output('fallback-source', 'source') }),
+    call('source-present', 'source.is-present', { source: output('source-ref', 'value') }),
     branch('source-check', output('source-present', 'value'), [], failure('no-source')),
-    call('source', 'source.require-present', { source: output('source-ref', 'source') }),
+    call('source', 'source.require-present', { source: output('source-ref', 'value') }),
     call('source-owner', 'source.captured-owner', { source: output('source', 'source') }),
+    call('bound', 'source.capture-event-piece', {}, { field: 'rulePiece' }),
+    call('bound-present', 'source.is-present', { source: output('bound', 'source') }),
+    branch('bound-check', output('bound-present', 'value'), [], failure('no-bound')),
     call('holder-ref', 'ref.holder'),
+    call('holder-exists', 'query.has-piece', { pieceId: output('holder-ref', 'piece') }),
+    branch('holder-check', output('holder-exists', 'exists'), [], failure('no-holder')),
     call('holder', 'query.piece', { pieceId: output('holder-ref', 'piece') }),
     call('alive', 'piece.alive', { piece: output('holder', 'piece') }),
     call('is-liadrin', 'piece.matches-template', { piece: output('holder', 'piece') }, { templateId: 'liadrin' }),
     call('holder-owner', 'piece.owner', { piece: output('holder', 'piece') }),
+    call('player-exists', 'query.has-player', { playerId: output('holder-owner', 'player') }),
+    branch('player-check', output('player-exists', 'exists'), [], failure('no-player')),
     call('allied', 'compare.allied-players', { left: output('holder-owner', 'player'), right: output('source-owner', 'player') }),
     call('eligible-1', 'logic.and', { left: output('alive', 'alive'), right: output('is-liadrin', 'value') }),
     call('eligible', 'logic.and', { left: output('eligible-1', 'value'), right: output('allied', 'value') }),
-    call('ineligible', 'logic.not', { value: output('eligible', 'value') }),
-    branch('eligibility-check', output('ineligible', 'value'), [], failure('ineligible')),
+    branch('eligibility-check', output('eligible', 'value'), [], failure('ineligible')),
     call('add-card', 'card.hand-add', { player: output('holder-owner', 'player') }, { cardId: 'holy-charge' }),
     call('message', 'value.select-text', { condition: output('add-card', 'success'), whenTrue: literal('血色回响生成了1张圣光充能'), whenFalse: literal('') }),
     ...result('success', output('add-card', 'success'), output('message', 'text')),
@@ -207,7 +198,7 @@ export function migrateHolySupportSkills(root: string, write = false): string[] 
     const original = baseline['skills/' + id]
     if (!original) throw new Error(`Missing frozen baseline skills/${id}`)
     const surface = id === 'blood-echo-trigger' ? 'triggerSkill' : 'skill'
-    assertExecutableProvenance(current, original, surface, id)
+    assertFrozenExecutable(current, original, 'code', surface, id)
     for (const key of new Set([...Object.keys(original), ...Object.keys(current)])) {
       if (!generated.has(key) && JSON.stringify(original[key]) !== JSON.stringify(current[key])) throw new Error(`${id}: changed compatibility field ${key}`)
     }

@@ -1,0 +1,267 @@
+{
+  "task": "RED-252 flat Chinese sentence UI",
+  "role": "real Electron regression verification",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-flat-sentence-ui-sL4mM5\\rvb-content-653dd55b",
+  "sourceProject": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue",
+  "viewport": {
+    "width": 1487,
+    "height": 1058
+  },
+  "checks": [
+    {
+      "name": "Fireball wide default uses one modern inspector and hides technical row chrome",
+      "ok": true,
+      "detail": {
+        "inspectorCount": 1,
+        "rowMenus": 2,
+        "sentenceText": "效果步骤按顺序执行编辑内容执行效果范围与效果预览使用时执行此能力。选择 5 格内的一名敌人目标并记作目标。更多操作编辑模块↑↓复制删除查看技术信息按一次声明的范围、阵营和取消约束选择一个棋子；目标失效时由权威目标引擎拒绝本次语句。可用结果：棋子目标对 目标造成自身攻击力 × 1.5的伤害。更多操作编辑模块↑↓复制删除查看技术信息伤害量：当前棋子.攻击力 × 技能威力倍率 · 值通过权威伤害流程造成普通或真实伤害并返回本次结算结果；毒素及其他历史分类不属于新的作者接口。可用结果"
+      }
+    },
+    {
+      "name": "Fireball damage amount edits only that input in the right inspector and composes a nested AST expression",
+      "ok": true,
+      "detail": {
+        "slot": {
+          "selector": "damage:input:amount",
+          "text": "当前棋子.攻击力 × 技能威力倍率 · 值",
+          "row": true
+        },
+        "panel": {
+          "editor": "damage",
+          "slot": "input:amount",
+          "moduleSelect": false,
+          "inputs": [
+            "amount"
+          ],
+          "parameters": [],
+          "editorOutside": 0
+        },
+        "nestedId": "sentence-expression-1",
+        "innerId": "sentence-expression-2",
+        "amount": {
+          "kind": "output",
+          "node": "sentence-expression-1",
+          "port": "value"
+        },
+        "preservedUnknown": {
+          "preserved": true,
+          "source": "official-fireball"
+        }
+      }
+    },
+    {
+      "name": "The module picker writes the selected v2 while reopened legacy nodes retain v1",
+      "ok": true,
+      "detail": {
+        "pickerState": {
+          "relationOptions": [
+            {
+              "id": "query.same-relation",
+              "text": "判断棋子敌我关系使用现有敌我关系查询判断两个仍在场且存活的棋子是否属于指定关系，兼容队伍映射而非比较玩家字符串。"
+            }
+          ]
+        },
+        "selected": {
+          "id": "sentence-module-1",
+          "version": "2"
+        },
+        "persisted": {
+          "selectedVersion": "2",
+          "legacyVersion": "1"
+        },
+        "reopened": {
+          "selectedVersion": "2",
+          "legacyVersion": "1"
+        }
+      }
+    },
+    {
+      "name": "A branch consumer can edit its parent source and compose into the root declaration",
+      "ok": true,
+      "detail": {
+        "initial": {
+          "branchIndex": 5,
+          "amountIndex": 4,
+          "amountInputs": {
+            "left": {
+              "kind": "output",
+              "node": "attack",
+              "port": "value"
+            },
+            "right": {
+              "kind": "output",
+              "node": "power",
+              "port": "value"
+            }
+          },
+          "damageAmount": {
+            "kind": "output",
+            "node": "amount",
+            "port": "value"
+          },
+          "damageSlot": true,
+          "errors": []
+        },
+        "result": {
+          "bodyIds": [
+            "source",
+            "target",
+            "attack",
+            "power",
+            "sentence-expression-1",
+            "amount",
+            "lexical-if"
+          ],
+          "amountIndex": 5,
+          "expressionIndex": 4,
+          "expression": {
+            "id": "sentence-expression-1",
+            "module": "math.add",
+            "owner": "amount",
+            "input": "left"
+          },
+          "amountInputs": {
+            "left": {
+              "kind": "output",
+              "node": "sentence-expression-1",
+              "port": "value"
+            },
+            "right": {
+              "kind": "output",
+              "node": "power",
+              "port": "value"
+            }
+          },
+          "damageAmount": {
+            "kind": "output",
+            "node": "amount",
+            "port": "value"
+          },
+          "diagnostic": "",
+          "errors": []
+        }
+      }
+    },
+    {
+      "name": "Shadow Clone keeps complex authoring readable, supports nested collapse and horizontal scrolling",
+      "ok": true,
+      "detail": {
+        "rows": 10,
+        "collapseKey": "skills:naruto-shadow-clone:code::mode-branch",
+        "collapsed": {
+          "aria": "false",
+          "hidden": true,
+          "scrollLeft": 157,
+          "focusKey": "skills:naruto-shadow-clone:code::mode-branch"
+        },
+        "flowStyle": {
+          "scrollLeft": 64,
+          "scrollWidth": 900,
+          "clientWidth": 380,
+          "persistentStyle": true
+        }
+      }
+    },
+    {
+      "name": "Keyboard more menu, Escape and focus restoration stay inside the inspector surface",
+      "ok": true,
+      "detail": {
+        "menuState": {
+          "menu": true,
+          "summaryFocused": true,
+          "open": false
+        },
+        "opened": {
+          "open": true,
+          "actionVisible": true,
+          "active": "SUMMARY"
+        },
+        "selected": {
+          "editor": "mode-options",
+          "inspectorCount": 1,
+          "editors": 1
+        },
+        "closed": {
+          "editor": false,
+          "activeDataset": {},
+          "activeText": "更多操作"
+        }
+      }
+    },
+    {
+      "name": "Extension custom access, schema, ports and declarations use the same modern inspector and survive save/reload",
+      "ok": true,
+      "detail": {
+        "initial": {
+          "inspectorCount": 1,
+          "editorOutside": 0,
+          "name": "savedPlayerState",
+          "valueType": true
+        },
+        "edited": {
+          "namespace": "author-test",
+          "name": "customRecord",
+          "path": "state.hp",
+          "valueType": "record"
+        },
+        "datalist": [
+          "priorPlayer"
+        ],
+        "configBefore": {
+          "schemas": true,
+          "ports": 2,
+          "declarations": true,
+          "addSchema": true,
+          "addComposite": true,
+          "addContinuation": true
+        },
+        "schemaState": {
+          "card": "flat-record@1",
+          "fields": 3
+        },
+        "declarationState": {
+          "composites": [
+            "composite-1@v1"
+          ],
+          "continuations": [
+            "continuation-1@v1"
+          ],
+          "portAddButtons": 2
+        },
+        "configAfter": {
+          "schemas": 3,
+          "fields": 8,
+          "composites": 1,
+          "continuations": 1,
+          "ports": 6,
+          "inspectorCount": 1
+        },
+        "inspectorScrollBefore": {
+          "top": 3832,
+          "max": 3832
+        },
+        "inspectorScrollAfter": {
+          "top": 3832,
+          "max": 4018
+        },
+        "persisted": {
+          "namespace": "author-test",
+          "name": "customRecord",
+          "path": "state.hp",
+          "valueType": "record"
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\fireball-wide-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\fireball-amount-inspector.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\module-version-picker.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\shadow-clone-narrow-collapsed.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\extension-config-inspector.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\fireball-narrow.png"
+  ],
+  "ok": true,
+  "failureCount": 0,
+  "reportPath": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\guard-cleanup\\editor\\sentence-flat-ui-smoke.json"
+}

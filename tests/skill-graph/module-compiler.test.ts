@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { compileGameplayModuleGraph, GAMEPLAY_MODULE_COMPILER_VERSION } from '../../lib/skill-graph/module-compiler'
+import { compileGameplayModuleGraph, compileGameplayModuleGraphV1, GAMEPLAY_MODULE_COMPILER_VERSION } from '../../lib/skill-graph/module-compiler'
 import { GAMEPLAY_MODULE_GRAPH_VERSION, type GameplayModuleDescriptor, type GameplayModuleGraph, type GameplayModuleRegistry, type GameplayValue } from '../../lib/skill-graph/module-types'
 
 const version = '1'
@@ -141,6 +141,55 @@ describe('semantic gameplay module compiler', () => {
     expect(hasPieceCalls).toBe(2)
   })
 
+  it('invalidates living reference dependents for dead or removed pieces while continuing branches and the independent tail', () => {
+    const producePiece = descriptor('test.living-piece', [], [{ name: 'piece', type: 'piece' }], () => ({ expression: '"piece-id"' }), { pure: true, previewSafe: true }, ['skill'])
+    const livingPredicate = {
+      ...descriptor('test.living-predicate', [{ name: 'piece', type: 'piece' }], [{ name: 'value', type: 'boolean' }], () => ({ expression: '({value: (context.values.push("predicate"), true)})' }), { pure: true, previewSafe: true }, ['skill']),
+      livingReferences: ['piece'] as const,
+    }
+    const thenBranch = descriptor('test.living-then', [], [], () => ({ expression: 'context.values.push("then")' }), { pure: false, writes: ['test'], previewSafe: false }, ['skill'])
+    const elseBranch = descriptor('test.living-else', [], [], () => ({ expression: 'context.values.push("else")' }), { pure: false, writes: ['test'], previewSafe: false }, ['skill'])
+    const independent = descriptor('test.living-independent', [], [], () => ({ expression: 'context.values.push("independent")' }), { pure: false, writes: ['test'], previewSafe: false }, ['skill'])
+    const input = graph('skill', [
+      call('piece', 'test.living-piece'),
+      call('predicate', 'test.living-predicate', { piece: { kind: 'output', node: 'piece', port: 'piece' } }),
+      {
+        kind: 'if', id: 'branch', condition: { kind: 'output', node: 'predicate', port: 'value' },
+        then: [call('then', 'test.living-then')], else: [call('else', 'test.living-else')],
+      },
+      call('independent', 'test.living-independent'),
+    ])
+    const compiled = compileGameplayModuleGraph(input, registryOf(producePiece, livingPredicate, thenBranch, elseBranch, independent))
+    const aliveFlow = { query: { hasPiece: () => true, piece: () => ({ currentHp: 2 }) } }
+    const deadFlow = { query: { hasPiece: () => true, piece: () => ({ currentHp: 0 }) } }
+    const removedFlow = { query: { hasPiece: () => false, piece: () => undefined } }
+    const invoke = (flow: unknown) => {
+      const values: string[] = []
+      const execute = runInNewContext('(' + compiled.code + ')', { flow }) as (context: unknown) => unknown
+      execute({ values })
+      return values
+    }
+    expect(invoke(aliveFlow)).toEqual(['predicate', 'then', 'independent'])
+    expect(invoke(deadFlow)).toEqual(['independent'])
+    expect(invoke(removedFlow)).toEqual(['independent'])
+    expect(invoke({ query: { hasPiece: () => true } })).toEqual(['independent'])
+  })
+
+  it('keeps unmarked references on the legacy v1 path without adding living checks', () => {
+    const producer = descriptor('test.legacy-producer', [], [{ name: 'piece', type: 'piece' }], () => ({ expression: '"piece-id"' }), { pure: true, previewSafe: true }, ['skill'])
+    const legacyReader = descriptor('test.legacy-reader', [{ name: 'piece', type: 'piece' }], [{ name: 'value', type: 'number' }], ({ inputs }) => ({ expression: '({value: context.values.push(' + inputs.piece + ')})' }), { pure: false, writes: ['test'], previewSafe: false }, ['skill'])
+    const input = graph('skill', [
+      call('piece', 'test.legacy-producer'),
+      call('read', 'test.legacy-reader', { piece: { kind: 'output', node: 'piece', port: 'piece' } }),
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'read', port: 'value' } },
+    ], { outputs: [{ name: 'value', type: 'number' }] })
+    const compiled = compileGameplayModuleGraphV1(input, registryOf(producer, legacyReader))
+    expect(compiled.code).not.toContain('currentHp')
+    expect(compiled.code).not.toContain('__gameplayRecordFault')
+    const execute = runInNewContext('(' + compiled.code + ')') as (context: { values: string[] }) => unknown
+    expect(execute({ values: [] })).toEqual(1)
+  })
+
   it('propagates invalid branch conditions through composite outputs', () => {
     const producePiece = descriptor('test.condition-piece', [], [{ name: 'piece', type: 'piece' }], () => ({ expression: "'gone'" }), { pure: true, previewSafe: true }, ['skill'])
     const readPiece = descriptor('test.condition-read', [{ name: 'piece', type: 'piece' }], [{ name: 'value', type: 'number' }], ({ inputs }) => ({ expression: 'context.read(' + inputs.piece + ')' }), { pure: true, previewSafe: true }, ['skill'])
@@ -271,6 +320,15 @@ describe('semantic gameplay module compiler', () => {
     expect(() => compileGameplayModuleGraph(graph('preview', [call('unsafe', 'unsafe.preview'), { kind: 'return', id: 'done' }], { composites: [composite] }), registryOf(effect))).toThrow(/preview/)
   })
 
+  it('honors an explicit preview prohibition even for pure host queries', () => {
+    const hostQuery = descriptor('host.read', [], [], () => 'flow.cards.hand("player-red")', { pure: true, previewSafe: false }, ['skill', 'preview'])
+    const registry = registryOf(hostQuery)
+    expect(() => compileGameplayModuleGraph(graph('skill', [call('read', 'host.read')]), registry)).not.toThrow()
+    expect(() => compileGameplayModuleGraph(graph('preview', [call('read', 'host.read')]), registry)).toThrow(/preview/)
+    const composite = { id: 'nested.read', version, inputs: [], outputs: [], allowedSurfaces: ['preview'] as const, body: [call('read', 'host.read')] }
+    expect(() => compileGameplayModuleGraph(graph('preview', [call('nested', 'nested.read')], { composites: [composite] }), registry)).toThrow(/preview/)
+  })
+
   it('rejects composite cycles, universal port types, and mutable root context lookup', () => {
     const cycle = { id: 'loop', version, inputs: [], outputs: [], body: [call('again', 'loop'), { kind: 'return' as const, id: 'done' }] }
     expect(() => compileGameplayModuleGraph(graph('skill', [call('loop', 'loop')], { composites: [cycle] }), registryOf())).toThrow(/cycle/)
@@ -291,5 +349,11 @@ describe('semantic gameplay module compiler', () => {
     expect(() => compileGameplayModuleGraph(graph('skill', [call('bad', 'bad.inspect')]), registryOf(invalidInspection))).toThrow(/piece or player/)
     const unknownInspection = { ...descriptor('bad.inspect-missing', [], [], () => ({ expression: '0' })), inspectReferences: ['missing'] as const }
     expect(() => compileGameplayModuleGraph(graph('skill', [call('bad', 'bad.inspect-missing')]), registryOf(unknownInspection))).toThrow(/unknown input/)
+    const unknownLiving = { ...descriptor('bad.living-missing', [], [], () => ({ expression: '0' })), livingReferences: ['missing'] as const }
+    expect(() => compileGameplayModuleGraph(graph('skill', [call('bad', 'bad.living-missing')]), registryOf(unknownLiving))).toThrow(/livingReferences names unknown input/)
+    const nonPieceLiving = { ...descriptor('bad.living-player', [{ name: 'player', type: 'player' }], [], () => ({ expression: '0' })), livingReferences: ['player'] as const }
+    expect(() => compileGameplayModuleGraph(graph('skill', [call('bad', 'bad.living-player', { player: { kind: 'literal', value: 'player-id' } })]), registryOf(nonPieceLiving))).toThrow(/livingReferences input .*piece reference/)
+    const conflictingReferences = { ...descriptor('bad.living-conflict', [{ name: 'piece', type: 'piece' }], [], () => ({ expression: '0' })), livingReferences: ['piece'] as const, inspectReferences: ['piece'] as const }
+    expect(() => compileGameplayModuleGraph(graph('skill', [call('bad', 'bad.living-conflict', { piece: { kind: 'literal', value: 'piece-id' } })]), registryOf(conflictingReferences))).toThrow(/both livingReferences and inspectReferences/)
   })
 })

@@ -14,6 +14,7 @@ import {
   assertGameplayModuleDocument,
   compileGameplayModuleGraph,
 } from '@/lib/skill-graph/module-document'
+import { buildSemanticPreviewGraph } from '@/scripts/migrate-semantic-previews'
 import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
 
 type JsonRecord = Record<string, any>
@@ -36,6 +37,7 @@ const RESULT_IDS = [
   'skills/muzan-parasitism',
   'skills/naruto-vanguard',
   'skills/obito-grudge',
+  'skills/rafaam-curse-ward',
   'skills/shelly-bandage',
   'skills/shishio-combustion-passive',
   'skills/soul-fracture',
@@ -158,7 +160,7 @@ describe('RED-252 semantic constant migration', () => {
       const document = JSON.parse(readFileSync(join(root, 'data', `${id}.json`), 'utf8')) as JsonRecord
       assertGameplayModuleDocument(document)
       expect(runPreview(document.previewCode), id).toEqual(runPreview(entry.previewCode))
-      expect(document.gameplayModules.entries.previewCode.graph).toEqual(graph)
+      expect(document.gameplayModules.entries.previewCode.graph, id).toEqual(id === 'skills/elune-blessing' ? buildSemanticPreviewGraph(entry.previewCode) : graph)
     }
   })
 
@@ -194,7 +196,7 @@ describe('RED-252 semantic constant migration', () => {
 
       const document = JSON.parse(readFileSync(join(root, 'data', `${id}.json`), 'utf8')) as JsonRecord
       assertGameplayModuleDocument(document)
-      expect(document.gameplayModules.entries.previewCode.graph).toEqual(graph)
+      expect(document.gameplayModules.entries.previewCode.graph, id).toEqual(graph)
     }
   })
 

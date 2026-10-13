@@ -1,6 +1,71 @@
-import type { GameplayModuleDescriptor, GameplayNativeLoweringContext } from './module-types'
+import type { GameplayModuleDescriptor, GameplayNativeLoweringContext, GameplayRecordSchema, GameplayValueType } from './module-types'
+import { authorValueSchemas } from '../game/author-extension'
 const flow = (ctx: GameplayNativeLoweringContext) => ctx.surface === 'pending' ? 'ctx.flow' : 'flow'
+const valueType = (ctx: GameplayNativeLoweringContext): { type: string; schemas: string } => {
+  const raw = ctx.parameters.valueType
+  if (typeof raw !== 'string') throw new Error(`module ${ctx.moduleId}: valueType is required`)
+  const type = raw.trimStart().startsWith('{') ? JSON.parse(raw) as GameplayValueType : raw as GameplayValueType
+  const schemas = authorValueSchemas(type, (ctx.recordSchemas ?? []) as readonly GameplayRecordSchema[])
+  return { type: JSON.stringify(type), schemas: JSON.stringify(schemas) }
+}
+const activeSurfaces = ['skill', 'card', 'rule', 'triggerSkill', 'pending'] as const
+const localParameters = [{ name: 'valueType', type: 'string' as const, label: '值类型', default: 'number' }]
+export const NAMED_LOCAL_GAMEPLAY_MODULE: GameplayModuleDescriptor = {
+  id: 'local.declare', version: '2', label: '新建变量',
+  description: '新建指定类型的局部变量；表达式直接引用变量名，赋值后读取最新值。',
+  allowedSurfaces: activeSurfaces, inputs: [{ name: 'initial', type: 'record', label: '初始值', optional: true }],
+  outputs: [{ name: 'handle', type: 'record', label: '变量' }],
+  inputValueTypeBindings: { initial: { parameter: 'valueType' } },
+  parameters: [...localParameters, { name: 'name', type: 'string', label: '变量名', default: 'value' }],
+  effects: { pure: false, previewSafe: false, writes: ['execution-context'] },
+  lower: ctx => {
+    if (typeof ctx.parameters.name !== 'string' || !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(ctx.parameters.name)) throw new Error('变量名须以文字或下划线开头')
+    const selected = valueType(ctx)
+    return `${flow(ctx)}.execution.declare(${selected.type},${selected.schemas}${ctx.inputs.initial === undefined ? '' : ',' + ctx.inputs.initial})`
+  }, ui: { category: 'flow', authoring: 'standard' },
+}
 export const EXECUTION_LOCAL_GAMEPLAY_MODULES: readonly GameplayModuleDescriptor[] = [
+  NAMED_LOCAL_GAMEPLAY_MODULE,
+  {
+    id: 'local.declare', version: '1', label: '声明本次执行局部变量',
+    description: '创建只属于当前图执行的类型化局部变量；句柄不能伪造、保存或跨执行复用。',
+    allowedSurfaces: activeSurfaces, inputs: [{ name: 'initial', type: 'record', optional: true }],
+    outputs: [{ name: 'handle', type: 'record' }, { name: 'success', type: 'boolean' }],
+    inputValueTypeBindings: { initial: { parameter: 'valueType' } }, parameters: localParameters,
+    effects: { pure: false, previewSafe: false, writes: ['execution-context'] },
+    lower: ctx => {
+      const selected = valueType(ctx)
+      const initial = ctx.inputs.initial === undefined ? '' : `,${ctx.inputs.initial}`
+      return `(${flow(ctx)}.execution.declare(${selected.type},${selected.schemas}${initial}))`
+    },
+    ui: { category: 'flow', authoring: 'standard' },
+  },
+  {
+    id: 'local.read', version: '1', label: '读取本次执行局部变量',
+    description: '按声明时的封闭类型读取当前执行局部变量，并返回实际读取成功标记。',
+    allowedSurfaces: activeSurfaces, inputs: [{ name: 'handle', type: 'record' }],
+    outputs: [{ name: 'value', type: 'record' }, { name: 'success', type: 'boolean' }],
+    outputValueTypeBindings: { value: { parameter: 'valueType' } }, parameters: localParameters,
+    effects: { pure: true, previewSafe: false, reads: ['execution-context'] },
+    lower: ctx => {
+      const selected = valueType(ctx)
+      return `(${flow(ctx)}.execution.read(${ctx.inputs.handle},${selected.type},${selected.schemas}))`
+    },
+    ui: { category: 'flow', authoring: 'standard' },
+  },
+  {
+    id: 'local.write', version: '1', label: '写入本次执行局部变量',
+    description: '按声明时的封闭类型更新当前执行局部变量；验证失败时保留旧值。',
+    allowedSurfaces: activeSurfaces, inputs: [{ name: 'handle', type: 'record' }, { name: 'value', type: 'record' }],
+    outputs: [{ name: 'success', type: 'boolean' }],
+    inputValueTypeBindings: { value: { parameter: 'valueType' } }, parameters: localParameters,
+    effects: { pure: false, previewSafe: false, writes: ['execution-context'] },
+    lower: ctx => {
+      const selected = valueType(ctx)
+      return `(${flow(ctx)}.execution.write(${ctx.inputs.handle},${selected.type},${selected.schemas},${ctx.inputs.value}))`
+    },
+    ui: { category: 'flow', authoring: 'standard' },
+  },
   {
     id: 'source.captured-no-kill-charge', version: '1', label: '读取来源击杀充能豁免',
     allowedSurfaces: ['skill', 'card', 'rule', 'triggerSkill', 'pending'], inputs: [{ name: 'source', type: 'record' }], outputs: [{ name: 'value', type: 'boolean' }],

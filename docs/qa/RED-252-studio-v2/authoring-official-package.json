@@ -1,0 +1,52 @@
+{
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-candidate-04Y5hO\\rvb-content-0ddb57cf",
+  "source": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-candidate-04Y5hO\\rvb-content-0ddb57cf\\sources\\current-workspace",
+  "archive": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-candidate-04Y5hO\\red252-authoring-candidate.rvbpack",
+  "counts": {
+    "data": 783,
+    "pve": 19,
+    "images": 56
+  },
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "published": false,
+  "previousAttempt": {
+    "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-candidate-JTdgUO\\rvb-content-878de469",
+    "archive": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-candidate-JTdgUO\\red252-authoring-candidate.rvbpack",
+    "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+    "published": false,
+    "buildExitCode": 3,
+    "buildOutput": "",
+    "buildError": "[RVB content] REFUSED build\n[RVB content] PACK_PATH_INVALID: Unsupported payload path: data/pages/adventure.html\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T041210878Z-build-49728-89d5f018-22f9-4c8e-9d50-dd825f98cdaf\\report.json\n"
+  },
+  "buildExitCode": 0,
+  "buildOutput": "[RVB content] PASS build\n[RVB content] packageHash=dfdd72c74396e6b4ca2dcbfa48b77bbace9658a9a99e2d2aedf8a7725588240e\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T041703027Z-build-7192-c6ce3121-64d6-48f4-99cc-9412593009e8\\report.json\n",
+  "buildError": "",
+  "previousChannelAttempt": {
+    "exitCode": 3,
+    "error": "[RVB content] REFUSED build\n[RVB content] PACK_FORBIDDEN_EXECUTABLE_CONTENT: [content-pipeline:content] PACK_FORBIDDEN_EXECUTABLE_CONTENT pack=\"red252-authoring-candidate\" path=\"data/cards/armor-attack-defense.json\"\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T041449065Z-build-76776-566ac7d6-8f32-470f-b1c9-830107a5cff5\\report.json\n"
+  },
+  "channel": "authoring",
+  "validate": {
+    "exitCode": 0,
+    "stdout": "[RVB content] PASS validate\n[RVB content] packageHash=dfdd72c74396e6b4ca2dcbfa48b77bbace9658a9a99e2d2aedf8a7725588240e\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T041735016Z-validate-24536-b12870aa-c4e2-46a6-a9c1-0a19c47b821f\\report.json\n",
+    "stderr": ""
+  },
+  "smoke": {
+    "exitCode": 3,
+    "stdout": "",
+    "stderr": "[RVB content] REFUSED smoke\n[RVB content] AUTHORING_PREVIEW_ONLY: Authoring packages are for editing only; sign and explicitly trust the publisher before runtime testing.\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T041736282Z-smoke-90564-99030470-efa9-4e77-8ddc-aa469972b4d8\\report.json\n"
+  },
+  "archiveInspection": {
+    "webShellIconPresent": false,
+    "documents": 293,
+    "sourceMismatches": [],
+    "compiledDocumentValidation": "pass",
+    "archiveFiles": 548,
+    "semanticEntries": 381
+  },
+  "runtimeArchiveSmoke": {
+    "status": "not-run-policy-refused",
+    "reason": "AUTHORING_PREVIEW_ONLY",
+    "note": "Authoring channel packages are intentionally edit-only. No security policy relaxed, credentials created, signing or publishing performed."
+  }
+}

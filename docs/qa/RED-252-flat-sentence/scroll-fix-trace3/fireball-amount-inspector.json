@@ -1,0 +1,10 @@
+{
+  "editor": "damage",
+  "slot": "input:amount",
+  "moduleSelect": false,
+  "inputs": [
+    "amount"
+  ],
+  "parameters": [],
+  "editorOutside": 0
+}

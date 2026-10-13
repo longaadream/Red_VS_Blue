@@ -804,4 +804,24 @@ describe('RED-252 generated card content graphs', () => {
       root: process.cwd(),
     })).toThrow('recognized frozen')
   })
+
+  it('preserves a valid semantic rule document while retaining generated-family discovery', () => {
+    const semantic = JSON.parse(readFileSync('data/rules/rule-rafaam-curse-ward.json', 'utf8')) as JsonRecord
+    const change = buildGeneratedContentMigration('rules/rule-rafaam-curse-ward', {
+      legacy: fixture.entries['rules/rule-rafaam-curse-ward'],
+      current: semantic,
+      root: process.cwd(),
+    })
+    expect(change.document).toEqual(semantic)
+    expect(change.families).toHaveLength(1)
+    expect(change.families[0].generatedIds).toEqual([])
+
+    const tampered = cloneJson(semantic)
+    tampered.skillCode += '\n// authored executable edit'
+    expect(() => buildGeneratedContentMigration('rules/rule-rafaam-curse-ward', {
+      legacy: fixture.entries['rules/rule-rafaam-curse-ward'],
+      current: tampered,
+      root: process.cwd(),
+    })).toThrow('generated skillCode does not match its module graph')
+  })
 })

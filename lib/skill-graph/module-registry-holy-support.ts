@@ -19,6 +19,23 @@ const runtime = (ctx: GameplayNativeLoweringContext): string => ctx.surface === 
  */
 export const HOLY_SUPPORT_GAMEPLAY_MODULES: readonly GameplayModuleDescriptor[] = Object.freeze([
   {
+    id: 'status.replace-related-rules', version: '1', label: '替换状态关联规则',
+    description: '替换首个匹配状态的关联规则列表；规则的安装和移除由独立模块处理。',
+    inputs: [port('piece', 'piece'), port('rules', { kind: 'list', element: 'string' })],
+    outputs: [port('changed', 'boolean')], parameters: [parameter('statusId', 'string'), parameter('statusType', 'string')],
+    allowedSurfaces: ACTIVE, effects: { pure: false, previewSafe: false, reads: ['statuses'], writes: ['statuses'] },
+    lower: ctx => `(function(pieceId, rules) { var piece = ${runtime(ctx)}.query.piece(pieceId); var status = (piece.statusTags || []).find(function(tag) { return tag.id === ${ctx.emitLiteral(ctx.parameters.statusId)} && tag.type === ${ctx.emitLiteral(ctx.parameters.statusType)}; }); if (!status) return false; status.relatedRules = rules.slice(); return true; })(${ctx.inputs.piece}, ${ctx.inputs.rules})`,
+    ui: { category: 'status' },
+  },
+  {
+    id: 'value.coalesce-record', version: '1', label: '选取首个有效记录',
+    inputs: [port('first', 'record', { nullable: true }), port('fallback', 'record', { nullable: true })],
+    outputs: [port('value', 'record', { nullable: true })], allowedSurfaces: ACTIVE,
+    effects: { pure: true, previewSafe: false },
+    lower: ctx => `(${ctx.inputs.first} == null ? ${ctx.inputs.fallback} : ${ctx.inputs.first})`,
+    ui: { category: 'value' },
+  },
+  {
     id: 'piece.matches-template',
     version: '1',
     label: '棋子模板匹配',

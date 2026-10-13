@@ -5,7 +5,7 @@
   "trigger": {
     "type": "beforeMove"
   },
-  "skillCode": "var __gameplayInvalid = {}; var _module0 = (flow.refs.holder()); var _module1 = ((context.piece ? context.piece.instanceId : null)); var _composite2 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _composite2 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { _done3: { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined)) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } var _condition20 = ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"exists\")) ? _module4[\"exists\"] : _module4); if (_condition20 !== __gameplayInvalid && _condition20) { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module5 = __gameplayInvalid; } else { var _module5 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined)) { _module6 = __gameplayInvalid; } else { var _module6 = (flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))); } var _condition19 = ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"exists\")) ? _module6[\"exists\"] : _module6); if (_condition19 !== __gameplayInvalid && _condition19) { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module7 = __gameplayInvalid; } else { var _module7 = (flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)) ? flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).instanceId : null); } if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))); } var _condition18 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); if (_condition18 !== __gameplayInvalid && _condition18) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module9 = __gameplayInvalid; } else { var _module9 = (flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))[\"currentHp\"]); } if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module10 = __gameplayInvalid; } else { var _module10 = ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) > 0)); } var _condition17 = ((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"value\")) ? _module10[\"value\"] : _module10); if (_condition17 !== __gameplayInvalid && _condition17) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module11 = __gameplayInvalid; } else { var _module11 = (((flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)).statusTags || []).some(function(tag) { return tag.type === \"sage-mode\"; }))); } var _condition16 = ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11); if (_condition16 !== __gameplayInvalid && _condition16) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module12 = __gameplayInvalid; } else { var _module12 = (String(flow.query.piece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))[\"name\"])); } if ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) === null) || (\"正在打坐，无法移动\" === __gameplayInvalid) || (\"正在打坐，无法移动\" === undefined) || (\"正在打坐，无法移动\" === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"text\")) ? _module12[\"text\"] : _module12) + \"正在打坐，无法移动\")); } if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13) === null)) { _module14 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module14 = (({success: true, blocked: true, message: ((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"text\")) ? _module13[\"text\"] : _module13)})); } if (!(((_module14[\"success\"]) === __gameplayInvalid) || ((_module14[\"blocked\"]) === __gameplayInvalid) || ((_module14[\"message\"]) === __gameplayInvalid))) { _composite2 = { \"success\": (_module14[\"success\"]), \"blocked\": (_module14[\"blocked\"]), \"message\": (_module14[\"message\"]) }; break _done3; } } else if (_condition16 !== __gameplayInvalid) { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module15 = __gameplayInvalid; } else { var _module15 = (flow.rules.remove(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5), \"rule-naruto-sage-immobile\", \"piece\")); } if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { _composite2 = { \"success\": false, \"blocked\": __gameplayInvalid, \"message\": \"\" }; break _done3; } } } else if (_condition17 !== __gameplayInvalid) { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { _composite2 = { \"success\": false, \"blocked\": __gameplayInvalid, \"message\": \"\" }; break _done3; } } } else if (_condition18 !== __gameplayInvalid) { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { _composite2 = { \"success\": false, \"blocked\": __gameplayInvalid, \"message\": \"\" }; break _done3; } } } else if (_condition19 !== __gameplayInvalid) { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { _composite2 = { \"success\": false, \"blocked\": __gameplayInvalid, \"message\": \"\" }; break _done3; } } } else if (_condition20 !== __gameplayInvalid) { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { _composite2 = { \"success\": false, \"blocked\": __gameplayInvalid, \"message\": \"\" }; break _done3; } } } } var _condition21 = (_composite2[\"blocked\"]); if (_condition21 !== __gameplayInvalid && _condition21) { if (!(((_composite2[\"success\"]) === __gameplayInvalid) || ((_composite2[\"blocked\"]) === __gameplayInvalid) || ((_composite2[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite2[\"success\"]), \"blocked\": (_composite2[\"blocked\"]), \"message\": (_composite2[\"message\"]) }; } } else if (_condition21 !== __gameplayInvalid) { if (!(((_composite2[\"success\"]) === __gameplayInvalid) || ((_composite2[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_composite2[\"success\"]), \"message\": (_composite2[\"message\"]) }; } }",
+  "skillCode": "var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { var _module1 = ((context.piece ? context.piece.instanceId : null)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"subject-ref\", __gameplayError, \"ref.event-piece\"); _module1 = __gameplayInvalid; } try { var _module2 = ((flow.execution.declare({\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}]))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--result-handle\", __gameplayError, \"local.declare\"); _module2 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module3 = __gameplayInvalid; } else { var _module3 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--holder\", __gameplayError, \"query.piece\"); _module3 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)) ? flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--subject\", __gameplayError, \"query.piece\"); _module4 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === null)) { _module5 = __gameplayInvalid; } else { var _module5 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--same-holder\", __gameplayError, \"compare.values\"); _module5 = __gameplayInvalid; } try { var _condition36 = ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5); if (_condition36 !== __gameplayInvalid && _condition36) { try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module6 = __gameplayInvalid; } else { var _module6 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))[\"currentHp\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--current-hp\", __gameplayError, \"piece.field\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--alive\", __gameplayError, \"compare.greater-than\"); _module7 = __gameplayInvalid; } try { var _condition33 = ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7); if (_condition33 !== __gameplayInvalid && _condition33) { try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module8 = __gameplayInvalid; } else { var _module8 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status--statusTags\", __gameplayError, \"piece.field\"); _module8 = __gameplayInvalid; } var _loopRoot19 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection9 = __gameplayInvalid; var _items10 = ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8); var _capture15 = \"sage-mode\"; if (Array.isArray(_items10) && _capture15 !== __gameplayInvalid && _capture15 !== undefined) { if (_items10.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues18 = [];  for (var _index11 = 0; _index11 < _items10.length; _index11 += 1) { __gameplayConsumeIteration(); var _item12 = _items10[_index11]; var _collectionResult13 = __gameplayInvalid; _collectionDone14: { try { if ((_item12 === __gameplayInvalid) || (_item12 === undefined) || (_item12 === null)) { _module16 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module16 = ((function(record){var result=({value:((function(record){if(record===__gameplayInvalid||record===null||typeof record!==\"object\")return __gameplayInvalid;var value=record[\"type\"];return value===undefined||value===null?null:(typeof value===\"string\"?value:__gameplayInvalid);})(record))});result.exists=record[\"type\"]!==undefined&&record[\"type\"]!==null;return result;})(_item12)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status--field\", __gameplayError, \"data.field\"); _module16 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module16[\"value\"]) === __gameplayInvalid) || ((_module16[\"value\"]) === undefined) || (_capture15 === __gameplayInvalid) || (_capture15 === undefined)) { _module17 = __gameplayInvalid; } else { var _module17 = (((_module16[\"value\"]) === _capture15)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status--matches\", __gameplayError, \"compare.values\"); _module17 = __gameplayInvalid; } try { if (!((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid))) { _collectionResult13 = { \"value\": ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) }; break _collectionDone14; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status--filter-return\", __gameplayError); } } if (_collectionResult13 !== __gameplayInvalid && _collectionResult13 != null && _collectionResult13[\"value\"]) { _collectionValues18.push(_item12); } } var _collection9 = _collectionValues18; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot19) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"guard--has-status--filtered\", new Error(\"gameplay shared iteration budget exceeded\")); _collection9 = __gameplayInvalid; } else { __gameplayRecordFault(\"guard--has-status--filtered\", __gameplayError); _collection9 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection9 === __gameplayInvalid) || (_collection9 === undefined) || (_collection9 === null)) { _module20 = __gameplayInvalid; } else { var _module20 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection9)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status--count\", __gameplayError, \"collection.length\"); _module20 = __gameplayInvalid; } try { if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module21 = __gameplayInvalid; } else { var _module21 = ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--has-status\", __gameplayError, \"compare.greater-than\"); _module21 = __gameplayInvalid; } try { var _condition30 = ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21); if (_condition30 !== __gameplayInvalid && _condition30) { try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module22 = __gameplayInvalid; } else { var _module22 = ({value:(flow.query.pieceText(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--holder-name\", __gameplayError, \"piece.field\"); _module22 = __gameplayInvalid; } try { if ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === null) || (\"正在打坐，无法移动\" === __gameplayInvalid) || (\"正在打坐，无法移动\" === undefined) || (\"正在打坐，无法移动\" === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) + \"正在打坐，无法移动\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--message\", __gameplayError, \"text.concat\"); _module23 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23) === null)) { _module24 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module24 = (({success: true, blocked: true, message: ((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"text\")) ? _module23[\"text\"] : _module23)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--block\", __gameplayError, \"event.block\"); _module24 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { var _record25 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"success\"] = __gameplayRecordValue0; if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"blocked\"] = __gameplayRecordValue1; } __gameplayRecord[\"message\"] = __gameplayRecordValue2; return __gameplayRecord; })((_module24[\"success\"]), (_module24[\"blocked\"]), (_module24[\"message\"]))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-blocked-record\", __gameplayError); _record25 = __gameplayInvalid; } try { if (((_module2[\"handle\"]) === __gameplayInvalid) || ((_module2[\"handle\"]) === undefined) || ((_module2[\"handle\"]) === null) || (_record25 === __gameplayInvalid) || (_record25 === undefined) || (_record25 === null)) { _module26 = __gameplayInvalid; } else { var _module26 = ((flow.execution.write((_module2[\"handle\"]),{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}],_record25))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-blocked-write\", __gameplayError, \"local.write\"); _module26 = __gameplayInvalid; } } else if (_condition30 !== __gameplayInvalid) { try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3)))) { _module27 = __gameplayInvalid; } else { var _module27 = (flow.rules.remove(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"piece\")) ? _module3[\"piece\"] : _module3), \"rule-naruto-sage-immobile\", \"piece\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--remove-rule\", __gameplayError, \"rule.remove-piece\"); _module27 = __gameplayInvalid; } try { var _record28 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"success\"] = __gameplayRecordValue0; if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"blocked\"] = __gameplayRecordValue1; } __gameplayRecord[\"message\"] = __gameplayRecordValue2; return __gameplayRecord; })(false, false, \"\")); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-inactive-record\", __gameplayError); _record28 = __gameplayInvalid; } try { if (((_module2[\"handle\"]) === __gameplayInvalid) || ((_module2[\"handle\"]) === undefined) || ((_module2[\"handle\"]) === null) || (_record28 === __gameplayInvalid) || (_record28 === undefined) || (_record28 === null)) { _module29 = __gameplayInvalid; } else { var _module29 = ((flow.execution.write((_module2[\"handle\"]),{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}],_record28))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-inactive-write\", __gameplayError, \"local.write\"); _module29 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--status-guard\", __gameplayError); _condition30 = __gameplayInvalid; } } else if (_condition33 !== __gameplayInvalid) { try { var _record31 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"success\"] = __gameplayRecordValue0; if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"blocked\"] = __gameplayRecordValue1; } __gameplayRecord[\"message\"] = __gameplayRecordValue2; return __gameplayRecord; })(false, false, \"\")); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-dead-record\", __gameplayError); _record31 = __gameplayInvalid; } try { if (((_module2[\"handle\"]) === __gameplayInvalid) || ((_module2[\"handle\"]) === undefined) || ((_module2[\"handle\"]) === null) || (_record31 === __gameplayInvalid) || (_record31 === undefined) || (_record31 === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((flow.execution.write((_module2[\"handle\"]),{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}],_record31))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-dead-write\", __gameplayError, \"local.write\"); _module32 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--alive-guard\", __gameplayError); _condition33 = __gameplayInvalid; } } else if (_condition36 !== __gameplayInvalid) { try { var _record34 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"success\"] = __gameplayRecordValue0; if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"blocked\"] = __gameplayRecordValue1; } __gameplayRecord[\"message\"] = __gameplayRecordValue2; return __gameplayRecord; })(false, false, \"\")); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-wrong-subject-record\", __gameplayError); _record34 = __gameplayInvalid; } try { if (((_module2[\"handle\"]) === __gameplayInvalid) || ((_module2[\"handle\"]) === undefined) || ((_module2[\"handle\"]) === null) || (_record34 === __gameplayInvalid) || (_record34 === undefined) || (_record34 === null)) { _module35 = __gameplayInvalid; } else { var _module35 = ((flow.execution.write((_module2[\"handle\"]),{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}],_record34))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--guard--return-wrong-subject-write\", __gameplayError, \"local.write\"); _module35 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--subject-identity-guard\", __gameplayError); _condition36 = __gameplayInvalid; } try { if (((_module2[\"handle\"]) === __gameplayInvalid) || ((_module2[\"handle\"]) === undefined) || ((_module2[\"handle\"]) === null)) { _module37 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module37 = ((flow.execution.read((_module2[\"handle\"]),{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"},[{\"id\":\"atomic-inline-guard\",\"version\":\"1\",\"fields\":[{\"name\":\"success\",\"type\":\"boolean\"},{\"name\":\"blocked\",\"type\":\"boolean\",\"optional\":true},{\"name\":\"message\",\"type\":\"string\"}]}]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--result-read\", __gameplayError, \"local.read\"); _module37 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module37[\"value\"]) === __gameplayInvalid) || ((_module37[\"value\"]) === undefined)) { _module38 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module38 = ((function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!==\"object\")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,\"constructor\");if(!constructor||!hasOwn.call(constructor,\"value\")||typeof constructor.value!==\"function\")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,\"name\");return !!name&&hasOwn.call(name,\"value\")&&name.value===\"Object\";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,\"value\"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,\"value\")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind===\"string\"||kind===\"boolean\")return true;if(kind===\"number\")return Number.isFinite(value);if(kind!==\"object\")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!==\"string\"){arrayValid=false;break;}if(arrayKey===\"length\"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name===\"__proto__\"||name===\"prototype\"||name===\"constructor\"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected===\"object\"){if(expected.kind===\"nullable\")return value===null||valid(value,expected.value,depth);if(expected.kind===\"list\"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!==\"string\"){listValid=false;break;}if(listKey===\"length\")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind===\"record\")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected===\"string\"||expected===\"piece\"||expected===\"player\")return typeof value===\"string\";if(expected===\"number\")return typeof value===\"number\"&&Number.isFinite(value);if(expected===\"boolean\")return typeof value===\"boolean\";if(expected===\"cell\"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,\"x\"),yDescriptor=Object.getOwnPropertyDescriptor(value,\"y\");return !!xDescriptor&&hasOwn.call(xDescriptor,\"value\")&&!!yDescriptor&&hasOwn.call(yDescriptor,\"value\")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected===\"choice\")return plain(value)&&validRecord(value,depth);if(expected===\"record\")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!==\"object\")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,\"value\"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,\"value\"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})((_module37[\"value\"]),\"success\",\"boolean\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--result-success\", __gameplayError, \"data.read-key\"); _module38 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module37[\"value\"]) === __gameplayInvalid) || ((_module37[\"value\"]) === undefined)) { _module39 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module39 = ((function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!==\"object\")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,\"constructor\");if(!constructor||!hasOwn.call(constructor,\"value\")||typeof constructor.value!==\"function\")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,\"name\");return !!name&&hasOwn.call(name,\"value\")&&name.value===\"Object\";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,\"value\"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,\"value\")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind===\"string\"||kind===\"boolean\")return true;if(kind===\"number\")return Number.isFinite(value);if(kind!==\"object\")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!==\"string\"){arrayValid=false;break;}if(arrayKey===\"length\"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name===\"__proto__\"||name===\"prototype\"||name===\"constructor\"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected===\"object\"){if(expected.kind===\"nullable\")return value===null||valid(value,expected.value,depth);if(expected.kind===\"list\"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!==\"string\"){listValid=false;break;}if(listKey===\"length\")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind===\"record\")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected===\"string\"||expected===\"piece\"||expected===\"player\")return typeof value===\"string\";if(expected===\"number\")return typeof value===\"number\"&&Number.isFinite(value);if(expected===\"boolean\")return typeof value===\"boolean\";if(expected===\"cell\"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,\"x\"),yDescriptor=Object.getOwnPropertyDescriptor(value,\"y\");return !!xDescriptor&&hasOwn.call(xDescriptor,\"value\")&&!!yDescriptor&&hasOwn.call(yDescriptor,\"value\")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected===\"choice\")return plain(value)&&validRecord(value,depth);if(expected===\"record\")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!==\"object\")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,\"value\"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,\"value\"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})((_module37[\"value\"]),\"blocked\",\"boolean\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--result-blocked\", __gameplayError, \"data.read-key\"); _module39 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module37[\"value\"]) === __gameplayInvalid) || ((_module37[\"value\"]) === undefined)) { _module40 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module40 = ((function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!==\"object\")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,\"constructor\");if(!constructor||!hasOwn.call(constructor,\"value\")||typeof constructor.value!==\"function\")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,\"name\");return !!name&&hasOwn.call(name,\"value\")&&name.value===\"Object\";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,\"value\"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,\"value\")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind===\"string\"||kind===\"boolean\")return true;if(kind===\"number\")return Number.isFinite(value);if(kind!==\"object\")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!==\"string\"){arrayValid=false;break;}if(arrayKey===\"length\"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name===\"__proto__\"||name===\"prototype\"||name===\"constructor\"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected===\"object\"){if(expected.kind===\"nullable\")return value===null||valid(value,expected.value,depth);if(expected.kind===\"list\"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,\"value\")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!==\"string\"){listValid=false;break;}if(listKey===\"length\")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind===\"record\")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected===\"string\"||expected===\"piece\"||expected===\"player\")return typeof value===\"string\";if(expected===\"number\")return typeof value===\"number\"&&Number.isFinite(value);if(expected===\"boolean\")return typeof value===\"boolean\";if(expected===\"cell\"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,\"x\"),yDescriptor=Object.getOwnPropertyDescriptor(value,\"y\");return !!xDescriptor&&hasOwn.call(xDescriptor,\"value\")&&!!yDescriptor&&hasOwn.call(yDescriptor,\"value\")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected===\"choice\")return plain(value)&&validRecord(value,depth);if(expected===\"record\")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!==\"object\")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,\"length\");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,\"value\"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,\"value\"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,\"value\"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})((_module37[\"value\"]),\"message\",\"string\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard--result-message\", __gameplayError, \"data.read-key\"); _module40 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { var _condition41 = (_module39[\"value\"]); if (_condition41 !== __gameplayInvalid && _condition41) { try { if (!(((_module38[\"value\"]) === __gameplayInvalid) || ((_module39[\"value\"]) === __gameplayInvalid) || ((_module40[\"value\"]) === __gameplayInvalid))) { return { \"success\": (_module38[\"value\"]), \"blocked\": (_module39[\"value\"]), \"message\": (_module40[\"value\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return-blocked\", __gameplayError); } } else if (_condition41 !== __gameplayInvalid) { try { if (!(((_module38[\"value\"]) === __gameplayInvalid) || ((_module40[\"value\"]) === __gameplayInvalid))) { return { \"success\": (_module38[\"value\"]), \"message\": (_module40[\"value\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return-unblocked\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"result-shape\", __gameplayError); _condition41 = __gameplayInvalid; }",
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",
     "entries": {
@@ -28,391 +28,7 @@
               "type": "string"
             }
           ],
-          "composites": [
-            {
-              "id": "shared.status-event-guard",
-              "version": "1",
-              "label": "状态事件拦截守卫",
-              "description": "验证持有者和事件主体，检查状态并阻挡事件；状态失效时移除关联规则。",
-              "inputs": [
-                {
-                  "name": "holder",
-                  "type": "piece",
-                  "nullable": true
-                },
-                {
-                  "name": "subject",
-                  "type": "piece",
-                  "nullable": true
-                }
-              ],
-              "outputs": [
-                {
-                  "name": "success",
-                  "type": "boolean"
-                },
-                {
-                  "name": "blocked",
-                  "type": "boolean",
-                  "optional": true
-                },
-                {
-                  "name": "message",
-                  "type": "string"
-                }
-              ],
-              "allowedSurfaces": [
-                "skill",
-                "card",
-                "rule",
-                "triggerSkill",
-                "pending"
-              ],
-              "body": [
-                {
-                  "kind": "call",
-                  "id": "holder-exists",
-                  "module": "query.has-piece",
-                  "version": "1",
-                  "inputs": {
-                    "pieceId": {
-                      "kind": "input",
-                      "name": "holder"
-                    }
-                  },
-                  "parameters": {}
-                },
-                {
-                  "kind": "if",
-                  "id": "holder-guard",
-                  "condition": {
-                    "kind": "output",
-                    "node": "holder-exists",
-                    "port": "exists"
-                  },
-                  "then": [
-                    {
-                      "kind": "call",
-                      "id": "holder",
-                      "module": "query.piece",
-                      "version": "1",
-                      "inputs": {
-                        "pieceId": {
-                          "kind": "input",
-                          "name": "holder"
-                        }
-                      },
-                      "parameters": {}
-                    },
-                    {
-                      "kind": "call",
-                      "id": "subject-exists",
-                      "module": "query.has-piece",
-                      "version": "1",
-                      "inputs": {
-                        "pieceId": {
-                          "kind": "input",
-                          "name": "subject"
-                        }
-                      },
-                      "parameters": {}
-                    },
-                    {
-                      "kind": "if",
-                      "id": "subject-exists-guard",
-                      "condition": {
-                        "kind": "output",
-                        "node": "subject-exists",
-                        "port": "exists"
-                      },
-                      "then": [
-                        {
-                          "kind": "call",
-                          "id": "subject",
-                          "module": "query.piece",
-                          "version": "1",
-                          "inputs": {
-                            "pieceId": {
-                              "kind": "input",
-                              "name": "subject"
-                            }
-                          },
-                          "parameters": {}
-                        },
-                        {
-                          "kind": "call",
-                          "id": "same-holder",
-                          "module": "compare.equal-piece",
-                          "version": "1",
-                          "inputs": {
-                            "left": {
-                              "kind": "output",
-                              "node": "holder",
-                              "port": "piece"
-                            },
-                            "right": {
-                              "kind": "output",
-                              "node": "subject",
-                              "port": "piece"
-                            }
-                          },
-                          "parameters": {}
-                        },
-                        {
-                          "kind": "if",
-                          "id": "subject-identity-guard",
-                          "condition": {
-                            "kind": "output",
-                            "node": "same-holder",
-                            "port": "value"
-                          },
-                          "then": [
-                            {
-                              "kind": "call",
-                              "id": "current-hp",
-                              "module": "attribute.read",
-                              "version": "1",
-                              "inputs": {
-                                "piece": {
-                                  "kind": "output",
-                                  "node": "holder",
-                                  "port": "piece"
-                                }
-                              },
-                              "parameters": {
-                                "attribute": "currentHp"
-                              }
-                            },
-                            {
-                              "kind": "call",
-                              "id": "alive",
-                              "module": "compare.greater-than",
-                              "version": "1",
-                              "inputs": {
-                                "left": {
-                                  "kind": "output",
-                                  "node": "current-hp",
-                                  "port": "value"
-                                },
-                                "right": {
-                                  "kind": "literal",
-                                  "value": 0
-                                }
-                              },
-                              "parameters": {}
-                            },
-                            {
-                              "kind": "if",
-                              "id": "alive-guard",
-                              "condition": {
-                                "kind": "output",
-                                "node": "alive",
-                                "port": "value"
-                              },
-                              "then": [
-                                {
-                                  "kind": "call",
-                                  "id": "has-status",
-                                  "module": "status.has-piece",
-                                  "version": "1",
-                                  "inputs": {
-                                    "piece": {
-                                      "kind": "output",
-                                      "node": "holder",
-                                      "port": "piece"
-                                    }
-                                  },
-                                  "parameters": {
-                                    "statusType": "sage-mode"
-                                  }
-                                },
-                                {
-                                  "kind": "if",
-                                  "id": "status-guard",
-                                  "condition": {
-                                    "kind": "output",
-                                    "node": "has-status",
-                                    "port": "value"
-                                  },
-                                  "then": [
-                                    {
-                                      "kind": "call",
-                                      "id": "holder-name",
-                                      "module": "attribute.text",
-                                      "version": "1",
-                                      "inputs": {
-                                        "piece": {
-                                          "kind": "output",
-                                          "node": "holder",
-                                          "port": "piece"
-                                        }
-                                      },
-                                      "parameters": {
-                                        "attribute": "name"
-                                      }
-                                    },
-                                    {
-                                      "kind": "call",
-                                      "id": "message",
-                                      "module": "text.concat",
-                                      "version": "1",
-                                      "inputs": {
-                                        "left": {
-                                          "kind": "output",
-                                          "node": "holder-name",
-                                          "port": "text"
-                                        },
-                                        "right": {
-                                          "kind": "literal",
-                                          "value": "正在打坐，无法移动"
-                                        }
-                                      },
-                                      "parameters": {}
-                                    },
-                                    {
-                                      "kind": "call",
-                                      "id": "block",
-                                      "module": "event.block",
-                                      "version": "1",
-                                      "inputs": {
-                                        "message": {
-                                          "kind": "output",
-                                          "node": "message",
-                                          "port": "text"
-                                        }
-                                      },
-                                      "parameters": {}
-                                    },
-                                    {
-                                      "kind": "return",
-                                      "id": "return-blocked",
-                                      "values": {
-                                        "success": {
-                                          "kind": "output",
-                                          "node": "block",
-                                          "port": "success"
-                                        },
-                                        "blocked": {
-                                          "kind": "output",
-                                          "node": "block",
-                                          "port": "blocked"
-                                        },
-                                        "message": {
-                                          "kind": "output",
-                                          "node": "block",
-                                          "port": "message"
-                                        }
-                                      }
-                                    }
-                                  ],
-                                  "else": [
-                                    {
-                                      "kind": "call",
-                                      "id": "remove-rule",
-                                      "module": "rule.remove-piece",
-                                      "version": "1",
-                                      "inputs": {
-                                        "target": {
-                                          "kind": "output",
-                                          "node": "holder",
-                                          "port": "piece"
-                                        }
-                                      },
-                                      "parameters": {
-                                        "ruleId": "rule-naruto-sage-immobile"
-                                      }
-                                    },
-                                    {
-                                      "kind": "return",
-                                      "id": "return-inactive",
-                                      "values": {
-                                        "success": {
-                                          "kind": "literal",
-                                          "value": false
-                                        },
-                                        "message": {
-                                          "kind": "literal",
-                                          "value": ""
-                                        }
-                                      }
-                                    }
-                                  ]
-                                }
-                              ],
-                              "else": [
-                                {
-                                  "kind": "return",
-                                  "id": "return-dead",
-                                  "values": {
-                                    "success": {
-                                      "kind": "literal",
-                                      "value": false
-                                    },
-                                    "message": {
-                                      "kind": "literal",
-                                      "value": ""
-                                    }
-                                  }
-                                }
-                              ]
-                            }
-                          ],
-                          "else": [
-                            {
-                              "kind": "return",
-                              "id": "return-wrong-subject",
-                              "values": {
-                                "success": {
-                                  "kind": "literal",
-                                  "value": false
-                                },
-                                "message": {
-                                  "kind": "literal",
-                                  "value": ""
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      ],
-                      "else": [
-                        {
-                          "kind": "return",
-                          "id": "return-missing-subject",
-                          "values": {
-                            "success": {
-                              "kind": "literal",
-                              "value": false
-                            },
-                            "message": {
-                              "kind": "literal",
-                              "value": ""
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  ],
-                  "else": [
-                    {
-                      "kind": "return",
-                      "id": "return-missing-holder",
-                      "values": {
-                        "success": {
-                          "kind": "literal",
-                          "value": false
-                        },
-                        "message": {
-                          "kind": "literal",
-                          "value": ""
-                        }
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          ],
+          "composites": [],
           "body": [
             {
               "kind": "call",
@@ -432,16 +48,35 @@
             },
             {
               "kind": "call",
-              "id": "guard",
-              "module": "shared.status-event-guard",
+              "id": "guard--result-handle",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "guard--holder",
+              "module": "query.piece",
               "version": "1",
               "inputs": {
-                "holder": {
+                "pieceId": {
                   "kind": "output",
                   "node": "holder-ref",
                   "port": "piece"
-                },
-                "subject": {
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "guard--subject",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
                   "kind": "output",
                   "node": "subject-ref",
                   "port": "piece"
@@ -450,12 +85,512 @@
               "parameters": {}
             },
             {
+              "kind": "call",
+              "id": "guard--same-holder",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "guard--holder",
+                  "port": "piece"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "guard--subject",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "valueType": "piece",
+                "operator": "=="
+              }
+            },
+            {
+              "kind": "if",
+              "id": "guard--subject-identity-guard",
+              "condition": {
+                "kind": "output",
+                "node": "guard--same-holder",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "guard--current-hp",
+                  "module": "piece.field",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "guard--holder",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "field": "currentHp"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "guard--alive",
+                  "module": "compare.greater-than",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "guard--current-hp",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "guard--alive-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "guard--alive",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "guard--has-status--statusTags",
+                      "module": "piece.field",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "guard--holder",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "field": "statusTags"
+                      }
+                    },
+                    {
+                      "kind": "collection",
+                      "id": "guard--has-status--filtered",
+                      "method": "filter",
+                      "items": {
+                        "kind": "output",
+                        "node": "guard--has-status--statusTags",
+                        "port": "value"
+                      },
+                      "inputs": {
+                        "expected": {
+                          "kind": "literal",
+                          "value": "sage-mode"
+                        }
+                      },
+                      "body": [
+                        {
+                          "kind": "call",
+                          "id": "guard--has-status--field",
+                          "module": "data.field",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "input",
+                              "name": "item"
+                            }
+                          },
+                          "parameters": {
+                            "field": "type"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard--has-status--matches",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "guard--has-status--field",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "input",
+                              "name": "expected"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "return",
+                          "id": "guard--has-status--filter-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "guard--has-status--matches",
+                            "port": "value"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "guard--has-status--count",
+                      "module": "collection.length",
+                      "version": "1",
+                      "inputs": {
+                        "items": {
+                          "kind": "output",
+                          "node": "guard--has-status--filtered",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "guard--has-status",
+                      "module": "compare.greater-than",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "guard--has-status--count",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "guard--status-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "guard--has-status",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "guard--holder-name",
+                          "module": "piece.field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "guard--holder",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "name"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard--message",
+                          "module": "text.concat",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "guard--holder-name",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": "正在打坐，无法移动"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard--block",
+                          "module": "event.block",
+                          "version": "1",
+                          "inputs": {
+                            "message": {
+                              "kind": "output",
+                              "node": "guard--message",
+                              "port": "text"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "record.create",
+                          "id": "guard--guard--return-blocked-record",
+                          "schema": "atomic-inline-guard",
+                          "fields": {
+                            "success": {
+                              "kind": "output",
+                              "node": "guard--block",
+                              "port": "success"
+                            },
+                            "blocked": {
+                              "kind": "output",
+                              "node": "guard--block",
+                              "port": "blocked"
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "guard--block",
+                              "port": "message"
+                            }
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard--guard--return-blocked-write",
+                          "module": "local.write",
+                          "version": "1",
+                          "inputs": {
+                            "handle": {
+                              "kind": "output",
+                              "node": "guard--result-handle",
+                              "port": "handle"
+                            },
+                            "value": {
+                              "kind": "output",
+                              "node": "guard--guard--return-blocked-record",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+                          }
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "guard--remove-rule",
+                          "module": "rule.remove-piece",
+                          "version": "1",
+                          "inputs": {
+                            "target": {
+                              "kind": "output",
+                              "node": "guard--holder",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "ruleId": "rule-naruto-sage-immobile"
+                          }
+                        },
+                        {
+                          "kind": "record.create",
+                          "id": "guard--guard--return-inactive-record",
+                          "schema": "atomic-inline-guard",
+                          "fields": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            },
+                            "message": {
+                              "kind": "literal",
+                              "value": ""
+                            },
+                            "blocked": {
+                              "kind": "literal",
+                              "value": false
+                            }
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard--guard--return-inactive-write",
+                          "module": "local.write",
+                          "version": "1",
+                          "inputs": {
+                            "handle": {
+                              "kind": "output",
+                              "node": "guard--result-handle",
+                              "port": "handle"
+                            },
+                            "value": {
+                              "kind": "output",
+                              "node": "guard--guard--return-inactive-record",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "record.create",
+                      "id": "guard--guard--return-dead-record",
+                      "schema": "atomic-inline-guard",
+                      "fields": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        },
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
+                        },
+                        "blocked": {
+                          "kind": "literal",
+                          "value": false
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "guard--guard--return-dead-write",
+                      "module": "local.write",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "guard--result-handle",
+                          "port": "handle"
+                        },
+                        "value": {
+                          "kind": "output",
+                          "node": "guard--guard--return-dead-record",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "record.create",
+                  "id": "guard--guard--return-wrong-subject-record",
+                  "schema": "atomic-inline-guard",
+                  "fields": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    },
+                    "blocked": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "guard--guard--return-wrong-subject-write",
+                  "module": "local.write",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "guard--result-handle",
+                      "port": "handle"
+                    },
+                    "value": {
+                      "kind": "output",
+                      "node": "guard--guard--return-wrong-subject-record",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "guard--result-read",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "guard--result-handle",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"record\",\"schema\":\"atomic-inline-guard\"}"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "guard--result-success",
+              "module": "data.read-key",
+              "version": "1",
+              "inputs": {
+                "record": {
+                  "kind": "output",
+                  "node": "guard--result-read",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "key": "success",
+                "valueType": "boolean"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "guard--result-blocked",
+              "module": "data.read-key",
+              "version": "1",
+              "inputs": {
+                "record": {
+                  "kind": "output",
+                  "node": "guard--result-read",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "key": "blocked",
+                "valueType": "boolean"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "guard--result-message",
+              "module": "data.read-key",
+              "version": "1",
+              "inputs": {
+                "record": {
+                  "kind": "output",
+                  "node": "guard--result-read",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "key": "message",
+                "valueType": "string"
+              }
+            },
+            {
               "kind": "if",
               "id": "result-shape",
               "condition": {
                 "kind": "output",
-                "node": "guard",
-                "port": "blocked"
+                "node": "guard--result-blocked",
+                "port": "value"
               },
               "then": [
                 {
@@ -464,18 +599,18 @@
                   "values": {
                     "success": {
                       "kind": "output",
-                      "node": "guard",
-                      "port": "success"
+                      "node": "guard--result-success",
+                      "port": "value"
                     },
                     "blocked": {
                       "kind": "output",
-                      "node": "guard",
-                      "port": "blocked"
+                      "node": "guard--result-blocked",
+                      "port": "value"
                     },
                     "message": {
                       "kind": "output",
-                      "node": "guard",
-                      "port": "message"
+                      "node": "guard--result-message",
+                      "port": "value"
                     }
                   }
                 }
@@ -487,21 +622,42 @@
                   "values": {
                     "success": {
                       "kind": "output",
-                      "node": "guard",
-                      "port": "success"
+                      "node": "guard--result-success",
+                      "port": "value"
                     },
                     "message": {
                       "kind": "output",
-                      "node": "guard",
-                      "port": "message"
+                      "node": "guard--result-message",
+                      "port": "value"
                     }
                   }
                 }
               ]
             }
+          ],
+          "schemas": [
+            {
+              "id": "atomic-inline-guard",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "success",
+                  "type": "boolean"
+                },
+                {
+                  "name": "blocked",
+                  "type": "boolean",
+                  "optional": true
+                },
+                {
+                  "name": "message",
+                  "type": "string"
+                }
+              ]
+            }
           ]
         },
-        "compilerVersion": "rvb-gameplay-module-compiler/v1"
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
       }
     }
   }

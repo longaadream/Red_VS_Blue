@@ -99,7 +99,7 @@ const guardOutputs = [
 ] as const
 
 const failure = (id: string): GameplayStatement[] => [
-  returnValues(id, { success: literal(false), message: literal('') }),
+  returnValues(id, { success: literal(false), blocked: literal(false), message: literal('') }),
 ]
 
 function referenceModule(reference: GuardReference): string {

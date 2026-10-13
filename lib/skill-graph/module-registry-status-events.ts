@@ -4,7 +4,7 @@ const surfaces: readonly GameplayModuleSurface[] = ['skill', 'card', 'rule', 'tr
 const flow = (ctx: Context) => ctx.surface === 'pending' ? 'ctx.flow' : 'flow'
 const context = (ctx: Context) => ctx.surface === 'pending' ? 'ctx' : 'context'
 const define = (value: Omit<Descriptor, 'version' | 'allowedSurfaces'>): Descriptor => ({ version: '1', allowedSurfaces: surfaces, ...value })
-const fields = ['stacks', 'intensity', 'currentDuration', 'remainingDuration', 'currentUses', 'remainingUses', 'value']
+const fields = ['stacks', 'intensity', 'currentDuration', 'remainingDuration', 'currentUses', 'remainingUses', 'remainingTurns', 'grantedTurnNumber', 'createdTurnNumber', 'value']
 
 /** Status IDs remain immutable values; mutable host status objects never escape. */
 export const STATUS_EVENT_GAMEPLAY_MODULES: readonly Descriptor[] = [
@@ -79,6 +79,14 @@ export const STATUS_EVENT_GAMEPLAY_MODULES: readonly Descriptor[] = [
     ui: { category: 'status' },
   }),
   define({
+    id: 'status.find-instance', label: '查找状态实例引用',
+    description: '保留当前执行中选中的状态对象引用；不为无标识状态分配标识，也不会按类型重新匹配。',
+    inputs: [{ name: 'piece', type: 'piece' }], outputs: [{ name: 'status', type: 'status', nullable: true }],
+    parameters: [{ name: 'statusType', type: 'string' }], effects: { pure: false, previewSafe: false, reads: ['statuses'], writes: ['execution-context'] },
+    lower: ctx => `${flow(ctx)}.status.findInstance(${ctx.inputs.piece}, ${ctx.emitLiteral(ctx.parameters.statusType)})`,
+    ui: { category: 'status' },
+  }),
+  define({
     id: 'status.read-number', label: '读取状态数值',
     inputs: [{ name: 'piece', type: 'piece' }, { name: 'statusId', type: 'string', nullable: true }, { name: 'fallback', type: 'number' }], outputs: [{ name: 'value', type: 'number' }],
     parameters: [{ name: 'field', type: 'string', enum: fields }], effects: { pure: true, previewSafe: false, reads: ['statuses'] },
@@ -86,10 +94,34 @@ export const STATUS_EVENT_GAMEPLAY_MODULES: readonly Descriptor[] = [
     ui: { category: 'status' },
   }),
   define({
+    id: 'status.read-player-field', label: '读取状态创建玩家',
+    description: '读取状态创建时保存的 ownerPlayerId；缺失或状态不存在时返回空玩家引用。',
+    inputs: [{ name: 'piece', type: 'piece' }, { name: 'statusId', type: 'string', nullable: true }], outputs: [{ name: 'player', type: 'player', nullable: true }],
+    parameters: [{ name: 'field', type: 'string', enum: ['ownerPlayerId'] }], effects: { pure: true, previewSafe: false, reads: ['statuses'] },
+    lower: ctx => `(function() { var piece = ${flow(ctx)}.query.piece(${ctx.inputs.piece}), tag = piece && (piece.statusTags || []).find(function(tag) { return tag && tag.id === ${ctx.inputs.statusId}; }), value = tag && tag[${ctx.emitLiteral(ctx.parameters.field)}]; return typeof value === "string" ? value : null; })()`,
+    ui: { category: 'status' },
+  }),
+  define({
+    id: 'status.read-number-instance', label: '读取状态实例数值',
+    description: '从当前执行保留的状态实例读取数值；无匹配实例时使用回退值。',
+    inputs: [{ name: 'status', type: 'status', nullable: true }, { name: 'fallback', type: 'number' }], outputs: [{ name: 'value', type: 'number' }],
+    parameters: [{ name: 'field', type: 'string', enum: fields }], effects: { pure: true, previewSafe: false, reads: ['execution-context', 'statuses'] },
+    lower: ctx => `${flow(ctx)}.status.readNumberInstance(${ctx.inputs.status}, ${ctx.emitLiteral(ctx.parameters.field)}, ${ctx.inputs.fallback})`,
+    ui: { category: 'status' },
+  }),
+  define({
     id: 'status.set-number', label: '设定状态数值',
     inputs: [{ name: 'piece', type: 'piece' }, { name: 'statusId', type: 'string', nullable: true }, { name: 'value', type: 'number' }], outputs: [{ name: 'success', type: 'boolean' }],
     parameters: [{ name: 'field', type: 'string', enum: ['stacks', 'intensity', 'value'] }], effects: { pure: false, previewSafe: false, writes: ['statuses'] },
     lower: ctx => `${flow(ctx)}.status.setNumber(${ctx.inputs.piece}, ${ctx.inputs.statusId}, ${ctx.emitLiteral(ctx.parameters.field)}, ${ctx.inputs.value})`,
+    ui: { category: 'status' },
+  }),
+  define({
+    id: 'status.set-number-instance', label: '设定状态实例数值',
+    description: '修改当前执行保留的状态实例数值；不按标识或类型寻找其他状态。',
+    inputs: [{ name: 'status', type: 'status', nullable: true }, { name: 'value', type: 'number' }], outputs: [{ name: 'success', type: 'boolean' }],
+    parameters: [{ name: 'field', type: 'string', enum: fields }], effects: { pure: false, previewSafe: false, reads: ['execution-context'], writes: ['statuses'] },
+    lower: ctx => `${flow(ctx)}.status.setNumberInstance(${ctx.inputs.status}, ${ctx.emitLiteral(ctx.parameters.field)}, ${ctx.inputs.value})`,
     ui: { category: 'status' },
   }),
   define({

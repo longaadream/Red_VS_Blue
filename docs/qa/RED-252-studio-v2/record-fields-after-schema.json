@@ -1,0 +1,12 @@
+{
+  "fieldsEditor": true,
+  "expressions": 0,
+  "fieldPanels": [
+    {
+      "slot": "sentence-record.create-1:property:field:field1",
+      "name": "field:field1",
+      "text": "空列表"
+    }
+  ],
+  "html": "<div class=\"sentence-inline-editor sentence-record-fields-editor\" data-sentence-inline-editor=\"sentence-record.create-1\" data-sentence-record-fields-editor=\"sentence-record.create-1\"><div class=\"sentence-inline-editor-top\"><strong class=\"sentence-inline-editor-title\">编辑记录字段</strong><button class=\"sentence-popover-close\" type=\"button\">关闭编辑</button></div><div class=\"sentence-record-fields-list\"><div class=\"sentence-record-field sentence-record-field-editor\"><span class=\"sentence-field-label\">field1：</span><button class=\"sentence-inline-token sentence-slot-token\" type=\"button\" data-sentence-slot-editor=\"sentence-record.create-1:property:field:field1\" data-sentence-slot-kind=\"property\" data-sentence-slot-name=\"field:field1\" aria-pressed=\"false\" title=\"编辑field1\">空列表</button></div></div></div>"
+}

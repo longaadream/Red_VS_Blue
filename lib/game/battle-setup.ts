@@ -34,6 +34,8 @@ import {
 } from './rule-runtime'
 import { finalizeBattleTerminal } from './terminal'
 import { assertContentAvailable, type ContentMode } from './content-availability'
+import { createAuthorClusterRuntime } from './author-clusters'
+import { planAuthorClusterInitialization } from './author-cluster-initialization'
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
 
@@ -1051,10 +1053,37 @@ export async function createInitialBattleForPlayers(
   }
 
   const initializeRules = () => {
+    // Static piece content is already installed by applyInitialRules. Author
+    // Cluster bootstrap only records ownership around those existing members;
+    // it must not resolve/reinstall them or consume a gameplay RNG stream.
+    // Keep the allocator in its own deterministic ID namespace so dynamic
+    // Cluster calls cannot collide with bootstrap IDs.
+    const authorClusterRuntime = createAuthorClusterRuntime({
+      ...(runtime ? {
+        nextInstanceId: () => runtime.nextInstanceId('author-cluster-initialization', 'cluster'),
+      } : {}),
+    })
+
     pieces.forEach(piece => {
       const template = allSelectedPieces.find(t => t.id === piece.templateId)
       if (template) {
         applyInitialRules(piece, template)
+
+        // PVE helper pieces are not part of the normal 45-piece authoring
+        // catalog. Their setup remains governed by their existing rules.
+        if (!piece.templateId.startsWith('pve-')) {
+          const ruleCatalog = Object.fromEntries(
+            piece.rules
+              .filter(rule => rule && typeof rule.id === 'string')
+              .map(rule => [rule.id, rule]),
+          )
+          const plan = planAuthorClusterInitialization(piece, {
+            skills: state.skillsById as Readonly<Record<string, unknown>>,
+            rules: ruleCatalog,
+          })
+          for (const definition of plan.definitions) authorClusterRuntime.adopt(piece, definition)
+        }
+
         const owner = state.players.find(player => player.playerId === piece.ownerPlayerId)
         for (const ruleId of template.playerRules ?? []) {
           if (!owner) throw new Error(`Initial player rule owner is missing: ${piece.ownerPlayerId}`)

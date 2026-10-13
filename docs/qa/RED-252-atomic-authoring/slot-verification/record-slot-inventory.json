@@ -1,0 +1,26 @@
+[
+  {
+    "slot": "record-create:property:schema",
+    "name": "schema",
+    "kind": "property",
+    "text": "记录内容"
+  },
+  {
+    "slot": "record-get:input:record",
+    "name": "record",
+    "kind": "input",
+    "text": "record-create · 值"
+  },
+  {
+    "slot": "record-get:parameter:field",
+    "name": "field",
+    "kind": "parameter",
+    "text": "hp"
+  },
+  {
+    "slot": "return-result:input:return:result",
+    "name": "return:result",
+    "kind": "input",
+    "text": "9"
+  }
+]

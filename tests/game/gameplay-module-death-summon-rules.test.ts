@@ -30,7 +30,6 @@ describe('death summon profiles expressed as typed data', () => {
         const state: any = makeState({ pieces: [holder, attacker] })
         const result = scenario === 'combat' ? dealDamage(attacker, holder, 999, 'true', state, 'death-parity') : rule.effect(state, { type: 'onPieceDied', piece: holder, sourcePiece: scenario === 'wrong-subject' ? attacker : scenario === 'missing-subject' ? null : holder, rulePiece: scenario === 'missing-holder' ? null : holder } as any)
         const plain = JSON.parse(JSON.stringify(state))
-        for (const piece of [...plain.pieces, ...(plain.graveyard || [])]) piece.rules = (piece.rules || []).map((r: any) => r.id)
         return { result, state: plain }
       }
       for (const scenario of ['active', 'already', 'missing-status', 'wrong-subject', 'missing-subject', 'missing-holder']) for (const hp of [0, 1, -1]) expect(run(true, scenario, true, hp), scenario + ':' + hp).toEqual(run(false, scenario, true, hp))

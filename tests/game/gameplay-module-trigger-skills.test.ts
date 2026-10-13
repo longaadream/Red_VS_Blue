@@ -30,7 +30,6 @@ describe('semantic trigger skill entry points', () => {
         const context: any = { type: 'beforeDamageDealt', damage, rulePiece: source, sourcePiece: source, piece: subject, playerId: 'player-red' }
         const result = rule.effect(state, context)
         const normalized = JSON.parse(JSON.stringify(state)); delete normalized.skillsById
-        for (const entity of [...normalized.pieces, ...normalized.players]) if (entity.rules) entity.rules = entity.rules.map((r: any) => r.id)
         return { result, state: normalized, damage: context.damage }
       }
       for (const damage of [-1, 0, 0.5, 10.5]) for (const intensities of [[], [1], [1, 2.5, null], [-1, 1]]) expect(run(true, damage, intensities)).toEqual(run(false, damage, intensities))

@@ -29,7 +29,6 @@ describe('icebound retaliation graph', () => {
         const runtime = new RuleRuntime({ rootSeed: 126 })
         const result = withRuleRuntime(runtime, () => scenario === 'combat' ? dealDamage(attacker, holder, damage, 'true', battle, 'icebound-test') : rule.effect(battle, { type: 'afterDamageTaken', rulePiece: scenario === 'missing-holder' ? null : holder, piece: scenario === 'missing-subject' ? null : scenario === 'wrong-subject' ? attacker : holder, targetPiece: scenario === 'missing-attacker' ? null : attacker, damage } as any))
         const state = JSON.parse(JSON.stringify(battle))
-        for (const item of [...state.pieces, ...state.graveyard]) if (item.rules) item.rules = item.rules.map((rule: any) => rule.id)
         return { result, state, random: runtime.snapshot() }
       }
       for (const damage of [0, 0.5, 1, 3, 20]) for (const scenario of ['normal', 'same-owner', 'dead-attacker', 'no-status', 'departed-defender', 'departed-attacker', 'missing-holder', 'missing-subject', 'wrong-subject', 'missing-attacker', 'combat']) expect(run(true, scenario, damage), scenario + ':' + damage).toEqual(run(false, scenario, damage))

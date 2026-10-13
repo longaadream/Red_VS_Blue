@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from '../../electron-editor/content-project'
 import { applyGameplayModuleGraph, assertGameplayModuleDocument, createGameplayModuleGraph } from '../../lib/skill-graph/module-document'
+import { prepareWorkspacePackageV1 } from '../../electron-editor/workspace'
 
 const roots: string[] = []
 it('validates Cluster identities only at authoring save, preserving runtime skill copies', () => {
@@ -44,6 +45,20 @@ it('copies official data and images into an independent content project', () => 
   expect(readFileSync(path.join(project, 'images/hero.svg'), 'utf8')).toBe('<svg/>')
 })
 
+it('includes public-root portraits without replacing assets from the images directory', () => {
+  const root = fixture()
+  const bundle = path.join(root, 'bundle')
+  mkdirSync(path.join(bundle, 'public/images'), { recursive: true })
+  writeFileSync(path.join(bundle, 'public/hero.jpg'), 'root portrait')
+  writeFileSync(path.join(bundle, 'public/shared.png'), 'root duplicate')
+  writeFileSync(path.join(bundle, 'public/images/shared.png'), 'image directory asset')
+  writeFileSync(path.join(bundle, 'public/unrelated.json'), '{}')
+  const project = createContentProject(root, 'official', bundle)
+  expect(readFileSync(path.join(project, 'images/hero.jpg'), 'utf8')).toBe('root portrait')
+  expect(readFileSync(path.join(project, 'images/shared.png'), 'utf8')).toBe('image directory asset')
+  expect(readdirSync(path.join(project, 'images'))).not.toContain('unrelated.json')
+})
+
 it('refuses stale saves after an AI edit and preserves exact external bytes', () => {
   const file = path.join(fixture(), 'hero.json')
   writeFileSync(file, '{"hp":10}')
@@ -51,6 +66,19 @@ it('refuses stale saves after an AI edit and preserves exact external bytes', ()
   writeFileSync(file, '{ "hp": 20, "ai": true }\n')
   expect(() => writeDocumentSnapshot(file, { hp: 11 }, snapshot.revision)).toThrow('文件已被 AI')
   expect(readFileSync(file, 'utf8')).toBe('{ "hp": 20, "ai": true }\n')
+})
+
+it('keeps web shell icons out of game assets so official projects can be staged', () => {
+  const root = fixture()
+  const bundle = path.join(root, 'bundle')
+  mkdirSync(path.join(bundle, 'public/images'), { recursive: true })
+  mkdirSync(path.join(bundle, 'data/pieces'), { recursive: true })
+  writeFileSync(path.join(bundle, 'public/icon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><style>@media(prefers-color-scheme:dark){}</style></svg>')
+  writeFileSync(path.join(bundle, 'public/hero.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="red"/></svg>')
+  const project = createContentProject(root, 'official', bundle)
+  expect(readdirSync(path.join(project, 'images'))).toEqual(['hero.svg'])
+  expect(prepareWorkspacePackageV1(project, bundle).counts.images).toBe(1)
+  expect(readFileSync(path.join(bundle, 'public/icon.svg'), 'utf8')).toContain('<style>')
 })
 
 it('returns the new revision after a successful save and does not leave temporary files', () => {

@@ -158,12 +158,24 @@
       })
       .flatMap(function (group) {
         const beats = []
-        ;[group.root].concat(group.children).forEach(function (event) {
+        const identityEvents = [group.root].concat(group.children)
+        let currentBatch = null
+        identityEvents.forEach(function (event) {
           if (['actionPoints', 'cardDiscarded', 'cardChanged'].includes(event.kind)) return
           if (event.parentEventId && event.kind === 'passive' && !(event.result && event.result.pending)) return
-          beats.push({ rootEventId: event.eventId, root: event, children: [], identityEvents: [group.root].concat(group.children) })
+          const batchId = event.batchId == null || event.batchId === '' ? null : String(event.batchId)
+          const canMerge = currentBatch && batchId !== null
+            && currentBatch.batchId === batchId && currentBatch.root.kind === event.kind
+          if (canMerge) {
+            currentBatch.children.push(event)
+            return
+          }
+          currentBatch = { batchId: batchId, rootEventId: event.eventId, root: event, children: [], identityEvents: identityEvents }
+          beats.push(currentBatch)
         })
-        return beats
+        return beats.map(function (beat) {
+          return { rootEventId: beat.rootEventId, root: beat.root, children: beat.children, identityEvents: beat.identityEvents }
+        })
       })
   }
 

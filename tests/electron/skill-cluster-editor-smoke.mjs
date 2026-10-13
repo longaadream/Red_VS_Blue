@@ -108,15 +108,17 @@ async function openDraftDocument(collection, id) {
 async function click(expression) { await evaluate(`(${expression}).click()`) }
 async function clickStatus(collection, ownerId) {
   const selector = `#${collection}-detail [data-skill-cluster-member=${JSON.stringify(`status:${skill.statusTag.id}`)}]`
-  await evaluate(`(()=>{const rows=[...document.querySelectorAll(${JSON.stringify(selector)})];const row=rows.find(e=>e.dataset.skillClusterMemberKey.includes(${JSON.stringify(ownerId)}));if(!row)throw new Error('missing status owner '+${JSON.stringify(ownerId)});if(typeof row.onclick!=='function')throw new Error('status row has no handler');row.onclick()})()`)
+  await evaluate(`(()=>{const tab=document.querySelector('#${collection}-detail [data-skill-cluster-member-tab="status"]');if(tab&&!tab.disabled)tab.click();const rows=[...document.querySelectorAll(${JSON.stringify(selector)})];const row=rows.find(e=>e.dataset.skillClusterMemberKey.includes(${JSON.stringify(ownerId)}));if(!row)throw new Error('missing status owner '+${JSON.stringify(ownerId)});if(typeof row.onclick!=='function')throw new Error('status row has no handler');row.onclick()})()`)
 }
 try {
   await connect()
   await openCollection('skills', skill.id)
   await until("Boolean(document.querySelector('#skills-detail [data-skill-cluster-editor]'))")
   assert.equal(await evaluate("document.querySelector('#skills-detail [data-skill-cluster-editor]')?.dataset.skillClusterKind"), 'active')
-  assert.equal(await evaluate("document.querySelector('#skills-detail .skill-cluster-kicker').textContent"), '技能总览')
-  assert.equal(await evaluate("document.querySelector('#skills-detail .skill-cluster-description').textContent"), skill.description)
+  assert.equal(await evaluate("document.querySelector('#skills-detail .skill-cluster-kicker').textContent"), 'Cluster · skills')
+  assert.equal(await evaluate("document.querySelector('#skills-detail .skill-cluster-subtitle').textContent"), '主动 Cluster · 成员关系仅供引用投影')
+  await click("document.querySelector('#skills-detail [data-skill-cluster-member-tab=rule]')")
+  await until("Boolean(document.querySelector('#skills-detail [data-skill-cluster-member=\\\"rule:cluster-demo-rule\\\"]'))")
   assert.equal(await evaluate("Boolean(document.querySelector('#skills-detail [data-skill-cluster-member=\"rule:cluster-demo-rule\"]'))"), true)
   assert.equal(await evaluate("document.querySelectorAll('#skills-detail [data-skill-cluster-editor] textarea').length"), 0, 'Cluster status editing does not default to raw JSON')
 
@@ -156,22 +158,26 @@ try {
 
   // Edit an inline status, then follow its explicit rule link and return. The
   // skill draft must survive the navigation without an implicit save.
-  await click("document.querySelector('#skills-detail [data-skill-cluster-member=" + JSON.stringify(`status:${skill.statusTag.id}`) + "]')")
+  await clickStatus('skills', skill.id)
   await until("Boolean(document.querySelector('#skills-detail [data-skill-cluster-status-field=duration]'))")
   await evaluate("(()=>{const e=document.querySelector('#skills-detail [data-skill-cluster-status-field=duration]');e.value='4';e.dispatchEvent(new Event('change',{bubbles:true}))})()")
   assert.equal(await evaluate("document.querySelector('#skills-detail [data-footer-state]').textContent"), '未保存')
+  await click("document.querySelector('#skills-detail [data-skill-cluster-member-tab=rule]')")
+  await until("Boolean(document.querySelector('#skills-detail [data-skill-cluster-member=\\\"rule:cluster-demo-rule\\\"]'))")
   await click("document.querySelector('#skills-detail [data-skill-cluster-member=\"rule:cluster-demo-rule\"]')")
-  await click("[...document.querySelectorAll('#skills-detail .skill-cluster-detail .skill-cluster-action')].find(e=>e.textContent.includes('打开规则'))")
+  await click("[...document.querySelectorAll('#skills-detail .skill-cluster-detail .skill-cluster-action')].find(e=>e.textContent.includes('打开所属文档'))")
   await until("document.querySelector('#rules-detail [data-document-title]')?.textContent.includes('Cluster 演示规则')")
-  assert.equal(await evaluate("document.querySelector('#rules-detail [data-cluster-return]')?.textContent"), '返回技能总览')
+  assert.equal(await evaluate("document.querySelector('#rules-detail [data-cluster-return]')?.textContent"), '返回能力组')
   await click("document.querySelector('#rules-detail [data-cluster-return]')")
-  await click("document.querySelector('#skills-detail [data-skill-cluster-member=" + JSON.stringify(`status:${skill.statusTag.id}`) + "]')")
+  await clickStatus('skills', skill.id)
   await until("document.querySelector('#skills-detail [data-skill-cluster-status-field=duration]')?.value==='4'")
 
   // Passive roots are first-class clusters. Their rule relationship is shown
   // from the piece declaration and is not guessed from a similar name.
   await openDraftDocument('pieces', piece.id)
   await until("document.querySelector('#pieces-detail [data-skill-cluster-kind]')?.dataset.skillClusterKind==='passive'")
+  await click("document.querySelector('#pieces-detail [data-skill-cluster-member-tab=rule]')")
+  await until("Boolean(document.querySelector('#pieces-detail [data-skill-cluster-member=\\\"rule:cluster-demo-rule\\\"]'))")
   assert.equal(await evaluate("Boolean(document.querySelector('#pieces-detail [data-skill-cluster-member=\"rule:cluster-demo-rule\"]'))"), true)
   // Replacing Skill A with Skill B in the same collection must retire A's
   // panel closure. Editing A's duplicate status from the passive root must not
@@ -207,6 +213,7 @@ try {
   await until("Boolean(document.querySelector('#skills-detail [data-skill-cluster-editor]'))")
   await evaluate("document.querySelector('[data-new-document=skills]').click()")
   await evaluate("(()=>{document.querySelector('#create-id').value='cluster-new-passive';document.querySelector('#create-name').value='新建被动能力';document.querySelector('#create-form').requestSubmit()})()")
+  await click("document.querySelector('#skills-detail [data-editor-mode=fields]')")
   await until("Boolean(document.querySelector('#skills-detail [data-field-path=kind]'))")
   assert.equal(await evaluate("document.querySelector('#skills-detail [data-editor-pane=fields]').classList.contains('active')"), true)
   assert.equal(await evaluate("(()=>{const values=[...document.querySelectorAll('#skills-detail [data-field-path=kind] option')].map(e=>e.value);return values.includes('active')&&values.includes('passive')})()"), true)

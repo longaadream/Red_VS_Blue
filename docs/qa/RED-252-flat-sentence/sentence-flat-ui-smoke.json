@@ -1,0 +1,1829 @@
+{
+  "task": "RED-252 flat Chinese sentence UI",
+  "role": "real Electron regression verification",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-flat-sentence-ui-zPkIp5\\rvb-content-0e2a198e",
+  "sourceProject": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue",
+  "viewport": {
+    "width": 1487,
+    "height": 1058
+  },
+  "checks": [
+    {
+      "name": "Fireball wide default uses one modern inspector and hides technical row chrome",
+      "ok": true,
+      "detail": {
+        "inspectorCount": 1,
+        "rowMenus": 3,
+        "sentenceText": "点击蓝色参数即可修改；可以逐项填写，也能随时返回。主流程在5格内选择敌方的棋子目标，提示为选择火球术目标，允许中止本次效果为是保存返回值棋子目标 → 更多操作编辑模块↑↓复制删除查看技术信息按一次声明的范围、阵营和取消约束选择一个棋子；目标失效时由权威目标引擎拒绝本次语句。可用结果：棋子目标对当前目标造成当前棋子.攻击力 × 当前技能.倍率点普通伤害，来源为当前棋子，技能为fireball保存返回值结果 → 实际伤害 → 更多操作编辑模块↑↓复制删除查看技术信息伤害量：当前棋"
+      }
+    },
+    {
+      "name": "Fireball damage amount edits only that input in the right inspector through the shared expression editor",
+      "ok": true,
+      "detail": {
+        "slot": {
+          "selector": "damage:input:amount",
+          "text": "当前棋子.攻击力 × 当前技能.倍率",
+          "row": true
+        },
+        "panel": {
+          "editor": "damage",
+          "slot": "input:amount",
+          "moduleSelect": false,
+          "inputs": [
+            "amount"
+          ],
+          "parameters": [],
+          "editorOutside": 0
+        },
+        "authoredIds": [
+          "expr-2_1",
+          "expr-2_2",
+          "expr-2_3",
+          "expr-2_4"
+        ],
+        "amount": {
+          "kind": "output",
+          "node": "expr-2_4",
+          "port": "value"
+        },
+        "preservedUnknown": {
+          "preserved": true,
+          "source": "official-fireball"
+        }
+      }
+    },
+    {
+      "name": "Choice v3 infers typed map values and synchronizes the single/multi return shape",
+      "ok": true,
+      "detail": {
+        "choiceId": "sentence-module-1",
+        "optionsType": {
+          "kind": "map",
+          "key": "string",
+          "value": "number"
+        },
+        "valueType": "number"
+      }
+    },
+    {
+      "name": "Authors a typed code block through the Cluster sentence editor and reopens the saved definition",
+      "ok": true,
+      "detail": {
+        "codeBlockId": "sentence-module-2",
+        "blockType": {
+          "kind": "record",
+          "schema": "expr-5_18@1"
+        },
+        "argsType": {
+          "kind": "record",
+          "schema": "expr-4_1@1"
+        }
+      }
+    },
+    {
+      "name": "Creates a card from the blank authoring entry and composes choice, block, hand extension, target, damage and heal steps",
+      "ok": true,
+      "detail": {
+        "cardId": "flat-ui-armor-assembly",
+        "inserted": [
+          "sentence-module-1",
+          "sentence-module-2",
+          "sentence-module-3",
+          "sentence-module-4",
+          "sentence-module-5",
+          "sentence-module-7"
+        ],
+        "handExtension": {
+          "moduleId": "sentence-module-6",
+          "accepted": true,
+          "entityKind": "card",
+          "entity": {
+            "kind": "output",
+            "node": "expr-6_1",
+            "port": "card"
+          },
+          "name": "armor",
+          "valueType": "number",
+          "typeLabel": "手牌实例"
+        },
+        "compiled": {
+          "surface": "card",
+          "codeLength": 55479,
+          "bodyLength": 55,
+          "blockOutputs": 2
+        },
+        "persistedBodyLength": 55,
+        "reopened": true
+      }
+    },
+    {
+      "name": "Current skill references, module categories and status icon entry remain reachable",
+      "ok": true,
+      "detail": {
+        "picker": {
+          "currentSkill": true,
+          "currentSkillText": "当前技能实例取得当前正在执行的实际技能实例；不存在有效实例时由运行时使语句失效。",
+          "categories": [
+            {
+              "id": "all",
+              "disabled": false,
+              "pressed": "true"
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": "false"
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "board",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "control",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "selection",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "calculation",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "combat",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "card-ability",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "status-rule",
+              "disabled": false,
+              "pressed": null
+            },
+            {
+              "id": "data",
+              "disabled": false,
+              "pressed": null
+            }
+          ]
+        },
+        "statusTab": {
+          "present": true,
+          "disabled": false,
+          "label": "状态 1"
+        },
+        "status": {
+          "iconField": true,
+          "iconValue": "",
+          "placeholder": "images/effect-icons/example.svg",
+          "preview": true,
+          "tab": "状态 1"
+        }
+      }
+    },
+    {
+      "name": "The module picker writes generic piece field v2 while legacy field and comparison references survive",
+      "ok": true,
+      "detail": {
+        "pickerState": {
+          "textOptions": [],
+          "fieldOptions": [
+            {
+              "id": "piece.field",
+              "text": "读取棋子字段读取已验证且仍在场棋子的封闭字段；HP 为零仍可读取身份、数值和历史结算所需事实。",
+              "title": "读取已验证且仍在场棋子的封闭字段；HP 为零仍可读取身份、数值和历史结算所需事实。"
+            },
+            {
+              "id": "piece.field",
+              "text": "读取棋子字段读取存活棋子的封闭字段；死亡事件的已保留数据通过事件记录读取。",
+              "title": "读取存活棋子的封闭字段；死亡事件的已保留数据通过事件记录读取。"
+            }
+          ],
+          "relationOptions": [],
+          "alliedOptions": []
+        },
+        "selected": {
+          "id": "sentence-module-1",
+          "version": "2",
+          "field": "faction"
+        },
+        "persisted": {
+          "selectedModule": "piece.field",
+          "selectedVersion": "2",
+          "selectedField": "faction",
+          "legacyVersion": "1"
+        },
+        "reopened": {
+          "selectedModule": "piece.field",
+          "selectedVersion": "2",
+          "selectedField": "faction",
+          "legacyVersion": "1"
+        },
+        "comparisonDisplay": "当前棋子.阵营==当前目标.阵营，参数为文本保存返回值比较结果 → 更多操作编辑模块↑↓复制删除查看技术信息按封闭值类型对两个值执行严格相等或不相等比较；不允许跨类型比较。可用结果：比较结果"
+      }
+    },
+    {
+      "name": "A branch consumer can compose a typed expression without changing its root source",
+      "ok": true,
+      "detail": {
+        "initial": {
+          "branchIndex": 7,
+          "amountIndex": 6,
+          "amountInputs": {
+            "left": {
+              "kind": "output",
+              "node": "attack",
+              "port": "value"
+            },
+            "right": {
+              "kind": "output",
+              "node": "power",
+              "port": "value"
+            }
+          },
+          "damageAmount": {
+            "kind": "output",
+            "node": "amount",
+            "port": "value"
+          },
+          "damageSlot": true,
+          "errors": []
+        },
+        "result": {
+          "bodyIds": [
+            "source",
+            "target",
+            "source-name",
+            "target-name",
+            "attack",
+            "power",
+            "amount",
+            "lexical-if"
+          ],
+          "amountIndex": 6,
+          "expressionIndex": 1,
+          "expression": {
+            "id": "expr-1_2",
+            "module": "math.floor",
+            "owner": "damage",
+            "input": "amount"
+          },
+          "expressionModules": [
+            "math.add",
+            "math.floor"
+          ],
+          "amountInputs": {
+            "left": {
+              "kind": "output",
+              "node": "attack",
+              "port": "value"
+            },
+            "right": {
+              "kind": "output",
+              "node": "power",
+              "port": "value"
+            }
+          },
+          "damageAmount": {
+            "kind": "output",
+            "node": "expr-1_2",
+            "port": "value"
+          },
+          "diagnostic": "",
+          "errors": []
+        }
+      }
+    },
+    {
+      "name": "Shadow Clone keeps complex authoring readable, supports nested collapse and horizontal scrolling",
+      "ok": true,
+      "detail": {
+        "rows": 8,
+        "collapseKey": "skills:naruto-shadow-clone:code::mode-branch",
+        "collapsed": {
+          "aria": "false",
+          "hidden": true,
+          "scrollLeft": 340,
+          "focusKey": "skills:naruto-shadow-clone:code::mode-branch"
+        },
+        "flowStyle": {
+          "scrollLeft": 64,
+          "scrollWidth": 900,
+          "clientWidth": 380,
+          "persistentStyle": true
+        },
+        "targetRange": 6,
+        "reopened": true
+      }
+    },
+    {
+      "name": "Keyboard more menu, Escape and focus restoration stay inside the inspector surface",
+      "ok": true,
+      "detail": {
+        "menuState": {
+          "menu": true,
+          "summaryFocused": true,
+          "open": false
+        },
+        "opened": {
+          "open": true,
+          "actionVisible": true,
+          "active": "SUMMARY"
+        },
+        "selected": {
+          "editor": "mode-options",
+          "inspectorCount": 1,
+          "editors": 1
+        },
+        "closed": {
+          "editor": false,
+          "activeDataset": {},
+          "activeText": "更多操作"
+        }
+      }
+    },
+    {
+      "name": "Recall trigger projects the pure extension map read into the foreach expression and survives reopen",
+      "ok": true,
+      "detail": {
+        "state": {
+          "rows": [
+            "records-loop",
+            "eligible-branch",
+            "advanced-record",
+            "replace-record",
+            "ready-branch",
+            "restore-remove",
+            "restore-move",
+            "restore-apply",
+            "done"
+          ],
+          "loopText": "依次处理读取扩展映射记录（当前棋子.所属玩家，变量：recall-records）中的每一项。收起步骤更多操作编辑结构↑↓复制删除执行内容如果（当前棋子 == 按键读取记录字段 · 值） 且 （事件玩家.阵营 != 按键读取记录字段 · 值.阵营），执行满足条件的分支。收起步骤更多操作编辑结构↑↓复制删除满足条件时基于输入 · 记录更新记录。字段按键读取记录字段 · 值 ＋ 1更多操作编辑结构↑↓复制删除写入玩家按键读取记录字段 · 值的扩展映射，名称为recall-records，分组为content，记录类型为atomic-recall-record@1，键字段为pieceKey，记录为advanced-record · 值保存返回值完成 → 更多操作编辑模块↑↓复制删除查看技术信息操作已经声明的玩家 extension 映射；同一键写入只替换对应记录，其他实例保持独立。可用结果：完成如果（按键读取记录字段 · 值 ＋ 1） >= 按键读取记录字段 · 值，执行满足条件的分支。收起步骤更多操作编辑结构↑↓复制删除满足条件时删除玩家按键读取记录字段 · 值的扩展映射，名称为recall-records，分组为content，记录类型为atomic-recall-record@1，键字段为pieceKey，输入为输入 · 记录保存返回值完成 → 更多操作编辑模块↑↓复制删除查看技术信息操作已经声明的玩家 extension 映射；同一键写入只替换对应记录，其他实例保持独立。可用结果：完成让按键读取记录字段 · 值位移到按键读取记录字段 · 值，方式为传送保存返回值结果 → 更多操作编辑模块↑↓复制删除查看技术信息通过现有 displace 提交器提交一名棋子的位移。可用结果：结果、是否成功将实例副本按键读取记录字段 · 值应用到按键读取记录字段 · 值保存返回值完成 → 更多操作编辑模块↑↓复制删除查看技术信息恢复目标棋子信息，保留场上身份和位置；位置通过位移模块单独处理，不产生普通治疗或状态增删触发。可用结果：完成满足条件时添加步骤＋ 添加语句＋ 条件＋ 逐项执行＋ 受限循环＋ 创建结构化记录＋ 读取记录字段＋ 更新结构化记录＋ 映射集合＋ 筛选集合＋ 汇总集合＋ 查找第一项＋ 等待选择＋ 返回结果否则否则添加步骤＋ 添加语句＋ 条件＋ 逐项执行＋ 受限循环＋ 创建结构化记录＋ 读取记录字段＋ 更新结构化记录＋ 映射集合＋ 筛选集合＋ 汇总集合＋ 查找第一项＋ 等待选择＋ 返回结果满足条件时添加步骤＋ 添加语句＋ 条件＋ 逐项执行＋ 受限循环＋ 创建结构化记录＋ 读取记录字段＋ 更新结构化记录＋ 映射集合＋ 筛选集合＋ 汇总集合＋ 查找第一项＋ 等待选择＋ 返回结果否则否则添加步骤＋ 添加语句＋ 条件＋ 逐项执行＋ 受限循环＋ 创建结构化记录＋ 读取记录字段＋ 更新结构化记录＋ 映射集合＋ 筛选集合＋ 汇总集合＋ 查找第一项＋ 等待选择＋ 返回结果执行内容添加步骤＋ 添加语句＋ 条件＋ 逐项执行＋ 受限循环＋ 创建结构化记录＋ 读取记录字段＋ 更新结构化记录＋ 映射集合＋ 筛选集合＋ 汇总集合＋ 查找第一项＋ 等待选择＋ 返回结果",
+          "editor": true,
+          "inspectorCount": 1
+        },
+        "expression": "records_items",
+        "typeLabel": "元组<记录 · atomic-recall-record@1>",
+        "persistedItems": {
+          "kind": "output",
+          "node": "records",
+          "port": "items"
+        },
+        "reopened": true
+      }
+    },
+    {
+      "name": "Flying Raijin exposes its linked rule through the Cluster sentence editor",
+      "ok": true,
+      "detail": {
+        "tabs": [
+          {
+            "kind": "overview",
+            "text": "概览",
+            "disabled": false
+          },
+          {
+            "kind": "skill",
+            "text": "被动入口（兼容） 1",
+            "disabled": false
+          },
+          {
+            "kind": "rule",
+            "text": "规则 2",
+            "disabled": false
+          },
+          {
+            "kind": "status",
+            "text": "状态 1",
+            "disabled": false
+          },
+          {
+            "kind": "card",
+            "text": "卡牌 0",
+            "disabled": true
+          },
+          {
+            "kind": "extension",
+            "text": "扩展 0",
+            "disabled": false
+          }
+        ],
+        "state": {
+          "visibleNodes": [
+            "mark-instances",
+            "active-mark-instances",
+            "active-mark-return",
+            "eligible-branch",
+            "marked-ally-branch",
+            "source-enemy-branch",
+            "source-target-available",
+            "source-target-reserved-hit--filter",
+            "source-target-reserved-hit--filter-return",
+            "source-target-available-return",
+            "source-target-landing-branch",
+            "source-target-options",
+            "source-target-choice",
+            "source-target-choice-branch",
+            "source-target-landing",
+            "source-target-move",
+            "source-target-move-branch",
+            "source-target-damage",
+            "source-target-attack-up",
+            "source-target-target-statuses",
+            "source-target-target-status-branch",
+            "source-target-write-stacks",
+            "source-target-write-duration",
+            "source-target-mark-id",
+            "source-target-mark-record",
+            "source-target-mark-target",
+            "source-target-old-statuses",
+            "source-target-remove-old-statuses",
+            "source-target-remove-mark",
+            "marked-enemy-branch",
+            "marked-target-available",
+            "marked-target-reserved-hit--filter",
+            "marked-target-reserved-hit--filter-return",
+            "marked-target-available-return",
+            "marked-target-landing-branch",
+            "marked-target-options",
+            "marked-target-choice",
+            "marked-target-choice-branch",
+            "marked-target-landing",
+            "marked-target-move",
+            "marked-target-move-branch",
+            "marked-target-damage",
+            "marked-target-attack-up",
+            "marked-target-target-statuses",
+            "marked-target-target-status-branch",
+            "marked-target-write-stacks",
+            "marked-target-write-duration",
+            "marked-target-mark-id",
+            "marked-target-mark-record",
+            "marked-target-mark-target",
+            "marked-target-old-statuses",
+            "marked-target-remove-old-statuses",
+            "marked-target-remove-mark",
+            "done"
+          ],
+          "slotCount": 111,
+          "firstSlot": "mark-instances:input:piece",
+          "inspectorCount": 1
+        },
+        "selectedRuleSlot": true,
+        "choiceTitle": "飞雷神触发（UI验收）",
+        "savedAndReopened": true
+      }
+    },
+    {
+      "name": "Extension custom access, schema, ports and declarations use the same modern inspector and survive save/reload",
+      "ok": true,
+      "detail": {
+        "projection": {
+          "visible": [
+            "choice",
+            "wait-or-cancel",
+            "return-selection",
+            "damage",
+            "freeze-after-success",
+            "freeze-clock",
+            "freeze-record",
+            "freeze-status",
+            "freeze-move-rule",
+            "freeze-skill-rule",
+            "freeze-skill",
+            "flat-declare-player",
+            "flat-write-player",
+            "flat-read-missing",
+            "flat-declare-piece",
+            "flat-scope",
+            "flat-declare-branch-piece",
+            "flat-read-else-piece",
+            "return-result"
+          ],
+          "writeText": "将读取玩家扩展变量（所属玩家，变量：savedPlayerState，字段：stats.hp）写入所属玩家的扩展变量savedPlayerState，分组为content，字段路径为stats.hp，类型为数值保存返回值值 → 更多操作编辑模块↑↓复制删除查看技术信息可从当前上下文选择，也可自定义变量和字段路径。缺失或类型不符时语句无效，独立后续继续，不自动创建数据。元组路径下标从 1 开始。可用结果：值"
+        },
+        "initial": {
+          "inspectorCount": 1,
+          "editorOutside": 0,
+          "name": "missingState",
+          "valueType": true
+        },
+        "edited": {
+          "namespace": "author-test",
+          "name": "customRecord",
+          "path": "state.hp",
+          "valueType": "record"
+        },
+        "datalist": [
+          "priorPlayer"
+        ],
+        "configBefore": {
+          "schemas": true,
+          "ports": 2,
+          "declarations": true,
+          "addSchema": true,
+          "addComposite": true,
+          "addContinuation": true
+        },
+        "schemaState": {
+          "card": "flat-record@1",
+          "fields": 3
+        },
+        "declarationState": {
+          "composites": [
+            "composite-1@v1"
+          ],
+          "continuations": [
+            "continuation-1@v1"
+          ],
+          "portAddButtons": 2
+        },
+        "configAfter": {
+          "schemas": 3,
+          "fields": 8,
+          "composites": 1,
+          "continuations": 1,
+          "ports": 6,
+          "inspectorCount": 1
+        },
+        "inspectorScrollBefore": {
+          "top": 3891,
+          "max": 3891
+        },
+        "inspectorScrollAfter": {
+          "top": 3891,
+          "max": 4077
+        },
+        "persisted": {
+          "namespace": "author-test",
+          "name": "customRecord",
+          "path": "state.hp",
+          "valueType": "record"
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\fireball-wide-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\fireball-amount-inspector.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\author-card-hand-extension.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\author-card-armor-assembly.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\current-skill-status-icon.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\module-version-picker.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shadow-clone-wide.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shadow-clone-narrow-collapsed.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shadow-clone-edit-reopen.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\recall-trigger-wide.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\flying-raijin-rule.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\extension-config-inspector.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\fireball-narrow.png"
+  ],
+  "ok": true,
+  "failureCount": 0,
+  "reportPath": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\sentence-flat-ui-smoke.json"
+}

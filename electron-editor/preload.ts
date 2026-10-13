@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('editorAPI', {
   workbenchImage: (id: string, relative: string, side: 'before' | 'after', hash: string, acceptedHash: string) => ipcRenderer.invoke('workbench-image', id, relative, side, hash, acceptedHash),
   workbenchExport: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-export', id, hash, notes),
   workbenchTraining: (id: string, hash: string) => ipcRenderer.invoke('workbench-training', id, hash),
+  skillTrial: (input: unknown) => ipcRenderer.invoke('skill-trial', input),
   workbenchPublish: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-publish', id, hash, notes),
   publicationSettings: () => ipcRenderer.invoke('publication-settings'),
   publicationSaveSettings: (input: unknown) => ipcRenderer.invoke('publication-save-settings', input),

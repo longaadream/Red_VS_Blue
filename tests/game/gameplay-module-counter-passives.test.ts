@@ -28,9 +28,6 @@ function testPiece(options: Record<string, any> = {}): any {
 
 function snapshot(state: any, extras: any): any {
   const plain = JSON.parse(JSON.stringify(state))
-  for (const piece of [...(plain.pieces || []), ...(plain.graveyard || [])]) {
-    if (Array.isArray(piece.rules)) piece.rules = piece.rules.map((rule: any) => rule?.id || rule)
-  }
   return { state: plain, extras: JSON.parse(JSON.stringify(extras ?? null)) }
 }
 
@@ -78,11 +75,29 @@ describe('counter/passive semantic rule graphs', () => {
       holder.statusTags = variant === 'missing-core' ? [] : [{ id: 'momentum-core', type: 'momentum-core', stacks: 1 }]
       const other = testPiece({ instanceId: 'other', ownerPlayerId: 'player-blue', name: '敌方' })
       const state: any = makeState({ pieces: [holder, other], turnNumber: 2 })
-      state.actions = variant === 'zero' ? [] : [{ type: 'move', payload: { pieceId: holder.instanceId, fromX: 0, fromY: 0, toX: 2, toY: 1 } }]
+      state.actions = variant === 'zero'
+        ? [{ type: 'move', payload: { pieceId: holder.instanceId, path: [] } }]
+        : [{ type: 'move', payload: {
+          pieceId: holder.instanceId,
+          path: [{ x: 1, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 1 }],
+        } }]
       return { state, contexts: [{ type: 'afterMove', rulePiece: holder, sourcePiece: variant === 'wrong-source' ? other : holder }] }
     }
     for (const variant of ['active', 'zero', 'wrong-source', 'missing-core'] as const) expectEquivalent('rule-momentum-gain', build(variant))
     expect(execute('rule-momentum-gain', true, build('active')).results[0]).toMatchObject({ success: true })
+  })
+  it('updates the exact no-id momentum status instance', () => {
+    const build: Build = () => {
+      const holder = testPiece({ instanceId: 'momentum-no-id', ownerPlayerId: 'player-red', name: '无标识动能棋子' })
+      holder.statusTags = [{ type: 'momentum-core', stacks: 1 }, { type: 'momentum-core', stacks: 8 }]
+      const other = testPiece({ instanceId: 'other', ownerPlayerId: 'player-blue', name: '敌方' })
+      const state: any = makeState({ pieces: [holder, other], turnNumber: 2 })
+      state.actions = [{ type: 'move', payload: { pieceId: holder.instanceId, path: [{ x: 1, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 1 }] } }]
+      return { state, contexts: [{ type: 'afterMove', rulePiece: holder, sourcePiece: holder }] }
+    }
+    const result = expectEquivalent('rule-momentum-gain', build)
+    const statuses = result.state.pieces.find((piece: any) => piece.instanceId === 'momentum-no-id').statusTags
+    expect(statuses).toEqual([{ type: 'momentum-core', stacks: 4 }, { type: 'momentum-core', stacks: 8 }])
   })
 
   it('uses the most recent matching move when opposite-direction moves coexist', () => {
@@ -92,14 +107,19 @@ describe('counter/passive semantic rule graphs', () => {
       const other = testPiece({ instanceId: 'other', ownerPlayerId: 'player-blue', name: '敌方' })
       const state: any = makeState({ pieces: [holder, other], turnNumber: 2 })
       state.actions = [
-        { type: 'move', payload: { pieceId: holder.instanceId, fromX: 0, fromY: 0, toX: 4, toY: 0 } },
-        { type: 'move', payload: { pieceId: holder.instanceId, fromX: 4, fromY: 0, toX: 1, toY: 0 } },
+        { type: 'move', payload: { pieceId: holder.instanceId, path: [{ x: 1, y: 0 }, { x: 2, y: 0 }] } },
+        { type: 'move', payload: {
+          pieceId: holder.instanceId,
+          // The latest action takes a four-cell detour even though its
+          // endpoints are only two cells apart; path length is authoritative.
+          path: [{ x: 3, y: 0 }, { x: 3, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }],
+        } },
       ]
       return { state, contexts: [{ type: 'afterMove', rulePiece: holder, sourcePiece: holder }] }
     }
     const result = expectEquivalent('rule-momentum-gain', build)
-    expect(result.results[0]).toMatchObject({ success: true, message: '动能棋子获得3点动能（4）' })
-    expect(result.state.pieces.find((piece: any) => piece.instanceId === 'momentum-holder').statusTags[0].stacks).toBe(4)
+    expect(result.results[0]).toMatchObject({ success: true, message: '动能棋子获得4点动能（5）' })
+    expect(result.state.pieces.find((piece: any) => piece.instanceId === 'momentum-holder').statusTags[0].stacks).toBe(5)
   })
 
   it('preserves Mortis fractional counters and repeated unlock attempts', () => {

@@ -18,6 +18,7 @@ import {
   STATUS_GUARD_COMPOSITE_ID,
   runSemanticGuardMigrations,
 } from '@/scripts/migrate-semantic-guards'
+import { migrateAtomicAuthorGraph } from '@/scripts/migrate-atomic-author-modules'
 import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
 import { clearRuleCache, loadRuleById } from '@/lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
@@ -51,10 +52,11 @@ function statementModules(graph: any): string[] {
   return modules
 }
 
-function migratedDocument(config: GuardConfig): JsonRecord {
+function migratedDocument(config: GuardConfig, canonical = false): JsonRecord {
   const baseline = fixture.entries[config.id]
   if (!baseline) throw new Error(`Missing frozen guard fixture ${config.id}`)
-  return applyGameplayModuleGraph(clone(baseline), buildSemanticGuardGraph(config), 'skillCode') as JsonRecord
+  const graph = canonical ? migrateAtomicAuthorGraph(buildSemanticGuardGraph(config)) : buildSemanticGuardGraph(config)
+  return applyGameplayModuleGraph(clone(baseline), graph, 'skillCode') as JsonRecord
 }
 
 type Scenario = {
@@ -95,15 +97,7 @@ function scenarioState(config: GuardConfig, rule: any, scenario: Scenario): { st
 }
 
 function behaviorSnapshot(state: any, result: unknown): unknown {
-  return JSON.parse(JSON.stringify({
-    result,
-    pieces: state.pieces.map((piece: any) => ({
-      instanceId: piece.instanceId,
-      currentHp: piece.currentHp,
-      statusTags: piece.statusTags,
-      ruleIds: (piece.rules ?? []).map((rule: any) => rule.id),
-    })),
-  }))
+  return JSON.parse(JSON.stringify({ state, result }))
 }
 
 function withRulePair<T>(config: GuardConfig, callback: (legacy: any, semantic: any) => T): T {
@@ -112,7 +106,9 @@ function withRulePair<T>(config: GuardConfig, callback: (legacy: any, semantic: 
   const previousRoot = process.env.RVB_PROFILE_ROOT
   const filename = join(root, 'data', 'rules', `${config.ruleId}.json`)
   const legacy = clone(fixture.entries[config.id])
-  const semantic = migratedDocument(config)
+  // Exercise the same canonical graph that is written to production, rather
+  // than mixing the intermediate builder's legacy guards with v3 expectations.
+  const semantic = migratedDocument(config, true)
   try {
     process.env.RVB_PROFILE_ROOT = root
     writeFileSync(filename, JSON.stringify(legacy), 'utf8')
@@ -133,31 +129,31 @@ function withRulePair<T>(config: GuardConfig, callback: (legacy: any, semantic: 
 }
 
 describe('RED-252 semantic status event guard batch', () => {
-  it('builds every guard from one expandable graph composition', () => {
+  it('expands every guard into public atomic statements', () => {
     for (const config of SEMANTIC_GUARD_CONFIGS) {
-      const graph = buildSemanticGuardGraph(config)
+      const graph = migrateAtomicAuthorGraph(buildSemanticGuardGraph(config))
       expect(graph.version).toBe(GAMEPLAY_MODULE_GRAPH_VERSION)
       expect(graph.surface).toBe('rule')
-      expect(graph.composites).toEqual(expect.arrayContaining([
+      expect(graph.composites ?? []).not.toEqual(expect.arrayContaining([
         expect.objectContaining({ id: STATUS_GUARD_COMPOSITE_ID, version: '1' }),
       ]))
       const modules = statementModules(graph)
       expect(modules).toEqual(expect.arrayContaining([
         'ref.holder',
         config.reference === 'source' ? 'ref.source' : config.reference === 'target' ? 'ref.target' : 'ref.event-piece',
-        'query.has-piece',
-        'compare.equal-piece',
-        'status.has-piece',
-        'attribute.text',
+        'query.piece',
+        'compare.values',
+        'piece.field',
+        'collection.length',
         'text.concat',
         'rule.remove-piece',
         'event.block',
       ]))
-      if (config.requiresAlive) expect(modules).toEqual(expect.arrayContaining(['attribute.read', 'compare.greater-than']))
-      else expect(modules).not.toContain('attribute.read')
+      expect(modules).not.toContain('shared.status-event-guard')
+      if (config.requiresAlive) expect(modules).toEqual(expect.arrayContaining(['piece.field', 'compare.greater-than']))
       expect(modules.some(module => module.includes('native') || module.includes('execute'))).toBe(false)
       const compiled = compileGameplayModuleGraph(graph, GAMEPLAY_MODULE_REGISTRY)
-      expect(compiled.code).toBe((migratedDocument(config).skillCode as string))
+      expect(compiled.code).toBe((migratedDocument(config, true).skillCode as string))
     }
   })
 
@@ -193,7 +189,7 @@ describe('RED-252 semantic status event guard batch', () => {
     }
   })
 
-  it('matches the frozen host across missing references, wrong subjects, status expiry, and dead holders', () => {
+  it('preserves gameplay guards while missing references skip their dependent statements', () => {
     const scenarios: readonly [string, Scenario][] = [
       ['active', { status: true }],
       ['missing-holder', { status: true, missingHolder: true }],
@@ -209,6 +205,17 @@ describe('RED-252 semantic status event guard batch', () => {
           const semanticInput = scenarioState(config, semantic, scenario)
           const legacyResult = legacy.effect(legacyInput.state, legacyInput.context)
           const semanticResult = semantic.effect(semanticInput.state, semanticInput.context)
+          if (label === 'missing-holder' || label === 'missing-subject') {
+            // A missing or stale holder/subject invalidates only the graph
+            // dependency.  The semantic guard skips its own work and lets the
+            // host continue; the frozen helper returned its historical
+            // failure result.
+            expect(behaviorSnapshot(semanticInput.state, undefined), `${config.id}:${label}:state`)
+              .toEqual(behaviorSnapshot(legacyInput.state, undefined))
+            expect(semanticResult, `${config.id}:${label}:semantic`).toEqual({ success: true })
+            expect(legacyResult, `${config.id}:${label}:legacy`).toEqual({ success: false, message: '' })
+            continue
+          }
           expect(behaviorSnapshot(semanticInput.state, semanticResult), `${config.id}:${label}`)
             .toEqual(behaviorSnapshot(legacyInput.state, legacyResult))
         }

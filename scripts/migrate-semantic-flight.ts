@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertFrozenExecutable } from './semantic-migration-source'
 
 import {
   applyGameplayModuleGraph,
@@ -223,15 +224,18 @@ export function buildTailsTwinFlightGraph(): GameplayModuleGraph {
       allyX: output('cell-b-coordinates', 'x'), allyY: output('cell-b-coordinates', 'y'),
       flightId: output('flight-id-b-y', 'text'), currentDuration: literal(2), relatedRules: literal([FLIGHT_RULE]),
     }),
-    call('apply-reservation-record', 'status.apply-record', { target: output('source', 'piece'), record: output('reservation-record', 'value') }),
+    call('apply-reservation-record', 'status.apply-record', { target: output('source', 'piece'), record: output('reservation-record', 'value') }, { inputPolicy: 'host' }),
+    call('install-reservation-rule', 'rule.apply-piece', { target: output('source', 'piece') }, { ruleId: FLIGHT_RULE }),
     statusRecord(commitSuccess, 'source', 'immune', output('flight-id-b-y', 'text'), output('source-id', 'id')),
-    call('apply-source-immune', 'status.apply-record', { target: output('source', 'piece'), record: output('immune-source-record', 'value') }),
+    call('apply-source-immune', 'status.apply-record', { target: output('source', 'piece'), record: output('immune-source-record', 'value') }, { inputPolicy: 'host' }),
     statusRecord(commitSuccess, 'source', 'inoperable', output('flight-id-b-y', 'text'), output('source-id', 'id')),
-    call('apply-source-inoperable', 'status.apply-record', { target: output('source', 'piece'), record: output('inoperable-source-record', 'value') }),
+    call('apply-source-inoperable', 'status.apply-record', { target: output('source', 'piece'), record: output('inoperable-source-record', 'value') }, { inputPolicy: 'host' }),
+    ...['rule-tails-flight-immune', 'rule-tails-flight-immune-target', 'rule-tails-flight-inoperable', 'rule-tails-flight-inoperable-skill'].map((ruleId, index) => call('install-source-rule-' + index, 'rule.apply-piece', { target: output('source', 'piece') }, { ruleId })),
     statusRecord(commitSuccess, 'ally', 'immune', output('flight-id-b-y', 'text'), output('ally-id', 'id')),
-    call('apply-ally-immune', 'status.apply-record', { target: output('ally', 'piece'), record: output('immune-ally-record', 'value') }),
+    call('apply-ally-immune', 'status.apply-record', { target: output('ally', 'piece'), record: output('immune-ally-record', 'value') }, { inputPolicy: 'host' }),
     statusRecord(commitSuccess, 'ally', 'inoperable', output('flight-id-b-y', 'text'), output('ally-id', 'id')),
-    call('apply-ally-inoperable', 'status.apply-record', { target: output('ally', 'piece'), record: output('inoperable-ally-record', 'value') }),
+    call('apply-ally-inoperable', 'status.apply-record', { target: output('ally', 'piece'), record: output('inoperable-ally-record', 'value') }, { inputPolicy: 'host' }),
+    ...['rule-tails-flight-immune', 'rule-tails-flight-immune-target', 'rule-tails-flight-inoperable', 'rule-tails-flight-inoperable-skill'].map((ruleId, index) => call('install-ally-rule-' + index, 'rule.apply-piece', { target: output('ally', 'piece') }, { ruleId })),
     ...resultAction('success', literal(true), literal('已预留双尾飞行落点')),
   )
   const commit: GameplayStatement[] = [
@@ -359,7 +363,7 @@ function canonicalJson(value: unknown): string {
   return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson((value as JsonRecord)[key])}`).join(',')}}`
 }
 
-const GENERATED_FIELDS = new Set(['code', 'skillCode', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries', 'gameplayModules'])
+const GENERATED_FIELDS = new Set(['code', 'skillCode', 'previewCode', 'cluster', 'contentGraph', 'contentGraphField', 'contentGraphCompilerVersion', 'contentGraphEntries', 'gameplayModules'])
 const APPROVED_DESCRIPTION = '选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记为双方落点。标记格可被进入。双方获得免疫[2]与不可操作[2]。此后的第2个己方回合结束时分别传送至标记格。落点被占或无法落脚时，仅取消对应棋子的传送。结束飞行状态。'
 
 function assertCompatibility(current: JsonRecord, baseline: JsonRecord, migration: SemanticFlightMigration): void {
@@ -381,6 +385,12 @@ function migrateOne(root: string, baseline: JsonRecord, migration: SemanticFligh
   const file = path.join(root, relative)
   if (!fs.existsSync(file)) throw new Error(`${migration.id}: production file does not exist`)
   const current = readJson(file)
+  const moduleDocument = current.gameplayModules
+  if (isRecord(moduleDocument) && isRecord(moduleDocument.entries) && moduleDocument.entries[migration.field]) {
+    assertGameplayModuleDocument(current)
+    return current
+  }
+  assertFrozenExecutable(current, baselineEntry, migration.field, migration.surface, migration.id)
   assertCompatibility(current, baselineEntry, migration)
   const next = applyGameplayModuleGraph(current, migration.build(), migration.field)
   assertGameplayModuleDocument(next)

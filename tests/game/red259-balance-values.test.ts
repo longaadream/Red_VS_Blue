@@ -8,6 +8,7 @@ import { hashStable, runBattleAction } from '@/lib/game/battle-runner'
 import { getPieceById } from '@/lib/game/piece-repository'
 import { prepareAction } from '@/lib/game/targeting'
 import { applyBattleAction, type BattleState } from '@/lib/game/turn'
+import { assertGameplayModuleDocument } from '@/lib/skill-graph/module-document'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
 const DATA_ROOT = join(process.cwd(), 'data')
@@ -113,7 +114,13 @@ describe('RED-259 holy-light balance values', () => {
     expect(blessing).toMatchObject({ cooldownTurns: 2, powerMultiplier: 1.5 })
     expect(blessing.description).toBe('获得1张随机圣光手牌。下张打出的圣光手牌效果提高50%。')
     expect(blessing.previewCode).toContain(blessing.description)
-    expect(blessing.code).toContain("multiplier: 1.5")
+    assertGameplayModuleDocument(blessing)
+    expect(blessing.gameplayModules.entries.code.graph.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'record.create',
+        fields: expect.objectContaining({ multiplier: { kind: 'literal', value: 1.5 } }),
+      }),
+    ]))
     expect(blessing.code).toContain('效果提高50%')
 
     const velen = loadJson<any>('pieces', 'velen.json')

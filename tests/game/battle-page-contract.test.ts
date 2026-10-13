@@ -681,6 +681,7 @@ describe('battle page route contract', () => {
       pendingMove: false,
       selectedPieceId: null,
       isPendingHandSelection: () => false,
+      getHandOptionSelection: () => null,
       setStatusMsg: (message: string) => statusMessages.push(message),
       setMoveButtonClass: () => undefined,
       renderPieceContextMenu: () => undefined,

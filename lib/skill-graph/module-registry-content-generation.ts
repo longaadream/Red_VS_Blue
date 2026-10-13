@@ -107,6 +107,22 @@ function stringListLiteral(ctx: GameplayNativeLoweringContext, name: string): st
 
 const CHOICE_AND_LIST_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
+    id: 'choice.string-options', label: '选择文本选项',
+    description: '只传递作者声明的选择参数，未声明的单选/多选、取消和数量沿用宿主默认协议。',
+    inputs: [], outputs: [port('choice', choiceType)],
+    parameters: [parameter('options', stringListType), parameter('labels', stringListType, { optional: true }),
+      parameter('title', stringType, { optional: true }), parameter('selectionMode', stringType, { enum: ['single', 'multi'], optional: true }),
+      parameter('minSelections', numberType, { minimum: 1, optional: true }), parameter('maxSelections', numberType, { minimum: 1, optional: true }),
+      parameter('canCancel', booleanType, { optional: true })],
+    allowedSurfaces: ['skill', 'card', 'pending'], effects: writes(['pending'], ['pendingOptionSelection']),
+    lower: ctx => {
+      const options = stringListLiteral(ctx, 'options'), labels = ctx.parameters.labels === undefined ? options : stringListLiteral(ctx, 'labels')
+      const fields = ['title', 'selectionMode', 'minSelections', 'maxSelections', 'canCancel'].filter(key => Object.prototype.hasOwnProperty.call(ctx.parameters, key))
+        .map(key => `, ${key}: ${ctx.emitLiteral(ctx.parameters[key])}`).join('')
+      return `${flow(ctx)}.choice.option({options:${options}.map(function(value,index){return {value:value,label:${labels}[index]===undefined?value:${labels}[index]};})${fields}})`
+    }, ui: { category: 'choice' },
+  }),
+  define({
     id: 'choice.multi-string',
     label: '多选文本选项',
     description: '使用固定文本选项进入现有多选协议；候选、数量、取消和恢复仍由权威选择宿主处理。',
@@ -281,14 +297,20 @@ const CONTENT_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
     id: 'content.copy-card',
     label: '复制卡牌定义',
-    description: '复制已存在的动态卡牌定义；静态卡牌或缺少动态定义时沿用来源 ID。未知字段与模块图保持原样。',
-    inputs: [port('sourceId', stringType), port('index', numberType)],
-    outputs: [port('cardId', stringType), port('copied', booleanType)],
-    parameters: [parameter('idPrefix', stringType, { default: 'content-copy-' })],
+    description: '按来源卡牌标识复制已存在的动态卡牌定义；静态卡牌或缺少动态定义时沿用来源标识。复制序号只用于生成稳定的新标识，卡牌字段和模块图由宿主深复制并保持原样。',
+    inputs: [
+      port('sourceId', stringType, { label: '来源卡牌标识', description: '内容库中已有卡牌或动态卡牌定义的标识。' }),
+      port('index', numberType, { label: '复制序号', description: '当前复制操作的非负整数序号。' }),
+    ],
+    outputs: [
+      port('cardId', stringType, { label: '新卡牌标识', description: '复制成功时生成的卡牌标识；静态来源复制失败时返回来源标识。' }),
+      port('copied', booleanType, { label: '是否复制成功', description: '来源存在动态定义并完成深复制时为真。' }),
+    ],
+    parameters: [parameter('idPrefix', stringType, { label: '新卡牌标识前缀', description: '生成动态卡牌标识时使用的前缀。', default: 'content-copy-' })],
     allowedSurfaces: ACTIVE_SURFACES,
     effects: writes(['content', 'hand'], ['contentCardCopied']),
     lower: ctx => `${flow(ctx)}.content.copyCard(${input(ctx, 'sourceId')}, ${stringLiteral(ctx, 'idPrefix', 'content-copy-')}, ${input(ctx, 'index')})`,
-    ui: { category: 'content' },
+    ui: { category: 'content', authoring: 'standard' },
   }),
   define({
     id: 'content.materialize-template',
@@ -300,14 +322,51 @@ const CONTENT_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
       port('name', stringType),
       port('description', stringType),
       port('owner', playerType, { nullable: true, optional: true }),
+      port('extension', 'record', { optional: true, label: '扩展变量' }),
+      port('fields', 'record', { optional: true, label: '字段绑定' }),
+      port('omitFields', stringListType, { optional: true, label: '省略的展示字段' }),
     ],
     outputs: [port('cardId', stringType), port('success', booleanType)],
     parameters: [parameter('kind', stringType, { enum: ['card'], default: 'card' })],
     allowedSurfaces: ACTIVE_SURFACES,
     effects: writes(['content'], ['contentCardMaterialized']),
-    lower: ctx => `${flow(ctx)}.content.materializeTemplate({kind: ${stringLiteral(ctx, 'kind', 'card')}, templateId: ${input(ctx, 'templateId')}, cardId: ${input(ctx, 'cardId')}, name: ${input(ctx, 'name')}, description: ${input(ctx, 'description')}, owner: ${ctx.inputs.owner ?? 'null'}})`,
+    lower: ctx => `${flow(ctx)}.content.materializeTemplate({kind: ${stringLiteral(ctx, 'kind', 'card')}, templateId: ${input(ctx, 'templateId')}, cardId: ${input(ctx, 'cardId')}, name: ${input(ctx, 'name')}, description: ${input(ctx, 'description')}, owner: ${ctx.inputs.owner ?? 'null'}${ctx.inputs.extension ? ', extension: ' + ctx.inputs.extension : ''}${ctx.inputs.fields ? ', fields: ' + ctx.inputs.fields : ''}${ctx.inputs.omitFields ? ', omitFields: ' + ctx.inputs.omitFields : ''}})`,
     ui: { category: 'content' },
   }),
+  {
+    ...define({
+      id: 'content.materialize-template',
+      label: '按模板创建卡牌',
+      description: '以受信卡牌模板引用、结构化字段和结构化扩展创建动态卡牌定义；返回可直接交给“获得手牌”的卡牌定义引用，不接受源码或原始 JSON 文本。',
+      inputs: [
+        port('template', 'content', { label: '卡牌模板', description: '从模板引用句式取得的受信卡牌模板。' }),
+        port('cardId', stringType, { label: '生成卡牌标识', description: '可由文本、编号或其他表达式动态生成。' }),
+        port('name', stringType, { label: '卡牌名称', description: '可由文本表达式动态生成。' }),
+        port('description', stringType, { optional: true, label: '卡牌说明', description: '可由文本表达式动态生成；省略时为空。' }),
+        port('owner', playerType, { nullable: true, optional: true, label: '归属玩家' }),
+        port('fields', 'record', { optional: true, label: '模板字段' }),
+        port('extension', 'record', { optional: true, label: '初始扩展变量' }),
+        port('omitFields', stringListType, { optional: true, label: '省略的展示字段' }),
+      ],
+      outputs: [port('card', 'card', { label: '动态卡牌定义' }), port('success', booleanType)],
+      inputValueTypeBindings: {
+        fields: { parameter: 'fieldsType' },
+        extension: { parameter: 'extensionType' },
+      },
+      parameters: [
+        parameter('fieldsType', stringType, { label: '字段结构类型', default: 'record' }),
+        parameter('extensionType', stringType, { label: '扩展结构类型', default: 'record' }),
+      ],
+      allowedSurfaces: ACTIVE_SURFACES,
+      effects: writes(['content'], ['contentCardMaterialized']),
+      lower: ctx => {
+        const options = `{kind: "card", templateId: ${input(ctx, 'template')}, cardId: ${input(ctx, 'cardId')}, name: ${input(ctx, 'name')}, description: ${ctx.inputs.description ?? '""'}, owner: ${ctx.inputs.owner ?? 'null'}${ctx.inputs.fields ? ', fields: ' + ctx.inputs.fields : ''}${ctx.inputs.extension ? ', extension: ' + ctx.inputs.extension : ''}${ctx.inputs.omitFields ? ', omitFields: ' + ctx.inputs.omitFields : ''}}`
+        return `(function(result) { return {card: result.cardId, success: Boolean(result.success)}; })(${flow(ctx)}.content.materializeTemplate(${options}))`
+      },
+      ui: { category: 'content', authoring: 'standard' },
+    }),
+    version: '2',
+  },
   define({
     id: 'card.hand-add-ref',
     label: '加入动态卡牌手牌',

@@ -29,7 +29,6 @@ describe('oath reflection semantic graph', () => {
         const runtime = new RuleRuntime({ rootSeed: 251 })
         const result = withRuleRuntime(runtime, () => scenario === 'combat' ? dealDamage(enemy, holder, damage, 'true', battle, 'oath-test') : rule.effect(battle, context))
         const state = JSON.parse(JSON.stringify(battle))
-        for (const item of [...state.pieces, ...state.graveyard]) if (item.rules) item.rules = item.rules.map((rule: any) => rule.id)
         return { result, state, queued: queued.map(effect => ({ ...effect, attacker: effect.attacker.instanceId, target: effect.target.instanceId })), random: runtime.snapshot() }
       }
       for (const damage of [0, 0.5, 1, 10, 20]) for (const scenario of ['normal', 'ally', 'dead-first', 'no-oath', 'departed', 'departed-no-oath', 'wrong-subject', 'combat']) expect(run(true, scenario, damage), scenario + ':' + damage).toEqual(run(false, scenario, damage))

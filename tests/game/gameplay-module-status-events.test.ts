@@ -37,7 +37,6 @@ describe('semantic status event recipes', () => {
           const context: any = { type: frozen.trigger.type, damage, rulePiece: scenario === 'missing-holder' ? null : holder, piece: subject, sourcePiece: subject, playerId: scenario === 'wrong-turn' ? 'player-blue' : 'player-red' }
           const result = rule.effect(state, context)
           const plain = JSON.parse(JSON.stringify(state))
-          for (const piece of plain.pieces) piece.rules = piece.rules.map((r: any) => r.id)
           return { result, state: plain, damage: context.damage }
         }
         for (const damage of [-2, 0, 0.5, 1, 2, 10.5]) for (const scenario of ['active', 'dead', 'missing-status', 'missing-subject', 'wrong-subject', 'missing-holder', ...(id === 'rule-naruto-sage-tick' ? ['clones', 'enemy-clones', 'dead-clones', 'wrong-turn'] : [])]) {

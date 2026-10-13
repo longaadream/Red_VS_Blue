@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "executable": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\node_modules\\electron\\dist\\electron.exe",
+  "projectFixture": "isolated temporary content project",
+  "firstView": "piece-first/light-shell",
+  "skillNavigation": true,
+  "noSkillTitleOrPreviewArtwork": true,
+  "constantExpressionOptions": true,
+  "expressionScreenshot": true,
+  "multiplierSavedAndReopened": true,
+  "unknownSkillFieldPreserved": true,
+  "undoRedoPersisted": true,
+  "statusGlobalNavigationActualDefinition": true,
+  "statusCrossDocumentOwner": true,
+  "standaloneRuleStatusUndoRedoSaveReopen": true,
+  "statusIconChosenEditedSavedReopened": true,
+  "statusExtensionPreserved": true,
+  "dirtyBuildBlocked": true,
+  "buildSucceededAfterSave": true,
+  "buildPublished": false,
+  "archive": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\studio-shell-smoke.rvbpack",
+  "archiveEntries": [
+    "data/cards/manifest.json",
+    "data/pieces/manifest.json",
+    "data/pieces/studio-piece.json",
+    "data/rules/manifest.json",
+    "data/rules/studio-rule.json",
+    "data/skills/fireball.json",
+    "data/skills/manifest.json",
+    "data/skills/studio-literal.json",
+    "images/status-new.png",
+    "images/status-old.png",
+    "images/studio-piece.png",
+    "manifest.json"
+  ],
+  "archiveManifest": {
+    "kind": "snapshot",
+    "version": "0.1.252",
+    "capabilities": [
+      "game-data",
+      "raster-assets",
+      "trusted-executable-content"
+    ]
+  },
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\piece-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\skill-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\expression-inline.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\status-library.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\piece-status-editor.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\rule-status-editor.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\build-result.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\expression-narrow.png"
+  ]
+}

@@ -15,6 +15,8 @@ import { applyContentGraph, assertContentGraphArtifact } from '@/electron-editor
 import { importContentGraph } from '@/electron-editor/content-graph-import'
 import { compileContentGraph } from '@/electron-editor/content-graph'
 import { buildRafaamCurseCardGraph } from '@/scripts/migrate-generated-content-graphs'
+import { buildRafaamCurseCardGraph as buildSemanticRafaamCurseCardGraph } from '@/scripts/migrate-semantic-rafaam-curse'
+import { assertGameplayModuleDocument, compileGameplayModuleGraph, GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-document'
 import {
   executeCardFunction,
   loadRuleById,
@@ -61,6 +63,8 @@ const FIXTURE_PATH = resolve(
 const ROOT_SEED = 0x2520_252
 
 const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8')) as LegacyFixture
+const currentCurseTemplate = JSON.parse(readFileSync('data/cards/rafaam-curse-sample.json', 'utf8')) as JsonRecord
+assertGameplayModuleDocument(currentCurseTemplate)
 
 // This one generated card family is independently executed (including missing
 // source and copies) in content-graph-generated-cards.test.ts. Normalize only
@@ -77,7 +81,11 @@ function findFrozenCardSource(value:unknown):string[] {
 }
 const frozenCardSources = findFrozenCardSource(frozenWardGraph)
 if (frozenCardSources.length !== 1) throw new Error('Expected exactly one frozen Rafaam generated card source')
-for (const source of [frozenCardSources[0],compileContentGraph(buildRafaamCurseCardGraph()).code]) generatedSourceIdentity.set(source,'RED-252:verified-rafaam-child-source')
+for (const source of [
+  frozenCardSources[0],
+  compileContentGraph(buildRafaamCurseCardGraph()).code,
+  compileGameplayModuleGraph(buildSemanticRafaamCurseCardGraph(), GAMEPLAY_MODULE_REGISTRY).code,
+]) generatedSourceIdentity.set(source,'RED-252:verified-rafaam-child-source')
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -167,7 +175,10 @@ function snapshotValue(value: unknown, context: SnapshotContext = {
   }
 
   const result: JsonRecord = { id }
-  for (const [key, nested] of Object.entries(value)) {
+  // Object construction order is not gameplay state. Canonical key traversal
+  // keeps reference numbering stable when author metadata is attached before
+  // rather than after the same bound data fields. Every key/value is retained.
+  for (const [key, nested] of Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) {
     result[key] = key === 'code' && typeof nested === 'string' && generatedSourceIdentity.has(nested)
       ? generatedSourceIdentity.get(nested)
       : snapshotValue(nested, context)
@@ -457,7 +468,9 @@ function ruleInput(rule: TriggerRule, variant: number): {
     modifiedDamage: variant === 0 ? 7 : variant === 1 ? 3 : 9,
     statusId: variant === 1 ? 'divine-shield' : 'test-status',
     statusType: variant === 1 ? 'divine-shield' : 'test-status',
-    statuses: source.statusTags,
+    // Event data is an explicit snapshot. Removing no matching statuses may
+    // keep or replace the owner's array; neither implies changing this input.
+    statuses: [...source.statusTags],
     targets: [{ info: targetPiece, pos: { x: targetPiece.x, y: targetPiece.y } }],
     battle,
     damageQueue: queues.damage,
@@ -497,6 +510,34 @@ function runRule(
     )
   } catch (cause) {
     error = captureError(cause)
+  }
+
+  if (!definition.gameplayModules) {
+    // Author storage adds a verified type declaration to the same old counter;
+    // the owner, namespace, lifetime and counter value remain fully compared.
+    if (id === 'rule-muzan-regeneration-damage' || id === 'rule-muzan-regeneration-end') {
+      for (const entry of input.battle.extensions?.flowState ?? []) {
+        expect(entry.namespace).toBe('muzan-flesh-regeneration')
+        expect(['lastDamageTurn', 'lastCheckTurn', 'successfulHeals']).toContain(entry.name)
+        expect(typeof entry.value).toBe('number')
+        expect(entry.authorDeclaration).toBeUndefined()
+        entry.authorDeclaration = {type: 'number', schemas: []}
+      }
+    }
+    if (id === 'rule-rafaam-curse-ward') {
+      // The approved player-source child is now a validated author template.
+      // Its runtime behavior (copies, missing source and turn-end) is tested in
+      // content-graph-generated-cards/author-delayed-player-source. Here retain
+      // all generated bindings and compare the exact registered child graph.
+      for (const card of Object.values(input.battle.customCards ?? {}) as JsonRecord[]) {
+        expect(generatedSourceIdentity.has(card.code)).toBe(true)
+        expect(card.sourcePieceId).toBe('rule-source')
+        delete card.sourcePieceId
+        card.code = currentCurseTemplate.code
+        card.gameplayModules = cloneJson(currentCurseTemplate.gameplayModules)
+        card.extension = {sourcePlayerId: 'player-red'}
+      }
+    }
   }
 
   return snapshotValue({

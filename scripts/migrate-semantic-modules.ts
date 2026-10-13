@@ -367,6 +367,14 @@ function migrateOne(root: string, baseline: JsonRecord, entry: SemanticMigration
   const file = path.join(root, 'data', `${entry.id}.json`)
   if (!fs.existsSync(file)) throw new Error(`${entry.id}: production file does not exist`)
   const current = readJson(file)
+  // An authored gameplay-module document is already the source of truth.  It
+  // may intentionally use a different valid composition from this historical
+  // recipe, so validate it before any compatibility comparison or rebuilding
+  // and preserve it unchanged.
+  if (current.gameplayModules !== undefined) {
+    assertGameplayModuleDocument(current)
+    return current
+  }
   assertCompatibilityFields(current, fixtureEntry, entry.id, entry.field)
   const graph = entry.build()
   let document = applyGameplayModuleGraph(current, graph, entry.field)
@@ -381,7 +389,8 @@ export type SemanticMigrationResult = {
   readonly id: string
   readonly field: GraphField
   readonly surface: GameplayModuleSurface
-  readonly status: 'ready' | 'blocked'
+  readonly status: 'ready' | 'already-migrated' | 'blocked'
+  readonly reason?: string
   readonly dependencies?: readonly string[]
   readonly missingAtoms?: readonly string[]
   readonly error?: string
@@ -389,14 +398,38 @@ export type SemanticMigrationResult = {
   readonly file?: string
 }
 
-function run(root: string, entries: readonly SemanticMigration[], baseline: JsonRecord): SemanticMigrationResult[] {
-  return entries.map(entry => {
+export type SemanticMigrationRun = {
+  readonly migrations: readonly SemanticMigration[]
+  readonly reports: readonly SemanticMigrationResult[]
+  readonly documents: ReadonlyMap<string, JsonRecord>
+}
+
+function selectMigrations(ids?: readonly string[]): readonly SemanticMigration[] {
+  if (!ids?.length) return SEMANTIC_MIGRATIONS
+  const known = new Set(SEMANTIC_MIGRATION_IDS.flatMap(id => [id, id.slice(0, id.lastIndexOf('.'))]))
+  const unknown = ids.filter(id => !known.has(id))
+  if (unknown.length) throw new Error(`Unknown semantic migration: ${unknown.join(', ')}`)
+  return SEMANTIC_MIGRATIONS.filter(entry => ids.includes(entry.id) || ids.includes(`${entry.id}.${entry.field}`))
+}
+
+export function runSemanticModuleMigrations(root: string, baseline: JsonRecord, ids?: readonly string[]): SemanticMigrationRun {
+  const migrations = selectMigrations(ids)
+  const reports: SemanticMigrationResult[] = []
+  const documents = new Map<string, JsonRecord>()
+  for (const entry of migrations) {
     const file = path.join(root, 'data', `${entry.id}.json`)
     try {
+      const current = readJson(file)
       const document = migrateOne(root, baseline, entry)
-      return { id: entry.id, field: entry.field, surface: entry.surface, status: 'ready', document, file }
+      const unchanged = canonicalJson(current[entry.field]) === canonicalJson(document[entry.field])
+        && canonicalJson(current.gameplayModules) === canonicalJson(document.gameplayModules)
+      if (unchanged) reports.push({ id: entry.id, field: entry.field, surface: entry.surface, status: 'already-migrated', file })
+      else {
+        documents.set(file, document)
+        reports.push({ id: entry.id, field: entry.field, surface: entry.surface, status: 'ready', document, file })
+      }
     } catch (error) {
-      return {
+      reports.push({
         id: entry.id,
         field: entry.field,
         surface: entry.surface,
@@ -404,9 +437,21 @@ function run(root: string, entries: readonly SemanticMigration[], baseline: Json
         missingAtoms: entry.missingAtoms,
         error: error instanceof Error ? error.message : String(error),
         file,
-      }
+      })
     }
-  })
+  }
+  return { migrations, reports, documents }
+}
+
+export function migrateSemanticModules(root: string, write = false, ids?: readonly string[]): SemanticMigrationRun {
+  const baseline = readJson(path.join(root, 'tests', 'game', 'fixtures', 'RED-252-legacy-content.json'))
+  const run = runSemanticModuleMigrations(root, baseline, ids)
+  const blocked = run.reports.filter(report => report.status === 'blocked')
+  if (write && blocked.length) {
+    throw new Error(JSON.stringify({ message: 'Semantic migration is blocked; no production files were written.', blocked }, null, 2))
+  }
+  if (write) for (const [file, document] of run.documents) fs.writeFileSync(file, JSON.stringify(document, null, 2) + '\n', 'utf8')
+  return run
 }
 
 function cli(): void {
@@ -414,31 +459,15 @@ function cli(): void {
   const args = process.argv.slice(2)
   const write = args.includes('--write')
   const requestedIds = args.filter(argument => argument !== '--write')
-  const entries = requestedIds.length
-    ? SEMANTIC_MIGRATIONS.filter(entry => requestedIds.includes(entry.id) || requestedIds.includes(`${entry.id}.${entry.field}`))
-    : SEMANTIC_MIGRATIONS
-  if (!entries.length) throw new Error(`Unknown semantic migration. Choose one of: ${SEMANTIC_MIGRATION_IDS.join(', ')}`)
-  if (requestedIds.some(id => !SEMANTIC_MIGRATIONS.some(entry => entry.id === id || `${entry.id}.${entry.field}` === id))) {
-    throw new Error(`Unknown semantic migration. Choose one of: ${SEMANTIC_MIGRATION_IDS.join(', ')}`)
-  }
   const baseline = readJson(path.join(root, 'tests', 'game', 'fixtures', 'RED-252-legacy-content.json'))
-  const results = run(root, entries, baseline)
-  const blocked = results.filter(result => result.status === 'blocked')
-  if (write && blocked.length) {
-    throw new Error(JSON.stringify({ message: 'Semantic migration is blocked; no production files were written.', blocked }, null, 2))
-  }
-  if (write) {
-    for (const result of results) {
-      if (!result.document || !result.file) throw new Error(`${result.id}: missing migrated document`)
-      fs.writeFileSync(result.file, JSON.stringify(result.document, null, 2) + '\n', 'utf8')
-    }
-  }
+  const run = migrateSemanticModules(root, write, requestedIds)
+  const blocked = run.reports.filter(report => report.status === 'blocked')
   console.log(JSON.stringify({
     mode: write ? 'written' : 'dry-run',
     compilerVersion: GAMEPLAY_MODULE_COMPILER_VERSION,
     baseSha: baseline.baseSha,
-    notice: 'Only --write updates production data; blocked recipes remain verification-only.',
-    migrations: results.map(({ id, field, surface, status, missingAtoms, error }) => ({ id, field, surface, status, missingAtoms, error })),
+    notice: 'Only --write updates production data; authored gameplay-module documents are validated and preserved.',
+    migrations: run.reports.map(({ id, field, surface, status, reason, missingAtoms, error }) => ({ id, field, surface, status, reason, missingAtoms, error })),
   }, null, 2))
   // A dry run is also a validation command: callers must not mistake a
   // report containing blocked recipes for a successful migration audit.

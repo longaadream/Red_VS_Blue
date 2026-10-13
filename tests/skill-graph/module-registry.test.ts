@@ -10,7 +10,7 @@ import type {
   GameplayModuleSurface,
 } from '../../lib/skill-graph/module-types'
 import { GAMEPLAY_MODULE_GRAPH_VERSION } from '../../lib/skill-graph/module-types'
-import { compileGameplayModuleGraph } from '../../lib/skill-graph/module-compiler'
+import { compileGameplayModuleGraph, compileGameplayModuleGraphV1 } from '../../lib/skill-graph/module-compiler'
 import {
   GAMEPLAY_MODULE_REGISTRY,
   GAMEPLAY_MODULE_VERSION,
@@ -60,17 +60,28 @@ function port(entry: GameplayModuleDescriptor, name: string): GameplayPort {
 
 describe('gameplay semantic module registry', () => {
   it('contains unique versioned descriptors with closed metadata', () => {
-    const ids = gameplayModuleDescriptors.map(entry => entry.id)
+    const ids = gameplayModuleDescriptors.map(entry => `${entry.id}@${entry.version}`)
     expect(ids.length).toBeGreaterThan(25)
     expect(new Set(ids).size).toBe(ids.length)
     for (const entry of gameplayModuleDescriptors) {
-      expect(entry.version).toBe(GAMEPLAY_MODULE_VERSION)
+      expect(entry.version).toMatch(/^\d+$/)
       expect(entry.id).toMatch(/^[a-z][a-z0-9.-]+$/)
       expect(entry.allowedSurfaces.length).toBeGreaterThan(0)
       expect(entry.effects).toBeDefined()
       expect(typeof entry.lower).toBe('function')
       expect(entry.inputs.every(item => typeof item.name === 'string' && item.type !== 'any')).toBe(true)
-      expect(entry.outputs.every(item => typeof item.name === 'string' && item.type !== 'any')).toBe(true)
+      for (const output of entry.outputs) {
+        expect(typeof output.name).toBe('string')
+        // Generic collection access has no concrete element type until its
+        // input is connected. It must declare a closed input-derived binding,
+        // never expose an unbound `any` output to author content.
+        if (output.type === 'any') {
+          const binding = entry.outputTypeBindings?.[output.name]
+          expect(binding, `${entry.id}.${output.name} needs a type binding`).toBeDefined()
+          expect(['same', 'element']).toContain(binding?.projection)
+          expect(entry.inputs.some(input => input.name === binding?.input && input.type !== 'any')).toBe(true)
+        }
+      }
     }
   })
 
@@ -83,10 +94,91 @@ describe('gameplay semantic module registry', () => {
     expect(getGameplayModule('unknown.module')).toBeUndefined()
   })
 
+  it('keeps relation descriptors compatibility-only while preserving both versions for old graphs', () => {
+    const legacy = getGameplayModule('query.same-relation', '1')
+    const current = getGameplayModule('query.same-relation', '2')
+    expect(legacy).toBeDefined()
+    expect(current).toBeDefined()
+    expect(legacy?.ui?.authoring).toBe('compatibility')
+    expect(current?.ui?.authoring).toBe('compatibility')
+    expect(legacy?.livingReferences).toBeUndefined()
+    expect(current?.livingReferences).toEqual(['source', 'target'])
+    expect(Object.isFrozen(current?.livingReferences)).toBe(true)
+    expect(GAMEPLAY_MODULE_REGISTRY.get?.('query.same-relation', '1')).toBe(legacy)
+    expect(GAMEPLAY_MODULE_REGISTRY.get?.('query.same-relation', '2')).toBe(current)
+    expect(getGameplayModule('query.same-relation')).toBe(legacy)
+    const catalog = getGameplayModuleCatalog()
+    expect(catalog.find(item => item.id === 'query.same-relation' && item.version === '2')?.livingReferences).toEqual(['source', 'target'])
+    expect(catalog.find(item => item.id === 'query.same-relation' && item.ui?.authoring === 'standard')).toBeUndefined()
+    expect(catalog.find(item => item.id === 'compare.allied-players' && item.ui?.authoring === 'standard')).toBeUndefined()
+  })
+
+  it('adds standard v2 piece and player text fields while preserving v1 lowering', () => {
+    const legacy = getGameplayModule('attribute.text', '1')
+    const current = getGameplayModule('attribute.text', '2')
+    const player = getGameplayModule('attribute.player-text', '1')
+    const playerField = getGameplayModule('player.field', '1')
+    expect(legacy).toBeDefined()
+    expect(current).toBeDefined()
+    expect(player).toBeDefined()
+    expect(playerField).toBeDefined()
+    expect(legacy?.ui?.authoring).toBe('compatibility')
+    expect(current?.ui?.authoring).toBe('standard')
+    expect(player?.ui?.authoring).toBe('compatibility')
+    expect(playerField?.ui?.authoring).toBe('standard')
+    expect(legacy?.parameters?.[0]?.enum).toEqual(['name'])
+    expect(current?.parameters?.[0]?.enum).toEqual(['name', 'faction'])
+    expect(current?.livingReferences).toEqual(['piece'])
+    expect(player?.parameters?.[0]?.enum).toEqual(['name', 'faction'])
+    expect(player?.livingReferences).toBeUndefined()
+
+    const lowerContext = (entry: GameplayModuleDescriptor, parameters: Record<string, GameplayLiteral>) => entry.lower({
+      surface: 'skill', callId: 'text-test', moduleId: entry.id, moduleVersion: entry.version,
+      inputs: entry.id === 'attribute.player-text' ? { player: 'playerId' } : { piece: 'pieceId' },
+      parameters, outputPorts: entry.outputs, emitLiteral: value => JSON.stringify(value),
+    })
+    expect(source(lowerContext(legacy!, { attribute: 'name' }))).toBe('String(flow.query.piece(pieceId)["name"])')
+    expect(source(lowerContext(current!, { attribute: 'faction' }))).toBe('flow.query.pieceText(pieceId, "faction")')
+    expect(source(lowerContext(player!, { attribute: 'faction' }))).toBe('flow.query.playerText(playerId, "faction")')
+
+    const catalog = getGameplayModuleCatalog()
+    expect(catalog.find(item => item.id === 'attribute.text' && item.version === '2')?.livingReferences).toEqual(['piece'])
+    expect(catalog.find(item => item.id === 'player.field' && item.version === '1')?.ui?.authoring).toBe('standard')
+  })
+
+  it('keeps v1 relation reads available for historical dead-event content', () => {
+    const compiled = compileGameplayModuleGraphV1({
+      version: GAMEPLAY_MODULE_GRAPH_VERSION,
+      surface: 'skill',
+      outputs: [{ name: 'value', type: 'boolean' }],
+      body: [
+        { kind: 'call', id: 'source-ref', module: 'ref.holder', version: '1' },
+        { kind: 'call', id: 'source', module: 'query.piece', version: '1', inputs: { pieceId: { kind: 'output', node: 'source-ref', port: 'piece' } } },
+        { kind: 'call', id: 'target-ref', module: 'ref.target', version: '1' },
+        { kind: 'call', id: 'target', module: 'query.piece', version: '1', inputs: { pieceId: { kind: 'output', node: 'target-ref', port: 'piece' } } },
+        {
+          kind: 'call', id: 'relation', module: 'query.same-relation', version: '1',
+          inputs: { source: { kind: 'output', node: 'source', port: 'piece' }, target: { kind: 'output', node: 'target', port: 'piece' } },
+          parameters: { relation: 'enemy' },
+        },
+        { kind: 'return', id: 'done', value: { kind: 'output', node: 'relation', port: 'value' } },
+      ],
+    }, GAMEPLAY_MODULE_REGISTRY)
+    const execute = runInNewContext('(' + compiled.code + ')', {
+      flow: {
+        refs: { holder: () => 'source-id', target: () => 'target-id' },
+        query: { hasPiece: () => true, piece: (id: string) => ({ instanceId: id, currentHp: 0 }), pieces: () => ['target-id'] },
+      },
+    }) as (context: unknown) => unknown
+    expect(execute({})).toBe(true)
+  })
+
   it('publishes JSON-safe editor metadata without trusted lowering functions', () => {
     const catalog = getGameplayModuleCatalog()
     expect(catalog.length).toBe(gameplayModuleDescriptors.length)
-    expect(JSON.stringify(catalog)).not.toContain('lower')
+    // Module identifiers such as text.lowercase are data; only the trusted
+    // lowering implementation must be absent from the editor snapshot.
+    for (const item of catalog) expect(Object.hasOwn(item, 'lower')).toBe(false)
     expect(JSON.parse(JSON.stringify(catalog))).toEqual(catalog)
     const mutable = catalog.find(item => item.id === 'ref.holder') as { label: string } | undefined
     expect(mutable).toBeDefined()
@@ -114,6 +206,11 @@ describe('gameplay semantic module registry', () => {
     expect(source(lower('query.player', 'skill', { playerId: 'ownerId' }))).toContain('flow.query.hasPlayer(ownerId) ? flow.query.player(ownerId).playerId : null')
     expect(source(lower('query.has-piece', 'skill', { pieceId: 'pieceId' }))).toBe('flow.query.hasPiece(pieceId)')
     expect(source(lower('query.has-player', 'skill', { playerId: 'ownerId' }))).toBe('flow.query.hasPlayer(ownerId)')
+    expect(source(lower('status.find-instance', 'skill', { piece: 'pieceId' }, { statusType: 'momentum-core' }))).toBe('flow.status.findInstance(pieceId, "momentum-core")')
+    expect(source(lower('status.read-number-instance', 'skill', { status: 'statusRef', fallback: 'fallback' }, { field: 'stacks' }))).toBe('flow.status.readNumberInstance(statusRef, "stacks", fallback)')
+    expect(source(lower('status.set-number-instance', 'skill', { status: 'statusRef', value: 'next' }, { field: 'stacks' }))).toBe('flow.status.setNumberInstance(statusRef, "stacks", next)')
+    expect(source(lower('status.has-skill-instance', 'rule', { status: 'statusRef', skillId: 'skillId' }))).toBe('flow.status.hasSkillInstance(statusRef, skillId)')
+    expect(descriptor('status.find-instance').outputs[0]).toMatchObject({ name: 'status', type: 'status', nullable: true })
     expect(descriptor('query.has-piece').inspectReferences).toEqual(['pieceId'])
     expect(descriptor('query.has-player').inspectReferences).toEqual(['playerId'])
     expect(source(lower('query.pieces', 'skill', { originId: 'origin', ownerId: 'owner' }, { relation: 'enemy', range: 3 }))).toContain('flow.query.pieces({')

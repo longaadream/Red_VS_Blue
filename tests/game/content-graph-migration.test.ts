@@ -563,12 +563,22 @@ describe('RED-252 real content graph migration parity', () => {
   })
   it.each(ACTIVE_SKILL_IDS)('%s preserves real active-skill behavior', async skillId => {
     const migration = activeMigration(skillId)
-    const legacyState = () => activeState(migration.legacy)
+    let expectedLegacy = migration.legacy
+    if (skillId === 'fireball') {
+      // The author contract now has only normal/true damage. Apply that one
+      // approved category change to an in-memory copy of the frozen program;
+      // all amounts, targets, events, logs, payment and RNG still execute through
+      // the independent legacy implementation and compare in every channel.
+      const originalCall = "dealDamage(sourcePiece, targetEnemy, damageValue, 'magical', context.battle, context.skill.id)"
+      expect(migration.legacy.code?.split(originalCall)).toHaveLength(2)
+      expectedLegacy = { ...migration.legacy, code: migration.legacy.code!.replace(originalCall, originalCall.replace("'magical'", "'physical'")) }
+    }
+    const legacyState = () => activeState(expectedLegacy)
     const graphState = () => activeState(migration.graph)
     const action = activeAction(legacyState(), skillId)
 
     const report = await assertContentGraphParity(parityOptions(
-      { skills: { [skillId]: migration.legacy }, artifact: migration.artifact },
+      { skills: { [skillId]: expectedLegacy }, artifact: migration.artifact },
       { skills: { [skillId]: migration.graph }, artifact: migration.artifact },
       legacyState,
       graphState,

@@ -1,0 +1,41 @@
+{
+  "passed": false,
+  "error": "Error: Error: missing editable choice range\n    at <anonymous>:5:23\n    at <anonymous>:7:5\n    at evaluate (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-workbench-v2-smoke.mjs:273:38)\n    at async file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-workbench-v2-smoke.mjs:752:3",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-studio-workbench-v2-EgmtaQ\\rvb-content-5d684fb5",
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-piece-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-skills-cluster-list.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-cluster-members.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-card-owner.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-expression-selected.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-expression-narrow.png"
+  ],
+  "runtimeConsoleErrors": [],
+  "runtimeConsoleNoise": [
+    {
+      "type": "error",
+      "args": [
+        "Electron sandboxed_renderer.bundle.js script failed to run"
+      ]
+    },
+    {
+      "type": "error",
+      "args": [
+        "TypeError: Cannot destructure property 'preloadScripts' of 'binding.startupData' as it is null.\n    at node:electron/js2c/sandbox_bundle:2:132134\n    at node:electron/js2c/sandbox_bundle:2:133238\n    at ___electron_webpack_init__ (node:electron/js2c/sandbox_bundle:2:133242)\n    at node:electron/js2c/sandbox_bundle:2:133365"
+      ]
+    }
+  ],
+  "runtimeExceptions": [],
+  "protocolLogErrors": [],
+  "childStdout": "\r\n",
+  "childStderr": "\r\nDevTools listening on ws://127.0.0.1:61329/devtools/browser/ead89f8a-4044-4f9f-ba36-d4f072053920\r\n",
+  "renderer": {
+    "url": "file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/electron-editor/ui/index.html",
+    "active": "<body class=\"studio-surface skill-sentence-surface\" data-shell-route=\"skills\">\n<aside id=\"sidebar\">\n  <div class=\"brand\"><img class=\"studio-brand-image\" src=\"assets/studio-brand.png\" alt=\"\" aria-hidden=\"true\"><div class=\"brand-copy\"><strong>Red VS Blue</strong><span>内容工作台</span></div></div>\n  <nav id=\"tab-bar\" aria-label=\"编辑器模块\">\n    <button class=\"tab-btn\" data-tab=\"workbench\" data-shell-nav=\"workbench\" data-short=\"任务\"><img class=\"tab-icon\" src=\"assets/icons/workbench.svg\" alt=\"\" aria-hidden=\"true\"><span class=\"tab-label\">创作工作台</span></button>\n    <div class=\"tool-separator\">内容</div>\n    <button class=\"tab-btn\" data-tab=\"pieces\" data-shell-nav=\"pieces\" data-short=\"PC\"><img class=\"tab-icon\" src=\"assets/icons/pieces.svg\" alt=\"\" aria-hidden=\"true\"><span class=\"tab-label\">棋子</span></button>\n ",
+    "route": "skills",
+    "status": "",
+    "build": "选择一项操作，结果会显示在这里。",
+    "body": "Red VS Blue\n内容工作台\n创作工作台\n棋子\n能力组\n卡牌\n规则\n素材\n资源包\n组合效果 · 保存内容\n生成资源包 · 试用验证\n内容工作台\n能力组 / studio-expression\n生成资源包\n保存\n项目\n工作台嵌套表达式\nstudio-expression.json\n已保存\n返回列表\n效果\n属性\n高级选项\n概览\n主动技能 1\n规则 0\n状态 0\n卡牌 0\n扩展 1\n表达式组合\n按注册模块展示\n\n能力步骤按注册模块和真实数据引用展示；每条语句、记录、集合、组合流程和续接流程都可在当前作用域继续编辑。\n\n主流程\n持有者\n→ 棋子引用\n\n读取当前技能或规则的持有棋子引用。\n\n↑\n↓\n复制\n删除\n验证棋子引用\n·\npieceId：持有者 · 棋子引用\n→ piece\n\n按不透明棋子 ID 验证并返回同一个不透明引用。\n\n↑\n↓\n复制\n删除\n选择棋子目标\n·\nrange：5\n·\nfilter：敌方\n→ choice\n\n使用现有 selectTarget 协议选择一名棋子；挂起、取消和候选校验由权威宿主处理。\n\n↑\n↓\n复制\n删除\n编辑模块\n完成\n模块选择\n技能威力倍率 · skill.power-multiplier\n选择未完成或已取消 · choice.is-unresolved\n返回权威选择结果 · choice.as-result\n构造行动结果 · result.action\n当前回合编号 · turn.number\n当前回合玩家 · turn.current-player\n当前事件棋子 · ref.event-piece\n棋子所属玩家 · piece.owner\n棋子具有状态类型 · status.has-piece\n棋子状态数量 · status.count-piece\n增加棋子属性 · attribute.adjust\n阻挡当前事件 · event.block\n获取集合长度 · collection.length\n获取集合项 · collection.at\n排序集合 · collection.sort\n棋子具有棋盘坐标 · spatial.has-position\n棋子标识 · piece.identifier\n棋子存活 · piece.alive\n构造地格记录 · spatial.cell\n相邻地格 · spatial.cell-adjacent\n读取地格坐标 · spatial.cell-coordinates\n合法落点 · spatial.cell-landing-legal\n地格具有附着 · tile.has-effect\n添加地格预留标记 · tile.add-reservation\n清理飞行预留 · tile.clear-flight-reservations\n按存在性传送 · effect.teleport-if-present\n附加结构化棋子状态 · status.apply-record\n读取飞行记录 · status.find-flight\n按飞行标识移除状态 · status.remove-by-flight\n二选一选项 · choice.option-pair\n读取选项值 · choice.option-value\n读取棋子位置 · spatial.piece-position\n地格曼哈顿距离 · spatial.cell-distance\n检查地格可行走 · spatial.cell-walkable\n排队声明式召唤 · lifecycle.queue-summon\n玩家是否为队友 · compare.allied-players\n读取棋子技能列表 · skill.identifiers\n能力已消耗本局次数 · ability.was-spent\n记录能力已消耗 · ability.mark-spent\n计算地格位移 · spatial.cell-delta\n读取可选棋子名称 · piece.name-or\n读取资源上限 · resource.limit\n比较文本是否相同 · compare.text\n按条件选择文本 · value.select-text\n取较小值 · math.min\n取较大值 · math.max\n获得技能 · skill.add\n移除技能 · skill.remove\n棋子具有规则 · rule.has-piece\n设定棋子属性 · attribute.set\n宿主标识时间 · identity.host-time\n玩家具有状态类型 · status.has-player\n附加结构化玩家状态 · status.apply-player-record\n移除玩家状态记录（不触发事件） · status.remove-player-records\n读取事件状态标识 · event.status-text\n直接移除首个匹配状态记录 · status.remove-record\n检查状态类型 · status.matches-type\n伤害已被阻挡 · damage.was-blocked\n伤害造成击杀 · damage.killed\n查询同类型状态标识集合 · status.list-ids\n比较可空玩家引用 · compare.player-reference\n查找首个状态标识 · status.find-id\n读取状态数值 · status.read-number\n设定状态数值 · status.set-number\n按标识移除状态 · status.remove-id\n读取事件数值 · event.read-number\n改写结算前事件数值 · event.write-number\n保留本次结算来源 · source.capture\n使用已保留"
+  },
+  "failureScreenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-smoke-failure.png"
+}

@@ -20,6 +20,7 @@ import {
   type ContentGraphRegionNode,
   type ContentGraphSurface,
 } from '../electron-editor/content-graph-document'
+import { assertGameplayModuleDocument } from '../lib/skill-graph/module-document'
 
 /**
  * Generated cards are a separate migration family.  The ordinary importer is
@@ -364,6 +365,27 @@ export function buildGeneratedContentMigration(idValue: string, options: Generat
   const { graph, families } = sourceFor(id, legacy)
   const field = sourceField(id)
   const current = cloneJson(options.current ?? readCurrent(root, id))
+  // A generated-card family may already be owned by the newer semantic module
+  // document.  Validate that document and preserve it byte-for-byte: the
+  // compatibility content-graph migration must not replace a valid authored
+  // graph with the frozen legacy source merely because the old generated-card
+  // family is still discoverable from the fixture.
+  if (current.gameplayModules !== undefined) {
+    assertGameplayModuleDocument(current)
+    compileContentGraph(graph)
+    const source = legacy[field]
+    if (typeof source !== 'string') throw new Error(`${id}: source hash requires a string field`)
+    return {
+      id,
+      field,
+      surface: sourceSurface(id),
+      legacy,
+      graph,
+      document: current,
+      families,
+      sourceSha256: createHash('sha256').update(source).digest('hex'),
+    }
+  }
   if (!current.contentGraph && JSON.stringify(current[field]) !== JSON.stringify(legacy[field])) {
     throw new Error(`${id}: current ${field} differs from frozen source; inspect before generated migration`)
   }

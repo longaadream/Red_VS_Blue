@@ -472,6 +472,64 @@ describe('Velen delayed holy cards', () => {
     expect(ally.statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(false)
   })
 
+  it('removes a legacy id-less fate shelter without touching unrelated statuses', () => {
+    const velen = makePiece({
+      instanceId: 'velen-idless-cleanup', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    const ally = makePiece({
+      instanceId: 'idless-shelter-target', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 0, maxHp: 12,
+      statusTags: [
+        { type: 'velen-fate-shelter', sourceId: velen.instanceId },
+        { id: 'keep-idless-regression', type: 'other-status' },
+      ],
+    }) as any
+    velen.rules = [loadRuleById('rule-velen-death-cleanup', true)!]
+    const state = makeState({ pieces: [velen, ally], turnNumber: 1 }) as any
+
+    expect(ally.statusTags[0]).not.toHaveProperty('id')
+    velen.currentHp = 0
+    new TriggerSystem().checkTriggers(state, {
+      type: 'onPieceDied', playerId: 'player-red', sourcePiece: velen,
+    } as any)
+
+    expect(ally.statusTags).toEqual([expect.objectContaining({ id: 'keep-idless-regression', type: 'other-status' })])
+  })
+
+  it('clears Velen prophecy from hand and fate shelter from a graveyard piece on Velen death', () => {
+    const velen = makePiece({
+      instanceId: 'velen-graveyard-cleanup', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0,
+    }) as any
+    velen.rules = [loadRuleById('rule-velen-death-cleanup', true)!]
+    const deadAlly = makePiece({
+      instanceId: 'graveyard-shelter-target', ownerPlayerId: 'player-red', currentHp: 0, maxHp: 12,
+      statusTags: [
+        { id: 'graveyard-shelter', type: 'velen-fate-shelter', sourceId: velen.instanceId },
+        { id: 'graveyard-keep', type: 'other-status' },
+      ],
+    }) as any
+    const state = makeState({ pieces: [velen], turnNumber: 1 }) as any
+    state.graveyard = [deadAlly]
+    state.players[0].hand = [
+      {
+        cardId: 'holy-heal', instanceId: 'graveyard-cleanup-prophecy', ownerPlayerId: 'player-red',
+        contentState: { velenHolyProphecy: { sourcePieceId: velen.instanceId, createdTurnNumber: 1 } },
+      },
+      {
+        cardId: 'holy-charge', instanceId: 'unrelated-prophecy', ownerPlayerId: 'player-red',
+        contentState: { velenHolyProphecy: { sourcePieceId: 'other-velen', createdTurnNumber: 1 } },
+      },
+    ]
+
+    velen.currentHp = 0
+    new TriggerSystem().checkTriggers(state, {
+      type: 'onPieceDied', playerId: 'player-red', sourcePiece: velen,
+    } as any)
+
+    expect(state.players[0].hand[0].contentState?.velenHolyProphecy).toBeUndefined()
+    expect(state.players[0].hand[1].contentState?.velenHolyProphecy).toBeDefined()
+    expect(deadAlly.statusTags).toEqual([expect.objectContaining({ id: 'graveyard-keep', type: 'other-status' })])
+  })
+
 
   it('tracks prophecy by hand instance across duplicate names, early play, early discard, and repeat attempts', () => {
     const velen = makePiece({

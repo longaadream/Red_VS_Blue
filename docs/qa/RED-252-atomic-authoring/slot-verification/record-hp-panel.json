@@ -1,0 +1,9 @@
+{
+  "className": "sentence-inline-editor sentence-structured-editor sentence-slot-only-editor",
+  "text": "编辑生命关闭编辑生命数值生命3展开绘制相对范围Tab 补全 · Ctrl / ⌘ + Enter 应用应用下一项：label",
+  "moduleSelect": false,
+  "inputs": [],
+  "parameters": [],
+  "slotEditor": "property:field:hp",
+  "chooser": false
+}

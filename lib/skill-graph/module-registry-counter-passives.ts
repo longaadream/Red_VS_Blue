@@ -33,10 +33,10 @@ export const COUNTER_PASSIVE_GAMEPLAY_MODULES: readonly Descriptor[] = [
     ui: { category: 'event' },
   }),
   define({
-    id: 'event.last-move-distance', label: '读取最近移动距离',
+    id: 'event.last-move-distance', label: '读取最近移动路径长度',
     inputs: [{ name: 'piece', type: pieceType }], outputs: [{ name: 'distance', type: numberType }],
     effects: { pure: true, previewSafe: false, reads: ['event', 'actions'] },
-    lower: ctx => `(function() { var actions = Array.isArray(${battle(ctx)}.actions) ? ${battle(ctx)}.actions.slice().reverse() : []; var action = actions.find(function(item) { return item && item.type === 'move' && item.payload && item.payload.pieceId === ${input(ctx, 'piece')}; }); if (!action || !action.payload) return 0; return Math.abs(Number(action.payload.toX || 0) - Number(action.payload.fromX || 0)) + Math.abs(Number(action.payload.toY || 0) - Number(action.payload.fromY || 0)); })()`,
+    lower: ctx => `(function() { var actions = Array.isArray(${battle(ctx)}.actions) ? ${battle(ctx)}.actions.slice().reverse() : []; var action = actions.find(function(item) { return item && item.type === 'move' && item.payload && item.payload.pieceId === ${input(ctx, 'piece')}; }); if (!action || !action.payload || !Array.isArray(action.payload.path)) return 0; return action.payload.path.length; })()`,
     ui: { category: 'event' },
   }),
   define({

@@ -108,7 +108,6 @@ function run(
   configure?.(state, context)
   const result = rule.effect(state, context)
   const plain = copy(state)
-  for (const piece of plain.pieces) piece.rules = (piece.rules ?? []).map((item: any) => item.id)
   return { state: plain, result, damage: context.damage }
 }
 

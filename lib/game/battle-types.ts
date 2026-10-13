@@ -3,7 +3,8 @@
 // 可以被客户端和服务器端安全导入
 
 import type { BoardMap } from "./map"
-import type { PieceInstance, PieceStats } from "./piece"
+import type { PieceInstance, PieceStats, PieceStatusIdentityLedger } from "./piece"
+import type { AuthorEntityExtensionDeclarations } from './author-entity-extension'
 import type { SkillDefinition } from "./skills"
 import type { PendingTargetSelectionSession, TargetSelectionCredential } from "./targeting"
 import type { TerminalResult } from "./terminal"
@@ -31,6 +32,9 @@ export interface CardInstance {
   ownerPlayerId: string
   /** 卡牌显示名称（从 CardDefinition.name 复制，避免前端重新加载定义文件） */
   name?: string
+  description?: string
+  icon?: string
+  type?: string
   /** Per-instance cost after runtime character effects. */
   actionPointCost?: number
   /** Original cost restored when a temporary reduction expires. */
@@ -38,6 +42,10 @@ export interface CardInstance {
   /** Turn number in which the temporary reduction applies. */
   temporaryCostReductionTurnNumber?: number
   contentState?: Record<string, unknown>
+  /** Independent author-declared values, initialized before card-gain events. */
+  extension?: Record<string, unknown>
+  /** Typed declaration metadata for this concrete card instance. */
+  authorExtensionDeclarations?: AuthorEntityExtensionDeclarations
   presentation?: {
     variant?: string
     badge?: string
@@ -64,6 +72,8 @@ export interface PlayerTurnMeta {
   rules?: any[]
   /** 玩家级别状态标签（如时空扭曲等阵营buff） */
   statusTags?: any[]
+  /** Persistent identity history for player-owned status records. */
+  statusIdentityLedger?: PieceStatusIdentityLedger
 }
 
 export interface PerTurnActionFlags {

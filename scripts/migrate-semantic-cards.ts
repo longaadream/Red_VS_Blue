@@ -209,7 +209,7 @@ function hashiramaThousandHandsGraph(): GameplayModuleGraph {
     call('missing', 'logic.not', { value: out('has-hashirama', 'present') }),
     branch('missing-guard', out('missing', 'value'), resultBranch('missing-result', false, '场上没有存活的柱间')),
     call('hashirama-valid', 'query.piece', { pieceId: out('hashirama', 'piece') }),
-    call('choice', 'choice.target-piece', {}, { range: 99, filter: 'enemy' }),
+    call('choice', 'choice.context-piece-or-select', {}, { range: 99, filter: 'enemy' }),
     call('unresolved', 'choice.is-unresolved', { choice: out('choice', 'choice') }),
     branch('wait-or-cancel', out('unresolved', 'value'), [
       call('selection-result', 'choice.as-result', { choice: out('choice', 'choice') }),

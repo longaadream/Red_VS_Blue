@@ -26,6 +26,7 @@ import {
   type GameplayModuleGraph,
 } from '@/lib/skill-graph/module-document'
 import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
+import { migrateAtomicAuthorGraph } from '@/scripts/migrate-atomic-author-modules'
 import {
   SEMANTIC_PENDING_MIGRATIONS,
   type PendingMigration,
@@ -98,10 +99,14 @@ function pendingFixture(id: 'minato-spiral-barrage' | 'turalyon-grand-crusade'):
   if (!migration || migration.field !== 'code') {
     throw new Error(`Missing semantic pending migration for skills/${id}`)
   }
-  const semanticGraph = migration.build()
-  const semantic = compileGameplayModuleGraph(semanticGraph, GAMEPLAY_MODULE_REGISTRY)
+  // Historical recipe IDs may differ from an incrementally migrated document.
+  // Exercise the actual shipped graph and require that its latest migration is
+  // idempotent; runtime parity below still compares every observable channel.
+  compileGameplayModuleGraph(migrateAtomicAuthorGraph(migration.build()), GAMEPLAY_MODULE_REGISTRY)
   const graph = JSON.parse(readFileSync(`data/skills/${id}.json`, 'utf8')) as ContentRecord
   assertGameplayModuleDocument(graph)
+  const semanticGraph = migrateAtomicAuthorGraph(graph.gameplayModules.entries.code.graph)
+  const semantic = compileGameplayModuleGraph(semanticGraph, GAMEPLAY_MODULE_REGISTRY)
   expect(graph.gameplayModules?.entries?.code?.graph).toEqual(semanticGraph)
   expect(graph.gameplayModules?.entries?.code?.compilerVersion).toBe(semantic.compilerVersion)
   expect(graph.code).toBe(semantic.code)
@@ -599,6 +604,17 @@ function assertLegacyPendingExecutionEqual(
 }
 
 describe('RED-252 pending content graph integration parity', () => {
+  it('keeps repaired published graphs identical to independently rebuilt pending factories', () => {
+    for (const id of ['minato-spiral-barrage', 'turalyon-grand-crusade'] as const) {
+      const fixture = pendingFixture(id)
+      const rebuilt = migrateAtomicAuthorGraph(fixture.migration.build())
+      expect(fixture.semanticGraph, `${id} repaired graph`).toEqual(rebuilt)
+      expect(fixture.semanticCode, `${id} repaired source`).toBe(
+        compileGameplayModuleGraph(rebuilt, GAMEPLAY_MODULE_REGISTRY).code,
+      )
+    }
+  })
+
   it('rejects a forged current pre-state hash and preserves historical and payload hashes', () => {
     const trace = { actionId: 'current', preStateHash: 'expected', payload: { preStateHash: 'payload-hash' } }
     expect(() => normalizeCurrentPendingTrace({ ...trace, preStateHash: 'forged' }, 'expected')).toThrow()

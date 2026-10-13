@@ -43,11 +43,18 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function normalize(value: unknown): unknown {
-  if (typeof value === 'string') return value.replace(/\d{10,}/g, '<clock>')
-  if (Array.isArray(value)) return value.map(normalize)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalize(item)]))
-  return value
+function comparableRun(value: HostRun): HostRun {
+  const snapshot = clone(value)
+  // Only authored executable definitions differ by design. Preserve every runtime field.
+  for (const card of Object.values(snapshot.battle.customCards ?? {}) as JsonRecord[]) {
+    if (!GENERATED_ARMOR_CARD_IDS.includes(card.id)) continue
+    if (card.gameplayModules) {
+      expect(card.code).toBe(compileGameplayModuleGraph(card.gameplayModules.entries.code.graph, GENERATED_CONTENT_GAMEPLAY_REGISTRY).code)
+    }
+    delete card.code
+    delete card.gameplayModules
+  }
+  return snapshot
 }
 
 function graphStatements(graph: any): any[] {
@@ -155,7 +162,7 @@ function runCard(card: CardDefinition, state: ReturnType<typeof hostState>, targ
   return { result, error, battle: state.battle, random: runtime.snapshot(), presentation: recordedBattlePresentation(state.battle) }
 }
 
-function runRule(definition: JsonRecord, id: string, type: 'beginTurn' | 'endTurn', seed = 0x252, setup?: (state: ReturnType<typeof hostState>) => void): HostRun {
+function runRule(definition: JsonRecord, id: string, type: 'beginTurn' | 'endTurn', seed = 0x252, setup?: (state: ReturnType<typeof hostState>) => void, configureTriggers?: (system: TriggerSystem) => void): HostRun {
   const root = mkdtempSync(join(tmpdir(), 'rvb-red252-generated-rule-'))
   mkdirSync(join(root, 'data', 'rules'), { recursive: true })
   writeFileSync(join(root, 'data', 'rules', `${id}.json`), JSON.stringify({ ...clone(definition), id }))
@@ -166,6 +173,7 @@ function runRule(definition: JsonRecord, id: string, type: 'beginTurn' | 'endTur
   setup?.(state)
   const runtime = new RuleRuntime({ rootSeed: seed })
   const triggerSystem = new TriggerSystem()
+  configureTriggers?.(triggerSystem)
   const context: any = {
     type,
     rulePiece: state.caster,
@@ -267,13 +275,11 @@ describe('RED-252 generated-content semantic modules', () => {
     const armorLegacy = fixture.entries['skills/tails-armor-assembly'] as SkillDefinition
     const armorGenerated = { ...clone(armorLegacy), code: armorCode } as SkillDefinition
     const armorOld = runSkill(armorLegacy, ['attack', 'defense'])
-    const armorNew = runSkill(armorGenerated, ['attack', 'defense'], undefined, 0x252, state => {
-      state.battle.customCards = Object.fromEntries(buildGeneratedCardDefinitions().map(card => [card.id, clone(card)]))
-    })
+    const armorNew = runSkill(armorGenerated, ['attack', 'defense'])
     expect(armorNew.error).toBeUndefined()
     expect(armorNew.result).toEqual(armorOld.result)
-    expect(normalize({ hand: armorNew.battle.players[0].hand, actions: armorNew.battle.actions, presentation: armorNew.presentation, random: armorNew.random }))
-      .toEqual(normalize({ hand: armorOld.battle.players[0].hand, actions: armorOld.battle.actions, presentation: armorOld.presentation, random: armorOld.random }))
+    expect(comparableRun(armorNew))
+      .toEqual(comparableRun(armorOld))
 
     const armorId = 'armor-attack-defense'
     const cardDefinition = buildGeneratedCardDefinitions().find(item => item.id === armorId) as unknown as CardDefinition
@@ -286,8 +292,8 @@ describe('RED-252 generated-content semantic modules', () => {
     const oldCardRun = runCard(oldCard, oldCardState, oldCardState.ally)
     const newCardRun = runCard(cardDefinition, newCardState, newCardState.ally)
     expect(newCardRun.error).toBeUndefined()
-    expect(normalize({ result: newCardRun.result, target: newCardState.ally, actions: newCardRun.battle.actions, presentation: newCardRun.presentation, random: newCardRun.random }))
-      .toEqual(normalize({ result: oldCardRun.result, target: oldCardState.ally, actions: oldCardRun.battle.actions, presentation: oldCardRun.presentation, random: oldCardRun.random }))
+    expect(comparableRun(newCardRun))
+      .toEqual(comparableRun(oldCardRun))
 
     const supportLegacy = fixture.entries['skills/tails-mechanical-support'] as SkillDefinition
     const supportGraph = buildTailsMechanicalSupportGraph()
@@ -296,8 +302,8 @@ describe('RED-252 generated-content semantic modules', () => {
     const supportNew = runSkill(supportGenerated, 'none', undefined, 0x252, state => { state.caster.momentum = 8 })
     expect(supportNew.error).toBeUndefined()
     expect(supportNew.result).toEqual(supportOld.result)
-    expect(normalize({ ally: supportNew.battle.pieces[1], actions: supportNew.battle.actions, presentation: supportNew.presentation, random: supportNew.random }))
-      .toEqual(normalize({ ally: supportOld.battle.pieces[1], actions: supportOld.battle.actions, presentation: supportOld.presentation, random: supportOld.random }))
+    expect(comparableRun(supportNew))
+      .toEqual(comparableRun(supportOld))
 
     const supportWithStatusSetup = (state: ReturnType<typeof hostState>) => {
       state.caster.momentum = 8
@@ -306,8 +312,8 @@ describe('RED-252 generated-content semantic modules', () => {
     const supportWithStatusOld = runSkill(supportLegacy, '0', undefined, 0x252, supportWithStatusSetup)
     const supportWithStatusNew = runSkill(supportGenerated, '0', undefined, 0x252, supportWithStatusSetup)
     expect(supportWithStatusNew.error).toBeUndefined()
-    expect(normalize({ ally: supportWithStatusNew.battle.pieces[1], actions: supportWithStatusNew.battle.actions, presentation: supportWithStatusNew.presentation, random: supportWithStatusNew.random }))
-      .toEqual(normalize({ ally: supportWithStatusOld.battle.pieces[1], actions: supportWithStatusOld.battle.actions, presentation: supportWithStatusOld.presentation, random: supportWithStatusOld.random }))
+    expect(comparableRun(supportWithStatusNew))
+      .toEqual(comparableRun(supportWithStatusOld))
 
     const amplifyLegacy = fixture.entries['skills/rafaam-curse-amplify'] as SkillDefinition
     const amplifyGenerated = { ...clone(amplifyLegacy), code: compileGameplayModuleGraph(buildRafaamCurseAmplifyGraph(), GENERATED_CONTENT_GAMEPLAY_REGISTRY).code } as SkillDefinition
@@ -324,8 +330,8 @@ describe('RED-252 generated-content semantic modules', () => {
     const amplifyNew = runSkill(amplifyGenerated, undefined, undefined, 0x252, setupCurse)
     expect(amplifyNew.error).toBeUndefined()
     expect(amplifyNew.result).toEqual(amplifyOld.result)
-    expect(normalize({ hand: amplifyNew.battle.players[1].hand, customCards: amplifyNew.battle.customCards, actions: amplifyNew.battle.actions, presentation: amplifyNew.presentation, random: amplifyNew.random }))
-      .toEqual(normalize({ hand: amplifyOld.battle.players[1].hand, customCards: amplifyOld.battle.customCards, actions: amplifyOld.battle.actions, presentation: amplifyOld.presentation, random: amplifyOld.random }))
+    expect(comparableRun(amplifyNew))
+      .toEqual(comparableRun(amplifyOld))
 
     const oldCopyId = amplifyOld.battle.players[1].hand.find((card: any) => card.cardId !== 'rafaam-curse-dynamic')?.cardId
     const newCopyId = amplifyNew.battle.players[1].hand.find((card: any) => card.cardId !== 'rafaam-curse-dynamic')?.cardId
@@ -344,9 +350,28 @@ describe('RED-252 generated-content semantic modules', () => {
     const oldTrigger = runCard(oldTriggerState.battle.customCards[oldCopyId], oldTriggerState, oldTriggerState.enemy, 0x252, { playerId: oldTriggerState.enemyOwner, type: 'endTurn' })
     const newTrigger = runCard(newTriggerState.battle.customCards[newCopyId], newTriggerState, newTriggerState.enemy, 0x252, { playerId: newTriggerState.enemyOwner, type: 'endTurn' })
     expect(newTrigger.error).toBeUndefined()
-    expect(normalize({ result: newTrigger.result, pieces: newTrigger.battle.pieces, actions: newTrigger.battle.actions, presentation: newTrigger.presentation, random: newTrigger.random }))
-      .toEqual(normalize({ result: oldTrigger.result, pieces: oldTrigger.battle.pieces, actions: oldTrigger.battle.actions, presentation: oldTrigger.presentation, random: oldTrigger.random }))
+    expect(comparableRun(newTrigger))
+      .toEqual(comparableRun(oldTrigger))
   })
+
+  for (const armorId of GENERATED_ARMOR_CARD_IDS) {
+    it(`preserves full creation and play state for ${armorId}`, () => {
+      const selected = armorId.slice('armor-'.length).split('-')
+      const original = fixture.entries['skills/tails-armor-assembly'] as SkillDefinition
+      const generated = { ...clone(original), code: compileGameplayModuleGraph(buildTailsArmorAssemblyGraph(), GENERATED_CONTENT_GAMEPLAY_REGISTRY).code } as SkillDefinition
+      const oldCreation = runSkill(original, selected)
+      const newCreation = runSkill(generated, selected)
+      expect(newCreation.error).toBeUndefined()
+      expect(comparableRun(newCreation)).toEqual(comparableRun(oldCreation))
+      const oldState = hostState(), newState = hostState()
+      oldState.battle.customCards = clone(oldCreation.battle.customCards)
+      newState.battle.customCards = clone(newCreation.battle.customCards)
+      const oldPlay = runCard(oldState.battle.customCards[armorId], oldState, oldState.ally)
+      const newPlay = runCard(newState.battle.customCards[armorId], newState, newState.ally)
+      expect(newPlay.error).toBeUndefined()
+      expect(comparableRun(newPlay)).toEqual(comparableRun(oldPlay))
+    })
+  }
 
   it('keeps seeded rule execution parity including presentation logs', () => {
     const sonicLegacy = fixture.entries['rules/rule-sonic-free-move']
@@ -354,8 +379,8 @@ describe('RED-252 generated-content semantic modules', () => {
     const sonicOld = runRule(sonicLegacy, 'rule-sonic-free-move', 'beginTurn')
     const sonicNew = runRule(sonicGenerated, 'rule-sonic-free-move', 'beginTurn')
     expect(sonicNew.error).toBeUndefined()
-    expect(normalize({ result: sonicNew.result, caster: sonicNew.battle.pieces[0], actions: sonicNew.battle.actions, presentation: sonicNew.presentation, random: sonicNew.random }))
-      .toEqual(normalize({ result: sonicOld.result, caster: sonicOld.battle.pieces[0], actions: sonicOld.battle.actions, presentation: sonicOld.presentation, random: sonicOld.random }))
+    expect(comparableRun(sonicNew))
+      .toEqual(comparableRun(sonicOld))
 
     const recoveryLegacy = fixture.entries['rules/rule-tails-armor-recovery']
     const recoveryGenerated = { ...clone(recoveryLegacy), skillCode: compileGameplayModuleGraph(buildTailsArmorRecoveryRuleGraph(), GENERATED_CONTENT_GAMEPLAY_REGISTRY).code }
@@ -369,8 +394,38 @@ describe('RED-252 generated-content semantic modules', () => {
     const recoveryOld = runRule(recoveryLegacy, 'rule-tails-armor-recovery', 'endTurn', 0x252, recoverySetup)
     const recoveryNew = runRule(recoveryGenerated, 'rule-tails-armor-recovery', 'endTurn', 0x252, recoverySetup)
     expect(recoveryNew.error).toBeUndefined()
-    expect(normalize({ result: recoveryNew.result, caster: recoveryNew.battle.pieces[0], actions: recoveryNew.battle.actions, presentation: recoveryNew.presentation, random: recoveryNew.random }))
-      .toEqual(normalize({ result: recoveryOld.result, caster: recoveryOld.battle.pieces[0], actions: recoveryOld.battle.actions, presentation: recoveryOld.presentation, random: recoveryOld.random }))
+    // Approved author contract: recovery is normal healing, so it now emits
+    // the healing batch metadata and consumes that batch's deterministic id.
+    // Everything else, including the resulting battle and visible text, stays equal.
+    expect(recoveryNew.battle).toEqual(recoveryOld.battle)
+    expect(recoveryNew.result).toEqual(recoveryOld.result)
+    expect(recoveryNew.random).toMatchObject({ cursors: { 'instance-id/heal-batch': 1 } })
+    const presentation = clone(recoveryNew.presentation) as JsonRecord[]
+    expect(presentation).toHaveLength(1)
+    expect(presentation[0]).toMatchObject({ actorPlayerId: 'player-red', sourcePieceId: 'host-rule', skillId: 'rule-tails-armor-recovery', batchId: expect.any(String) })
+    for (const key of ['actorPlayerId', 'sourcePieceId', 'skillId', 'batchId']) delete presentation[0][key]
+    expect(presentation).toEqual(recoveryOld.presentation)
+  })
+
+  it.each([false, true])('heals through normal before/after events with id-less statuses=%s', idless => {
+    const definition = { ...clone(fixture.entries['rules/rule-tails-armor-recovery']), skillCode: compileGameplayModuleGraph(buildTailsArmorRecoveryRuleGraph(), GENERATED_CONTENT_GAMEPLAY_REGISTRY).code }
+    const events: string[] = []
+    const run = runRule(definition, 'rule-tails-armor-recovery', 'endTurn', 0x252, state => {
+      state.caster.currentHp = 3
+      state.caster.statusTags = [0, 1].map(index => ({ ...(idless ? {} : { id: `recovery-${index}` }), type: 'periodic-heal' })) as any
+    }, system => {
+      for (const type of ['beforeHealDealt', 'beforeHealTaken', 'afterHealDealt', 'afterHealTaken']) system.addRule({
+        id: `recovery-observe-${type}`, name: type, description: '', trigger: { type },
+        effect: (_battle: any, context: any) => {
+          events.push(type)
+          if (type === 'beforeHealTaken') context.heal += 1
+          return { success: true }
+        },
+      } as any)
+    })
+    expect(run.error).toBeUndefined()
+    expect(run.battle.pieces[0].currentHp).toBe(10)
+    expect(events).toEqual(['beforeHealDealt', 'beforeHealTaken', 'afterHealDealt', 'afterHealTaken'])
+    expect(run.battle.pieces[0].statusTags).toHaveLength(2)
   })
 })
-

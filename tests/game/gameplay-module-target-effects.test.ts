@@ -7,10 +7,21 @@ import { applyGameplayModuleGraph, compileGameplayModuleGraph, GAMEPLAY_MODULE_R
 import { executeSkillFunction, loadRuleById, type SkillDefinition } from '../../lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { buildTargetEffectGraph, buildTargetEffectPreview, migrateTargetEffects, TARGET_EFFECT_RECIPES } from '../../scripts/migrate-semantic-target-effects'
+import { buildProjectileSkillGraph } from '../../scripts/migrate-semantic-projectile-skills'
+import { buildAtomicFireballGraph } from '../../scripts/migrate-atomic-author-samples'
+import { migrateAtomicAuthorGraph } from '../../scripts/migrate-atomic-author-modules'
+import { RuleRuntime, withRuleRuntime } from '../../lib/game/rule-runtime'
+import { recordBattlePresentation, recordedBattlePresentation } from '../../lib/game/battle-presentation-recording'
 
 const entries = JSON.parse(fs.readFileSync('tests/game/fixtures/RED-252-legacy-content.json', 'utf8')).entries
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
-function run(definition: any, targetHp: number, select: boolean, distance = TARGET_EFFECT_RECIPES[definition.id].minimumDistance ?? 1, rage = false, shield = false) {
+function canonicalSkillGraph(id: string): any {
+  if (id === 'fireball') return buildAtomicFireballGraph()
+  if (id === 'ulquiorra-cero') return migrateAtomicAuthorGraph(buildProjectileSkillGraph(id))
+  return migrateAtomicAuthorGraph(buildTargetEffectGraph(id))
+}
+
+function run(definition: any, targetHp: number, select: boolean, distance = TARGET_EFFECT_RECIPES[definition.id].minimumDistance ?? 1, rage = false, shield = false, rewrittenTarget?: string) {
   const caster = makePiece({ instanceId: 'caster', name: '施放者', ownerPlayerId: 'player-red', x: 1, y: 1, attack: 7, currentHp: 6, maxHp: 12 })
   const ally = TARGET_EFFECT_RECIPES[definition.id].ally
   const target = makePiece({ instanceId: 'target', ownerPlayerId: ally ? 'player-red' : 'player-blue', x: 1 + distance, y: 1, currentHp: targetHp, maxHp: Math.max(20, targetHp) })
@@ -29,16 +40,38 @@ function run(definition: any, targetHp: number, select: boolean, distance = TARG
   battle.skillsById[definition.id] = definition
   const clock = vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
   let result
-  try { result = executeSkillFunction(definition as SkillDefinition, {
+  try { result = recordBattlePresentation(battle, () => executeSkillFunction(definition as SkillDefinition, {
     piece: caster, skill: definition, battle, target: select ? target : null,
     targetPosition: null, targets: select ? [{ info: target, pos: null }] : [],
-  } as any, battle) } finally { clock.mockRestore() }
+    ruleRewrittenPrimaryTargetPieceId: rewrittenTarget,
+  } as any, battle), () => battle) } finally { clock.mockRestore() }
   const snapshot: any = clone(battle)
   delete snapshot.skillsById
-  return { result: clone(result), state: snapshot }
+  return { result: clone(result), state: snapshot, presentation: recordedBattlePresentation(battle) }
+}
+
+function assertProductionExecutable(id: string, original: any, production: any): void {
+  // Keep exact-code checks pointed at the owning canonical graph.  Fireball is
+  // one of the public atomic author samples; Cero belongs to projectiles.
+  expect(production.code).toBe(applyGameplayModuleGraph(original, canonicalSkillGraph(id)).code)
 }
 
 describe('registered target effects preserve production behavior', () => {
+  for (const distance of [1, 6, 7]) for (const rewrittenTarget of [undefined, 'target', 'another-piece']) {
+    it(`preserves Deadly Gaze distance ${distance} with rewritten target ${rewrittenTarget}`, () => {
+      const old = clone(entries['skills/blackwidow-deadly-gaze'])
+      const next = applyGameplayModuleGraph(old, buildTargetEffectGraph(old.id))
+      const seeded = (definition: any, hp: number, shield: boolean) => {
+        const runtime = new RuleRuntime({ rootSeed: 594 })
+        return withRuleRuntime(runtime, () => ({ ...run(definition, hp, true, distance, false, shield, rewrittenTarget), runtime: runtime.snapshot() }))
+      }
+      for (const hp of [1, 50]) for (const shield of [false, true]) {
+        const actual = seeded(next, hp, shield)
+        expect(actual).toEqual(seeded(old, hp, shield))
+        expect(actual.result.success).toBe(distance >= 7 || rewrittenTarget === 'target')
+      }
+    })
+  }
   it('does not apply frostbolt freeze when a shield blocks its damage', () => {
     const old = clone(entries['skills/frostbolt'])
     const next = applyGameplayModuleGraph(old, buildTargetEffectGraph('frostbolt'))
@@ -86,7 +119,53 @@ describe('registered target effects preserve production behavior', () => {
     for (const hp of [3, 20]) it(`${id} preserves damage/heal, logs and removal with target HP ${hp}`, () => {
       const old = clone(entries['skills/' + id])
       const next = JSON.parse(fs.readFileSync('data/skills/' + id + '.json', 'utf8'))
-      expect(next.code).toBe(applyGameplayModuleGraph(old, buildTargetEffectGraph(id)).code)
+      assertProductionExecutable(id, old, next)
+      if (id === 'fireball') {
+        const actual = run(next, hp, true)
+        const damageAction = actual.state.actions.find((action: any) => action.type === 'damage') as any
+        // Success text is optional, and this existing skill intentionally
+        // retains its message. Keep the original wording, including on death.
+        expect(actual.result).toEqual(run(old, hp, true).result)
+        expect(actual.result).toHaveProperty('message')
+        expect(actual.state.actions).toHaveLength(1)
+        expect(damageAction).toMatchObject({
+          type: 'damage',
+          payload: expect.objectContaining({
+            skillId: 'fireball',
+            damageType: 'physical',
+            rawDamage: 10,
+            modifiedDamage: 10,
+            defense: 1,
+            finalDamage: hp === 3 ? 3 : 9,
+            resolvedDamage: 9,
+            blocked: false,
+            killed: hp === 3,
+          }),
+        })
+        expect(actual.presentation).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'damage',
+            targetPieceIds: ['target'],
+            result: expect.objectContaining({ amount: hp === 3 ? 3 : 9 }),
+          }),
+        ]))
+        if (hp === 3) {
+          expect(actual.state.pieces.find((piece: any) => piece.instanceId === 'target')).toBeUndefined()
+          expect(actual.state.graveyard).toEqual(expect.arrayContaining([
+            expect.objectContaining({ instanceId: 'target', currentHp: 0 }),
+          ]))
+          expect(actual.presentation).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: 'death', targetPieceIds: ['target'] }),
+          ]))
+        } else {
+          expect(actual.state.pieces.find((piece: any) => piece.instanceId === 'target')).toMatchObject({ currentHp: 11 })
+          expect(actual.state.graveyard ?? []).not.toEqual(expect.arrayContaining([
+            expect.objectContaining({ instanceId: 'target' }),
+          ]))
+          expect(actual.presentation).toHaveLength(1)
+        }
+        return
+      }
       const expected = run(old, hp, true)
       expect(expected.result.success).toBe(true)
       expect(expected.result.needsTargetSelection).not.toBe(true)

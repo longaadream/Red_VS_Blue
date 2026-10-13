@@ -1,0 +1,3188 @@
+{
+  "schema": "rvb-red252-compatibility-composition-proof/v1",
+  "generatedAt": "2026-10-13T19:13:56.303Z",
+  "source": {
+    "compatibilityRoutes": "output/completion-compatibility-routes.json",
+    "currentCatalog": "output/completion-current-catalog-gap.json",
+    "proofMethod": "Compile-only proof: compileGameplayModuleGraph with the full registry plus typed proof fixtures; every emitted registry descriptor is checked through authorModuleUi(...).authoring === standard. Runtime result equivalence is reported separately by output/completion-compatibility-behavior-proof.json."
+  },
+  "summary": {
+    "expected": 16,
+    "proved": 16,
+    "provedIds": [
+      "card.cell-unoccupied@1",
+      "choice.first-cell-reference@1",
+      "choice.first-piece-reference@1",
+      "query.affectable-pieces@1",
+      "query.enemies-on-cells@1",
+      "query.enemies-on-ordered-cells@1",
+      "query.piece-by-id@1",
+      "query.piece-by-identifier@1",
+      "query.pieces-in-rectangle@1",
+      "query.pieces-on-cells-all@1",
+      "spatial.cell-require@1",
+      "spatial.cell-unoccupied-except@1",
+      "spatial.cell-unoccupied@1",
+      "spatial.cell-walkable-safe@1",
+      "spatial.cell-walkable@1",
+      "spatial.clip-cells@1"
+    ],
+    "activeCapturedRoutes": [
+      "effect.damage-captured@1"
+    ],
+    "unprovedCaptured": [],
+    "trueGapSummon": null,
+    "orderProofs": [
+      "query.enemies-on-ordered-cells@1",
+      "spatial.clip-cells@1"
+    ]
+  },
+  "proofs": [
+    {
+      "id": "card.cell-unoccupied@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "occupied",
+            "module": "cell.field",
+            "version": "1",
+            "inputs": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "occupied"
+            }
+          },
+          {
+            "kind": "call",
+            "id": "empty",
+            "module": "logic.not",
+            "version": "1",
+            "inputs": {
+              "value": {
+                "kind": "output",
+                "node": "occupied",
+                "port": "value"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "value": {
+                "kind": "output",
+                "node": "empty",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "type": "boolean"
+          }
+        ]
+      },
+      "publicModules": [
+        "cell.field@1",
+        "logic.not@1"
+      ],
+      "operations": [
+        "cell.field(walkable/occupied)",
+        "logic.not"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 3557,
+        "modules": [
+          "cell.field@1",
+          "logic.not@1"
+        ]
+      },
+      "equivalence": "The public cell occupancy field is authoritative for live occupancy; negating it reproduces the empty-cell boolean without the retired cell-equal or compare.equal adapters."
+    },
+    {
+      "id": "choice.first-cell-reference@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "items",
+            "module": "proof.choice-items",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "first",
+            "module": "collection.at",
+            "version": "1",
+            "inputs": {
+              "items": {
+                "kind": "output",
+                "node": "items",
+                "port": "value"
+              },
+              "position": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "x",
+            "module": "data.field",
+            "version": "2",
+            "inputs": {
+              "record": {
+                "kind": "output",
+                "node": "first",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "x"
+            }
+          },
+          {
+            "kind": "call",
+            "id": "y",
+            "module": "data.field",
+            "version": "2",
+            "inputs": {
+              "record": {
+                "kind": "output",
+                "node": "first",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "y"
+            }
+          },
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "spatial.cell",
+            "version": "1",
+            "inputs": {
+              "x": {
+                "kind": "output",
+                "node": "x",
+                "port": "value"
+              },
+              "y": {
+                "kind": "output",
+                "node": "y",
+                "port": "value"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "cell"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cell",
+            "type": {
+              "kind": "nullable",
+              "value": "cell"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "collection.at@1",
+        "data.field@2",
+        "spatial.cell@1"
+      ],
+      "operations": [
+        "collection.at",
+        "data.field(x/y)",
+        "spatial.cell"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 6170,
+        "modules": [
+          "collection.at@1",
+          "data.field@2",
+          "spatial.cell@1"
+        ]
+      },
+      "equivalence": "A one-based collection.at over the typed choice sequence reads x/y through the public record field and reconstructs the cell. Valid cell choices retain the first-item semantics; malformed choice records remain host-invalid rather than gaining an author guard."
+    },
+    {
+      "id": "choice.first-piece-reference@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "items",
+            "module": "proof.choice-items",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "first",
+            "module": "collection.at",
+            "version": "1",
+            "inputs": {
+              "items": {
+                "kind": "output",
+                "node": "items",
+                "port": "value"
+              },
+              "position": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "id",
+            "module": "record.optional-field",
+            "version": "1",
+            "inputs": {
+              "record": {
+                "kind": "output",
+                "node": "first",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "pieceId",
+              "valueType": "string"
+            }
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "piece",
+            "method": "find",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "needle": {
+                "kind": "output",
+                "node": "id",
+                "port": "value"
+              }
+            },
+            "item": "candidate",
+            "body": [
+              {
+                "kind": "call",
+                "id": "candidate-id",
+                "module": "piece.field",
+                "version": "2",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "candidate"
+                  }
+                },
+                "parameters": {
+                  "field": "instanceId"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "same",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "candidate-id",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "input",
+                    "name": "needle"
+                  }
+                },
+                "parameters": {
+                  "valueType": "string",
+                  "operator": "=="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "piece-return",
+                "value": {
+                  "kind": "output",
+                  "node": "same",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "piece": {
+                "kind": "output",
+                "node": "piece",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "piece",
+            "type": {
+              "kind": "nullable",
+              "value": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "collection.at@1",
+        "record.optional-field@1",
+        "query.pieces@1",
+        "piece.field@2",
+        "compare.values@1"
+      ],
+      "operations": [
+        "collection.at",
+        "record.optional-field(pieceId)",
+        "query.pieces",
+        "piece.field(instanceId)",
+        "collection.find",
+        "compare.values"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 8028,
+        "modules": [
+          "collection.at@1",
+          "record.optional-field@1",
+          "query.pieces@1",
+          "piece.field@2",
+          "compare.values@1"
+        ]
+      },
+      "equivalence": "The first choice record supplies the pieceId, and a public query/find over live piece handles resolves the matching instance without the retired piece-identifier adapter."
+    },
+    {
+      "id": "query.affectable-pieces@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "owner",
+            "module": "proof.owner",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "pieces",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {
+              "ownerId": {
+                "kind": "output",
+                "node": "owner",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "relation": "ally",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "pieces": {
+                "kind": "output",
+                "node": "pieces",
+                "port": "pieces"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pieces",
+            "type": {
+              "kind": "list",
+              "element": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1"
+      ],
+      "operations": [
+        "query.pieces"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 2727,
+        "modules": [
+          "query.pieces@1"
+        ]
+      },
+      "equivalence": "The public owner/relation/liveness query is the host policy boundary for the affectable set; no local compatibility predicate or retired alive adapter is needed.",
+      "hostBoundary": "Host query.pieces retains relation and living-target policy; this proof does not replace that host policy with a text or owner comparison."
+    },
+    {
+      "id": "query.enemies-on-cells@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "source",
+            "module": "proof.source",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "cells",
+            "module": "proof.cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {
+              "originId": {
+                "kind": "output",
+                "node": "source",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "relation": "enemy",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "filtered",
+            "method": "filter",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "cells": {
+                "kind": "output",
+                "node": "cells",
+                "port": "value"
+              }
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "collection",
+                "id": "membership-find",
+                "method": "find",
+                "items": {
+                  "kind": "input",
+                  "name": "cells"
+                },
+                "inputs": {
+                  "candidate": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "item": "cell",
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-position",
+                    "module": "spatial.piece-position",
+                    "version": "1",
+                    "inputs": {
+                      "piece": {
+                        "kind": "input",
+                        "name": "candidate"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-piece-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "output",
+                        "node": "membership-cell-position",
+                        "port": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-target-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-x",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-piece-coords",
+                        "port": "x"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-target-coords",
+                        "port": "x"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-y",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-piece-coords",
+                        "port": "y"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-target-coords",
+                        "port": "y"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-same",
+                    "module": "logic.and",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-x",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-y",
+                        "port": "value"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "membership-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "membership-cell-same",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "id": "membership-present",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "membership-find",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": null
+                  }
+                },
+                "parameters": {
+                  "valueType": "{\"kind\":\"nullable\",\"value\":\"cell\"}",
+                  "operator": "!="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "filter-return",
+                "value": {
+                  "kind": "output",
+                  "node": "membership-present",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "pieces": {
+                "kind": "output",
+                "node": "filtered",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pieces",
+            "type": {
+              "kind": "list",
+              "element": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "spatial.piece-position@1",
+        "spatial.cell-coordinates@1",
+        "compare.values@1",
+        "logic.and@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "spatial.piece-position",
+        "spatial.cell-coordinates",
+        "collection.find",
+        "collection.filter",
+        "compare.values",
+        "logic.and"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 11901,
+        "modules": [
+          "query.pieces@1",
+          "spatial.piece-position@1",
+          "spatial.cell-coordinates@1",
+          "compare.values@1",
+          "logic.and@1"
+        ]
+      },
+      "equivalence": "The public enemy query is filtered by x/y coordinate comparison against the supplied cells. The outer piece query order is retained while cell membership uses a bounded find."
+    },
+    {
+      "id": "query.enemies-on-ordered-cells@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "source",
+            "module": "proof.source",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "empty",
+            "module": "proof.empty-pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "cells",
+            "module": "proof.cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {
+              "originId": {
+                "kind": "output",
+                "node": "source",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "relation": "enemy",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "ordered",
+            "method": "reduce",
+            "items": {
+              "kind": "output",
+              "node": "cells",
+              "port": "value"
+            },
+            "inputs": {
+              "candidates": {
+                "kind": "output",
+                "node": "candidates",
+                "port": "pieces"
+              }
+            },
+            "initial": {
+              "kind": "output",
+              "node": "empty",
+              "port": "value"
+            },
+            "accumulator": "acc",
+            "item": "cell",
+            "body": [
+              {
+                "kind": "collection",
+                "id": "matched",
+                "method": "filter",
+                "items": {
+                  "kind": "input",
+                  "name": "candidates"
+                },
+                "inputs": {
+                  "target": {
+                    "kind": "input",
+                    "name": "cell"
+                  }
+                },
+                "item": "item",
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-position",
+                    "module": "spatial.piece-position",
+                    "version": "1",
+                    "inputs": {
+                      "piece": {
+                        "kind": "input",
+                        "name": "item"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-piece-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "output",
+                        "node": "ordered-match-position",
+                        "port": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-target-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "target"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-x",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "ordered-match-piece-coords",
+                        "port": "x"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "ordered-match-target-coords",
+                        "port": "x"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-y",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "ordered-match-piece-coords",
+                        "port": "y"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "ordered-match-target-coords",
+                        "port": "y"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "ordered-match-same",
+                    "module": "logic.and",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "ordered-match-x",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "ordered-match-y",
+                        "port": "value"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "matched-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "ordered-match-same",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "collection",
+                "id": "unique",
+                "method": "filter",
+                "items": {
+                  "kind": "output",
+                  "node": "matched",
+                  "port": "value"
+                },
+                "inputs": {
+                  "seen": {
+                    "kind": "input",
+                    "name": "acc"
+                  }
+                },
+                "item": "item",
+                "body": [
+                  {
+                    "kind": "collection",
+                    "id": "already-seen",
+                    "method": "find",
+                    "items": {
+                      "kind": "input",
+                      "name": "seen"
+                    },
+                    "inputs": {
+                      "candidate": {
+                        "kind": "input",
+                        "name": "item"
+                      }
+                    },
+                    "item": "seenItem",
+                    "body": [
+                      {
+                        "kind": "call",
+                        "id": "candidate-id",
+                        "module": "piece.field",
+                        "version": "2",
+                        "inputs": {
+                          "piece": {
+                            "kind": "input",
+                            "name": "candidate"
+                          }
+                        },
+                        "parameters": {
+                          "field": "instanceId"
+                        }
+                      },
+                      {
+                        "kind": "call",
+                        "id": "seen-id",
+                        "module": "piece.field",
+                        "version": "2",
+                        "inputs": {
+                          "piece": {
+                            "kind": "input",
+                            "name": "seenItem"
+                          }
+                        },
+                        "parameters": {
+                          "field": "instanceId"
+                        }
+                      },
+                      {
+                        "kind": "call",
+                        "id": "same-id",
+                        "module": "compare.values",
+                        "version": "1",
+                        "inputs": {
+                          "left": {
+                            "kind": "output",
+                            "node": "candidate-id",
+                            "port": "value"
+                          },
+                          "right": {
+                            "kind": "output",
+                            "node": "seen-id",
+                            "port": "value"
+                          }
+                        },
+                        "parameters": {
+                          "valueType": "string",
+                          "operator": "=="
+                        }
+                      },
+                      {
+                        "kind": "return",
+                        "id": "seen-return",
+                        "value": {
+                          "kind": "output",
+                          "node": "same-id",
+                          "port": "value"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "call",
+                    "id": "not-seen",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "already-seen",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": null
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "{\"kind\":\"nullable\",\"value\":\"piece\"}",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "return",
+                    "id": "unique-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "not-seen",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "id": "append",
+                "module": "collection.concat",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "input",
+                    "name": "acc"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "unique",
+                    "port": "value"
+                  }
+                },
+                "parameters": {
+                  "valueType": "{\"kind\":\"list\",\"element\":\"piece\"}"
+                }
+              },
+              {
+                "kind": "return",
+                "id": "ordered-return",
+                "value": {
+                  "kind": "output",
+                  "node": "append",
+                  "port": "items"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "pieces": {
+                "kind": "output",
+                "node": "ordered",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pieces",
+            "type": {
+              "kind": "list",
+              "element": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "spatial.piece-position@1",
+        "spatial.cell-coordinates@1",
+        "compare.values@1",
+        "logic.and@1",
+        "piece.field@2",
+        "collection.concat@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "spatial.piece-position",
+        "spatial.cell-coordinates",
+        "collection.filter",
+        "collection.reduce",
+        "collection.find",
+        "collection.concat",
+        "piece.field(instanceId)",
+        "compare.values"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 19932,
+        "modules": [
+          "query.pieces@1",
+          "spatial.piece-position@1",
+          "spatial.cell-coordinates@1",
+          "compare.values@1",
+          "logic.and@1",
+          "piece.field@2",
+          "collection.concat@1"
+        ]
+      },
+      "equivalence": "The public graph iterates the supplied cells in order, filters candidates at each cell, removes duplicate instanceIds, and concatenates in encounter order. It does not sort or replace the ordered-cell traversal."
+    },
+    {
+      "id": "query.piece-by-id@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "id",
+            "module": "proof.id",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "piece",
+            "method": "find",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "needle": {
+                "kind": "output",
+                "node": "id",
+                "port": "value"
+              }
+            },
+            "item": "candidate",
+            "body": [
+              {
+                "kind": "call",
+                "id": "candidate-id",
+                "module": "piece.field",
+                "version": "2",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "candidate"
+                  }
+                },
+                "parameters": {
+                  "field": "instanceId"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "same",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "candidate-id",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "input",
+                    "name": "needle"
+                  }
+                },
+                "parameters": {
+                  "valueType": "string",
+                  "operator": "=="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "piece-return",
+                "value": {
+                  "kind": "output",
+                  "node": "same",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "piece": {
+                "kind": "output",
+                "node": "piece",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "piece",
+            "type": {
+              "kind": "nullable",
+              "value": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "piece.field@2",
+        "compare.values@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "piece.field(instanceId)",
+        "collection.find",
+        "compare.values"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 5507,
+        "modules": [
+          "query.pieces@1",
+          "piece.field@2",
+          "compare.values@1"
+        ]
+      },
+      "equivalence": "A public live-piece query followed by instanceId field comparison and one-based find resolves the same nullable piece handle for an existing identifier."
+    },
+    {
+      "id": "query.piece-by-identifier@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "id",
+            "module": "proof.id",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "piece",
+            "method": "find",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "needle": {
+                "kind": "output",
+                "node": "id",
+                "port": "value"
+              }
+            },
+            "item": "candidate",
+            "body": [
+              {
+                "kind": "call",
+                "id": "candidate-id",
+                "module": "piece.field",
+                "version": "2",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "candidate"
+                  }
+                },
+                "parameters": {
+                  "field": "instanceId"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "same",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "candidate-id",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "input",
+                    "name": "needle"
+                  }
+                },
+                "parameters": {
+                  "valueType": "string",
+                  "operator": "=="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "piece-return",
+                "value": {
+                  "kind": "output",
+                  "node": "same",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "piece": {
+                "kind": "output",
+                "node": "piece",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "piece",
+            "type": {
+              "kind": "nullable",
+              "value": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "piece.field@2",
+        "compare.values@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "piece.field(instanceId)",
+        "collection.find",
+        "compare.values"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 5507,
+        "modules": [
+          "query.pieces@1",
+          "piece.field@2",
+          "compare.values@1"
+        ]
+      },
+      "equivalence": "The identifier alias has the same public instanceId lookup composition; the input name remains a graph-local compatibility spelling and does not add a module."
+    },
+    {
+      "id": "query.pieces-in-rectangle@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "origin",
+            "module": "proof.origin",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "empty",
+            "module": "proof.empty-pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "call",
+            "id": "board",
+            "module": "spatial.map-cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "collection",
+            "id": "rectangle",
+            "method": "filter",
+            "items": {
+              "kind": "output",
+              "node": "board",
+              "port": "cells"
+            },
+            "inputs": {
+              "origin": {
+                "kind": "output",
+                "node": "origin",
+                "port": "value"
+              }
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "call",
+                "id": "origin-coords",
+                "module": "spatial.cell-coordinates",
+                "version": "1",
+                "inputs": {
+                  "cell": {
+                    "kind": "input",
+                    "name": "origin"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "rectangle-item-coords",
+                "module": "spatial.cell-coordinates",
+                "version": "1",
+                "inputs": {
+                  "cell": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "x-offset",
+                "module": "math.subtract",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "rectangle-item-coords",
+                    "port": "x"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "origin-coords",
+                    "port": "x"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "y-offset",
+                "module": "math.subtract",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "rectangle-item-coords",
+                    "port": "y"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "origin-coords",
+                    "port": "y"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "x-min",
+                "module": "compare.greater-than",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "x-offset",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": -1
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "x-max",
+                "module": "compare.less-than",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "x-offset",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 2
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "y-min",
+                "module": "compare.greater-than",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "y-offset",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": -1
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "y-max",
+                "module": "compare.less-than",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "y-offset",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 2
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "x-range",
+                "module": "logic.and",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "x-min",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "x-max",
+                    "port": "value"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "y-range",
+                "module": "logic.and",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "y-min",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "y-max",
+                    "port": "value"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "in-range",
+                "module": "logic.and",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "x-range",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "y-range",
+                    "port": "value"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "return",
+                "id": "rectangle-return",
+                "value": {
+                  "kind": "output",
+                  "node": "in-range",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "collection",
+            "id": "rectangle-pieces",
+            "method": "reduce",
+            "items": {
+              "kind": "output",
+              "node": "rectangle",
+              "port": "value"
+            },
+            "inputs": {
+              "candidates": {
+                "kind": "output",
+                "node": "candidates",
+                "port": "pieces"
+              }
+            },
+            "initial": {
+              "kind": "output",
+              "node": "empty",
+              "port": "value"
+            },
+            "accumulator": "acc",
+            "item": "cell",
+            "body": [
+              {
+                "kind": "collection",
+                "id": "piece-at-cell",
+                "method": "find",
+                "items": {
+                  "kind": "input",
+                  "name": "candidates"
+                },
+                "inputs": {
+                  "target": {
+                    "kind": "input",
+                    "name": "cell"
+                  }
+                },
+                "item": "candidate",
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-position",
+                    "module": "spatial.piece-position",
+                    "version": "1",
+                    "inputs": {
+                      "piece": {
+                        "kind": "input",
+                        "name": "candidate"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-piece-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "output",
+                        "node": "rectangle-piece-position",
+                        "port": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-target-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "target"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-x",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "rectangle-piece-piece-coords",
+                        "port": "x"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "rectangle-piece-target-coords",
+                        "port": "x"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-y",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "rectangle-piece-piece-coords",
+                        "port": "y"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "rectangle-piece-target-coords",
+                        "port": "y"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "rectangle-piece-same",
+                    "module": "logic.and",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "rectangle-piece-x",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "rectangle-piece-y",
+                        "port": "value"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "piece-at-cell-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "rectangle-piece-same",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "id": "one",
+                "module": "collection.singleton",
+                "version": "1",
+                "inputs": {
+                  "value": {
+                    "kind": "output",
+                    "node": "piece-at-cell",
+                    "port": "value"
+                  }
+                },
+                "parameters": {
+                  "valueType": "piece"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "append",
+                "module": "collection.concat",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "input",
+                    "name": "acc"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "one",
+                    "port": "items"
+                  }
+                },
+                "parameters": {
+                  "valueType": "{\"kind\":\"list\",\"element\":\"piece\"}"
+                }
+              },
+              {
+                "kind": "return",
+                "id": "rectangle-pieces-return",
+                "value": {
+                  "kind": "output",
+                  "node": "append",
+                  "port": "items"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "pieces": {
+                "kind": "output",
+                "node": "rectangle-pieces",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pieces",
+            "type": {
+              "kind": "list",
+              "element": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "spatial.map-cells@1",
+        "spatial.cell-coordinates@1",
+        "math.subtract@1",
+        "compare.greater-than@1",
+        "compare.less-than@1",
+        "logic.and@1",
+        "spatial.piece-position@1",
+        "compare.values@1",
+        "collection.singleton@1",
+        "collection.concat@1"
+      ],
+      "operations": [
+        "spatial.map-cells",
+        "query.pieces",
+        "spatial.cell-coordinates",
+        "collection.filter",
+        "collection.reduce",
+        "collection.find",
+        "collection.singleton",
+        "collection.concat",
+        "compare.values",
+        "logic.and"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 25744,
+        "modules": [
+          "query.pieces@1",
+          "spatial.map-cells@1",
+          "spatial.cell-coordinates@1",
+          "math.subtract@1",
+          "compare.greater-than@1",
+          "compare.less-than@1",
+          "logic.and@1",
+          "spatial.piece-position@1",
+          "compare.values@1",
+          "collection.singleton@1",
+          "collection.concat@1"
+        ]
+      },
+      "equivalence": "Public board cells are bounded by coordinate comparisons, then resolved one cell at a time through a public find and concatenated. The fixed board-cell traversal preserves the legacy x/y rectangle order for the validated bounded rectangle."
+    },
+    {
+      "id": "query.pieces-on-cells-all@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cells",
+            "module": "proof.cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "filtered",
+            "method": "filter",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "cells": {
+                "kind": "output",
+                "node": "cells",
+                "port": "value"
+              }
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "collection",
+                "id": "membership-find",
+                "method": "find",
+                "items": {
+                  "kind": "input",
+                  "name": "cells"
+                },
+                "inputs": {
+                  "candidate": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "item": "cell",
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-position",
+                    "module": "spatial.piece-position",
+                    "version": "1",
+                    "inputs": {
+                      "piece": {
+                        "kind": "input",
+                        "name": "candidate"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-piece-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "output",
+                        "node": "membership-cell-position",
+                        "port": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-target-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-x",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-piece-coords",
+                        "port": "x"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-target-coords",
+                        "port": "x"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-y",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-piece-coords",
+                        "port": "y"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-target-coords",
+                        "port": "y"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "membership-cell-same",
+                    "module": "logic.and",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "membership-cell-x",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "membership-cell-y",
+                        "port": "value"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "membership-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "membership-cell-same",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "id": "membership-present",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "membership-find",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": null
+                  }
+                },
+                "parameters": {
+                  "valueType": "{\"kind\":\"nullable\",\"value\":\"cell\"}",
+                  "operator": "!="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "filter-return",
+                "value": {
+                  "kind": "output",
+                  "node": "membership-present",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "pieces": {
+                "kind": "output",
+                "node": "filtered",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "pieces",
+            "type": {
+              "kind": "list",
+              "element": "piece"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "spatial.piece-position@1",
+        "spatial.cell-coordinates@1",
+        "compare.values@1",
+        "logic.and@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "spatial.piece-position",
+        "spatial.cell-coordinates",
+        "collection.find",
+        "collection.filter",
+        "compare.values",
+        "logic.and"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 10873,
+        "modules": [
+          "query.pieces@1",
+          "spatial.piece-position@1",
+          "spatial.cell-coordinates@1",
+          "compare.values@1",
+          "logic.and@1"
+        ]
+      },
+      "equivalence": "The all-relation variant uses the same public cell-membership filter over the live piece query; no retired cell-equal module is required."
+    },
+    {
+      "id": "spatial.cell-require@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "coords",
+            "module": "spatial.cell-coordinates",
+            "version": "1",
+            "inputs": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "rebuilt",
+            "module": "spatial.cell",
+            "version": "1",
+            "inputs": {
+              "x": {
+                "kind": "output",
+                "node": "coords",
+                "port": "x"
+              },
+              "y": {
+                "kind": "output",
+                "node": "coords",
+                "port": "y"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "cell": {
+                "kind": "output",
+                "node": "rebuilt",
+                "port": "cell"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cell",
+            "type": "cell"
+          }
+        ]
+      },
+      "publicModules": [
+        "spatial.cell-coordinates@1",
+        "spatial.cell@1"
+      ],
+      "operations": [
+        "spatial.cell-coordinates",
+        "spatial.cell"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 3260,
+        "modules": [
+          "spatial.cell-coordinates@1",
+          "spatial.cell@1"
+        ]
+      },
+      "equivalence": "A typed cell is read and reconstructed with public coordinate/constructor primitives. Null/presence propagation remains an engine input boundary and is not exposed as a separate author guard."
+    },
+    {
+      "id": "spatial.cell-unoccupied-except@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "ignore",
+            "module": "proof.ignore-piece",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "candidates",
+            "module": "query.pieces",
+            "version": "1",
+            "inputs": {},
+            "parameters": {
+              "relation": "all",
+              "includeDead": false
+            }
+          },
+          {
+            "kind": "collection",
+            "id": "occupied-by-other",
+            "method": "filter",
+            "items": {
+              "kind": "output",
+              "node": "candidates",
+              "port": "pieces"
+            },
+            "inputs": {
+              "target": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              },
+              "ignored": {
+                "kind": "output",
+                "node": "ignore",
+                "port": "value"
+              }
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "call",
+                "id": "match-position",
+                "module": "spatial.piece-position",
+                "version": "1",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "match-piece-coords",
+                "module": "spatial.cell-coordinates",
+                "version": "1",
+                "inputs": {
+                  "cell": {
+                    "kind": "output",
+                    "node": "match-position",
+                    "port": "cell"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "match-target-coords",
+                "module": "spatial.cell-coordinates",
+                "version": "1",
+                "inputs": {
+                  "cell": {
+                    "kind": "input",
+                    "name": "target"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "match-x",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "match-piece-coords",
+                    "port": "x"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "match-target-coords",
+                    "port": "x"
+                  }
+                },
+                "parameters": {
+                  "valueType": "number",
+                  "operator": "=="
+                }
+              },
+              {
+                "kind": "call",
+                "id": "match-y",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "match-piece-coords",
+                    "port": "y"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "match-target-coords",
+                    "port": "y"
+                  }
+                },
+                "parameters": {
+                  "valueType": "number",
+                  "operator": "=="
+                }
+              },
+              {
+                "kind": "call",
+                "id": "match-same",
+                "module": "logic.and",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "match-x",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "match-y",
+                    "port": "value"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "item-id",
+                "module": "piece.field",
+                "version": "2",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "parameters": {
+                  "field": "instanceId"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "ignored-id",
+                "module": "piece.field",
+                "version": "2",
+                "inputs": {
+                  "piece": {
+                    "kind": "input",
+                    "name": "ignored"
+                  }
+                },
+                "parameters": {
+                  "field": "instanceId"
+                }
+              },
+              {
+                "kind": "call",
+                "id": "different-id",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "item-id",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "ignored-id",
+                    "port": "value"
+                  }
+                },
+                "parameters": {
+                  "valueType": "string",
+                  "operator": "!="
+                }
+              },
+              {
+                "kind": "call",
+                "id": "other",
+                "module": "logic.and",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "match-same",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "output",
+                    "node": "different-id",
+                    "port": "value"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "return",
+                "id": "occupied-return",
+                "value": {
+                  "kind": "output",
+                  "node": "other",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "call",
+            "id": "count",
+            "module": "collection.length",
+            "version": "1",
+            "inputs": {
+              "items": {
+                "kind": "output",
+                "node": "occupied-by-other",
+                "port": "value"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "empty",
+            "module": "compare.values",
+            "version": "1",
+            "inputs": {
+              "left": {
+                "kind": "output",
+                "node": "count",
+                "port": "value"
+              },
+              "right": {
+                "kind": "literal",
+                "value": 0
+              }
+            },
+            "parameters": {
+              "valueType": "number",
+              "operator": "=="
+            }
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "value": {
+                "kind": "output",
+                "node": "empty",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "type": "boolean"
+          }
+        ]
+      },
+      "publicModules": [
+        "query.pieces@1",
+        "spatial.piece-position@1",
+        "spatial.cell-coordinates@1",
+        "compare.values@1",
+        "logic.and@1",
+        "piece.field@2",
+        "collection.length@1"
+      ],
+      "operations": [
+        "query.pieces",
+        "spatial.piece-position",
+        "spatial.cell-coordinates",
+        "piece.field(instanceId)",
+        "collection.filter",
+        "collection.length",
+        "compare.values",
+        "logic.and"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 15852,
+        "modules": [
+          "query.pieces@1",
+          "spatial.piece-position@1",
+          "spatial.cell-coordinates@1",
+          "compare.values@1",
+          "logic.and@1",
+          "piece.field@2",
+          "collection.length@1"
+        ]
+      },
+      "equivalence": "The public live-piece filter compares both position and instanceId, so the authenticated ignored piece is excluded before the count-to-zero test."
+    },
+    {
+      "id": "spatial.cell-unoccupied@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "occupied",
+            "module": "cell.field",
+            "version": "1",
+            "inputs": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "occupied"
+            }
+          },
+          {
+            "kind": "call",
+            "id": "empty",
+            "module": "logic.not",
+            "version": "1",
+            "inputs": {
+              "value": {
+                "kind": "output",
+                "node": "occupied",
+                "port": "value"
+              }
+            },
+            "parameters": {}
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "value": {
+                "kind": "output",
+                "node": "empty",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "type": "boolean"
+          }
+        ]
+      },
+      "publicModules": [
+        "cell.field@1",
+        "logic.not@1"
+      ],
+      "operations": [
+        "cell.field(occupied)",
+        "logic.not"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 3557,
+        "modules": [
+          "cell.field@1",
+          "logic.not@1"
+        ]
+      },
+      "equivalence": "The public cell occupancy field and boolean negation provide the no-ignore form; null-cell handling is left to the typed host boundary."
+    },
+    {
+      "id": "spatial.cell-walkable-safe@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.optional-cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "walkable",
+            "module": "cell.field",
+            "version": "1",
+            "inputs": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "walkable"
+            }
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "value": {
+                "kind": "output",
+                "node": "walkable",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "type": "boolean"
+          }
+        ]
+      },
+      "publicModules": [
+        "cell.field@1"
+      ],
+      "operations": [
+        "cell.field(walkable)"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 2726,
+        "modules": [
+          "cell.field@1"
+        ]
+      },
+      "equivalence": "The public cell field reads walkability for a valid optional cell; nullable absence is propagated by the compiler/host input boundary rather than an author-facing present-cell adapter."
+    },
+    {
+      "id": "spatial.cell-walkable@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cell",
+            "module": "proof.cell",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "walkable",
+            "module": "cell.field",
+            "version": "1",
+            "inputs": {
+              "cell": {
+                "kind": "output",
+                "node": "cell",
+                "port": "value"
+              }
+            },
+            "parameters": {
+              "field": "walkable"
+            }
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "walkable": {
+                "kind": "output",
+                "node": "walkable",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "walkable",
+            "type": "boolean"
+          }
+        ]
+      },
+      "publicModules": [
+        "cell.field@1"
+      ],
+      "operations": [
+        "cell.field(walkable)"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 2712,
+        "modules": [
+          "cell.field@1"
+        ]
+      },
+      "equivalence": "The public cell field is the direct walkability read; no retired present-cell or cell-walkable descriptor is used."
+    },
+    {
+      "id": "spatial.clip-cells@1",
+      "status": "proved",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "inputs": [],
+        "body": [
+          {
+            "kind": "call",
+            "id": "cells",
+            "module": "proof.cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "call",
+            "id": "board",
+            "module": "spatial.map-cells",
+            "version": "1",
+            "inputs": {},
+            "parameters": {}
+          },
+          {
+            "kind": "collection",
+            "id": "clipped",
+            "method": "filter",
+            "items": {
+              "kind": "output",
+              "node": "cells",
+              "port": "value"
+            },
+            "inputs": {
+              "board": {
+                "kind": "output",
+                "node": "board",
+                "port": "cells"
+              }
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "collection",
+                "id": "board-membership-find",
+                "method": "find",
+                "items": {
+                  "kind": "input",
+                  "name": "board"
+                },
+                "inputs": {
+                  "candidate": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "item": "cell",
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "board-membership-candidate-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "candidate"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "board-membership-cell-coords",
+                    "module": "spatial.cell-coordinates",
+                    "version": "1",
+                    "inputs": {
+                      "cell": {
+                        "kind": "input",
+                        "name": "cell"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "board-membership-x",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "board-membership-candidate-coords",
+                        "port": "x"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "board-membership-cell-coords",
+                        "port": "x"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "board-membership-y",
+                    "module": "compare.values",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "board-membership-candidate-coords",
+                        "port": "y"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "board-membership-cell-coords",
+                        "port": "y"
+                      }
+                    },
+                    "parameters": {
+                      "valueType": "number",
+                      "operator": "=="
+                    }
+                  },
+                  {
+                    "kind": "call",
+                    "id": "board-membership-same",
+                    "module": "logic.and",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "board-membership-x",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "output",
+                        "node": "board-membership-y",
+                        "port": "value"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "board-membership-return",
+                    "value": {
+                      "kind": "output",
+                      "node": "board-membership-same",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "call",
+                "id": "board-membership-present",
+                "module": "compare.values",
+                "version": "1",
+                "inputs": {
+                  "left": {
+                    "kind": "output",
+                    "node": "board-membership-find",
+                    "port": "value"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": null
+                  }
+                },
+                "parameters": {
+                  "valueType": "{\"kind\":\"nullable\",\"value\":\"cell\"}",
+                  "operator": "!="
+                }
+              },
+              {
+                "kind": "return",
+                "id": "clip-return",
+                "value": {
+                  "kind": "output",
+                  "node": "board-membership-present",
+                  "port": "value"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "collection",
+            "id": "canonical-cells",
+            "method": "map",
+            "items": {
+              "kind": "output",
+              "node": "clipped",
+              "port": "value"
+            },
+            "item": "item",
+            "body": [
+              {
+                "kind": "call",
+                "id": "canonical-coords",
+                "module": "spatial.cell-coordinates",
+                "version": "1",
+                "inputs": {
+                  "cell": {
+                    "kind": "input",
+                    "name": "item"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "call",
+                "id": "cell",
+                "module": "spatial.cell",
+                "version": "1",
+                "inputs": {
+                  "x": {
+                    "kind": "output",
+                    "node": "canonical-coords",
+                    "port": "x"
+                  },
+                  "y": {
+                    "kind": "output",
+                    "node": "canonical-coords",
+                    "port": "y"
+                  }
+                },
+                "parameters": {}
+              },
+              {
+                "kind": "return",
+                "id": "canonical-return",
+                "value": {
+                  "kind": "output",
+                  "node": "cell",
+                  "port": "cell"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "return",
+            "id": "done",
+            "values": {
+              "cells": {
+                "kind": "output",
+                "node": "canonical-cells",
+                "port": "value"
+              }
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cells",
+            "type": {
+              "kind": "list",
+              "element": "cell"
+            }
+          }
+        ]
+      },
+      "publicModules": [
+        "spatial.map-cells@1",
+        "spatial.cell-coordinates@1",
+        "compare.values@1",
+        "logic.and@1",
+        "spatial.cell@1"
+      ],
+      "operations": [
+        "spatial.map-cells",
+        "spatial.cell-coordinates",
+        "spatial.cell",
+        "collection.filter",
+        "collection.map",
+        "collection.find",
+        "compare.values",
+        "logic.and"
+      ],
+      "compile": {
+        "ok": true,
+        "codeBytes": 12193,
+        "modules": [
+          "spatial.map-cells@1",
+          "spatial.cell-coordinates@1",
+          "compare.values@1",
+          "logic.and@1",
+          "spatial.cell@1"
+        ]
+      },
+      "equivalence": "The public map-cell set is used only as the membership authority while the outer filter preserves caller order; each retained item is then rebuilt from pure x/y coordinates so decorated input fields cannot change the canonical cell result."
+    }
+  ],
+  "notes": [
+    "These are bounded public graph compilation proofs only. They do not claim runtime result equivalence; the paired execution comparison is in output/completion-compatibility-behavior-proof.json.",
+    "compare.equal/compare.equal-string/cell-equal/piece.identifier are replaced by compare.values, coordinate fields, and piece.field(instanceId).",
+    "Collection.filter/reduce/find emit ordered array traversal; ordered-cell proofs retain the caller sequence and deduplicate only by the old instanceId rule.",
+    "cell-require/present-cell and finite-number checks remain host/type propagation boundaries, not gameplay author guards."
+  ]
+}

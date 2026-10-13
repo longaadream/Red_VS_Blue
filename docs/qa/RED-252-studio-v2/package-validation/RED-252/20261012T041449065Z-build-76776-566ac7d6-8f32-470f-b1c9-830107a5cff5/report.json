@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "rvb-content-report/v1",
+  "taskId": "RED-252",
+  "operation": "build",
+  "caller": "cli",
+  "channel": "local-dev",
+  "status": "REFUSED",
+  "exitCode": 3,
+  "startedAt": "2026-10-12T04:14:49.065Z",
+  "finishedAt": "2026-10-12T04:14:49.740Z",
+  "command": {
+    "name": "build",
+    "args": [
+      "snapshot",
+      "--source",
+      "<source>",
+      "--output",
+      "<output>"
+    ]
+  },
+  "identity": {
+    "packageHash": null,
+    "publisherKeyId": null,
+    "signature": null,
+    "capabilities": [],
+    "resolvedProfileHash": null,
+    "authorityContentHash": null,
+    "engineAbi": null,
+    "contentAbi": null
+  },
+  "seed": null,
+  "smoke": null,
+  "refusal": {
+    "code": "PACK_FORBIDDEN_EXECUTABLE_CONTENT",
+    "stage": "content",
+    "message": "[content-pipeline:content] PACK_FORBIDDEN_EXECUTABLE_CONTENT pack=\"red252-authoring-candidate\" path=\"data/cards/armor-attack-defense.json\"",
+    "packId": "red252-authoring-candidate",
+    "path": "data/cards/armor-attack-defense.json"
+  }
+}

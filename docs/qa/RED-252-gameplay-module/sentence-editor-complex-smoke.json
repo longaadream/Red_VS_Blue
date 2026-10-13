@@ -1,0 +1,288 @@
+{
+  "ok": true,
+  "sourceIds": [
+    "naruto-shadow-clone",
+    "muru-lament",
+    "aizen-kyoka-suiguetsu",
+    "kiljaedan-demonic-pact"
+  ],
+  "checks": [
+    "production catalog IDs opened in real Electron",
+    "complex graph sentence projection rendered without false simple controls",
+    "advanced route opened and exposed registered statements",
+    "no-op save preserved exact graph and unknown metadata",
+    "page reload preserved exact graph and metadata",
+    "sentence condition control changed the correct Naruto graph",
+    "changed graph and metadata saved and reloaded exactly",
+    "active and passive skill trial opened isolated training preview routes"
+  ],
+  "results": [
+    {
+      "id": "naruto-shadow-clone",
+      "name": "影分身之术",
+      "kind": "active",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "bodyCount": 7,
+        "bodyIds": [
+          "source",
+          "mode-options",
+          "mode",
+          "target",
+          "origin",
+          "is-teleport",
+          "mode-branch"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 10,
+        "semanticNodes": 10,
+        "nodeKinds": [
+          "record.create",
+          "call",
+          "if"
+        ]
+      },
+      "advanced": {
+        "statements": 7
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone.png"
+      ]
+    },
+    {
+      "id": "muru-lament",
+      "name": "穆鲁的挽歌",
+      "kind": "active",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "bodyCount": 5,
+        "bodyIds": [
+          "caster-ref",
+          "caster",
+          "owner-id",
+          "player-exists",
+          "player-guard"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 99,
+        "semanticNodes": 99,
+        "nodeKinds": [
+          "call",
+          "if",
+          "collection",
+          "return",
+          "foreach",
+          "record.create"
+        ]
+      },
+      "advanced": {
+        "statements": 5
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament.png"
+      ]
+    },
+    {
+      "id": "aizen-kyoka-suiguetsu",
+      "name": "镜花水月",
+      "kind": "active",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "bodyCount": 23,
+        "bodyIds": [
+          "holder",
+          "source",
+          "choice",
+          "unresolved",
+          "selection-check",
+          "target",
+          "remove-active",
+          "remove-secret",
+          "owner",
+          "opponent",
+          "has-opponent",
+          "id",
+          "target-id",
+          "active-id",
+          "secret-id",
+          "active",
+          "apply-active",
+          "secret",
+          "opponent-check",
+          "name",
+          "message",
+          "result",
+          "done"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 27,
+        "semanticNodes": 27,
+        "nodeKinds": [
+          "call",
+          "if",
+          "return",
+          "record.create",
+          "record.with"
+        ]
+      },
+      "advanced": {
+        "statements": 23
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu.png"
+      ]
+    },
+    {
+      "id": "kiljaedan-demonic-pact",
+      "name": "恶魔仪式",
+      "kind": "passive",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "triggerSkill",
+        "bodyCount": 15,
+        "bodyIds": [
+          "holder-ref",
+          "holder-present",
+          "missing-holder",
+          "holder-guard",
+          "holder",
+          "owner",
+          "snapshot",
+          "detached",
+          "detach-failed",
+          "detach-guard",
+          "store",
+          "store-failed",
+          "store-guard",
+          "add-card",
+          "done"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 17,
+        "semanticNodes": 17,
+        "nodeKinds": [
+          "call",
+          "if",
+          "return"
+        ]
+      },
+      "advanced": {
+        "statements": 15
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact.png"
+      ]
+    }
+  ],
+  "trials": [
+    {
+      "id": "naruto-shadow-clone",
+      "targetId": "7B3073123281E0747DB98FAE44DBA98A",
+      "url": "rvb-editor-training://74d608c9-3a76-4ec7-be90-9192171ebbe1/battle.html?mode=training",
+      "draft": {
+        "skillId": "naruto-shadow-clone",
+        "pieceId": "blue-naruto",
+        "skillName": "影分身之术",
+        "pieceFaction": "good"
+      },
+      "setupVisible": true
+    },
+    {
+      "id": "muru-lament",
+      "targetId": "0A9DC249F58CBF1092E6E44D7C93E7E6",
+      "url": "rvb-editor-training://f78dd889-48e4-46af-b6a4-6266225b2ba2/battle.html?mode=training",
+      "draft": {
+        "skillId": "muru-lament",
+        "pieceId": "liadrin",
+        "skillName": "穆鲁的挽歌",
+        "pieceFaction": "good"
+      },
+      "setupVisible": true
+    },
+    {
+      "id": "aizen-kyoka-suiguetsu",
+      "targetId": "F10C160A88C2462EB1C36C9DCC89AC96",
+      "url": "rvb-editor-training://79984c54-702f-4988-ab78-7bbe04b1f6df/battle.html?mode=training",
+      "draft": {
+        "skillId": "aizen-kyoka-suiguetsu",
+        "pieceId": "dark-aizen",
+        "skillName": "镜花水月",
+        "pieceFaction": "evil"
+      },
+      "setupVisible": true
+    },
+    {
+      "id": "kiljaedan-demonic-pact",
+      "targetId": "8356948A7E8C43661AD0ED23B61AEABA",
+      "url": "rvb-editor-training://597d61c9-eefd-4c71-93ba-56c60304655f/battle.html?mode=training",
+      "draft": {
+        "skillId": "kiljaedan-demonic-pact",
+        "pieceId": "kiljaedan",
+        "skillName": "恶魔仪式",
+        "pieceFaction": "evil"
+      },
+      "setupVisible": true
+    }
+  ],
+  "edit": {
+    "id": "naruto-shadow-clone",
+    "addedNodeId": "sentence-condition-1",
+    "beforeBodyIds": [
+      "source",
+      "mode-options",
+      "mode",
+      "target",
+      "origin",
+      "is-teleport",
+      "mode-branch"
+    ],
+    "afterBodyIds": [
+      "source",
+      "mode-options",
+      "mode",
+      "target",
+      "origin",
+      "is-teleport",
+      "mode-branch",
+      "sentence-condition-1"
+    ]
+  },
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-naruto-shadow-clone.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-muru-lament.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-aizen-kyoka-suiguetsu.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-gameplay-module\\sentence-editor-complex-kiljaedan-demonic-pact.png"
+  ],
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-complex-sentence-smoke-cTvRYc\\rvb-content-545f8fc6"
+}

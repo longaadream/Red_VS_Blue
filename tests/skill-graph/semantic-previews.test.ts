@@ -9,7 +9,7 @@ import {
   runSemanticPreviewMigrations,
   SEMANTIC_PREVIEW_GAMEPLAY_REGISTRY,
 } from '../../scripts/migrate-semantic-previews'
-import { compileGameplayModuleGraph } from '../../lib/skill-graph/module-document'
+import { compileGameplayModuleGraph, compileGameplayModuleGraphV2 } from '../../lib/skill-graph/module-document'
 import { GAMEPLAY_MODULE_REGISTRY } from '../../lib/skill-graph/module-registry'
 
 type JsonRecord = Record<string, any>
@@ -136,7 +136,7 @@ describe('RED-252 ordinary semantic previews', () => {
 
   it('discovers every ordinary candidate and reports protected sources without blockers', () => {
     const migrationRun = migrationRunForFixture()
-    expect(baseline.baseSha).toBe('00df31f8bd35b34200d507fd83853bf5ac99ba94')
+    expect(baseline.baseSha).toBe('082166c6b803b2e838bce5f0f6824c5bbc714dd6')
     expect(migrationRun.coverage).toEqual({ ordinaryCandidates: 33, ready: 33, alreadyMigrated: 0, skipped: 4, blocked: 0 })
     expect(migrationRun.reports.filter(report => report.status === 'skipped').map(report => report.id).sort()).toEqual([
       'skills/minato-rasengan',
@@ -151,6 +151,7 @@ describe('RED-252 ordinary semantic previews', () => {
     for (const migration of migrationRun.migrations) {
       const source = baseline.entries[migration.id].previewCode as string
       const compiled = compileGameplayModuleGraph(migration.build(), SEMANTIC_PREVIEW_GAMEPLAY_REGISTRY)
+      const legacyCompiled = compileGameplayModuleGraphV2(migration.build(), SEMANTIC_PREVIEW_GAMEPLAY_REGISTRY)
       for (const [pieceBefore, skillBefore, cooldown] of variedInputs) {
         const legacyPiece = freeze(clone(pieceBefore))
         const legacySkill = freeze(clone(skillBefore))
@@ -160,7 +161,11 @@ describe('RED-252 ordinary semantic previews', () => {
         const beforeSkill = clone(graphSkill)
         const expected = execute(source, legacyPiece, legacySkill, cooldown)
         const actual = execute(compiled.code, graphPiece, graphSkill, cooldown)
-        expect(actual, migration.id).toEqual(expected)
+        expect(execute(legacyCompiled.code, graphPiece, graphSkill, cooldown), migration.id + ' v2 compatibility').toEqual(expected)
+        // V3 must not turn a missing captured attack into a damage array of NaN.
+        const distanceValues = (expected as JsonRecord | undefined)?.expectedValues?.damageByDistance
+        if (Array.isArray(distanceValues) && distanceValues.some((value: unknown) => typeof value !== 'number' || !Number.isFinite(value)) && graphPiece.attack === undefined) expect(actual).toBeUndefined()
+        else expect(actual, migration.id).toEqual(expected)
         expect(graphPiece, `${migration.id} mutated piece input`).toEqual(beforePiece)
         expect(graphSkill, `${migration.id} mutated skill input`).toEqual(beforeSkill)
       }

@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "statementId": "sentence-module-1",
+  "parameters": {
+    "namespace": "author-test",
+    "path": "state.hp",
+    "valueType": "{\"kind\":\"record\",\"schema\":\"smoke-record@1\"}",
+    "name": "customRecord"
+  },
+  "rootSuggestions": [
+    "priorPlayer"
+  ],
+  "thenSuggestions": [
+    "rootPiece",
+    "priorPlayer",
+    "branchPiece"
+  ],
+  "elseSuggestions": [
+    "rootPiece",
+    "priorPlayer"
+  ],
+  "focusedCustom": {
+    "slotOnly": true,
+    "moduleSelect": false,
+    "parameters": [
+      "name"
+    ],
+    "inputs": []
+  },
+  "mapPickerWithSchema": [
+    "extension.map-items",
+    "extension.map-put",
+    "extension.map-remove"
+  ],
+  "missingExtension": {
+    "name": "missingState",
+    "fallback": false
+  },
+  "instanceEditor": {
+    "entityKind": false,
+    "entity": true,
+    "text": "读取当前技能实例 · 技能实例的扩展变量skillState，分组为content，类型为数值保存返回值值 → 更多操作编辑模块↑↓复制删除查看技术信息读取具体实体实例上已声明的扩展字段；实例失效、字段缺失或声明类型变化会使语句失效。可用结果：值"
+  },
+  "screenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\sentence-editor-extension-custom.png"
+}

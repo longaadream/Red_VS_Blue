@@ -5,8 +5,13 @@
  * host; this module does not introduce a runtime interpreter.
  */
 
+import { isAuthorMap, isAuthorSet } from '../game/author-containers'
 import {
   GAMEPLAY_MODULE_COMPILER_VERSION,
+  GAMEPLAY_MODULE_COMPILER_V1_VERSION,
+  GAMEPLAY_MODULE_COMPILER_V2_VERSION,
+  GAMEPLAY_MODULE_COMPILER_V3_VERSION,
+  type GameplayModuleCompilerVersion,
   GAMEPLAY_MODULE_GRAPH_VERSION,
   GameplayModuleCompileError,
   type GameplayCallStatement,
@@ -36,6 +41,7 @@ import {
 } from './module-types'
 
 export { GAMEPLAY_MODULE_COMPILER_VERSION }
+export { GAMEPLAY_MODULE_COMPILER_V1_VERSION, GAMEPLAY_MODULE_COMPILER_V2_VERSION, GAMEPLAY_MODULE_COMPILER_V3_VERSION }
 export const GAMEPLAY_COMPILER_VERSION = GAMEPLAY_MODULE_COMPILER_VERSION
 export const MODULE_COMPILER_VERSION = GAMEPLAY_MODULE_COMPILER_VERSION
 
@@ -51,6 +57,7 @@ const limitsDefault: Required<GameplayModuleCompilerOptions> = {
   maxExpandedCalls: 2_000,
   maxLiteralBytes: 256 * 1024,
   maxCollectionIterations: 10_000,
+  maxWhileIterations: 10_000,
 }
 type Rec = Record<string, unknown>
 type Port = GameplayPort
@@ -59,13 +66,13 @@ type StructuredContinuation = { readonly id: string; readonly version: string; r
 type Graph = { readonly version: typeof GAMEPLAY_MODULE_GRAPH_VERSION; readonly surface: GameplayModuleSurface; readonly inputs: readonly Port[]; readonly inputBindings: Readonly<Record<string, GameplayLiteral>>; readonly outputs: readonly Port[]; readonly body: readonly GameplayStatement[]; readonly composites: readonly GameplayCompositeDefinition[]; readonly schemas: readonly GameplayRecordSchema[]; readonly hostBindings: Readonly<Record<string, GameplayValueType>>; readonly continuations: readonly StructuredContinuation[]; readonly layout?: Readonly<Record<string, GameplayJsonValue>> }
 type Resolved = { readonly kind: 'native'; readonly descriptor: GameplayModuleDescriptor } | { readonly kind: 'composite'; readonly definition: GameplayCompositeDefinition }
 type VEnv = { readonly inputs: ReadonlyMap<string, GameplayValueType>; readonly bindings: ReadonlyMap<string, ReadonlyMap<string, GameplayValueType>> }
-type CallMeta = { readonly module: Resolved; readonly inputs: Readonly<Record<string, GameplayValue>>; readonly parameters: Readonly<Record<string, GameplayLiteral>> }
+type CallMeta = { readonly module: Resolved; readonly inputs: Readonly<Record<string, GameplayValue>>; readonly parameters: Readonly<Record<string, GameplayLiteral>>; readonly inputTypes?: ReadonlyMap<string, GameplayValueType>; readonly outputTypes: ReadonlyMap<string, GameplayValueType> }
 type ExpandedCall = { readonly id: string; readonly version: string; readonly kind: 'native' | 'composite'; readonly callId: string; readonly depth: number }
 type Resolver = { readonly graph: Graph; readonly composites: ReadonlyMap<string, GameplayCompositeDefinition>; readonly native: Map<string, GameplayModuleDescriptor>; readonly calls: Map<GameplayCallStatement, CallMeta>; readonly dependencies: Map<string, { id: string; version: string; kind: 'native' | 'composite' }>; readonly expanded: ExpandedCall[]; readonly limits: Required<GameplayModuleCompilerOptions>; readonly registry: GameplayModuleRegistry; readonly schemas: SchemaTable; statementCount: number }
 type CBinding = { readonly ports: ReadonlyMap<string, GameplayValueType>; readonly expression: string; readonly portExpressions?: ReadonlyMap<string, string> }
 type CEnv = { readonly inputs: ReadonlyMap<string, string>; readonly bindings: ReadonlyMap<string, CBinding>; readonly inputTypes?: ReadonlyMap<string, GameplayValueType> }
 type ReturnTarget = { readonly result: string; readonly label: string; readonly outputs: readonly Port[] }
-type Codegen = { next: number; readonly resolver: Resolver; readonly loweringDependencies: Set<string>; readonly continuationStack: readonly string[] }
+type Codegen = { next: number; readonly resolver: Resolver; readonly loweringDependencies: Set<string>; readonly continuationStack: readonly string[]; readonly compilerVersion: GameplayModuleCompilerVersion }
 
 class CompilerFailure extends GameplayModuleCompileError {
   constructor(message: string, path?: string, code = 'GAMEPLAY_MODULE_INVALID') { super(message, path, code) }
@@ -186,22 +193,26 @@ function matchesPreviewHostType(actual: GameplayValueType, expected: GameplayVal
   return actual === expected
 }
 
-function typeValue(value: unknown, path: string): GameplayValueType {
+function typeValue(value: unknown, path: string, trustedGeneric = false): GameplayValueType {
   if (typeof value === 'string') {
     if (!publicTypeNames.has(value as GameplayValueTypeName)) fail('unsupported value type "' + value + '"', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
-    if (value === 'unknown' || value === 'any') fail('universal value types are not allowed', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
+    if (!trustedGeneric && (value === 'unknown' || value === 'any')) fail('universal value types are not allowed', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
     return value as GameplayValueTypeName
   }
   const record = plain(value, path)
-  if (record.kind === 'list') {
+  if (record.kind === 'list' || record.kind === 'set') {
     allowed(record, ['kind', 'element'], path)
     if (!own(record, 'element')) fail('list type requires element', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
-    return { kind: 'list', element: typeValue(record.element, path + '.element') }
+    return { kind: record.kind, element: typeValue(record.element, path + '.element', trustedGeneric) }
+  }
+  if (record.kind === 'map') {
+    allowed(record, ['kind', 'key', 'value'], path)
+    return { kind: 'map', key: typeValue(record.key, path + '.key', trustedGeneric), value: typeValue(record.value, path + '.value', trustedGeneric) }
   }
   if (record.kind === 'nullable') {
     allowed(record, ['kind', 'value'], path)
     if (!own(record, 'value')) fail('nullable type requires value', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
-    return { kind: 'nullable', value: typeValue(record.value, path + '.value') }
+    return { kind: 'nullable', value: typeValue(record.value, path + '.value', trustedGeneric) }
   }
   if (record.kind === 'record') {
     allowed(record, ['kind', 'schema'], path)
@@ -209,18 +220,18 @@ function typeValue(value: unknown, path: string): GameplayValueType {
   }
   fail('unsupported value type descriptor', path, 'GAMEPLAY_MODULE_INVALID_TYPE')
 }
-function port(value: unknown, path: string): Port {
+function port(value: unknown, path: string, trustedGeneric = false): Port {
   const record = plain(value, path)
   allowed(record, ['name', 'type', 'optional', 'nullable', 'label', 'description'], path)
-  const result: Record<string, unknown> = { name: safeName(record.name, path + '.name'), type: typeValue(record.type, path + '.type') }
+  const result: Record<string, unknown> = { name: safeName(record.name, path + '.name'), type: typeValue(record.type, path + '.type', trustedGeneric) }
   for (const key of ['optional', 'nullable'] as const) if (record[key] !== undefined) result[key] = bool(record[key], path + '.' + key)
   for (const key of ['label', 'description'] as const) if (record[key] !== undefined) result[key] = nonempty(record[key], path + '.' + key)
   return result as Port
 }
-function ports(value: unknown, path: string): readonly Port[] {
+function ports(value: unknown, path: string, trustedGeneric = false): readonly Port[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) fail('ports must be an array', path, 'GAMEPLAY_MODULE_SHAPE')
-  const result = value.map((entry, index) => port(entry, path + '[' + index + ']'))
+  const result = value.map((entry, index) => port(entry, path + '[' + index + ']', trustedGeneric))
   const names = new Set<string>()
   for (const entry of result) { if (names.has(entry.name)) fail('duplicate port "' + entry.name + '"', path, 'GAMEPLAY_MODULE_DUPLICATE_PORT'); names.add(entry.name) }
   return result
@@ -270,7 +281,13 @@ function parameters(value: unknown, path: string): readonly Param[] {
   for (const entry of result) { if (names.has(entry.name)) fail('duplicate parameter "' + entry.name + '"', path, 'GAMEPLAY_MODULE_DUPLICATE_PARAMETER'); names.add(entry.name) }
   return result
 }
-function inspectReferences(value: unknown, inputs: readonly Port[], path: string): readonly string[] | undefined {
+function inspectReferences(
+  value: unknown,
+  inputs: readonly Port[],
+  path: string,
+  inputValueTypeBindings?: unknown,
+  declarations: readonly Param[] = [],
+): readonly string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) fail('inspectReferences must be an array', path, 'GAMEPLAY_MODULE_INVALID_REFERENCE_INSPECTION')
   const inputMap = mapPorts(inputs)
@@ -281,8 +298,67 @@ function inspectReferences(value: unknown, inputs: readonly Port[], path: string
     const input = inputMap.get(name)
     if (!input) fail('inspectReferences names unknown input "' + name + '"', path + '[' + index + ']', 'GAMEPLAY_MODULE_UNKNOWN_PORT')
     const reference = referenceKind(effective(input))
-    if (!reference) fail('inspectReferences input "' + name + '" must be a piece or player reference', path + '[' + index + ']', 'GAMEPLAY_MODULE_INVALID_REFERENCE_INSPECTION')
+    const rawBinding = isObject(inputValueTypeBindings) && own(inputValueTypeBindings, name)
+      ? inputValueTypeBindings[name]
+      : undefined
+    const binding = isObject(rawBinding) ? rawBinding : undefined
+    const bindingParameter = typeof binding?.parameter === 'string' ? binding.parameter : undefined
+    const dynamicBinding = bindingParameter !== undefined
+      && declarations.some(declaration => declaration.name === bindingParameter && declaration.type === 'string')
+    // Generic value modules bind their record-shaped ports to a closed type
+    // selected by a string parameter.  The selected type can be a piece or a
+    // player, and those modules intentionally compare opaque identities
+    // without asking the host to resolve a live entity first.  Accept the
+    // trusted binding here while continuing to reject ordinary record ports.
+    if (!reference && !dynamicBinding) fail('inspectReferences input "' + name + '" must be a piece or player reference or a trusted value binding', path + '[' + index + ']', 'GAMEPLAY_MODULE_INVALID_REFERENCE_INSPECTION')
     result.push(name)
+  }
+  return result
+}
+function livingReferences(value: unknown, inputs: readonly Port[], path: string): readonly string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) fail('livingReferences must be an array', path, 'GAMEPLAY_MODULE_INVALID_LIVING_REFERENCE')
+  const inputMap = mapPorts(inputs)
+  const result: string[] = []
+  for (let index = 0; index < value.length; index += 1) {
+    const name = nonempty(value[index], path + '[' + index + ']')
+    if (result.includes(name)) fail('duplicate living input "' + name + '"', path, 'GAMEPLAY_MODULE_DUPLICATE_LIVING_REFERENCE')
+    const input = inputMap.get(name)
+    if (!input) fail('livingReferences names unknown input "' + name + '"', path + '[' + index + ']', 'GAMEPLAY_MODULE_UNKNOWN_PORT')
+    if (referenceKind(effective(input)) !== 'piece') fail('livingReferences input "' + name + '" must be a piece reference', path + '[' + index + ']', 'GAMEPLAY_MODULE_INVALID_LIVING_REFERENCE')
+    result.push(name)
+  }
+  return result
+}
+function outputParameterTypeBindings(
+  value: unknown,
+  outputs: readonly Port[],
+  declarations: readonly Param[],
+  path: string,
+): Readonly<Record<string, { parameter: string; types: Readonly<Record<string, GameplayValueType>> }>> | undefined {
+  if (value === undefined) return undefined
+  const record = plain(value, path)
+  const outputMap = mapPorts(outputs)
+  const parameterMap = mapParams(declarations)
+  const result: Record<string, { parameter: string; types: Readonly<Record<string, GameplayValueType>> }> = Object.create(null) as Record<string, { parameter: string; types: Readonly<Record<string, GameplayValueType>> }>
+  for (const [outputName, rawBinding] of Object.entries(record)) {
+    const bindingPath = path + '.' + outputName
+    const binding = plain(rawBinding, bindingPath)
+    allowed(binding, ['parameter', 'types'], bindingPath)
+    const output = outputMap.get(outputName)
+    if (!output) fail('field type binding must name an output port', bindingPath, 'GAMEPLAY_MODULE_UNKNOWN_PORT')
+    const parameterName = safeName(binding.parameter, bindingPath + '.parameter')
+    const declaration = parameterMap.get(parameterName)
+    if (!declaration || declaration.type !== 'string') fail('field type binding parameter must be a string parameter', bindingPath + '.parameter', 'GAMEPLAY_MODULE_INVALID_TYPE_BINDING')
+    const types = plain(binding.types, bindingPath + '.types')
+    const normalized: Record<string, GameplayValueType> = Object.create(null) as Record<string, GameplayValueType>
+    for (const [fieldName, rawType] of Object.entries(types)) {
+      const safeField = safeName(fieldName, bindingPath + '.types.' + fieldName)
+      if (Object.prototype.hasOwnProperty.call(normalized, safeField)) fail('duplicate field type binding "' + safeField + '"', bindingPath + '.types', 'GAMEPLAY_MODULE_DUPLICATE_FIELD')
+      normalized[safeField] = typeValue(rawType, bindingPath + '.types.' + safeField)
+    }
+    if (Object.keys(normalized).length === 0) fail('field type binding requires at least one field', bindingPath + '.types', 'GAMEPLAY_MODULE_INVALID_TYPE_BINDING')
+    result[outputName] = { parameter: parameterName, types: normalized }
   }
   return result
 }
@@ -335,7 +411,7 @@ function collectionStatement(value: unknown, path: string): GameplayCollectionSt
   const record = plain(value, path)
   const rawKind = nonempty(record.kind, path + '.kind')
   const method = rawKind === 'collection' ? nonempty(record.method, path + '.method') : rawKind.slice('collection.'.length)
-  if (method !== 'map' && method !== 'filter' && method !== 'reduce') fail('unsupported collection method "' + method + '"', path + '.method', 'GAMEPLAY_MODULE_UNSUPPORTED_STATEMENT')
+  if (method !== 'map' && method !== 'filter' && method !== 'reduce' && method !== 'find') fail('unsupported collection method "' + method + '"', path + '.method', 'GAMEPLAY_MODULE_UNSUPPORTED_STATEMENT')
   const allowedFields = ['kind', 'method', 'id', 'items', 'inputs', 'item', 'index', 'accumulator', 'initial', 'body']
   allowed(record, allowedFields, path)
   if (rawKind !== 'collection' && (own(record, 'method') || (method !== 'reduce' && (own(record, 'accumulator') || own(record, 'initial'))))) fail('collection discriminator conflicts with method fields', path, 'GAMEPLAY_MODULE_INVALID_STATEMENT')
@@ -354,6 +430,33 @@ function collectionStatement(value: unknown, path: string): GameplayCollectionSt
   if (record.accumulator !== undefined) node.accumulator = safeName(record.accumulator, path + '.accumulator')
   if (record.initial !== undefined) node.initial = valueRef(record.initial, path + '.initial')
   return node as GameplayCollectionStatement
+}
+
+function whileCondition(value: unknown, path: string): { readonly inputs: Readonly<Record<string, GameplayValue>>; readonly body: readonly GameplayStatement[] } {
+  const record = plain(value, path)
+  allowed(record, ['inputs', 'body'], path)
+  if (!Array.isArray(record.body)) fail('while.condition.body must be an array', path + '.body', 'GAMEPLAY_MODULE_SHAPE')
+  return {
+    inputs: record.inputs === undefined ? {} : valueMap(record.inputs, path + '.inputs'),
+    body: statements(record.body, path + '.body'),
+  }
+}
+
+function whileStatement(value: unknown, path: string): GameplayStatement {
+  const record = plain(value, path)
+  allowed(record, ['kind', 'id', 'condition', 'index', 'budget', 'body', 'layout'], path)
+  if (!Array.isArray(record.body)) fail('while.body must be an array', path + '.body', 'GAMEPLAY_MODULE_SHAPE')
+  if (!Number.isSafeInteger(record.budget) || (record.budget as number) <= 0) fail('while.budget must be a positive safe integer', path + '.budget', 'GAMEPLAY_MODULE_INVALID_VALUE')
+  const node: Record<string, unknown> = {
+    kind: 'while',
+    id: nonempty(record.id, path + '.id'),
+    condition: whileCondition(record.condition, path + '.condition'),
+    budget: record.budget,
+    body: statements(record.body, path + '.body'),
+  }
+  if (record.index !== undefined) node.index = safeName(record.index, path + '.index')
+  const nodeLayout = layout(record.layout, path + '.layout'); if (nodeLayout !== undefined) node.layout = nodeLayout
+  return node as GameplayStatement
 }
 
 function statement(value: unknown, path: string): GameplayStatement {
@@ -375,14 +478,19 @@ function statement(value: unknown, path: string): GameplayStatement {
     return node as GameplayStatement
   }
   if (kind === 'foreach') {
-    allowed(record, ['kind', 'id', 'items', 'item', 'index', 'body', 'layout'], path)
+    allowed(record, ['kind', 'id', 'items', 'item', 'index', 'body', 'presentation', 'layout'], path)
     if (!Array.isArray(record.body)) fail('foreach.body must be an array', path + '.body', 'GAMEPLAY_MODULE_SHAPE')
     const node: Record<string, unknown> = { kind, id: nonempty(record.id, path + '.id'), items: valueRef(record.items, path + '.items'), body: statements(record.body, path + '.body') }
     if (record.item !== undefined) node.item = nonempty(record.item, path + '.item')
     if (record.index !== undefined) node.index = nonempty(record.index, path + '.index')
+    if (record.presentation !== undefined) {
+      if (!['statusAdded', 'statusRemoved', 'tileEffectAdded', 'tileEffectRemoved'].includes(String(record.presentation))) fail('unknown presentation batch kind', path + '.presentation', 'GAMEPLAY_MODULE_INVALID_VALUE')
+      node.presentation = record.presentation
+    }
     const nodeLayout = layout(record.layout, path + '.layout'); if (nodeLayout !== undefined) node.layout = nodeLayout
     return node as GameplayStatement
   }
+  if (kind === 'while') return whileStatement(value, path)
   if (kind === 'record.create') {
     allowed(record, ['kind', 'id', 'schema', 'fields'], path)
     return {
@@ -410,9 +518,9 @@ function statement(value: unknown, path: string): GameplayStatement {
       fields: recordFields(record.fields, path + '.fields'),
     } as GameplayRecordWithStatement
   }
-  if (kind === 'collection' || kind === 'collection.map' || kind === 'collection.filter' || kind === 'collection.reduce') return collectionStatement(value, path)
+  if (kind === 'collection' || kind === 'collection.map' || kind === 'collection.filter' || kind === 'collection.find' || kind === 'collection.reduce') return collectionStatement(value, path)
   if (kind === 'defer-choice') {
-    allowed(record, ['kind', 'id', 'graph', 'payload', 'player', 'title', 'targetType', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'], path)
+    allowed(record, ['kind', 'id', 'graph', 'payload', 'player', 'title', 'targetType', 'range', 'filter', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'], path)
     if (own(record, 'min') && own(record, 'minSelections')) fail('defer-choice cannot contain both min and minSelections', path, 'GAMEPLAY_MODULE_INVALID_STATEMENT')
     if (own(record, 'max') && own(record, 'maxSelections')) fail('defer-choice cannot contain both max and maxSelections', path, 'GAMEPLAY_MODULE_INVALID_STATEMENT')
     const node: Record<string, unknown> = {
@@ -421,7 +529,7 @@ function statement(value: unknown, path: string): GameplayStatement {
       graph: nonempty(record.graph, path + '.graph'),
       payload: valueRef(record.payload, path + '.payload'),
     }
-    for (const key of ['player', 'title', 'targetType', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
+    for (const key of ['player', 'title', 'targetType', 'range', 'filter', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
       if (record[key] !== undefined) node[key] = valueRef(record[key], path + '.' + key)
     }
     return node as GameplayDeferChoiceStatement
@@ -472,6 +580,10 @@ function ids(body: readonly GameplayStatement[], path: string): void {
       seen.add(node.id)
       if (node.kind === 'if') { visit(node.then, nested + '[' + index + '].then'); if (node.else) visit(node.else, nested + '[' + index + '].else') }
       if (node.kind === 'foreach' || node.kind === 'collection') visit(node.body, nested + '[' + index + '].body')
+      if (node.kind === 'while') {
+        visit(node.condition.body, nested + '[' + index + '].condition.body')
+        visit(node.body, nested + '[' + index + '].body')
+      }
     })
   }
   visit(body, path)
@@ -639,7 +751,8 @@ function schemaFor(table: SchemaTable, reference: string, path: string): Gamepla
 }
 function validateTypeSchemas(value: GameplayValueType, table: SchemaTable, path: string): void {
   if (typeof value === 'string') return
-  if (value.kind === 'list') return validateTypeSchemas(value.element, table, path + '.element')
+  if (value.kind === 'list' || value.kind === 'set') return validateTypeSchemas(value.element, table, path + '.element')
+  if (value.kind === 'map') { validateTypeSchemas(value.key, table, path + '.key'); validateTypeSchemas(value.value, table, path + '.value'); return }
   if (value.kind === 'nullable') return validateTypeSchemas(value.value, table, path + '.value')
   schemaFor(table, value.schema, path + '.schema')
 }
@@ -678,6 +791,9 @@ function validateGraphLiteralBudget(value: Graph, limit: number): void {
         visitValue(node.condition, currentBudget); visitBody(node.then, currentBudget); if (node.else) visitBody(node.else, currentBudget)
       } else if (node.kind === 'foreach') {
         visitValue(node.items, currentBudget); visitBody(node.body, currentBudget)
+      } else if (node.kind === 'while') {
+        for (const entry of Object.values(node.condition.inputs ?? {})) visitValue(entry, currentBudget)
+        visitBody(node.condition.body, currentBudget); visitBody(node.body, currentBudget)
       } else if (node.kind === 'record.create') {
         for (const entry of Object.values(node.fields ?? {})) visitValue(entry, currentBudget)
       } else if (node.kind === 'record.get') {
@@ -688,7 +804,7 @@ function validateGraphLiteralBudget(value: Graph, limit: number): void {
         visitValue(node.items, currentBudget); for (const entry of Object.values(node.inputs ?? {})) visitValue(entry, currentBudget); if (node.initial !== undefined) visitValue(node.initial, currentBudget); visitBody(node.body, currentBudget)
       } else if (node.kind === 'defer-choice') {
         visitValue(node.payload, currentBudget)
-        for (const name of ['player', 'title', 'targetType', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
+        for (const name of ['player', 'title', 'targetType', 'range', 'filter', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
           const value = node[name]
           if (value !== undefined) visitValue(value, currentBudget)
         }
@@ -726,6 +842,15 @@ function typeOfLiteral(value: GameplayLiteral): GameplayValueType {
     for (let i = 1; i < value.length; i += 1) if (!assignable(typeOfLiteral(value[i]), element) || !assignable(element, typeOfLiteral(value[i]))) return { kind: 'list', element: 'record' }
     return { kind: 'list', element }
   }
+  if (isAuthorSet(value)) {
+    const items = typeOfLiteral(value.items as GameplayLiteral)
+    if (typeof items === 'object' && items.kind === 'list') return { kind: 'set', element: items.element }
+  }
+  if (isAuthorMap(value)) {
+    const keys = typeOfLiteral(value.entries.map(entry => entry[0]) as GameplayLiteral)
+    const values = typeOfLiteral(value.entries.map(entry => entry[1]) as GameplayLiteral)
+    if (typeof keys === 'object' && keys.kind === 'list' && typeof values === 'object' && values.kind === 'list') return { kind: 'map', key: keys.element, value: values.element }
+  }
   return 'record'
 }
 function assignable(actual: GameplayValueType, expected: GameplayValueType): boolean {
@@ -749,12 +874,16 @@ function assignable(actual: GameplayValueType, expected: GameplayValueType): boo
       || (actual.schema.indexOf('@') < 0 && expected.schema.startsWith(actual.schema + '@'))
       || (expected.schema.indexOf('@') < 0 && actual.schema.startsWith(expected.schema + '@'))
   }
+  if (expected.kind === 'map') return typeof actual === 'object' && actual.kind === 'map' && assignable(actual.key, expected.key) && assignable(actual.value, expected.value)
+  if (expected.kind === 'set') return typeof actual === 'object' && actual.kind === 'set' && (actual.element === 'never' || assignable(actual.element, expected.element))
   if (typeof actual !== 'object' || actual.kind !== 'list') return false
   return expected.kind === 'list' && (actual.element === 'never' || assignable(actual.element, expected.element))
 }
 function typeName(value: GameplayValueType): string {
   if (typeof value === 'string') return value
   if (value.kind === 'list') return 'list<' + typeName(value.element) + '>'
+  if (value.kind === 'set') return 'set<' + typeName(value.element) + '>'
+  if (value.kind === 'map') return 'map<' + typeName(value.key) + ',' + typeName(value.value) + '>'
   if (value.kind === 'nullable') return 'nullable<' + typeName(value.value) + '>'
   return 'record<' + value.schema + '>'
 }
@@ -777,18 +906,71 @@ function descriptor(value: unknown, id: string, version: string): GameplayModule
   if (!isObject(value)) fail('registry returned an invalid descriptor', 'registry.' + id, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
   const record = value as Rec
   for (const key of ['id', 'version', 'label', 'inputs', 'outputs', 'allowedSurfaces', 'effects', 'lower']) if (!own(record, key)) fail('registry descriptor is missing ' + key, 'registry.' + id, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
-  allowed(record, ['id', 'version', 'label', 'description', 'uiDescription', 'inputs', 'outputs', 'parameters', 'inspectReferences', 'allowedSurfaces', 'effects', 'ui', 'lower'], 'registry.' + id)
+  allowed(record, ['id', 'version', 'label', 'description', 'uiDescription', 'inputs', 'outputs', 'outputTypeBindings', 'outputSchemaBindings', 'inputSchemaBindings', 'outputValueTypeBindings', 'inputValueTypeBindings', 'outputParameterTypeBindings', 'parameters', 'inspectReferences', 'livingReferences', 'allowedSurfaces', 'effects', 'ui', 'lower'], 'registry.' + id)
   const actualId = nonempty(record.id, 'registry.' + id + '.id')
   const actualVersion = nonempty(record.version, 'registry.' + id + '.version')
   if (actualId !== id || actualVersion !== version) fail('registry descriptor does not match requested module', 'registry.' + id, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
-  const inputPorts = ports(record.inputs, 'registry.' + id + '.inputs')
-  const result: Rec = { id: actualId, version: actualVersion, label: nonempty(record.label, 'registry.' + id + '.label'), inputs: inputPorts, outputs: ports(record.outputs, 'registry.' + id + '.outputs'), allowedSurfaces: allowedSurfaces(record.allowedSurfaces, 'registry.' + id + '.allowedSurfaces'), effects: validateEffects(record.effects, 'registry.' + id + '.effects'), lower: record.lower }
+  const inputPorts = ports(record.inputs, 'registry.' + id + '.inputs', true)
+  const result: Rec = { id: actualId, version: actualVersion, label: nonempty(record.label, 'registry.' + id + '.label'), inputs: inputPorts, outputs: ports(record.outputs, 'registry.' + id + '.outputs', true), allowedSurfaces: allowedSurfaces(record.allowedSurfaces, 'registry.' + id + '.allowedSurfaces'), effects: validateEffects(record.effects, 'registry.' + id + '.effects'), lower: record.lower }
+  for (const input of inputPorts) if (input.type === 'any' || input.type === 'unknown') fail('universal input types are not allowed', 'registry.' + id + '.inputs', 'GAMEPLAY_MODULE_INVALID_TYPE')
+  for (const output of result.outputs as Port[]) if ((output.type === 'any' || output.type === 'unknown') && !isObject(record.outputTypeBindings) && !isObject(record.outputParameterTypeBindings)) fail('unbound universal output types are not allowed', 'registry.' + id + '.outputs', 'GAMEPLAY_MODULE_INVALID_TYPE')
   if (record.description !== undefined) result.description = nonempty(record.description, 'registry.' + id + '.description')
   if (record.uiDescription !== undefined) result.uiDescription = nonempty(record.uiDescription, 'registry.' + id + '.uiDescription')
   const params = parameters(record.parameters, 'registry.' + id + '.parameters'); if (params.length) result.parameters = params
-  const inspected = inspectReferences(record.inspectReferences, inputPorts, 'registry.' + id + '.inspectReferences'); if (inspected !== undefined) result.inspectReferences = inspected
+  const inspected = inspectReferences(record.inspectReferences, inputPorts, 'registry.' + id + '.inspectReferences', record.inputValueTypeBindings, params); if (inspected !== undefined) result.inspectReferences = inspected
+  const living = livingReferences(record.livingReferences, inputPorts, 'registry.' + id + '.livingReferences')
+  if (living !== undefined) {
+    if (inspected?.some(name => living.includes(name))) fail('an input cannot be listed in both livingReferences and inspectReferences', 'registry.' + id + '.livingReferences', 'GAMEPLAY_MODULE_CONFLICTING_REFERENCE_METADATA')
+    result.livingReferences = living
+  }
+  if (record.outputTypeBindings !== undefined) {
+    const bindings = plain(record.outputTypeBindings, 'registry.' + id + '.outputTypeBindings')
+    const normalized: Record<string, { input: string; projection: 'same' | 'element' | 'singleton' }> = Object.create(null)
+    for (const [output, rawBinding] of Object.entries(bindings)) {
+      const path = 'registry.' + id + '.outputTypeBindings.' + output
+      const binding = plain(rawBinding, path)
+      allowed(binding, ['input', 'projection'], path)
+      const input = nonempty(binding.input, path + '.input')
+      if (!(result.outputs as Port[]).some(port => port.name === output) || !inputPorts.some(port => port.name === input && !port.optional)) fail('type binding must name an output and a required input', path, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+      if (binding.projection !== 'same' && binding.projection !== 'element' && binding.projection !== 'singleton') fail('unknown type binding projection', path, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+      normalized[output] = { input, projection: binding.projection }
+    }
+    result.outputTypeBindings = normalized
+  }
+  for (const output of result.outputs as Port[]) if ((output.type === 'any' || output.type === 'unknown') && !(result.outputTypeBindings as Record<string, unknown> | undefined)?.[output.name] && !(record.outputParameterTypeBindings && isObject(record.outputParameterTypeBindings) && own(record.outputParameterTypeBindings, output.name))) fail('unbound universal output types are not allowed', 'registry.' + id + '.outputs', 'GAMEPLAY_MODULE_INVALID_TYPE')
   if (record.ui !== undefined) result.ui = plain(record.ui, 'registry.' + id + '.ui')
+  for (const kind of ['outputSchemaBindings', 'inputSchemaBindings'] as const) if (record[kind] !== undefined) {
+    const bindings = plain(record[kind], 'registry.' + id + '.' + kind)
+    const normalized: Record<string, { parameter: string; list?: boolean }> = Object.create(null)
+    for (const [name, raw] of Object.entries(bindings)) {
+      const path = 'registry.' + id + '.' + kind + '.' + name
+      const binding = plain(raw, path)
+      allowed(binding, ['parameter', 'list'], path)
+      const parameter = nonempty(binding.parameter, path + '.parameter')
+      const boundPorts = kind === 'outputSchemaBindings' ? result.outputs as Port[] : inputPorts
+      if (!boundPorts.some(port => port.name === name) || !params.some(port => port.name === parameter && port.type === 'string')) fail('schema binding must name a port and a string parameter', path, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+      normalized[name] = { parameter, ...(binding.list === undefined ? {} : { list: bool(binding.list, path + '.list') }) }
+    }
+    result[kind] = normalized
+  }
   if (typeof record.lower !== 'function') fail('registry descriptor lower must be a function', 'registry.' + id + '.lower', 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+  for (const kind of ['outputValueTypeBindings', 'inputValueTypeBindings'] as const) if (record[kind] !== undefined) {
+    const bindings = plain(record[kind], 'registry.' + id + '.' + kind)
+    const normalized: Record<string, { parameter: string; nullable?: boolean }> = Object.create(null)
+    for (const [name, raw] of Object.entries(bindings)) {
+      const path = 'registry.' + id + '.' + kind + '.' + name
+      const binding = plain(raw, path)
+      allowed(binding, kind === 'inputValueTypeBindings' ? ['parameter', 'nullable'] : ['parameter'], path)
+      if (binding.nullable !== undefined && typeof binding.nullable !== 'boolean') fail('nullable binding must be boolean', path + '.nullable')
+      const parameter = nonempty(binding.parameter, path + '.parameter')
+      const boundPorts = kind === 'outputValueTypeBindings' ? result.outputs as Port[] : inputPorts
+      if (!boundPorts.some(port => port.name === name) || !params.some(port => port.name === parameter && port.type === 'string')) fail('value type binding must name a port and a string parameter', path, 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+      normalized[name] = { parameter, ...(binding.nullable === undefined ? {} : { nullable: binding.nullable as boolean }) }
+    }
+    result[kind] = normalized
+  }
+  const fieldBindings = outputParameterTypeBindings(record.outputParameterTypeBindings, result.outputs as Port[], params, 'registry.' + id + '.outputParameterTypeBindings')
+  if (fieldBindings !== undefined) result.outputParameterTypeBindings = fieldBindings
   return result as GameplayModuleDescriptor
 }
 function registryGet(registry: GameplayModuleRegistry, id: string, version: string): unknown {
@@ -856,6 +1038,7 @@ function valueType(value: GameplayValue, environment: VEnv, path: string): Gamep
   return type
 }
 function previewSafe(effects: GameplayEffectMetadata): boolean {
+  if (effects.previewSafe === false) return false
   if (effects.previewSafe === true) return true
   return effects.pure === true && !effects.random && !effects.pending && !(effects.writes && effects.writes.length) && !(effects.events && effects.events.length)
 }
@@ -881,6 +1064,15 @@ function validateReturn(node: GameplayReturnStatement, outputs: readonly Port[],
 }
 
 function recordType(schemaReference: string): GameplayValueType { return { kind: 'record', schema: schemaReference } }
+function parameterValueType(value: GameplayLiteral, resolver: Resolver, path: string): GameplayValueType {
+  let parsed: unknown = value
+  if (typeof value === 'string' && value.trimStart().startsWith('{')) {
+    try { parsed = JSON.parse(value) } catch { fail('invalid value type descriptor', path, 'GAMEPLAY_MODULE_INVALID_TYPE') }
+  }
+  const type = typeValue(parsed, path)
+  validateTypeSchemas(type, resolver.schemas, path)
+  return type
+}
 function resolveRecordSchema(resolver: Resolver, reference: string, path: string): GameplayRecordSchema {
   return schemaFor(resolver.schemas, reference, path)
 }
@@ -900,6 +1092,40 @@ function collectionReturnValue(node: GameplayReturnStatement, environment: VEnv,
   }
   fail('collection body must return a typed value', path, 'GAMEPLAY_MODULE_MISSING_OUTPUT')
 }
+
+type WhileEnvironments = {
+  readonly condition: VEnv
+  readonly body: VEnv
+}
+
+function whileEnvironments(node: Extract<GameplayStatement, { kind: 'while' }>, environment: VEnv, path: string): WhileEnvironments {
+  const conditionInputs = new Map<string, GameplayValueType>()
+  for (const [name, value] of Object.entries(node.condition.inputs ?? {})) {
+    conditionInputs.set(name, valueType(value, environment, path + '.condition.inputs.' + name))
+  }
+  const bodyInputs = new Map(environment.inputs)
+  if (node.index) {
+    if (bodyInputs.has(node.index)) fail('while index shadows an input', path + '.index', 'GAMEPLAY_MODULE_INVALID_NAME')
+    bodyInputs.set(node.index, 'number')
+  }
+  const loopBindings = new Map(environment.bindings)
+  loopBindings.set(node.id, new Map([['index', 'number']]))
+  return {
+    condition: { inputs: conditionInputs, bindings: new Map() },
+    body: { inputs: bodyInputs, bindings: loopBindings },
+  }
+}
+
+function validateWhileCondition(node: Extract<GameplayStatement, { kind: 'while' }>, resolver: Resolver, environment: VEnv, path: string, active: readonly string[], depth: number): void {
+  const environments = whileEnvironments(node, environment, path)
+  const outputs: readonly Port[] = [{ name: 'value', type: 'boolean' }]
+  validateBody(node.condition.body, resolver, environments.condition, outputs, path + '.condition.body', active, depth, true)
+  if (!bodyGuaranteesReturn(node.condition.body)) fail('while condition can fall through without returning a boolean', path + '.condition.body', 'GAMEPLAY_MODULE_MISSING_OUTPUT')
+  const returns = collectCollectionReturns(node.condition.body, resolver, environments.condition, path + '.condition.body', true)
+  if (!returns.length) fail('while condition must return a boolean', path + '.condition.body', 'GAMEPLAY_MODULE_MISSING_OUTPUT')
+  for (const value of returns) if (!assignable(value, 'boolean')) fail('while condition must return a boolean', path + '.condition.body', 'GAMEPLAY_MODULE_PORT_TYPE')
+}
+
 function collectCollectionReturns(list: readonly GameplayStatement[], resolver: Resolver, environment: VEnv, path: string, validateCollections = true): GameplayValueType[] {
   const bindings = new Map(environment.bindings)
   const result: GameplayValueType[] = []
@@ -908,9 +1134,7 @@ function collectCollectionReturns(list: readonly GameplayStatement[], resolver: 
     if (node.kind === 'call') {
       const metadata = resolver.calls.get(node)
       if (!metadata) fail('missing collection call metadata', nodePath, 'GAMEPLAY_MODULE_INTERNAL_ERROR')
-      const outputs = metadata.module.kind === 'native' ? metadata.module.descriptor.outputs : metadata.module.definition.outputs
-      const types = new Map<string, GameplayValueType>(); for (const output of outputs) types.set(output.name, effective(output))
-      bindings.set(node.id, types)
+      bindings.set(node.id, metadata.outputTypes)
     } else if (node.kind === 'record.create') {
       resolveRecordSchema(resolver, node.schema, nodePath + '.schema'); bindings.set(node.id, new Map([['value', recordType(node.schema)]]))
     } else if (node.kind === 'record.get') {
@@ -944,6 +1168,9 @@ function collectCollectionReturns(list: readonly GameplayStatement[], resolver: 
       const loopInputs = new Map(environment.inputs); if (node.item) loopInputs.set(node.item, collection.element); if (node.index) loopInputs.set(node.index, 'number')
       const loopBindings = new Map(bindings); loopBindings.set(node.id, new Map([['item', collection.element], ['index', 'number']]))
       result.push(...collectCollectionReturns(node.body, resolver, { inputs: loopInputs, bindings: loopBindings }, nodePath + '.body', validateCollections))
+    } else if (node.kind === 'while') {
+      const environments = whileEnvironments(node, { inputs: environment.inputs, bindings }, nodePath)
+      result.push(...collectCollectionReturns(node.body, resolver, environments.body, nodePath + '.body', validateCollections))
     } else if (node.kind === 'return') {
       result.push(collectionReturnValue(node, { inputs: environment.inputs, bindings }, nodePath))
     }
@@ -981,6 +1208,10 @@ function collectionOutputType(node: GameplayCollectionStatement, resolver: Resol
     if (!assignable(output, 'boolean')) fail('filter body must return boolean', path + '.body', 'GAMEPLAY_MODULE_PORT_TYPE')
     return { kind: 'list', element: collection.element }
   }
+  if (node.method === 'find') {
+    if (!assignable(output, 'boolean')) fail('find body must return boolean', path + '.body', 'GAMEPLAY_MODULE_PORT_TYPE')
+    return { kind: 'nullable', value: collection.element }
+  }
   if (node.method === 'map') return { kind: 'list', element: output }
   if (accumulatorType && (!assignable(output, accumulatorType) || !assignable(accumulatorType, output))) fail('reduce body must return the accumulator type', path + '.body', 'GAMEPLAY_MODULE_PORT_TYPE')
   return output
@@ -989,6 +1220,8 @@ const deferChoiceFieldTypes: Readonly<Record<string, GameplayValueType>> = {
   player: 'player',
   title: 'string',
   targetType: 'string',
+  range: 'number',
+  filter: 'string',
   candidates: { kind: 'list', element: 'choice' },
   selectionMode: 'string',
   min: 'number',
@@ -1005,6 +1238,8 @@ function validateDeferChoiceField(name: string, value: GameplayValue, environmen
   if (!assignable(actual, expected)) fail('pending field "' + name + '" expects ' + typeName(expected) + ', got ' + typeName(actual), path, 'GAMEPLAY_MODULE_PORT_TYPE')
   if (value.kind === 'literal') {
     if (name === 'targetType' && !['piece', 'cell', 'grid'].includes(value.value as string)) fail('targetType must be piece, cell, or grid', path, 'GAMEPLAY_MODULE_INVALID_VALUE')
+    if (name === 'range' && (typeof value.value !== 'number' || !Number.isFinite(value.value) || value.value < 0)) fail('range must be a finite non-negative number', path, 'GAMEPLAY_MODULE_INVALID_VALUE')
+    if (name === 'filter' && !['enemy', 'ally', 'all'].includes(value.value as string)) fail('filter must be enemy, ally, or all', path, 'GAMEPLAY_MODULE_INVALID_VALUE')
     if (name === 'selectionMode' && !['single', 'multi'].includes(value.value as string)) fail('selectionMode must be single or multi', path, 'GAMEPLAY_MODULE_INVALID_VALUE')
     if ((name === 'min' || name === 'max' || name === 'minSelections' || name === 'maxSelections') && (!Number.isSafeInteger(value.value) || (value.value as number) < 0)) fail('selection bounds must be non-negative integers', path, 'GAMEPLAY_MODULE_INVALID_VALUE')
   }
@@ -1044,22 +1279,74 @@ function validateBody(list: readonly GameplayStatement[], resolver: Resolver, en
       }
       const inputPorts = resolved.kind === 'native' ? resolved.descriptor.inputs : resolved.definition.inputs
       const parameterPorts = resolved.kind === 'native' ? resolved.descriptor.parameters ?? [] : resolved.definition.parameters ?? []
+      const params = parameterValues(node.parameters ?? {}, parameterPorts, nodePath + '.parameters')
+      const inputTypes = new Map<string, GameplayValueType>()
+      for (const input of inputPorts) {
+        const binding = resolved.kind === 'native' ? resolved.descriptor.inputValueTypeBindings?.[input.name] : undefined
+        const bound = binding ? parameterValueType(params[binding.parameter], resolver, nodePath + '.parameters.' + binding.parameter) : effective(input)
+        inputTypes.set(input.name, binding?.nullable && !(typeof bound === 'object' && bound.kind === 'nullable') ? { kind: 'nullable', value: bound } : bound)
+      }
       const declared = mapPorts(inputPorts)
       for (const key of Object.keys(node.inputs ?? {})) {
         const expected = declared.get(key)
         if (!expected) fail('unknown input port "' + key + '"', nodePath + '.inputs.' + key, 'GAMEPLAY_MODULE_UNKNOWN_PORT')
         const actual = valueType((node.inputs ?? {})[key], { inputs: environment.inputs, bindings }, nodePath + '.inputs.' + key)
-        if (!assignable(actual, effective(expected))) fail('input "' + key + '" expects ' + typeName(effective(expected)) + ', got ' + typeName(actual), nodePath + '.inputs.' + key, 'GAMEPLAY_MODULE_PORT_TYPE')
+        // A nullable reference may feed a required native port. Its generated
+        // input guard skips the statement if that reference is absent; authors
+        // do not need an existence test and a second "require" adapter.
+        const expectedType = inputTypes.get(key)!
+        const guardedNullable = resolved.kind === 'native' && typeof actual === 'object' && actual.kind === 'nullable' && assignable(actual.value, expectedType)
+        if (!assignable(actual, expectedType) && !guardedNullable) fail('input "' + key + '" expects ' + typeName(expectedType) + ', got ' + typeName(actual), nodePath + '.inputs.' + key, 'GAMEPLAY_MODULE_PORT_TYPE')
       }
       for (const expected of inputPorts) if (!own(node.inputs as Rec, expected.name) && !expected.optional) fail('missing input port "' + expected.name + '"', nodePath + '.inputs', 'GAMEPLAY_MODULE_MISSING_PORT')
-      const params = parameterValues(node.parameters ?? {}, parameterPorts, nodePath + '.parameters')
-      const metadata: CallMeta = { module: resolved, inputs: node.inputs ?? {}, parameters: params }
+      if (resolved.kind === 'native') for (const [name, binding] of Object.entries(resolved.descriptor.inputSchemaBindings ?? {})) {
+        resolveRecordSchema(resolver, String(params[binding.parameter]), nodePath + '.parameters.' + binding.parameter)
+        const value = node.inputs?.[name]
+        if (value !== undefined) {
+          const type: GameplayValueType = { kind: 'record', schema: String(params[binding.parameter]) }
+          const expected: GameplayValueType = binding.list ? { kind: 'list', element: type } : type
+          if (!assignable(valueType(value, { inputs: environment.inputs, bindings }, nodePath + '.inputs.' + name), expected)) fail('input must use declared record schema', nodePath + '.inputs.' + name, 'GAMEPLAY_MODULE_PORT_TYPE')
+        }
+      }
+      const outputPorts = resolved.kind === 'native' ? resolved.descriptor.outputs : resolved.definition.outputs
+      const outputTypes = new Map<string, GameplayValueType>()
+      for (const output of outputPorts) {
+        const binding = resolved.kind === 'native' ? resolved.descriptor.outputTypeBindings?.[output.name] : undefined
+        let type = effective(output)
+        const valueBinding = resolved.kind === 'native' ? resolved.descriptor.outputValueTypeBindings?.[output.name] : undefined
+        if (valueBinding) type = parameterValueType(params[valueBinding.parameter], resolver, nodePath + '.parameters.' + valueBinding.parameter)
+        const fieldBinding = resolved.kind === 'native' ? resolved.descriptor.outputParameterTypeBindings?.[output.name] : undefined
+        if (fieldBinding) {
+          const selected = params[fieldBinding.parameter]
+          if (typeof selected !== 'string') fail('field type binding parameter must select a string field', nodePath + '.parameters.' + fieldBinding.parameter, 'GAMEPLAY_MODULE_INVALID_TYPE_BINDING')
+          const selectedType = fieldBinding.types[selected]
+          if (!selectedType) fail('unknown field "' + selected + '"', nodePath + '.parameters.' + fieldBinding.parameter, 'GAMEPLAY_MODULE_UNKNOWN_FIELD')
+          type = selectedType
+          if (output.type !== 'any' && output.type !== 'unknown' && !assignable(type, effective(output))) fail('field type does not match its output declaration', nodePath + '.module.outputs.' + output.name, 'GAMEPLAY_MODULE_INVALID_TYPE_BINDING')
+        }
+        const schemaBinding = resolved.kind === 'native' ? resolved.descriptor.outputSchemaBindings?.[output.name] : undefined
+        if (schemaBinding) {
+          resolveRecordSchema(resolver, String(params[schemaBinding.parameter]), nodePath + '.parameters.' + schemaBinding.parameter)
+          const record: GameplayValueType = { kind: 'record', schema: String(params[schemaBinding.parameter]) }
+          type = schemaBinding.list ? { kind: 'list', element: record } : record
+        }
+        if (binding) {
+          const supplied = node.inputs?.[binding.input]
+          if (!supplied) fail('type binding requires an input', nodePath + '.inputs', 'GAMEPLAY_MODULE_MISSING_PORT')
+          const inputType = valueType(supplied, { inputs: environment.inputs, bindings }, nodePath + '.inputs.' + binding.input)
+          if (binding.projection === 'element') {
+            if (typeof inputType !== 'object' || inputType.kind !== 'list') fail('element type binding requires a collection', nodePath + '.inputs.' + binding.input, 'GAMEPLAY_MODULE_PORT_TYPE')
+            type = inputType.element
+          } else type = binding.projection === 'singleton' ? { kind: 'list', element: inputTypes.get(binding.input)! } : inputType
+          if (output.nullable && !(typeof type === 'object' && type.kind === 'nullable')) type = { kind: 'nullable', value: type }
+          if (!assignable(type, effective(output))) fail('inferred output type does not match its declaration', nodePath + '.module', 'GAMEPLAY_MODULE_REGISTRY_INVALID')
+        }
+        outputTypes.set(output.name, type)
+      }
+      const metadata: CallMeta = { module: resolved, inputs: node.inputs ?? {}, parameters: params, inputTypes, outputTypes }
       resolver.calls.set(node, metadata)
       resolver.dependencies.set(moduleKey(node.module, node.version), { id: node.module, version: node.version, kind: resolved.kind })
       resolver.expanded.push({ id: node.module, version: node.version, kind: resolved.kind, callId: node.id, depth })
-      const outputPorts = resolved.kind === 'native' ? resolved.descriptor.outputs : resolved.definition.outputs
-      const outputTypes = new Map<string, GameplayValueType>()
-      for (const output of outputPorts) outputTypes.set(output.name, effective(output))
       if (resolved.kind === 'composite') {
         const compositeInputs = new Map<string, GameplayValueType>()
         const declaredInputs = mapPorts(resolved.definition.inputs)
@@ -1135,6 +1422,19 @@ function validateBody(list: readonly GameplayStatement[], resolver: Resolver, en
       validateBody(node.then, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + '.then', active, depth, dataOnly)
       if (node.else) validateBody(node.else, resolver, { inputs: environment.inputs, bindings: new Map(bindings) }, outputs, nodePath + '.else', active, depth, dataOnly)
     } else if (node.kind === 'foreach') {
+      if (node.presentation !== undefined) {
+        if (dataOnly || resolver.graph.surface !== 'skill') fail('presentation groups currently require a skill surface', nodePath + '.presentation', 'GAMEPLAY_MODULE_COLLECTION_EFFECT')
+        const escapes = (body: readonly GameplayStatement[]): boolean => body.some(item => (
+          item.kind === 'return'
+          || item.kind === 'defer-choice'
+          || (item.kind === 'if' && (escapes(item.then) || escapes(item.else ?? [])))
+          || (item.kind === 'foreach' && escapes(item.body))
+          // A while condition returns into its local condition frame; only
+          // the execution body can escape the enclosing presentation group.
+          || (item.kind === 'while' && escapes(item.body))
+        ))
+        if (escapes(node.body)) fail('presentation group cannot return or suspend', nodePath + '.body', 'GAMEPLAY_MODULE_INVALID_VALUE')
+      }
       const collection = valueType(node.items, { inputs: environment.inputs, bindings }, nodePath + '.items')
       if (typeof collection !== 'object' || collection.kind !== 'list') fail('foreach items must be a list', nodePath + '.items', 'GAMEPLAY_MODULE_PORT_TYPE')
       const bodyInputs = new Map(environment.inputs)
@@ -1143,6 +1443,11 @@ function validateBody(list: readonly GameplayStatement[], resolver: Resolver, en
       const loopOutputs = new Map<string, GameplayValueType>([['item', collection.element], ['index', 'number']])
       const loopBindings = new Map(bindings); loopBindings.set(node.id, loopOutputs)
       validateBody(node.body, resolver, { inputs: bodyInputs, bindings: loopBindings }, outputs, nodePath + '.body', active, depth, dataOnly)
+    } else if (node.kind === 'while') {
+      if (node.budget > resolver.limits.maxWhileIterations) fail('while iteration budget exceeded', nodePath + '.budget', 'GAMEPLAY_MODULE_BUDGET_EXCEEDED')
+      validateWhileCondition(node, resolver, { inputs: environment.inputs, bindings }, nodePath, active, depth)
+      const environments = whileEnvironments(node, { inputs: environment.inputs, bindings }, nodePath)
+      validateBody(node.body, resolver, environments.body, outputs, nodePath + '.body', active, depth, dataOnly)
     } else if (node.kind === 'return') validateReturn(node, outputs, { inputs: environment.inputs, bindings }, nodePath)
   }
 }
@@ -1216,6 +1521,7 @@ function inputGuard(
 ): string | undefined {
   const ports = resolved.kind === 'native' ? resolved.descriptor.inputs : resolved.definition.inputs
   const inspectedReferences = resolved.kind === 'native' ? new Set(resolved.descriptor.inspectReferences ?? []) : undefined
+  const livingReferences = resolved.kind === 'native' ? new Set(resolved.descriptor.livingReferences ?? []) : undefined
   const declared = mapPorts(ports)
   const guards: string[] = []
   for (const key of Object.keys(metadata.inputs)) {
@@ -1223,10 +1529,16 @@ function inputGuard(
     if (!expected) continue
     const expression = emit(metadata.inputs[key], environment)
     guards.push('(' + expression + ' === __gameplayInvalid)')
-    const expectedType = effective(expected)
+    const expectedType = metadata.inputTypes?.get(key) ?? effective(expected)
     const kind = referenceKind(expectedType)
     if (!expected.optional) guards.push('(' + expression + ' === undefined)')
     if (!nullableType(expectedType)) guards.push('(' + expression + ' === null)')
+    if (livingReferences?.has(key)) {
+      const facade = runtimeFacade(surface)
+      const query = facade + '.query'
+      guards.push('(' + expression + ' != null && (typeof ' + facade + ' === "undefined" || ' + facade + ' === null || !' + query + ' || typeof ' + query + '.hasPiece !== "function" || typeof ' + query + '.piece !== "function" || !' + query + '.hasPiece(' + expression + ') || !' + query + '.piece(' + expression + ') || !(' + query + '.piece(' + expression + ').currentHp > 0)))')
+      continue
+    }
     if (!kind || inspectedReferences?.has(key)) continue
     const facade = runtimeFacade(surface)
     const checker = facade + '.query.has' + (kind === 'piece' ? 'Piece' : 'Player')
@@ -1238,11 +1550,22 @@ function invalidResult(outputs: readonly GameplayPort[]): string {
   if (outputs.length <= 1) return '__gameplayInvalid'
   return '{ ' + outputs.map(output => JSON.stringify(output.name) + ': __gameplayInvalid').join(', ') + ' }'
 }
+const diagnosticHostKey = '__gameplayModuleDiagnosticHost'
+function isFaultIsolatingEmitter(state: Codegen): boolean { return state.compilerVersion !== GAMEPLAY_MODULE_COMPILER_V1_VERSION }
+function statementBoundary(state: Codegen, node: GameplayStatement, code: string, recovery = '', moduleId?: string): string {
+  if (!isFaultIsolatingEmitter(state)) return code
+  return 'try { ' + code + ' } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(' + JSON.stringify(node.id) + ', __gameplayError' + (moduleId ? ', ' + JSON.stringify(moduleId) : '') + ');' + (recovery ? ' ' + recovery : '') + ' }'
+}
+function loopBoundary(state: Codegen, node: GameplayStatement, code: string, recovery = ''): string {
+  if (!isFaultIsolatingEmitter(state)) return code
+  const root = nextVariable(state, 'loopRoot')
+  return 'var ' + root + ' = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { ' + code + ' } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!' + root + ') throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(' + JSON.stringify(node.id) + ', new Error("gameplay shared iteration budget exceeded"));' + (recovery ? ' ' + recovery : '') + ' } else { __gameplayRecordFault(' + JSON.stringify(node.id) + ', __gameplayError);' + (recovery ? ' ' + recovery : '') + ' } } finally { __gameplayLoopDepth -= 1; }'
+}
 function lower(descriptorValue: GameplayModuleDescriptor, node: GameplayCallStatement, metadata: CallMeta, inputs: Readonly<Record<string, string>>, state: Codegen): { code: string; result: string } {
   const result = nextVariable(state, 'module')
   let lowered: GameplayNativeLoweringResult
   try {
-    lowered = descriptorValue.lower({ surface: state.resolver.graph.surface, callId: node.id, moduleId: descriptorValue.id, moduleVersion: descriptorValue.version, inputs, parameters: metadata.parameters, outputPorts: descriptorValue.outputs, emitLiteral: literalSource })
+    lowered = descriptorValue.lower({ surface: state.resolver.graph.surface, callId: node.id, moduleId: descriptorValue.id, moduleVersion: descriptorValue.version, inputs, parameters: metadata.parameters, outputPorts: descriptorValue.outputs, recordSchemas: [...state.resolver.schemas.values()], emitLiteral: literalSource })
   } catch (error) { fail('native lowering failed: ' + (error instanceof Error ? error.message : 'unknown failure'), 'graph.' + node.id, 'GAMEPLAY_MODULE_LOWERING_FAILED') }
   if (typeof lowered === 'string') { if (!lowered.trim()) fail('native lowering returned empty source', 'graph.' + node.id, 'GAMEPLAY_MODULE_LOWERING_FAILED'); return { code: 'var ' + result + ' = (' + lowered + ');', result } }
   if (isObject(lowered) && 'expression' in lowered && typeof lowered.expression === 'string') { if (!lowered.expression.trim()) fail('native lowering returned empty expression', 'graph.' + node.id, 'GAMEPLAY_MODULE_LOWERING_FAILED'); for (const dependency of (lowered.dependencies as readonly string[] | undefined) ?? []) state.loweringDependencies.add(nonempty(dependency, 'graph.' + node.id + '.dependencies')); return { code: 'var ' + result + ' = (' + lowered.expression + ');', result } }
@@ -1275,26 +1598,83 @@ function returnCode(node: GameplayReturnStatement, outputs: readonly Port[], env
   return guard === undefined ? action : 'if (!(' + guard + ')) { ' + action + ' }'
 }
 
-function emitRecordCreate(node: GameplayRecordCreateStatement, environment: CEnv, resolver: Resolver): string {
+function emitRecordCreate(node: GameplayRecordCreateStatement, environment: CEnv, resolver: Resolver, state: Codegen): string {
   const schemaValue = resolveRecordSchema(resolver, node.schema, 'graph.' + node.id + '.schema')
   const fields = node.fields ?? {}
   const entries: string[] = []
-  for (const field of schemaValue.fields) if (own(fields as Rec, field.name)) entries.push(JSON.stringify(field.name) + ': ' + emit(fields[field.name], environment))
-  return '({' + entries.join(', ') + '})'
+  const suppliedFields = schemaValue.fields.filter(field => own(fields as Rec, field.name))
+  if (!isFaultIsolatingEmitter(state)) {
+    for (const field of suppliedFields) entries.push(JSON.stringify(field.name) + ': ' + emit(fields[field.name], environment))
+    return '({' + entries.join(', ') + '})'
+  }
+
+  // v2 keeps the invalid dependency sentinel distinct from an absent optional
+  // value.  Native outputs may use `undefined` to mean that an optional field
+  // is not present; materializing that as an own property makes JSON-backed
+  // status records invalid.  Evaluate each input once, reject any sentinel,
+  // then assign optional fields only when their value is defined.
+  const parameters = suppliedFields.map((_field, index) => '__gameplayRecordValue' + String(index))
+  const values = suppliedFields.map(field => emit(fields[field.name], environment))
+  const invalidGuard = parameters.length === 0
+    ? undefined
+    : parameters.map(parameter => '(' + parameter + ' === __gameplayInvalid)').join(' || ')
+  const assignments = suppliedFields.map((field, index) => {
+    const parameter = parameters[index]
+    const assignment = '__gameplayRecord[' + JSON.stringify(field.name) + '] = ' + parameter + ';'
+    return field.optional
+      ? 'if (' + parameter + ' !== undefined) { ' + assignment + ' }'
+      : assignment
+  })
+  return '((function(' + parameters.join(', ') + '){ '
+    + (invalidGuard ? 'if (' + invalidGuard + ') return __gameplayInvalid; ' : '')
+    + 'var __gameplayRecord = {}; '
+    + assignments.join(' ')
+    + ' return __gameplayRecord; })(' + values.join(', ') + '))'
 }
 function emitRecordGet(node: GameplayRecordGetStatement, environment: CEnv): string {
   const recordValue = emit(node.record, environment)
   return '((' + recordValue + ' === __gameplayInvalid || ' + recordValue + ' == null) ? __gameplayInvalid : (' + recordValue + ')[' + JSON.stringify(node.field) + '])'
 }
-function emitRecordWith(node: GameplayRecordWithStatement, environment: CEnv, resolver: Resolver): string {
+function emitRecordWith(node: GameplayRecordWithStatement, environment: CEnv, resolver: Resolver, state: Codegen): string {
   const actual = compileValueType(node.record, environment, resolver)
   const schemaValue = typeof actual === 'object' && actual.kind === 'record' ? resolveRecordSchema(resolver, actual.schema, 'record.with') : undefined
   const recordValue = emit(node.record, environment)
   if (!schemaValue) return '__gameplayInvalid'
   const fields = node.fields ?? {}
-  const entries: string[] = []
-  for (const field of schemaValue.fields) entries.push(JSON.stringify(field.name) + ': ' + (own(fields as Rec, field.name) ? emit(fields[field.name], environment) : '(' + recordValue + ')[' + JSON.stringify(field.name) + ']'))
-  return '((function(__gameplayRecord){ return (__gameplayRecord === __gameplayInvalid || __gameplayRecord == null) ? __gameplayInvalid : ({' + entries.join(', ') + '}); })(' + recordValue + '))'
+  if (!isFaultIsolatingEmitter(state)) {
+    const entries: string[] = []
+    for (const field of schemaValue.fields) entries.push(JSON.stringify(field.name) + ': ' + (own(fields as Rec, field.name) ? emit(fields[field.name], environment) : '(' + recordValue + ')[' + JSON.stringify(field.name) + ']'))
+    return '((function(__gameplayRecord){ return (__gameplayRecord === __gameplayInvalid || __gameplayRecord == null) ? __gameplayInvalid : ({' + entries.join(', ') + '}); })(' + recordValue + '))'
+  }
+
+  // A v2 record update has the same JSON-shape rules as record.create:
+  // missing optional fields stay absent, while invalid dependencies must not
+  // become ordinary undefined values. Evaluate overrides once and copy the
+  // remaining fields from the input record inside the guarded function.
+  const suppliedFields = schemaValue.fields.filter(field => own(fields as Rec, field.name))
+  const parameters = suppliedFields.map((_field, index) => '__gameplayRecordWithValue' + String(index))
+  const values = suppliedFields.map(field => emit(fields[field.name], environment))
+  const fieldValues = schemaValue.fields.map((field, index) => {
+    const suppliedIndex = suppliedFields.indexOf(field)
+    const value = suppliedIndex >= 0
+      ? parameters[suppliedIndex]
+      : '__gameplayRecordInput[' + JSON.stringify(field.name) + ']'
+    return 'var __gameplayRecordField' + String(index) + ' = ' + value + ';'
+  })
+  const invalidGuard = schemaValue.fields
+    .map((_field, index) => '(__gameplayRecordField' + String(index) + ' === __gameplayInvalid)')
+    .join(' || ')
+  const assignments = schemaValue.fields.map((field, index) => {
+    const value = '__gameplayRecordField' + String(index)
+    const assignment = '__gameplayRecord[' + JSON.stringify(field.name) + '] = ' + value + ';'
+    return field.optional ? 'if (' + value + ' !== undefined) { ' + assignment + ' }' : assignment
+  })
+  return '((function(__gameplayRecordInput' + (parameters.length ? ', ' + parameters.join(', ') : '') + '){ '
+    + 'if (__gameplayRecordInput === __gameplayInvalid || __gameplayRecordInput == null) return __gameplayInvalid; '
+    + fieldValues.join(' ')
+    + (invalidGuard ? ' if (' + invalidGuard + ') return __gameplayInvalid; ' : '')
+    + 'var __gameplayRecord = {}; ' + assignments.join(' ')
+    + ' return __gameplayRecord; })(' + recordValue + (values.length ? ', ' + values.join(', ') : '') + '))'
 }
 function emitCollection(node: GameplayCollectionStatement, environment: CEnv, state: Codegen, outputs: readonly Port[], active: readonly string[], depth: number): { code: string; result: string } {
   const result = nextVariable(state, 'collection')
@@ -1306,10 +1686,20 @@ function emitCollection(node: GameplayCollectionStatement, environment: CEnv, st
   const stepResult = nextVariable(state, 'collectionResult')
   const label = nextVariable(state, 'collectionDone')
   const names = collectionNames(node, node.method, 'graph.' + node.id)
-  const initial = node.initial === undefined ? undefined : emit(node.initial, environment)
+  const strictDependencies = state.compilerVersion === GAMEPLAY_MODULE_COMPILER_V3_VERSION
+  const dependencies: string[] = []
+  const declarations: string[] = []
+  const captured = (value: GameplayValue): string => {
+    if (!strictDependencies) return emit(value, environment)
+    const variable = nextVariable(state, 'capture')
+    declarations.push('var ' + variable + ' = ' + emit(value, environment) + ';')
+    dependencies.push(variable + ' !== __gameplayInvalid && ' + variable + ' !== undefined')
+    return variable
+  }
+  const initial = node.initial === undefined ? undefined : captured(node.initial)
   const itemInputs = new Map<string, string>()
   const itemInputTypes = new Map<string, GameplayValueType>()
-  for (const [key, value] of Object.entries(node.inputs ?? {})) itemInputs.set(key, emit(value, environment))
+  for (const [key, value] of Object.entries(node.inputs ?? {})) itemInputs.set(key, captured(value))
   for (const [key, value] of Object.entries(node.inputs ?? {})) {
     const type = compileValueType(value, environment, state.resolver)
     if (type) itemInputTypes.set(key, type)
@@ -1328,27 +1718,59 @@ function emitCollection(node: GameplayCollectionStatement, environment: CEnv, st
       ? 'var ' + accumulator + ' = ' + items + '.length === 0 ? __gameplayInvalid : ' + items + '[0]; var ' + start + ' = ' + items + '.length === 0 ? 0 : 1;'
       : 'var ' + accumulator + ' = ' + initial + '; var ' + start + ' = 0;')
     : ''
-  const perIteration = node.method === 'map'
+  const perIteration = node.method === 'find'
+    ? 'if (' + stepResult + ' !== __gameplayInvalid && ' + stepResult + ' != null && ' + stepResult + '["value"]) { ' + result + ' = ' + item + '; break; }'
+    : node.method === 'map'
     ? 'if (' + stepResult + ' !== __gameplayInvalid && ' + stepResult + ' != null) { ' + output + '.push(' + stepResult + '["value"]); }'
     : node.method === 'filter'
       ? 'if (' + stepResult + ' !== __gameplayInvalid && ' + stepResult + ' != null && ' + stepResult + '["value"]) { ' + output + '.push(' + item + '); }'
       : 'if (' + stepResult + ' !== __gameplayInvalid && ' + stepResult + ' != null) { ' + accumulator + ' = ' + stepResult + '["value"]; }'
   const finalResult = node.method === 'reduce' ? accumulator! : output
+  const outputInitialization = node.method === 'find' ? '' : 'var ' + output + ' = [];'
+  const findInitialization = node.method === 'find' ? 'var ' + result + ' = null;' : ''
+  const resultAssignment = node.method === 'find' ? '' : 'var ' + result + ' = ' + finalResult + ';'
+  const iterationGuard = isFaultIsolatingEmitter(state) ? '__gameplayConsumeIteration(); ' : ''
   const code = [
     'var ' + result + ' = __gameplayInvalid; var ' + items + ' = ' + emit(node.items, environment) + ';',
-    'if (Array.isArray(' + items + ')) {',
+    ...(strictDependencies ? declarations : []),
+    'if (Array.isArray(' + items + ')' + (dependencies.length ? ' && ' + dependencies.join(' && ') : '') + ') {',
     'if (' + items + '.length > ' + String(state.resolver.limits.maxCollectionIterations) + ') { throw new Error("gameplay collection iteration budget exceeded"); }',
-    'var ' + output + ' = [];',
+    ...(outputInitialization ? [outputInitialization] : []),
+    ...(findInitialization ? [findInitialization] : []),
     startCode,
     'for (var ' + index + ' = ' + (start ?? '0') + '; ' + index + ' < ' + items + '.length; ' + index + ' += 1) {',
-    'var ' + item + ' = ' + items + '[' + index + ']; var ' + stepResult + ' = __gameplayInvalid;',
+    iterationGuard + 'var ' + item + ' = ' + items + '[' + index + ']; var ' + stepResult + ' = __gameplayInvalid;',
     label + ': { ' + body + ' }',
     perIteration,
     '}',
-    'var ' + result + ' = ' + finalResult + ';',
+    resultAssignment,
     '}',
   ].join(' ')
   return { code, result }
+}
+
+function emitWhileCondition(node: Extract<GameplayStatement, { kind: 'while' }>, environment: CEnv, state: Codegen, active: readonly string[], depth: number): { code: string; result: string } {
+  const result = nextVariable(state, 'whileCondition')
+  const label = nextVariable(state, 'whileConditionDone')
+  const inputExpressions = new Map<string, string>()
+  const inputTypes = new Map<string, GameplayValueType>()
+  const strictDependencies = state.compilerVersion === GAMEPLAY_MODULE_COMPILER_V3_VERSION
+  const declarations: string[] = []
+  const dependencies: string[] = []
+  for (const [name, value] of Object.entries(node.condition.inputs ?? {})) {
+    const expression = emit(value, environment)
+    if (strictDependencies) {
+      const captured = nextVariable(state, 'whileCapture')
+      declarations.push('var ' + captured + ' = ' + expression + ';')
+      dependencies.push(captured + ' !== __gameplayInvalid && ' + captured + ' !== undefined')
+      inputExpressions.set(name, captured)
+    } else inputExpressions.set(name, expression)
+    inputTypes.set(name, compileValueType(value, environment, state.resolver) ?? 'any')
+  }
+  const outputs: readonly Port[] = [{ name: 'value', type: 'boolean' }]
+  const body = emitStatements(node.condition.body, { inputs: inputExpressions, inputTypes, bindings: new Map() }, state, outputs, { result, label, outputs }, active, depth)
+  const condition = label + ': { ' + body + ' }'
+  return { code: 'var ' + result + ' = __gameplayInvalid; ' + (dependencies.length ? declarations.join(' ') + ' if (' + dependencies.join(' && ') + ') { ' + condition + ' }' : condition), result }
 }
 
 function continuationFor(resolver: Resolver, reference: string, path: string): StructuredContinuation {
@@ -1373,11 +1795,11 @@ function compileContinuation(continuation: StructuredContinuation, state: Codege
   if (childResolver.expanded.length + state.resolver.expanded.length > state.resolver.limits.maxExpandedCalls) fail('module call budget exceeded', path, 'GAMEPLAY_MODULE_BUDGET_EXCEEDED')
   for (const [dependency, value] of childResolver.dependencies) state.resolver.dependencies.set(dependency, value)
   for (const entry of childResolver.expanded) state.resolver.expanded.push({ ...entry, depth: entry.depth + 1 })
-  const childState: Codegen = { next: state.next, resolver: childResolver, loweringDependencies: state.loweringDependencies, continuationStack: state.continuationStack.concat(key) }
+  const childState: Codegen = { next: state.next, resolver: childResolver, loweringDependencies: state.loweringDependencies, continuationStack: state.continuationStack.concat(key), compilerVersion: state.compilerVersion }
   const rootInputs = new Map<string, string>(); for (const inputPort of child.inputs) { const expression = rootStaticInput(child, inputPort.name); if (expression) rootInputs.set(inputPort.name, expression) }
   const body = emitStatements(child.body, { inputs: rootInputs, bindings: new Map() }, childState, child.outputs, undefined, [], 0)
   state.next = childState.next
-  return wrapper('pending', body)
+  return wrapper('pending', body, state.compilerVersion, childResolver.limits.maxCollectionIterations)
 }
 function valueEnvironment(environment: CEnv, resolver: Resolver, bindings: ReadonlyMap<string, CBinding>): VEnv {
   const inputs = new Map(environment.inputTypes ?? [])
@@ -1407,6 +1829,8 @@ function emitPendingChoice(node: GameplayDeferChoiceStatement, continuation: Str
   const player = field('player') ?? environment.inputs.get('player') ?? '(typeof context !== "undefined" ? context["playerId"] : undefined)'
   const title = field('title') ?? literalSource('请选择目标')
   const targetType = field('targetType') ?? (continuation.graph.hostBindings.targetPiece !== undefined ? literalSource('piece') : literalSource('cell'))
+  const range = field('range')
+  const filter = field('filter')
   const candidates = field('candidates') ?? 'undefined'
   const selectionMode = field('selectionMode') ?? literalSource('single')
   const min = field('min') ?? field('minSelections') ?? '1'
@@ -1417,11 +1841,11 @@ function emitPendingChoice(node: GameplayDeferChoiceStatement, continuation: Str
   // The active skill host treats this as a successful root result carrying the
   // legacy pending descriptor.  It then stamps source/owner/revision fields
   // and owns validation when applyBattleAction resumes the generated effect.
-  const pending = '{ success: true' + (message === undefined ? '' : ', message: ' + message) + ', pendingTargetSelection: { playerId: ' + player + ', title: ' + title + ', targetType: ' + targetType + ', candidates: ' + candidates + ', selectionMode: ' + selectionMode + ', min: ' + min + ', max: ' + max + ', minSelections: ' + min + ', maxSelections: ' + max + ', canCancel: ' + canCancel + (resume === undefined ? '' : ', resumeOnCancel: ' + resume) + ', payload: ' + payload + ', effectCode: ' + literalSource(effectCode) + ' } }'
+  const pending = '{ success: true' + (message === undefined ? '' : ', message: ' + message) + ', pendingTargetSelection: { playerId: ' + player + ', title: ' + title + ', targetType: ' + targetType + (range === undefined ? '' : ', range: ' + range) + (filter === undefined ? '' : ', filter: ' + filter) + ', candidates: ' + candidates + ', selectionMode: ' + selectionMode + ', min: ' + min + ', max: ' + max + ', minSelections: ' + min + ', maxSelections: ' + max + ', canCancel: ' + canCancel + (resume === undefined ? '' : ', resumeOnCancel: ' + resume) + ', payload: ' + payload + ', effectCode: ' + literalSource(effectCode) + ' } }'
   const action = 'return ' + pending + ';'
   const checks = [payload, '(' + payload + ' !== null)', '(typeof ' + payload + ' === "object")', '(!Array.isArray(' + payload + '))']
   if (node.player || environment.inputs.has('player')) checks.push(player)
-  for (const name of ['title', 'targetType', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
+  for (const name of ['title', 'targetType', 'range', 'filter', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message'] as const) {
     const value = node[name]
     if (value !== undefined) {
       const expression = field(name)
@@ -1440,10 +1864,10 @@ function emitStatements(list: readonly GameplayStatement[], environment: CEnv, s
       const inputs = inputExpressions(node, metadata, currentEnvironment)
       if (metadata.module.kind === 'native') {
         const lowered = lower(metadata.module.descriptor, node, metadata, inputs, state)
-        const outputTypes = new Map<string, GameplayValueType>(); for (const output of metadata.module.descriptor.outputs) outputTypes.set(output.name, effective(output))
+        const outputTypes = metadata.outputTypes
         const guard = inputGuard(metadata.module, metadata, currentEnvironment, state.resolver.graph.surface)
         const code = guard === undefined ? lowered.code : 'if (' + guard + ') { ' + lowered.result + ' = ' + invalidResult(metadata.module.descriptor.outputs) + '; } else { ' + lowered.code + ' }'
-        bindings.set(node.id, { ports: outputTypes, expression: lowered.result }); chunks.push(code)
+        bindings.set(node.id, { ports: outputTypes, expression: lowered.result }); chunks.push(statementBoundary(state, node, code, lowered.result + ' = ' + invalidResult(metadata.module.descriptor.outputs) + ';', metadata.module.descriptor.id))
       } else {
         const definition = metadata.module.definition; const key = moduleKey(definition.id, definition.version)
         if (active.includes(key)) fail('composite cycle detected', node.id, 'GAMEPLAY_MODULE_COMPOSITE_CYCLE')
@@ -1459,22 +1883,22 @@ function emitStatements(list: readonly GameplayStatement[], environment: CEnv, s
         const outputTypes = new Map<string, GameplayValueType>(); for (const output of definition.outputs) outputTypes.set(output.name, effective(output))
         const guard = inputGuard(metadata.module, metadata, currentEnvironment, state.resolver.graph.surface)
         const bodyCode = 'var ' + result + ' = ' + invalidResult(definition.outputs) + '; ' + (guard === undefined ? label + ': { ' + body + ' }' : 'if (' + guard + ') { ' + result + ' = ' + invalidResult(definition.outputs) + '; } else { ' + label + ': { ' + body + ' } }')
-        bindings.set(node.id, { ports: outputTypes, expression: result }); chunks.push(bodyCode)
+        bindings.set(node.id, { ports: outputTypes, expression: result }); chunks.push(statementBoundary(state, node, bodyCode, result + ' = ' + invalidResult(definition.outputs) + ';', definition.id))
       }
     } else if (node.kind === 'record.create') {
-      const expression = emitRecordCreate(node, currentEnvironment, state.resolver)
+      const expression = emitRecordCreate(node, currentEnvironment, state.resolver, state)
       const variable = nextVariable(state, 'record')
-      chunks.push('var ' + variable + ' = ' + expression + ';')
+      chunks.push(statementBoundary(state, node, 'var ' + variable + ' = ' + expression + ';', variable + ' = __gameplayInvalid;'))
       bindings.set(node.id, { ports: new Map([['value', { kind: 'record', schema: node.schema }]]), expression: variable, portExpressions: new Map([['value', variable]]) })
     } else if (node.kind === 'record.get') {
       const expression = emitRecordGet(node, currentEnvironment)
       const variable = nextVariable(state, 'recordGet')
-      chunks.push('var ' + variable + ' = ' + expression + ';')
+      chunks.push(statementBoundary(state, node, 'var ' + variable + ' = ' + expression + ';', variable + ' = __gameplayInvalid;'))
       bindings.set(node.id, { ports: new Map([['value', recordOutputType(node, currentEnvironment, state.resolver)]]), expression: variable, portExpressions: new Map([['value', variable]]) })
     } else if (node.kind === 'record.with') {
-      const expression = emitRecordWith(node, currentEnvironment, state.resolver)
+      const expression = emitRecordWith(node, currentEnvironment, state.resolver, state)
       const variable = nextVariable(state, 'recordWith')
-      chunks.push('var ' + variable + ' = ' + expression + ';')
+      chunks.push(statementBoundary(state, node, 'var ' + variable + ' = ' + expression + ';', variable + ' = __gameplayInvalid;'))
       const actual = compileValueType(node.record, currentEnvironment, state.resolver)
       const outputType = actual && typeof actual === 'object' && actual.kind === 'record' ? actual : { kind: 'record' as const, schema: node.id }
       bindings.set(node.id, { ports: new Map([['value', outputType]]), expression: variable, portExpressions: new Map([['value', variable]]) })
@@ -1482,16 +1906,16 @@ function emitStatements(list: readonly GameplayStatement[], environment: CEnv, s
       const emitted = emitCollection(node, currentEnvironment, state, outputs, active, depth)
       const outputType = collectionOutputType(node, state.resolver, valueEnvironment(currentEnvironment, state.resolver, bindings), 'graph.' + node.id, false)
       bindings.set(node.id, { ports: new Map([['value', outputType]]), expression: emitted.result, portExpressions: new Map([['value', emitted.result]]) })
-      chunks.push(emitted.code)
+      chunks.push(loopBoundary(state, node, emitted.code, emitted.result + ' = __gameplayInvalid;'))
     } else if (node.kind === 'defer-choice') {
       const continuation = continuationFor(state.resolver, node.graph, node.id + '.graph')
       const effectCode = compileContinuation(continuation, state, node.id + '.graph')
-      chunks.push(emitPendingChoice(node, continuation, emit(node.payload, currentEnvironment), effectCode, currentEnvironment, target))
+      chunks.push(statementBoundary(state, node, emitPendingChoice(node, continuation, emit(node.payload, currentEnvironment), effectCode, currentEnvironment, target)))
     } else if (node.kind === 'if') {
       const thenCode = emitStatements(node.then, { inputs: new Map(environment.inputs), inputTypes: environment.inputTypes && new Map(environment.inputTypes), bindings: new Map(bindings) }, state, outputs, target, active, depth)
       const elseCode = node.else ? emitStatements(node.else, { inputs: new Map(environment.inputs), inputTypes: environment.inputTypes && new Map(environment.inputTypes), bindings: new Map(bindings) }, state, outputs, target, active, depth) : ''
       const condition = nextVariable(state, 'condition')
-      chunks.push('var ' + condition + ' = ' + emit(node.condition, currentEnvironment) + '; if (' + condition + ' !== __gameplayInvalid && ' + condition + ') { ' + thenCode + ' }' + (node.else ? ' else if (' + condition + ' !== __gameplayInvalid) { ' + elseCode + ' }' : ''))
+      chunks.push(statementBoundary(state, node, 'var ' + condition + ' = ' + emit(node.condition, currentEnvironment) + '; if (' + condition + ' !== __gameplayInvalid && ' + condition + ') { ' + thenCode + ' }' + (node.else ? ' else if (' + condition + ' !== __gameplayInvalid) { ' + elseCode + ' }' : ''), condition + ' = __gameplayInvalid;'))
     } else if (node.kind === 'foreach') {
       const index = nextVariable(state, 'index'); const items = nextVariable(state, 'items'); const item = nextVariable(state, 'item')
       const loopInputs = new Map(environment.inputs); const loopInputTypes = environment.inputTypes ? new Map(environment.inputTypes) : new Map<string, GameplayValueType>(); if (node.item) { loopInputs.set(node.item, item); loopInputTypes.set(node.item, listElement(node.items, currentEnvironment, state.resolver)) } if (node.index) { loopInputs.set(node.index, index); loopInputTypes.set(node.index, 'number') }
@@ -1499,18 +1923,51 @@ function emitStatements(list: readonly GameplayStatement[], environment: CEnv, s
       const loopExpressions = new Map<string, string>([['item', item], ['index', index]])
       const loopBindings = new Map(bindings); loopBindings.set(node.id, { ports: loopPorts, expression: item, portExpressions: loopExpressions })
       const body = emitStatements(node.body, { inputs: loopInputs, inputTypes: loopInputTypes, bindings: loopBindings }, state, outputs, target, active, depth)
-      chunks.push('for (var ' + index + ' = 0, ' + items + ' = ' + emit(node.items, currentEnvironment) + '; ' + items + ' !== __gameplayInvalid && ' + items + ' != null && ' + index + ' < ' + items + '.length; ' + index + ' += 1) { var ' + item + ' = ' + items + '[' + index + ']; ' + body + ' }')
-    } else if (node.kind === 'return') chunks.push(returnCode(node, outputs, currentEnvironment, target))
+      const legacyLoop = 'for (var ' + index + ' = 0, ' + items + ' = ' + emit(node.items, currentEnvironment) + '; ' + items + ' !== __gameplayInvalid && ' + items + ' != null && ' + index + ' < ' + items + '.length; ' + index + ' += 1) { var ' + item + ' = ' + items + '[' + index + ']; ' + body + ' }'
+      const loop = isFaultIsolatingEmitter(state)
+        ? 'var ' + items + ' = ' + emit(node.items, currentEnvironment) + '; if (' + items + ' !== __gameplayInvalid && ' + items + ' != null) { if (!Array.isArray(' + items + ')) { throw new Error("gameplay foreach items must be an array"); } if (' + items + '.length > ' + String(state.resolver.limits.maxCollectionIterations) + ') { throw new Error("gameplay foreach iteration budget exceeded"); } for (var ' + index + ' = 0; ' + index + ' < ' + items + '.length; ' + index + ' += 1) { __gameplayConsumeIteration(); var ' + item + ' = ' + items + '[' + index + ']; ' + body + ' } }'
+        : legacyLoop
+      if (node.presentation !== undefined) {
+        const host = state.resolver.graph.surface === 'pending' ? 'ctx' : 'context'
+        chunks.push(host + '.presentationQueue.push(' + literalSource(node.presentation) + ', function() { ' + loopBoundary(state, node, loop, item + ' = __gameplayInvalid; ' + index + ' = __gameplayInvalid;') + ' });')
+      } else chunks.push(loopBoundary(state, node, loop, item + ' = __gameplayInvalid; ' + index + ' = __gameplayInvalid;'))
+
+    } else if (node.kind === 'while') {
+      const iterations = nextVariable(state, 'whileIterations')
+      const index = nextVariable(state, 'whileIndex')
+      const loopInputs = new Map(environment.inputs)
+      const loopInputTypes = environment.inputTypes ? new Map(environment.inputTypes) : new Map<string, GameplayValueType>()
+      if (node.index) { loopInputs.set(node.index, index); loopInputTypes.set(node.index, 'number') }
+      const loopBindings = new Map(bindings)
+      loopBindings.set(node.id, { ports: new Map([['index', 'number']]), expression: index, portExpressions: new Map([['index', index]]) })
+      const condition = emitWhileCondition(node, currentEnvironment, state, active, depth)
+      const body = emitStatements(node.body, { inputs: loopInputs, inputTypes: loopInputTypes, bindings: loopBindings }, state, outputs, target, active, depth)
+      const conditionValue = '(' + condition.result + ' !== __gameplayInvalid && ' + condition.result + ' != null && ' + condition.result + '["value"] === true)'
+      const budgetError = 'throw new Error("gameplay while iteration budget exceeded: ' + node.id.replace(/[^a-zA-Z0-9_.:-]/g, '_') + '");'
+      const whileIterationGuard = isFaultIsolatingEmitter(state) ? '__gameplayConsumeIteration(); ' : ''
+      chunks.push(loopBoundary(state, node, 'var ' + iterations + ' = 0; while (true) { ' + condition.code + ' if (!' + conditionValue + ') break; if (' + iterations + ' >= ' + String(node.budget) + ') { ' + budgetError + ' } ' + whileIterationGuard + 'var ' + index + ' = ' + iterations + '; ' + body + ' ' + iterations + ' += 1; }'))
+
+    } else if (node.kind === 'return') chunks.push(statementBoundary(state, node, returnCode(node, outputs, currentEnvironment, target)))
   }
   return chunks.join(' ')
 }
-function wrapper(surface: GameplayModuleSurface, body: string): string {
+function wrapper(surface: GameplayModuleSurface, body: string, compilerVersion: GameplayModuleCompilerVersion, iterationBudget = 10_000): string {
   const prelude = 'var __gameplayInvalid = {}; '
-  if (surface === 'skill' || surface === 'triggerSkill') return 'function executeSkill(context) { ' + prelude + body + ' }'
-  if (surface === 'card') return 'function executeCard(context) { ' + prelude + body + ' }'
-  if (surface === 'rule') return prelude + body
-  if (surface === 'pending') return 'function(ctx) { ' + prelude + body + ' }'
-  return 'function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; ' + prelude + body + ' }'
+  if (compilerVersion === GAMEPLAY_MODULE_COMPILER_V1_VERSION) {
+    if (surface === 'skill' || surface === 'triggerSkill') return 'function executeSkill(context) { ' + prelude + body + ' }'
+    if (surface === 'card') return 'function executeCard(context) { ' + prelude + body + ' }'
+    if (surface === 'rule') return prelude + body
+    if (surface === 'pending') return 'function(ctx) { ' + prelude + body + ' }'
+    return 'function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; ' + prelude + body + ' }'
+  }
+  const hostContext = surface === 'pending' ? 'ctx' : 'context'
+  const hostPrelude = 'var __gameplayHost = (typeof ' + hostContext + ' !== "undefined" && ' + hostContext + ' !== null) ? ' + hostContext + '[' + JSON.stringify(diagnosticHostKey) + '] : undefined; var __gameplayBudget = { remaining: ' + String(iterationBudget) + ' }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== "function" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== "function") throw error; __gameplayHost.record(statementId, error, moduleId); }; '
+  const v2Prelude = prelude + hostPrelude
+  if (surface === 'skill' || surface === 'triggerSkill') return 'function executeSkill(context) { ' + v2Prelude + body + ' }'
+  if (surface === 'card') return 'function executeCard(context) { ' + v2Prelude + body + ' }'
+  if (surface === 'rule') return v2Prelude + body
+  if (surface === 'pending') return 'function(ctx) { ' + v2Prelude + body + ' }'
+  return 'function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; if (skillDef && typeof skillDef === "object") context[' + JSON.stringify(diagnosticHostKey) + '] = skillDef[' + JSON.stringify(diagnosticHostKey) + ']; ' + v2Prelude + body + ' }'
 }
 function options(value: GameplayModuleCompilerOptions | undefined): Required<GameplayModuleCompilerOptions> {
   const result = { ...limitsDefault }; if (!value) return result
@@ -1518,19 +1975,57 @@ function options(value: GameplayModuleCompilerOptions | undefined): Required<Gam
   return result
 }
 
-export function compileGameplayModuleGraph(input: unknown, registry: GameplayModuleRegistry, compilerOptions?: GameplayModuleCompilerOptions): GameplayModuleCompileResult {
+function validatePresentationNesting(body: readonly GameplayStatement[], resolver: Resolver, inside = false): void {
+  for (const node of body) {
+    if (node.kind === 'foreach') {
+      if (inside && node.presentation !== undefined) fail('nested presentation groups are not supported', 'graph.body.' + node.id, 'GAMEPLAY_MODULE_INVALID_VALUE')
+      validatePresentationNesting(node.body, resolver, inside || node.presentation !== undefined)
+    } else if (node.kind === 'while') {
+      // Walk both subgraphs. Returns from the condition are local, while
+      // presentation scopes in the execution body remain nested in `inside`.
+      validatePresentationNesting(node.condition.body, resolver, inside)
+      validatePresentationNesting(node.body, resolver, inside)
+    } else if (node.kind === 'collection') {
+      // Collection bodies are closed subgraphs; do not let them hide nested
+      // presentation groups from the structural validator.
+      validatePresentationNesting(node.body, resolver, inside)
+    } else if (node.kind === 'if') {
+      validatePresentationNesting(node.then, resolver, inside)
+      validatePresentationNesting(node.else ?? [], resolver, inside)
+    } else if (node.kind === 'call') {
+      const resolvedModule = resolver.calls.get(node)?.module
+      if (resolvedModule?.kind === 'composite') validatePresentationNesting(resolvedModule.definition.body, resolver, inside)
+    }
+  }
+}
+
+function compileGameplayModuleGraphVersioned(input: unknown, registry: GameplayModuleRegistry, compilerOptions: GameplayModuleCompilerOptions | undefined, compilerVersion: GameplayModuleCompilerVersion): GameplayModuleCompileResult {
   const compileLimits = options(compilerOptions); const graphValue = graph(input); validateGraphSchemas(graphValue); validateGraphLiteralBudget(graphValue, compileLimits.maxLiteralBytes); const resolver = makeResolver(graphValue, registry, compileLimits)
   const inputTypes = new Map<string, GameplayValueType>(); for (const inputPort of graphValue.inputs) inputTypes.set(inputPort.name, effective(inputPort))
   validateBody(graphValue.body, resolver, { inputs: inputTypes, bindings: new Map() }, graphValue.outputs, 'graph.body', [], 0)
+  validatePresentationNesting(graphValue.body, resolver)
   if (graphValue.outputs.some(output => !output.optional) && !bodyGuaranteesReturn(graphValue.body)) fail('graph can fall through without returning its required outputs', 'graph.body', 'GAMEPLAY_MODULE_MISSING_OUTPUT')
   if (resolver.expanded.length > resolver.limits.maxExpandedCalls) fail('module call budget exceeded', 'graph.body', 'GAMEPLAY_MODULE_BUDGET_EXCEEDED')
-  const state: Codegen = { next: 0, resolver, loweringDependencies: new Set(), continuationStack: [] }
+  const state: Codegen = { next: 0, resolver, loweringDependencies: new Set(), continuationStack: [], compilerVersion }
   const rootInputs = new Map<string, string>(); for (const inputPort of graphValue.inputs) { const expression = rootStaticInput(graphValue, inputPort.name); if (expression) rootInputs.set(inputPort.name, expression) }
   const body = emitStatements(graphValue.body, { inputs: rootInputs, inputTypes, bindings: new Map() }, state, graphValue.outputs, undefined, [], 0)
-  const code = wrapper(graphValue.surface, body)
+  const code = wrapper(graphValue.surface, body, compilerVersion, resolver.limits.maxCollectionIterations)
   const dependencyMap = new Map(resolver.dependencies)
   for (const dependency of state.loweringDependencies) if (![...dependencyMap.values()].some(entry => entry.id === dependency || entry.id + '@' + entry.version === dependency)) dependencyMap.set(dependency, { id: dependency, version: '', kind: 'native' })
-  return Object.freeze({ compilerVersion: GAMEPLAY_MODULE_COMPILER_VERSION, graphVersion: GAMEPLAY_MODULE_GRAPH_VERSION, surface: graphValue.surface, code, source: code, dependencies: Object.freeze([...dependencyMap.values()].map(entry => Object.freeze({ ...entry }))), expanded: Object.freeze({ surface: graphValue.surface, calls: Object.freeze(resolver.expanded.map(entry => Object.freeze({ ...entry }))) }), diagnostics: Object.freeze([]) })
+  return Object.freeze({ compilerVersion, graphVersion: GAMEPLAY_MODULE_GRAPH_VERSION, surface: graphValue.surface, code, source: code, dependencies: Object.freeze([...dependencyMap.values()].map(entry => Object.freeze({ ...entry }))), expanded: Object.freeze({ surface: graphValue.surface, calls: Object.freeze(resolver.expanded.map(entry => Object.freeze({ ...entry }))) }), diagnostics: Object.freeze([]) })
+}
+/** Compile new artifacts with the fault-isolating v2 emitter. */
+export function compileGameplayModuleGraph(input: unknown, registry: GameplayModuleRegistry, compilerOptions?: GameplayModuleCompilerOptions): GameplayModuleCompileResult {
+  return compileGameplayModuleGraphVersioned(input, registry, compilerOptions, GAMEPLAY_MODULE_COMPILER_V3_VERSION)
+}
+
+/** Preserve byte-for-byte v2 proofs for previously saved module documents. */
+export function compileGameplayModuleGraphV2(input: unknown, registry: GameplayModuleRegistry, compilerOptions?: GameplayModuleCompilerOptions): GameplayModuleCompileResult {
+  return compileGameplayModuleGraphVersioned(input, registry, compilerOptions, GAMEPLAY_MODULE_COMPILER_V2_VERSION)
+}
+/** Validate/reproduce legacy v1 artifacts without changing their emitted bytes. */
+export function compileGameplayModuleGraphV1(input: unknown, registry: GameplayModuleRegistry, compilerOptions?: GameplayModuleCompilerOptions): GameplayModuleCompileResult {
+  return compileGameplayModuleGraphVersioned(input, registry, compilerOptions, GAMEPLAY_MODULE_COMPILER_V1_VERSION)
 }
 export const compileModuleGraph = compileGameplayModuleGraph
 export const compileGameplayGraph = compileGameplayModuleGraph

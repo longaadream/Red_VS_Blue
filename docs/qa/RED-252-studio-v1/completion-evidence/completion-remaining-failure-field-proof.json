@@ -1,0 +1,1228 @@
+{
+  "schemaVersion": "RED-252-completion-field-and-loader-proof/v2",
+  "generatedAt": "2026-10-13T17:02:36.216Z",
+  "task": "RED-252",
+  "baseBranch": "main",
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "sourceChanges": [],
+  "fieldAssertions": {
+    "sourceFiles": [
+      {
+        "path": "tests/game/ichigo-itachi.test.ts",
+        "baseNormalizedSha256": "3c946ba908b54843c86ed3da681b16a01f868419077acd0b6e32d1e6f1c5d3ca",
+        "currentNormalizedSha256": "3c946ba908b54843c86ed3da681b16a01f868419077acd0b6e32d1e6f1c5d3ca",
+        "logicalContentEqual": true,
+        "note": "Working-tree CRLF normalized to LF."
+      },
+      {
+        "path": "tests/game/mangekyo.test.ts",
+        "baseNormalizedSha256": "2e244d044975554ba03a0972bfe428e20fa650d09a09602910059b0cf4f6c453",
+        "currentNormalizedSha256": "2e244d044975554ba03a0972bfe428e20fa650d09a09602910059b0cf4f6c453",
+        "logicalContentEqual": true,
+        "note": "Working-tree CRLF normalized to LF."
+      }
+    ],
+    "ichigoItachi": {
+      "file": "tests/game/ichigo-itachi.test.ts",
+      "assertionLine": 138,
+      "testName": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text",
+      "actualAssertedFieldsEqualOriginCurrent": true,
+      "skills": [
+        {
+          "id": "ichigo-zangetsu",
+          "path": "data/skills/ichigo-zangetsu.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "对本棋子相邻的1个敌方棋子造成等同于本棋子攻击力的物理伤害。",
+              "origin": "选择敌人（1），造成1倍伤害。",
+              "current": "选择敌人（1），造成1倍伤害。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 1,
+              "origin": 1,
+              "current": 1,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 1,
+              "origin": 1,
+              "current": 1,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "ichigo-getsuga-tensho",
+          "path": "data/skills/ichigo-getsuga-tensho.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "向同一行或同一列的1个方向发射弹射物，对路径上的第1个敌方棋子造成等同于本棋子攻击力150%的法术伤害。",
+              "origin": "弹射物。选择正方向，对首个敌人造成1.5倍伤害。",
+              "current": "弹射物。选择正方向，对首个敌人造成1.5倍伤害。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "keywords.contains(弹射物)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "ichigo-bankai-tensa-zangetsu",
+          "path": "data/skills/ichigo-bankai-tensa-zangetsu.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "攻击力+1、移动力+2并获得1临时行动点，失去【月牙天冲】，获得初始冷却为0的【黑色月牙天冲】。",
+              "origin": "攻击力+1、移动力+2。获得1点临时行动点。【月牙天冲】替换为可立即使用的【黑色月牙天冲】。",
+              "current": "攻击力+1、移动力+2。获得1点临时行动点。【月牙天冲】替换为可立即使用的【黑色月牙天冲】。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 0,
+              "origin": 0,
+              "current": 0,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 0,
+              "origin": 0,
+              "current": 0,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "ichigo-black-getsuga-tensho",
+          "path": "data/skills/ichigo-black-getsuga-tensho.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "向同一行或同一列的1个方向发射弹射物，对路径上的所有敌方棋子造成等同于本棋子攻击力200%的法术伤害；命中后，可以传送至第1个被命中敌方棋子相邻的1个空格。",
+              "origin": "弹射物。选择正方向，对路径上所有敌人造成2倍伤害，并可传送至首个命中敌人相邻地格。",
+              "current": "弹射物。选择正方向，对路径上所有敌人造成2倍伤害，并可传送至首个命中敌人相邻地格。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "keywords.contains(弹射物)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "itachi-tsukuyomi",
+          "path": "data/skills/itachi-tsukuyomi.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "选择6格内的1个敌方棋子，使其下1个使用的技能额外增加1回合冷却。",
+              "origin": "选择敌人（6），其下次使用的技能冷却+1回合。",
+              "current": "选择敌人（6），其下次使用的技能冷却+1回合。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 0,
+              "origin": 0,
+              "current": 0,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 1,
+              "origin": 1,
+              "current": 1,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "itachi-amaterasu",
+          "path": "data/skills/itachi-amaterasu.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "选择5格内的1个敌方棋子，将其所在格变为天照地格，并使其获得1层天照。",
+              "origin": "选择敌人（5），将其所在格化为天照地格。目标获得天照 x 1。",
+              "current": "选择敌人（5），将其所在格化为天照地格。目标获得天照 x 1。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "itachi-totsuka-blade",
+          "path": "data/skills/itachi-totsuka-blade.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "description": {
+              "expected": "万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。",
+              "origin": "万花筒。选择敌人（3），造成2倍伤害。目标所有主动技能进入1回合冷却。",
+              "current": "万花筒。选择敌人（3），造成2倍伤害。目标所有主动技能进入1回合冷却。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "actionPointCost": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "cooldownTurns": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "type": {
+              "expected": "super",
+              "origin": "super",
+              "current": "super",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "chargeCost": {
+              "expected": 3,
+              "origin": 3,
+              "current": 3,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "keywords.contains(万花筒)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "descriptionHasNoLegacyCostWording": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        }
+      ],
+      "manifestAndPieceChecks": [
+        {
+          "path": "data/skills/manifest.json",
+          "originLength": 183,
+          "currentLength": 183,
+          "exactArrayEqual": true,
+          "selected": {
+            "ichigo-zangetsu": {
+              "origin": 1,
+              "current": 1
+            },
+            "ichigo-getsuga-tensho": {
+              "origin": 1,
+              "current": 1
+            },
+            "ichigo-bankai-tensa-zangetsu": {
+              "origin": 1,
+              "current": 1
+            },
+            "ichigo-black-getsuga-tensho": {
+              "origin": 1,
+              "current": 1
+            },
+            "itachi-tsukuyomi": {
+              "origin": 1,
+              "current": 1
+            },
+            "itachi-amaterasu": {
+              "origin": 1,
+              "current": 1
+            },
+            "itachi-totsuka-blade": {
+              "origin": 1,
+              "current": 1
+            }
+          }
+        },
+        {
+          "path": "data/rules/manifest.json",
+          "originLength": 122,
+          "currentLength": 122,
+          "exactArrayEqual": true,
+          "selected": {
+            "rule-itachi-tsukuyomi": {
+              "origin": 1,
+              "current": 1
+            },
+            "rule-ichigo-black-getsuga-teleport": {
+              "origin": 1,
+              "current": 1
+            }
+          }
+        },
+        {
+          "path": "data/pieces/blue-ichigo.json",
+          "origin": "blue-ichigo",
+          "current": "blue-ichigo",
+          "equal": true
+        },
+        {
+          "path": "data/pieces/red-itachi.json",
+          "origin": "red-itachi",
+          "current": "red-itachi",
+          "equal": true
+        }
+      ]
+    },
+    "mangekyo": {
+      "file": "tests/game/mangekyo.test.ts",
+      "assertionLine": 122,
+      "testName": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs",
+      "modifier": [
+        {
+          "source": "battleExtensionPlayerNumber",
+          "path": "contentCounters.mangekyoDeaths",
+          "operation": "subtract",
+          "minimum": 0
+        }
+      ],
+      "actualAssertedFieldsEqualOriginCurrent": true,
+      "skills": [
+        {
+          "id": "sasuke-susanoo",
+          "path": "data/skills/sasuke-susanoo.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "chargeCost": {
+              "expected": 2,
+              "origin": 2,
+              "current": 2,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "chargeCostModifiers": {
+              "expected": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "origin": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "current": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "description": {
+              "expected": "万花筒。激活完全体须佐能乎：防御力+1，失去【千鸟】，获得【加具土命】与【因陀罗之矢】。",
+              "origin": "万花筒。进入完全体须佐能乎：防御力+1，【千鸟】替换为【加具土命】和【因陀罗之矢】。",
+              "current": "万花筒。进入完全体须佐能乎：防御力+1，【千鸟】替换为【加具土命】和【因陀罗之矢】。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "keywords.contains(万花筒)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "itachi-totsuka-blade",
+          "path": "data/skills/itachi-totsuka-blade.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "chargeCost": {
+              "expected": 3,
+              "origin": 3,
+              "current": 3,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "chargeCostModifiers": {
+              "expected": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "origin": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "current": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "description": {
+              "expected": "万花筒。选择3格内的1个敌方棋子，造成等同于本棋子攻击力200%的法术伤害，并使其所有主动技能进入1回合冷却。",
+              "origin": "万花筒。选择敌人（3），造成2倍伤害。目标所有主动技能进入1回合冷却。",
+              "current": "万花筒。选择敌人（3），造成2倍伤害。目标所有主动技能进入1回合冷却。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "keywords.contains(万花筒)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        },
+        {
+          "id": "obito-space-time",
+          "path": "data/skills/obito-space-time.json",
+          "topLevelChangedKeys": [
+            "cluster",
+            "code",
+            "gameplayModules",
+            "previewCode"
+          ],
+          "assertedFields": {
+            "name": {
+              "expected": "神威",
+              "origin": "神威",
+              "current": "神威",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "type": {
+              "expected": "ultimate",
+              "origin": "ultimate",
+              "current": "ultimate",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "actionPointCost": {
+              "expected": 5,
+              "origin": 5,
+              "current": 5,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "chargeCost": {
+              "expected": 3,
+              "origin": 3,
+              "current": 3,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "chargeCostModifiers": {
+              "expected": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "origin": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "current": [
+                {
+                  "source": "battleExtensionPlayerNumber",
+                  "path": "contentCounters.mangekyoDeaths",
+                  "operation": "subtract",
+                  "minimum": 0
+                }
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "description": {
+              "expected": "万花筒。选择地图上1个敌方棋子，将其强制移出战场。每局限用1次。",
+              "origin": "万花筒。选择全图敌人，将其移出战场。每局1次。",
+              "current": "万花筒。选择全图敌人，将其移出战场。每局1次。",
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": false,
+              "expectedMatchesCurrent": false
+            },
+            "targeting.steps.0": {
+              "expected": {
+                "type": "piece",
+                "filter": "enemy",
+                "range": 99
+              },
+              "origin": {
+                "type": "piece",
+                "filter": "enemy",
+                "range": 99
+              },
+              "current": {
+                "type": "piece",
+                "filter": "enemy",
+                "range": 99
+              },
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "keywords.contains(万花筒)": {
+              "expected": true,
+              "origin": true,
+              "current": true,
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          },
+          "actualAssertedFieldsEqualOriginCurrent": true
+        }
+      ],
+      "keywordEntry": {
+        "expected": [
+          {
+            "id": "mangekyo",
+            "name": "万花筒",
+            "shortDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。",
+            "longDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。"
+          }
+        ],
+        "origin": [
+          {
+            "id": "mangekyo",
+            "name": "万花筒",
+            "category": "resource",
+            "shortDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。",
+            "longDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。",
+            "highlight": true
+          }
+        ],
+        "current": [
+          {
+            "id": "mangekyo",
+            "name": "万花筒",
+            "category": "resource",
+            "shortDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。",
+            "longDescription": "每有一个友方角色死亡，己方万花筒技能的充能消耗永久降低1，最低为0。",
+            "highlight": true
+          }
+        ],
+        "originCurrentEqual": true,
+        "expectedMatchesOrigin": false,
+        "expectedMatchesCurrent": false
+      },
+      "pieces": [
+        {
+          "path": "data/pieces/red-obito.json",
+          "fields": {
+            "skills": {
+              "expected": [
+                "obito-ally-teleport",
+                "obito-space-time"
+              ],
+              "origin": [
+                "obito-ally-teleport",
+                "obito-space-time"
+              ],
+              "current": [
+                "obito-ally-teleport",
+                "obito-space-time"
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "rules": {
+              "expected": [
+                "rule-mangekyo-friendly-death"
+              ],
+              "origin": [
+                "rule-mangekyo-friendly-death"
+              ],
+              "current": [
+                "rule-mangekyo-friendly-death"
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            },
+            "initialStatusTags": {
+              "expected": [
+                {
+                  "id": "mangekyo-witness",
+                  "type": "mangekyo-witness",
+                  "name": "万花筒",
+                  "visible": false,
+                  "relatedRules": [
+                    "rule-mangekyo-friendly-death"
+                  ]
+                }
+              ],
+              "origin": [
+                {
+                  "id": "mangekyo-witness",
+                  "type": "mangekyo-witness",
+                  "name": "万花筒",
+                  "visible": false,
+                  "relatedRules": [
+                    "rule-mangekyo-friendly-death"
+                  ]
+                }
+              ],
+              "current": [
+                {
+                  "id": "mangekyo-witness",
+                  "type": "mangekyo-witness",
+                  "name": "万花筒",
+                  "visible": false,
+                  "relatedRules": [
+                    "rule-mangekyo-friendly-death"
+                  ]
+                }
+              ],
+              "originCurrentEqual": true,
+              "expectedMatchesOrigin": true,
+              "expectedMatchesCurrent": true
+            }
+          }
+        }
+      ],
+      "battlePageSnippets": {
+        "GameEngine.getEffectiveChargeCost(G, piece.ownerPlayerId, skillData)": {
+          "origin": true,
+          "current": true,
+          "equal": true
+        },
+        "currentCost + '/' + baseCost": {
+          "origin": false,
+          "current": false,
+          "equal": true
+        },
+        "const isCharge = skillUsesCharge(skData)": {
+          "origin": true,
+          "current": true,
+          "equal": true
+        }
+      },
+      "note": "Expected descriptions remain mismatched identically on base and current; matching-property counts changed only because generated fields changed."
+    },
+    "conclusion": "The Ichigo/Itachi and Mangekyo failures are same-baseline assertion mismatches: every field asserted by the failing contract assertions has equal origin/current actual data. Generated executable/cluster fields differ, but are outside those assertions."
+  },
+  "loaderSmoke": {
+    "file": "tests/game/skillcode-static-audit.test.ts",
+    "assertionLine": 139,
+    "testName": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+    "currentFailure": null,
+    "cleanBaseline": {
+      "firstFailedTest": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+      "firstDirectFailure": "expected report.triggerSkills to have length 21 but got 20",
+      "loaderSmokeWasNotReached": true
+    },
+    "rawDefinitionInventory": {
+      "skills": {
+        "rawJsonFiles": 184,
+        "rawDefinitionsWithId": 184,
+        "rawFilesWithoutId": [],
+        "manifestCount": 183,
+        "manifestIdsSha256": "428bce52958136196a336984059b5a075f1ea14c5558f3cc2a1c8d106a88c436",
+        "manifestDuplicates": [],
+        "manifestMissingRawIds": [],
+        "rawIdsNotInManifest": [
+          {
+            "id": "grimmjow-gran-rey-cero",
+            "file": "data/skills/grimmjow-gran-rey-cero.json"
+          }
+        ],
+        "duplicateRawIds": [],
+        "pveOnlyCount": 9,
+        "pveOnlyIds": [
+          "pve-arrow",
+          "pve-claw",
+          "pve-raise-dead",
+          "pve-shot",
+          "pve-sweep",
+          "pve-hook",
+          "pve-tracking-slash",
+          "pve-overwatch",
+          "pve-blaster"
+        ],
+        "ordinaryManifestCount": 174,
+        "ordinaryManifestIdsSha256": "caec8d46a65255d1bc6e0d42399c4e1e16a52b09362802270c75f0500c8517ec"
+      },
+      "rules": {
+        "rawJsonFiles": 124,
+        "rawDefinitionsWithId": 123,
+        "rawFilesWithoutId": [
+          "data/rules/ai-semantics.json"
+        ],
+        "manifestCount": 122,
+        "manifestIdsSha256": "28ab1aa7f6cd47510f4a7360c1fdb310a8d5d932746b6856914a9a3c46f797c9",
+        "manifestDuplicates": [],
+        "manifestMissingRawIds": [],
+        "rawIdsNotInManifest": [
+          {
+            "id": "rule-lucky-coin-gamestart",
+            "file": "data/rules/rule-lucky-coin-gamestart.json"
+          }
+        ],
+        "duplicateRawIds": [],
+        "pveOnlyCount": 1,
+        "pveOnlyIds": [
+          "rule-pve-overwatch"
+        ],
+        "ordinaryManifestCount": 121,
+        "ordinaryManifestIdsSha256": "8deadcf5df55286bb69374c5fe156f198cf8a8b4075b80a5e2e506a819978ade"
+      },
+      "cards": {
+        "rawJsonFiles": 82,
+        "rawDefinitionsWithId": 82,
+        "rawFilesWithoutId": [],
+        "manifestCount": 76,
+        "manifestIdsSha256": "8db62643210b5f25e20ed62f2005a8215517c71f6caf9d9ff2f316774fc78f52",
+        "manifestDuplicates": [],
+        "manifestMissingRawIds": [],
+        "rawIdsNotInManifest": [
+          {
+            "id": "armor-attack-defense",
+            "file": "data/cards/armor-attack-defense.json"
+          },
+          {
+            "id": "armor-attack-heal",
+            "file": "data/cards/armor-attack-heal.json"
+          },
+          {
+            "id": "armor-attack-speed",
+            "file": "data/cards/armor-attack-speed.json"
+          },
+          {
+            "id": "armor-defense-heal",
+            "file": "data/cards/armor-defense-heal.json"
+          },
+          {
+            "id": "armor-defense-speed",
+            "file": "data/cards/armor-defense-speed.json"
+          },
+          {
+            "id": "armor-heal-speed",
+            "file": "data/cards/armor-heal-speed.json"
+          }
+        ],
+        "duplicateRawIds": [],
+        "pveOnlyCount": 60,
+        "pveOnlyIds": [
+          "pve-blood-curse",
+          "pve-blood-cut",
+          "pve-blood-debt",
+          "pve-blood-drink",
+          "pve-blood-etch",
+          "pve-blood-flame",
+          "pve-blood-revenge",
+          "pve-blood-stop",
+          "pve-blood-ward",
+          "pve-blood-wounds",
+          "pve-light-arrow",
+          "pve-light-burst",
+          "pve-light-call",
+          "pve-light-comfort",
+          "pve-light-moon",
+          "pve-light-overheal",
+          "pve-light-prayer",
+          "pve-light-spark",
+          "pve-light-study",
+          "pve-light-verdict",
+          "pve-momentum-armor",
+          "pve-momentum-brake",
+          "pve-momentum-flywheel",
+          "pve-momentum-hit",
+          "pve-momentum-inertia",
+          "pve-momentum-mile",
+          "pve-momentum-recovery",
+          "pve-momentum-release",
+          "pve-momentum-repair",
+          "pve-momentum-step",
+          "pve-pressure-bolt",
+          "pve-pressure-crush",
+          "pve-pressure-erode",
+          "pve-pressure-focus",
+          "pve-pressure-grow",
+          "pve-pressure-hado",
+          "pve-pressure-resurge",
+          "pve-pressure-return",
+          "pve-pressure-seal",
+          "pve-pressure-study",
+          "pve-shield-afterglow",
+          "pve-shield-burst",
+          "pve-shield-cover",
+          "pve-shield-echo",
+          "pve-shield-formation",
+          "pve-shield-oath",
+          "pve-shield-polish",
+          "pve-shield-return",
+          "pve-shield-thorns",
+          "pve-shield-wall",
+          "pve-skirmish-aid",
+          "pve-skirmish-calibrate",
+          "pve-skirmish-cover",
+          "pve-skirmish-fire",
+          "pve-skirmish-flank",
+          "pve-skirmish-net",
+          "pve-skirmish-pursuit",
+          "pve-skirmish-recycle",
+          "pve-skirmish-smoke",
+          "pve-skirmish-step"
+        ],
+        "ordinaryManifestCount": 16,
+        "ordinaryManifestIdsSha256": "4f15ea0ae15ec28dc71cfa23928a77ce8cc0467d87cc9ad051c9836af41cbf92"
+      }
+    },
+    "authorityEvidence": {
+      "manifests": [
+        "data/skills/manifest.json",
+        "data/rules/manifest.json",
+        "data/cards/manifest.json"
+      ],
+      "runtimeProfileFileAuthority": "lib/content-pipeline/runtime/bundled-base.ts:bundledFiles includes every data/**/*.json file (except users.json and legacy data/pve files without rvb-pve schema); this is package authority, distinct from ordinary discovery manifests.",
+      "runtimeLoader": "lib/game/skills.ts:1832-1841 scans data/skills/*.json by filename and intentionally excludes only manifest.json; it does not synthesize IDs or consult the skill manifest.",
+      "ordinaryDiscoveryPolicy": "electron-editor/content-discovery-policy.ts:8-18 explicitly records generated armor templates, archived grimmjow-gran-rey-cero, and direct system rule-lucky-coin-gamestart as non-discovery definitions.",
+      "ordinaryGraphClosure": {
+        "source": "output/completion-current-catalog-gap.json activeGraphs.documentList",
+        "activeGameplayGraphSkillDocuments": 159,
+        "activeGameplayGraphSkillIdsSha256": "4cb4c011153899f74ca568a0314f8a61cedd76c4c539465610a484d232b46835",
+        "structuralOrdinaryReachableSkillDocuments": 165,
+        "structuralOrdinaryReachableSkillIdsSha256": "6ded7d3cbd93c062b1a69ce7e180697035146d71ae25b9976c6f6e94d47fd9de",
+        "ordinaryManifestSkillCount": 174,
+        "nonGraphOrdinaryManifestSkillIds": [
+          "arthas-howling-blast",
+          "blackwidow-toxin-damage",
+          "elune-guidance-trigger",
+          "elune-protection-trigger",
+          "hand-cannon",
+          "holy-shield-defense",
+          "kenshin-tenken-passive",
+          "mortis-night-construct",
+          "obito-kamui",
+          "passive-injury-charge-discount",
+          "reap-heal",
+          "sonic-free-move-passive",
+          "tirion-divine-glory",
+          "venom-corrosion",
+          "watcher-form"
+        ],
+        "ordinaryUnreachableSkillIds": [
+          "arthas-howling-blast",
+          "blackwidow-toxin-damage",
+          "elune-guidance-trigger",
+          "elune-protection-trigger",
+          "hand-cannon",
+          "holy-shield-defense",
+          "obito-kamui",
+          "reap-heal",
+          "venom-corrosion"
+        ],
+        "note": "The 159 graph-document closure is a graph authorability denominator, not the raw runtime loader total. Six ordinary manifest skills have no gameplayModules graph and nine ordinary manifest skills are structurally unreachable."
+      },
+      "nonDiscoveryRawDefinitions": [
+        {
+          "path": "data/skills/grimmjow-gran-rey-cero.json",
+          "reason": "历史技能定义：保留兼容读取，不进入普通技能目录"
+        },
+        {
+          "path": "data/cards/armor-attack-defense.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/cards/armor-attack-heal.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/cards/armor-attack-speed.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/cards/armor-defense-heal.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/cards/armor-defense-speed.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/cards/armor-heal-speed.json",
+          "reason": "生成护甲模板：由运行时实例化，不进入普通卡牌目录"
+        },
+        {
+          "path": "data/rules/rule-lucky-coin-gamestart.json",
+          "reason": "系统规则：由对局初始化直接加载"
+        }
+      ],
+      "noPveAdmission": {
+        "skills": {
+          "manifestPveOnlyCount": 9,
+          "ordinaryManifestCount": 174,
+          "pveIds": [
+            "pve-arrow",
+            "pve-claw",
+            "pve-raise-dead",
+            "pve-shot",
+            "pve-sweep",
+            "pve-hook",
+            "pve-tracking-slash",
+            "pve-overwatch",
+            "pve-blaster"
+          ]
+        },
+        "rules": {
+          "manifestPveOnlyCount": 1,
+          "ordinaryManifestCount": 121,
+          "pveIds": [
+            "rule-pve-overwatch"
+          ]
+        },
+        "cards": {
+          "manifestPveOnlyCount": 60,
+          "ordinaryManifestCount": 16,
+          "pveIds": [
+            "pve-blood-curse",
+            "pve-blood-cut",
+            "pve-blood-debt",
+            "pve-blood-drink",
+            "pve-blood-etch",
+            "pve-blood-flame",
+            "pve-blood-revenge",
+            "pve-blood-stop",
+            "pve-blood-ward",
+            "pve-blood-wounds",
+            "pve-light-arrow",
+            "pve-light-burst",
+            "pve-light-call",
+            "pve-light-comfort",
+            "pve-light-moon",
+            "pve-light-overheal",
+            "pve-light-prayer",
+            "pve-light-spark",
+            "pve-light-study",
+            "pve-light-verdict",
+            "pve-momentum-armor",
+            "pve-momentum-brake",
+            "pve-momentum-flywheel",
+            "pve-momentum-hit",
+            "pve-momentum-inertia",
+            "pve-momentum-mile",
+            "pve-momentum-recovery",
+            "pve-momentum-release",
+            "pve-momentum-repair",
+            "pve-momentum-step",
+            "pve-pressure-bolt",
+            "pve-pressure-crush",
+            "pve-pressure-erode",
+            "pve-pressure-focus",
+            "pve-pressure-grow",
+            "pve-pressure-hado",
+            "pve-pressure-resurge",
+            "pve-pressure-return",
+            "pve-pressure-seal",
+            "pve-pressure-study",
+            "pve-shield-afterglow",
+            "pve-shield-burst",
+            "pve-shield-cover",
+            "pve-shield-echo",
+            "pve-shield-formation",
+            "pve-shield-oath",
+            "pve-shield-polish",
+            "pve-shield-return",
+            "pve-shield-thorns",
+            "pve-shield-wall",
+            "pve-skirmish-aid",
+            "pve-skirmish-calibrate",
+            "pve-skirmish-cover",
+            "pve-skirmish-fire",
+            "pve-skirmish-flank",
+            "pve-skirmish-net",
+            "pve-skirmish-pursuit",
+            "pve-skirmish-recycle",
+            "pve-skirmish-smoke",
+            "pve-skirmish-step"
+          ]
+        },
+        "rule": "Derive PVE exclusion from definition availability.modes === [\"pve\"] and manifest membership; do not admit PVE into the ordinary selected profile by raw-directory count or filename prefix alone."
+      }
+    },
+    "proposedExactCoverageAssertion": {
+      "status": "proposal-only",
+      "reason": "This audit must not edit the test/source.",
+      "ordinaryExpectedSet": "manifest IDs whose parsed definition availability is absent or includes pvp; assert uniqueness and exact file/definition ID identity.",
+      "rawLoaderExpectedSet": "manifest IDs union the explicit nonDiscoveryDefinitionReason IDs for each group; assert every raw ID is either manifest-authoritative or explicitly non-discovery, and assert no unknown raw ID.",
+      "runtimeChecks": [
+        "For every ordinary manifest ID, load the definition through the same production loader and assert the loaded object ID matches the manifest ID.",
+        "Assert the loaded ordinary ID set equals the ordinary manifest ID set in both directions; this catches missing and synthesized/extra ordinary IDs.",
+        "Keep separate compatibility checks for explicit non-discovery files (grimmjow-gran-rey-cero, armor templates, rule-lucky-coin-gamestart) instead of silently folding them into ordinary counts.",
+        "Assert PVE-only manifest IDs are excluded from the ordinary set and remain separately enumerated; do not use a hard-coded total such as 134.",
+        "If checking graph authorability, assert the 159 active graph IDs against the graph closure source, separately from the 174 ordinary manifest definitions and the 184 raw skill loader entries."
+      ],
+      "forbiddenShortcuts": [
+        "hard-coded raw definition totals",
+        "subset-only toContain checks",
+        "prefix-only PVE exclusion",
+        "adding the non-discovery archive to ordinary manifests",
+        "treating gameplayModules graph count as the runtime loader count"
+      ]
+    },
+    "conclusion": "The stale hard-coded totals are replaced by exact bidirectional authority-set checks. The raw loader still validates every definition and rejects missing, synthesized, unregistered, manifest-leaked non-discovery, and incorrectly admitted PVE IDs.",
+    "beforeFix": null,
+    "implementation": {
+      "testFile": "tests/game/skillcode-static-audit.test.ts",
+      "exactSetChecks": [
+        "Each manifest is a unique authoritative ID set.",
+        "Raw definition IDs equal manifest IDs union IDs named by nonDiscoveryDefinitionReason.",
+        "Every raw non-manifest ID has an explicit non-discovery policy entry, and policy IDs stay out of manifests.",
+        "PVE-only is derived from availability.modes containing only pve and equals the manifest PVE set.",
+        "Ordinary raw IDs equal manifest IDs that are not PVE-only.",
+        "The production skill loader ID set equals every raw skill definition ID, with each loaded object retaining its file ID.",
+        "Rules and cards retain per-definition loader checks, including loaded object IDs; draft cards remain explicitly null."
+      ],
+      "explicitNonDiscoveryAuthority": "electron-editor/content-discovery-policy.ts:8-18",
+      "changedFrom": "Hard-coded 134/97/16 totals",
+      "status": "implemented; focused test invocation attempted but blocked because this worktree has no node_modules/vitest"
+    }
+  },
+  "validation": {
+    "testsRun": [],
+    "readOnlyChecks": [
+      "origin/current asserted-field comparison",
+      "manifest/raw ID inventory",
+      "authority and graph closure inventory",
+      "JSON generation"
+    ],
+    "sourceFilesModified": []
+  }
+}

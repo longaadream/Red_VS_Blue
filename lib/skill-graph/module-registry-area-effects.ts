@@ -9,14 +9,14 @@ export const AREA_EFFECT_GAMEPLAY_MODULES: readonly Descriptor[] = [
     id: 'source.capture', label: '保留本次结算来源',
     description: '仅为当前执行保留来源归属；来源离场后已开始的效果可继续结算，不允许来源重新行动。句柄不能跨执行使用。',
     inputs: [{ name: 'source', type: 'piece' }], outputs: [{ name: 'source', type: 'record' }],
-    effects: { pure: false, previewSafe: false, reads: ['pieces'], writes: ['execution-context'] }, lower: ctx => `${flow(ctx)}.effects.captureSource(${ctx.inputs.source})`, ui: { category: 'context' },
+    effects: { pure: false, previewSafe: false, reads: ['pieces'], writes: ['execution-context'] }, lower: ctx => `${flow(ctx)}.effects.captureSource(${ctx.inputs.source})`, ui: { category: 'context', authoring: 'standard' },
   }),
   ...(['damage', 'heal'] as const).map(kind => define({
     id: `effect.${kind}-many-captured`, label: kind === 'damage' ? '使用已保留来源批量伤害' : '使用已保留来源批量治疗',
     inputs: [{ name: 'source', type: 'record' }, { name: 'targets', type: pieces }, { name: 'amount', type: 'number' }], outputs: [{ name: 'result', type: 'record' }],
-    parameters: kind === 'damage' ? [{ name: 'damageType', type: 'string', enum: ['physical', 'magical', 'true'], default: 'physical' }] : [],
+    parameters: [...(kind === 'damage' ? [{ name: 'damageType', type: 'string' as const, enum: ['physical', 'magical', 'true'], default: 'physical' }] : []), { name: 'skillId', type: 'string', optional: true }],
     effects: { pure: false, previewSafe: false, reads: ['execution-context'], writes: [kind, 'events'] },
-    lower: ctx => `${flow(ctx)}.effects.${kind}ManyCaptured(${ctx.inputs.source}, ${ctx.inputs.targets}, ${ctx.inputs.amount}${kind === 'damage' ? ', ' + ctx.emitLiteral(ctx.parameters.damageType) : ''})`, ui: { category: 'effect' },
+    lower: ctx => `${flow(ctx)}.effects.${kind}ManyCaptured(${ctx.inputs.source}, ${ctx.inputs.targets}, ${ctx.inputs.amount}${kind === 'damage' ? ', ' + ctx.emitLiteral(ctx.parameters.damageType) : ''}${ctx.parameters.skillId === undefined ? '' : ', ' + ctx.emitLiteral(ctx.parameters.skillId)})`, ui: { category: 'effect' },
   })),
   define({
     id: 'query.pieces-around-cell', label: '查询地格周围棋子',

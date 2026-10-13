@@ -22,6 +22,10 @@ export interface PendingInteractionSource {
   type: 'skill' | 'card' | 'rule' | 'pending'
   id: string
   pieceId?: string
+  /** Exact installed skill identity when the interaction belongs to a skill. */
+  skillId?: string
+  skillInstanceId?: string
+  skillPieceId?: string
 }
 
 export type PendingOptionSelectionMode = 'single' | 'multi'
@@ -41,6 +45,8 @@ export interface PendingOptionSelectionSession {
   selectionId?: string
   stateRevision?: number
   canCancel?: boolean
+  /** Resume the current consumer with an explicit cancellation input. */
+  resumeOnCancel?: boolean
   selectionMode?: PendingOptionSelectionMode
   presentation?: PendingOptionPresentation
   minSelections?: number
@@ -96,10 +102,15 @@ function sameOptionValue(left: unknown, right: unknown): boolean {
 function pendingSource(pending: PendingOptionSelectionSession): PendingInteractionSource {
   if (pending.source) return pending.source
   const context = pending.triggerContext || {}
+  const hasSkillContext = typeof context.skillId === 'string'
+    && (typeof context.skillInstanceId === 'string' || typeof context.sourcePiece?.instanceId === 'string')
   return {
-    type: context.pendingRuleId ? 'rule' : 'pending',
-    id: context.pendingRuleId || 'pending-option',
-    pieceId: context.pendingRuleSourceId,
+    type: context.pendingRuleId ? 'rule' : hasSkillContext ? 'skill' : 'pending',
+    id: context.pendingRuleId || context.skillId || 'pending-option',
+    pieceId: context.pendingRuleSourceId || context.sourcePiece?.instanceId,
+    skillId: typeof context.skillId === 'string' ? context.skillId : undefined,
+    skillInstanceId: typeof context.skillInstanceId === 'string' ? context.skillInstanceId : undefined,
+    skillPieceId: context.sourcePiece?.instanceId,
   }
 }
 
@@ -121,6 +132,9 @@ export function finalizePendingOptionSession(
     source.type,
     source.id,
     source.pieceId || '',
+    source.skillId || '',
+    source.skillInstanceId || '',
+    source.skillPieceId || '',
     stableJson(pending.options),
     stableJson({
       selectionMode: pending.selectionMode || 'single',

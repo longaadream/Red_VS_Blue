@@ -23,7 +23,7 @@
   let dockCollapsed = false;
   const nativeCardClick = window.onCardClick;
   const nativeShowCard = window.showCardDetail, nativeCloseCard = window.closeCardDetail;
-  const forcedHand = () => !!G && isPendingHandSelection(G.pendingOptionSelection);
+  const forcedHand = () => !!G && isPendingHandSelection(typeof getHandOptionSelection === 'function' ? getHandOptionSelection() : G.pendingOptionSelection);
   function targeting() {
     return !!(pendingSkill || pendingCardAction || targetSubmissionPending || pendingActionFeedback ||
       pendingTargetSelectionForMe() || (pendingOptionSelectionForMe() && !forcedHand()));

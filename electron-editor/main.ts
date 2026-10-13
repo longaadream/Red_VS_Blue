@@ -7,10 +7,11 @@ import { ResourceRelease } from './resource-release'
 import { preparePublicationIdentity } from './publication-identity'
 import { openTrainingPreview, closeTrainingPreviews } from './training-preview'
 import type { TrainingSnapshot } from './training-resources'
+import { normalizeDraftTrainingRequest } from './training-draft-worker'
 import { readCodeImport } from './code-import'
 import { assertContentGraphArtifact, assertGameplayModuleTransition } from './content-graph-document'
 import { assertSkillGraphArtifact } from './skill-graph'
-import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
+import { assertContentProjectRoot, copyBundledRootImages, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
   EditorContentOperationQueueV1,
   normalizeEditorContentOperationRequestV1,
@@ -69,6 +70,7 @@ function ensureAuthoringWorkspace(): string {
       errorOnExist: false,
       force: false,
     })
+    copyBundledRootImages(getProjectRoot(), workspace)
   }
   for (const directory of ['archives', 'keys', 'reports', 'sources']) {
     fs.mkdirSync(path.join(workspace, directory), { recursive: true })
@@ -109,12 +111,12 @@ let win: BrowserWindow | null = null
 function createWindow(): void {
   win = new BrowserWindow({
     show: !process.argv.includes('--editor-smoke-hidden'),
-    width: 1200,
-    height: 780,
+    width: 1440,
+    height: 1024,
     minWidth: 900,
     minHeight: 600,
-    title: 'RED vs BLUE — 数据编辑器',
-    backgroundColor: '#0d0f12',
+    title: 'Red VS Blue — 内容工作台',
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -517,6 +519,14 @@ handleTrusted('workbench-training', (_event, taskId: string, acceptedHash: strin
   const workspace = ensureAuthoringWorkspace()
   return contentOperationQueue.enqueue(async () => {
     const snapshot = await runContentWorker({ operation: 'prepare-training-preview', workspace, taskId, acceptedHash, appRoot: getProjectRoot(), privateRoot: path.join(app.getPath('userData'), 'training-previews') }) as TrainingSnapshot
+    return openTrainingPreview(getProjectRoot(), snapshot, process.argv.includes('--editor-smoke-hidden'))
+  })
+})
+handleTrusted('skill-trial', (_event, rawRequest: unknown) => {
+  const workspace = ensureAuthoringWorkspace()
+  const request = normalizeDraftTrainingRequest(rawRequest)
+  return contentOperationQueue.enqueue(async () => {
+    const snapshot = await runContentWorker({ operation: 'prepare-draft-training', workspace, request }) as TrainingSnapshot
     return openTrainingPreview(getProjectRoot(), snapshot, process.argv.includes('--editor-smoke-hidden'))
   })
 })

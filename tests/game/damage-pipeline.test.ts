@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- focused engine fixtures use data-driven runtime shapes */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 import { hashBattleState } from '@/lib/game/battle-trace'
 import { runBattleAction } from '@/lib/game/battle-runner'
 import { createEffectChain, withEffectChain } from '@/lib/game/effect-batch'
 import { RuleRuntime, withRuleRuntime } from '@/lib/game/rule-runtime'
-import { dealDamage, loadRuleById } from '@/lib/game/skills'
+import { clearRuleCache, dealDamage, loadRuleById } from '@/lib/game/skills'
 import { globalTriggerSystem } from '@/lib/game/triggers'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -13,6 +16,29 @@ function requiredRule(id: string) {
   const rule = loadRuleById(id, true)
   if (!rule) throw new Error(`Missing RED-33 fixture rule: ${id}`)
   return rule
+}
+
+function withFrozenRuleDefinition(id: string, run: () => void) {
+  const root = mkdtempSync(path.join(tmpdir(), 'rvb-damage-reentry-'))
+  const previous = process.env.RVB_PROFILE_ROOT
+  const frozen = JSON.parse(readFileSync('tests/game/fixtures/RED-252-legacy-content.json', 'utf8'))
+  const definition = frozen.entries[`rules/${id}`]
+  expect(typeof definition.skillCode).toBe('string')
+  try {
+    mkdirSync(path.join(root, 'data', 'rules'), { recursive: true })
+    writeFileSync(path.join(root, 'data', 'rules', `${id}.json`), JSON.stringify(definition))
+    process.env.RVB_PROFILE_ROOT = root
+    clearRuleCache()
+    run()
+  } finally {
+    clearRuleCache()
+    if (previous === undefined) delete process.env.RVB_PROFILE_ROOT
+    else process.env.RVB_PROFILE_ROOT = previous
+    if (path.dirname(path.resolve(root)) !== path.resolve(tmpdir()) || !path.basename(root).startsWith('rvb-damage-reentry-')) {
+      throw new Error('Unexpected reentry fixture directory')
+    }
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 function eventRule(id: string, type: string, effect: (battle: any, context: any) => void) {
@@ -378,7 +404,7 @@ describe('RED-33 deterministic damage pipeline', () => {
     expect(dealDamage(attacker, defender, 1, 'true', state, 'after-reentrant-error')).toMatchObject({ damage: 1 })
   })
 
-  it('binds a real Rule skillCode facade to the root battle and rejects its context.battle alias during processing', () => {
+  it('binds a real Rule skillCode facade to the root battle and rejects its context.battle alias during processing', () => withFrozenRuleDefinition('rule-hidan-undying-tick', () => {
     const attacker = makePiece({
       instanceId: 'hidan-reentry-attacker', ownerPlayerId: 'player-red',
     }) as any
@@ -389,6 +415,9 @@ describe('RED-33 deterministic damage pipeline', () => {
       instanceId: 'hidan-reentry-defender', ownerPlayerId: 'player-blue', currentHp: 10, maxHp: 10,
     }) as any
     hidan.statusTags = [{ id: 'hidan-dying', type: 'hidan-dying', remainingTurns: 1 }]
+    // This probe intentionally executes the historical direct call through a
+    // real Rule facade. Production Hidan now uses the queued author effect,
+    // which must not replace the forbidden-reentry input this test protects.
     hidan.rules = [requiredRule('rule-hidan-undying-tick')]
     const skillId = 'hidan-reentry-root'
     attacker.skills = [{ skillId, currentCooldown: 0, usesRemaining: -1 }]
@@ -439,7 +468,7 @@ describe('RED-33 deterministic damage pipeline', () => {
       }),
     })
     expect(hashBattleState(state)).toBe(before)
-  })
+  }))
 
   it('keeps the real Hidan context.battle facade on an idle root chain through DeathBatch finalization', () => {
     const hidan = makePiece({

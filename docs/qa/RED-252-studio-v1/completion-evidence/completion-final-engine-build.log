@@ -1,0 +1,16 @@
+
+> my-project@0.1.15 build:game-engine
+> npm run build:practice-ai && node scripts/build-game-engine.js
+
+
+> my-project@0.1.15 build:practice-ai
+> node scripts/build-practice-ai.mjs && npm run build:adventure
+
+[practice] Built worker from current local sources
+
+> my-project@0.1.15 build:adventure
+> node scripts/build-adventure.mjs
+
+[adventure] Built independent same-map worker
+[build-game-engine] Built data\pages\js\game-engine.js
+[build-game-engine] Built android-client\www\js\game-engine.js

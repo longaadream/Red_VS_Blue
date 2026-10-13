@@ -1,0 +1,6 @@
+
+> my-project@0.1.15 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully

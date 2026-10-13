@@ -1,0 +1,13 @@
+{
+  "moduleId": "sentence-module-6",
+  "accepted": true,
+  "entityKind": "card",
+  "entity": {
+    "kind": "output",
+    "node": "expr-6_1",
+    "port": "card"
+  },
+  "name": "armor",
+  "valueType": "number",
+  "typeLabel": "手牌实例"
+}

@@ -29,7 +29,6 @@ describe('death card generation preserves event references', () => {
         const runtime = new RuleRuntime({ rootSeed: 594 })
         const result = withRuleRuntime(runtime, () => scenario === 'combat' ? dealDamage(holder, source, 2, 'true', battle, 'death-card-test') : rule.effect(battle, { type: 'onPieceDied', rulePiece: scenario === 'missing-holder' ? null : holder, sourcePiece: scenario === 'missing-source' ? null : source, playerId: 'player-red' } as any))
         const state = JSON.parse(JSON.stringify(battle))
-        for (const item of [...state.pieces, ...state.graveyard, ...state.players]) if (item.rules) item.rules = item.rules.map((rule: any) => rule.id)
         return { result, state, random: runtime.snapshot() }
       }
       for (const scenario of ['normal', 'graveyard', 'both-gone', 'full-hand', 'missing-holder', 'missing-source', 'combat']) expect(run(true, scenario), scenario).toEqual(run(false, scenario))

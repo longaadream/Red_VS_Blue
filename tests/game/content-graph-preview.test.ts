@@ -4,6 +4,7 @@ import { calculateSkillPreview, type SkillDefinition } from '../../lib/game/skil
 import type { PieceInstance } from '../../lib/game/piece'
 import { applyContentGraph, assertContentGraphDocument } from '../../electron-editor/content-graph-document'
 import { importContentGraph } from '../../electron-editor/content-graph-import'
+import { assertGameplayModuleDocument } from '../../lib/skill-graph/module-document'
 import { makePiece } from '../helpers/minimal-state'
 
 const baseline = JSON.parse(readFileSync('tests/game/fixtures/RED-252-legacy-content.json', 'utf8')) as {
@@ -11,7 +12,7 @@ const baseline = JSON.parse(readFileSync('tests/game/fixtures/RED-252-legacy-con
 }
 const ids = Object.keys(baseline.entries).filter(id => id.startsWith('skills/')).filter(id => {
   const document = JSON.parse(readFileSync(`data/${id}.json`, 'utf8'))
-  return document.contentGraphField === 'previewCode' || document.contentGraphEntries?.previewCode
+  return document.gameplayModules?.entries?.previewCode || document.contentGraphField === 'previewCode' || document.contentGraphEntries?.previewCode
 }).map(id => id.slice('skills/'.length))
 const candidates = Object.entries(baseline.entries).flatMap(([id, legacy]) => {
   if (!id.startsWith('skills/') || typeof legacy.previewCode !== 'string') return []
@@ -36,11 +37,17 @@ describe('supported preview corpus through the real host', () => {
 })
 
 describe('graph-backed production skill previews', () => {
+  it('discovers production previews after migration to typed modules', () => expect(ids.length).toBeGreaterThanOrEqual(80))
   for (const id of ids) it(`${id} preserves exact preview text and numbers`, () => {
     const current = JSON.parse(readFileSync(`data/skills/${id}.json`, 'utf8'))
     const legacy = baseline.entries[`skills/${id}`]
-    assertContentGraphDocument(current)
-    expect((current.contentGraphField === 'previewCode' ? current.contentGraph : current.contentGraphEntries.previewCode.graph).surface).toBe('preview')
+    if (current.gameplayModules?.entries?.previewCode) {
+      assertGameplayModuleDocument(current)
+      expect(current.gameplayModules.entries.previewCode.graph.surface).toBe('preview')
+    } else {
+      assertContentGraphDocument(current)
+      expect((current.contentGraphField === 'previewCode' ? current.contentGraph : current.contentGraphEntries.previewCode.graph).surface).toBe('preview')
+    }
     // Errors must fail, rather than allowing the runtime fallback to make a
     // broken graph appear equal to a static description.
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})

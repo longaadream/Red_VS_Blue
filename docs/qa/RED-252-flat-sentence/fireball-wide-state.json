@@ -1,0 +1,69 @@
+{
+  "editor": true,
+  "inspectorCount": 1,
+  "visibleInspectors": 1,
+  "inspectorScroll": 1,
+  "previewsOutsideInspector": 0,
+  "visibleDescriptions": 0,
+  "visibleOutputs": 0,
+  "visibleRowToolbars": 0,
+  "rowMenus": 3,
+  "menuSummaries": 3,
+  "visibleSteps": [
+    "target",
+    "damage",
+    "return-result"
+  ],
+  "damageText": "对当前目标造成当前棋子.攻击力 × 当前技能.倍率点普通伤害，来源为当前棋子，技能为fireball保存返回值结果 → 实际伤害 → 更多操作编辑模块↑↓复制删除查看技术信息伤害量：当前棋子.攻击力 × 当前技能.倍率通过权威伤害流程造成普通或真实伤害并返回本次结算结果；毒素及其他历史分类不属于新的作者接口。可用结果：结果、是否成功、实际伤害",
+  "nestedBorders": [
+    {
+      "className": "sentence-generic-step sentence-generic-semantic-step sentence-expression-row",
+      "border": "0px none rgb(20, 33, 59)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    },
+    {
+      "className": "sentence-row-expression",
+      "border": "0px none rgb(17, 30, 55)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    },
+    {
+      "className": "sentence-generic-step sentence-generic-semantic-step sentence-expression-row",
+      "border": "0px none rgb(20, 33, 59)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    },
+    {
+      "className": "sentence-row-expression",
+      "border": "0px none rgb(17, 30, 55)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    },
+    {
+      "className": "sentence-generic-step sentence-generic-semantic-step sentence-expression-row",
+      "border": "0px none rgb(20, 33, 59)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    },
+    {
+      "className": "sentence-row-expression",
+      "border": "0px none rgb(17, 30, 55)",
+      "top": "0px",
+      "right": "0px",
+      "bottom": "0px",
+      "left": "0px"
+    }
+  ],
+  "sentenceText": "点击蓝色参数即可修改；可以逐项填写，也能随时返回。主流程在5格内选择敌方的棋子目标，提示为选择火球术目标，允许中止本次效果为是保存返回值棋子目标 → 更多操作编辑模块↑↓复制删除查看技术信息按一次声明的范围、阵营和取消约束选择一个棋子；目标失效时由权威目标引擎拒绝本次语句。可用结果：棋子目标对当前目标造成当前棋子.攻击力 × 当前技能.倍率点普通伤害，来源为当前棋子，技能为fireball保存返回值结果 → 实际伤害 → 更多操作编辑模块↑↓复制删除查看技术信息伤害量：当前棋子.攻击力 × 当前技能.倍率通过权威伤害流程造成普通或真实伤害并返回本次结算结果；毒素及其他历史分类不属于新的作者接口。可用结果：结果、是否成功、实际伤害返回构造行动结果 · 结果。更多操作编辑结构↑↓复制删除"
+}

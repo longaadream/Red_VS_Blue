@@ -189,13 +189,35 @@ describe('skill Cluster authoring view', () => {
     const input = { skills: { probe: skill }, rules: { 'related-rule': { id: 'related-rule' } }, pieces: {} }
     const result = buildSkillCluster(input, { collection: 'skills', id: 'probe' })
     expect(result.members.statuses.map(status => status.id)).toEqual(['guard'])
+    // The author projection keeps explicitly declared related rules visible
+    // as reference-only members; this does not install a runtime rule.
     expect(result.members.rules.map(rule => rule.id)).toEqual(['related-rule'])
-    expect(result.members.rules[0].evidence).toBe('semantic')
     expect(result.diagnostics.filter(item => item.code === 'missing-reference')).toEqual([])
     skill.code += '\n'
     const invalid = buildSkillCluster(input, { collection: 'skills', id: 'probe' })
     expect(invalid.members.statuses).toEqual([])
     expect(invalid.members.rules).toEqual([])
+  })
+
+  it('follows semantic records applied from a bounded while body', () => {
+    const graph: GameplayModuleGraph = {
+      version: 'rvb-gameplay-modules/v1', surface: 'skill', outputs: [{ name: 'success', type: 'boolean' }],
+      schemas: [{ id: 'tag', version: '1', fields: [{ name: 'type', type: 'string' }, { name: 'relatedRules', type: { kind: 'list', element: 'string' } }] }],
+      body: [
+        { kind: 'call', id: 'ref', module: 'ref.holder', version: '1' },
+        { kind: 'call', id: 'piece', module: 'query.piece', version: '1', inputs: { pieceId: { kind: 'output', node: 'ref', port: 'piece' } } },
+        { kind: 'record.create', id: 'tag', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'while-guard' }, relatedRules: { kind: 'literal', value: ['while-rule'] } } },
+        { kind: 'while', id: 'apply-once', budget: 1, condition: { body: [{ kind: 'return', id: 'done', value: { kind: 'literal', value: false } }] }, body: [
+          { kind: 'call', id: 'apply', module: 'status.apply-record', version: '1', inputs: { target: { kind: 'output', node: 'piece', port: 'piece' }, record: { kind: 'output', node: 'tag', port: 'value' } }, parameters: { inputPolicy: 'host' } },
+        ] },
+        { kind: 'return', id: 'result', values: { success: { kind: 'literal', value: true } } },
+      ],
+    }
+    const skill = applyGameplayModuleGraph({ id: 'while-probe', kind: 'active' }, graph)
+    const result = buildSkillCluster({ skills: { 'while-probe': skill }, rules: { 'while-rule': { id: 'while-rule' } }, pieces: {} }, { collection: 'skills', id: 'while-probe' })
+    expect(result.members.statuses.map(status => status.id)).toEqual(['while-guard'])
+    expect(result.members.rules.map(rule => rule.id)).toEqual(['while-rule'])
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
   })
 
   it('expands only called nested composites and isolates their local node IDs', () => {
@@ -211,6 +233,56 @@ describe('skill Cluster authoring view', () => {
     const input = { skills: { probe: applyGameplayModuleGraph({ id: 'probe', kind: 'active' }, graph) }, rules: { 'first-rule': { id: 'first-rule' }, 'second-rule': { id: 'second-rule' } }, pieces: {} }
     const result = buildSkillCluster(input, { collection: 'skills', id: 'probe' })
     expect(result.members.rules.map(rule => rule.id)).toEqual(['first-rule', 'second-rule'])
+    expect(result.diagnostics.filter(item => item.code === 'missing-reference')).toEqual([])
+  })
+
+  it('propagates scoped record evidence through composite inputs and returned records', () => {
+    const applyAndReturn: NonNullable<GameplayModuleGraph['composites']>[number] = {
+      id: 'local.apply-tag', version: '1',
+      inputs: [{ name: 'target', type: 'piece' }, { name: 'record', type: 'record' }],
+      outputs: [{ name: 'record', type: 'record' }],
+      body: [
+        // This local ID intentionally collides with the caller's record ID.
+        { kind: 'record.create', id: 'tag', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'local-only' }, relatedRules: { kind: 'literal', value: ['local-only-rule'] } } },
+        { kind: 'call', id: 'apply-input', module: 'status.apply-record', version: '1', inputs: { target: { kind: 'input', name: 'target' }, record: { kind: 'input', name: 'record' } }, parameters: { inputPolicy: 'host' } },
+        { kind: 'return', id: 'done', value: { kind: 'input', name: 'record' } },
+      ],
+    }
+    const unused: NonNullable<GameplayModuleGraph['composites']>[number] = {
+      id: 'local.unused', version: '1',
+      inputs: [{ name: 'target', type: 'piece' }],
+      outputs: [{ name: 'success', type: 'boolean' }],
+      body: [
+        { kind: 'record.create', id: 'unused', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'unused' }, relatedRules: { kind: 'literal', value: ['unused-rule'] } } },
+        { kind: 'call', id: 'apply-unused', module: 'status.apply-record', version: '1', inputs: { target: { kind: 'input', name: 'target' }, record: { kind: 'output', node: 'unused', port: 'value' } }, parameters: { inputPolicy: 'host' } },
+        { kind: 'return', id: 'done', values: { success: { kind: 'literal', value: true } } },
+      ],
+    }
+    const graph: GameplayModuleGraph = {
+      version: 'rvb-gameplay-modules/v1', surface: 'skill', outputs: [{ name: 'success', type: 'boolean' }],
+      schemas: [{ id: 'tag', version: '1', fields: [{ name: 'type', type: 'string' }, { name: 'relatedRules', type: { kind: 'list', element: 'string' } }] }],
+      body: [
+        { kind: 'call', id: 'ref', module: 'ref.holder', version: '1' },
+        { kind: 'call', id: 'piece', module: 'query.piece', version: '1', inputs: { pieceId: { kind: 'output', node: 'ref', port: 'piece' } } },
+        { kind: 'record.create', id: 'tag', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'guard' }, relatedRules: { kind: 'literal', value: ['composite-rule'] } } },
+        { kind: 'record.create', id: 'unused-root', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'unused' }, relatedRules: { kind: 'literal', value: ['unused-root-rule'] } } },
+        { kind: 'call', id: 'apply', module: 'local.apply-tag', version: '1', inputs: { target: { kind: 'output', node: 'piece', port: 'piece' }, record: { kind: 'output', node: 'tag', port: 'value' } } },
+        { kind: 'call', id: 'apply-returned', module: 'status.apply-record', version: '1', inputs: { target: { kind: 'output', node: 'piece', port: 'piece' }, record: { kind: 'output', node: 'apply', port: 'record' } }, parameters: { inputPolicy: 'host' } },
+        { kind: 'return', id: 'done', values: { success: { kind: 'literal', value: true } } },
+      ],
+      composites: [applyAndReturn, unused],
+    }
+    const skill = applyGameplayModuleGraph({ id: 'probe', kind: 'active' }, graph)
+    const result = buildSkillCluster({
+      skills: { probe: skill },
+      rules: { 'composite-rule': { id: 'composite-rule' } },
+      pieces: {},
+    }, { collection: 'skills', id: 'probe' })
+
+    expect(result.members.statuses.map(status => status.id)).toEqual(['guard'])
+    expect(result.members.statuses[0].provenance.some(item => item.path.includes('composites[0].body'))).toBe(true)
+    expect(result.members.statuses[0].provenance.some(item => item.path.includes('.body[5]'))).toBe(true)
+    expect(result.members.rules.map(rule => rule.id)).toEqual(['composite-rule'])
     expect(result.diagnostics.filter(item => item.code === 'missing-reference')).toEqual([])
   })
 
@@ -270,7 +342,8 @@ describe('skill Cluster authoring view', () => {
 
   it('requires compiled runtime equality before reporting semantic completion', () => {
     const graph = { version: 'rvb-gameplay-modules/v1', surface: 'skill', body: [] }
-    const skill: JsonRecord = { id: 'probe', kind: 'active', code: compileGameplayModuleGraph(graph, GAMEPLAY_MODULE_REGISTRY).code, gameplayModules: { version: 'rvb-gameplay-module-document/v1', entries: { code: { compilerVersion: 'rvb-gameplay-module-compiler/v1', graph } } } }
+    const compiled = compileGameplayModuleGraph(graph, GAMEPLAY_MODULE_REGISTRY)
+    const skill: JsonRecord = { id: 'probe', kind: 'active', code: compiled.code, gameplayModules: { version: 'rvb-gameplay-module-document/v1', entries: { code: { compilerVersion: compiled.compilerVersion, graph } } } }
     const inspect = () => buildSkillCluster({ skills: { probe: skill }, pieces: {}, rules: {} }, { collection: 'skills', id: 'probe' }).coverage.semantic.status
     expect(inspect()).toBe('complete')
     skill.code = 'stale source'
@@ -326,7 +399,7 @@ describe('skill Cluster authoring view', () => {
     expect(() => assertSkillClusterMetadata({
       id: 'root',
       cluster: { version: SKILL_CLUSTER_DEFINITION_VERSION, id: 'cards:root', links: [] },
-    })).toThrow('skills:root or pieces:root')
+    })).not.toThrow()
     expect(() => assertSkillClusterMetadata({
       id: 'root',
       cluster: { version: 'future/v2', id: 'skills:root', links: [] },
@@ -342,13 +415,98 @@ describe('skill Cluster authoring view', () => {
       skills: { active: { id: 'active', kind: 'active', relatedRules: ['shared'] } },
       rules: { shared: { id: 'shared' } },
       pieces: { piece: { id: 'piece', rules: ['shared'] } },
+      cards: { card: { id: 'card', kind: 'active', rules: ['shared'] } },
     }
     const catalogView = buildSkillClusterCatalog(input)
-    expect(catalogView.clusters.map(cluster => cluster.clusterId)).toEqual(['skills:active', 'pieces:piece'])
+    expect(catalogView.clusters.map(cluster => cluster.clusterId)).toEqual(['skills:active', 'pieces:piece', 'rules:shared', 'cards:card'])
     expect(catalogView.definitions).toBe(catalogView.clusters)
     expect(catalogView.clusters[0].members.rules).toHaveLength(1)
     expect(catalogView.clusters[1].members.rules).toHaveLength(1)
+    expect(catalogView.clusters[3].members.rules).toHaveLength(1)
     expect(catalogView.clusters[0].execution).toBe('reference-only')
+  })
+
+  it('builds rule and card roots as reference-only passive or active Clusters', () => {
+    const input = {
+      skills: { skill: { id: 'skill', kind: 'active' } },
+      rules: { rootRule: { id: 'rootRule', skills: ['skill'], extension: { source: 'rule', nested: { unknown: true } } } },
+      pieces: {},
+      cards: { rootCard: { id: 'rootCard', kind: 'passive', rules: ['rootRule'], extension: { source: 'card' } } },
+    }
+    const ruleCluster = buildSkillCluster(input, { collection: 'rules', id: 'rootRule' })
+    expect(ruleCluster.kind).toBe('passive')
+    expect(ruleCluster.members.rules.map(member => member.id)).toEqual(['rootRule'])
+    expect(ruleCluster.members.skills.map(member => member.id)).toEqual(['skill'])
+    expect(ruleCluster.members.extensions).toHaveLength(1)
+    expect(ruleCluster.execution).toBe('reference-only')
+
+    const cardCluster = buildSkillCluster(input, { collection: 'cards', id: 'rootCard' })
+    expect(cardCluster.kind).toBe('passive')
+    expect(cardCluster.members.cards.map(member => member.id)).toEqual(['rootCard'])
+    expect(cardCluster.members.rules.map(member => member.id)).toEqual(['rootRule'])
+    expect(cardCluster.members.extensions[0].source?.path).toBe('cards.rootCard.extension')
+    expect(cardCluster.members.all.every(member => member.execution === 'reference-only')).toBe(true)
+  })
+
+  it('projects Rules related by an applied semantic StatusTag from a Card root', () => {
+    const graph: GameplayModuleGraph = {
+      version: 'rvb-gameplay-modules/v1', surface: 'card', outputs: [{ name: 'success', type: 'boolean' }],
+      schemas: [{ id: 'tag', version: '1', fields: [{ name: 'type', type: 'string' }, { name: 'relatedRules', type: { kind: 'list', element: 'string' } }] }],
+      body: [
+        { kind: 'call', id: 'ref', module: 'ref.holder', version: '1' },
+        { kind: 'call', id: 'piece', module: 'query.piece', version: '1', inputs: { pieceId: { kind: 'output', node: 'ref', port: 'piece' } } },
+        { kind: 'record.create', id: 'tag', schema: 'tag@1', fields: { type: { kind: 'literal', value: 'card-guard' }, relatedRules: { kind: 'literal', value: ['card-rule'] } } },
+        { kind: 'call', id: 'apply', module: 'status.apply-record', version: '1', inputs: { target: { kind: 'output', node: 'piece', port: 'piece' }, record: { kind: 'output', node: 'tag', port: 'value' } }, parameters: { inputPolicy: 'host' } },
+        { kind: 'return', id: 'done', values: { success: { kind: 'literal', value: true } } },
+      ],
+    }
+    const card = applyGameplayModuleGraph({ id: 'card', kind: 'active' }, graph)
+    const result = buildSkillCluster({ skills: {}, rules: { 'card-rule': { id: 'card-rule' } }, pieces: {}, cards: { card } }, { collection: 'cards', id: 'card' })
+    expect(result.members.statuses.map(status => status.id)).toEqual(['card-guard'])
+    expect(result.members.rules.map(rule => rule.id)).toEqual(['card-rule'])
+    expect(result.members.rules[0].execution).toBe('reference-only')
+  })
+
+  it('keeps owner-scoped extension snapshots safe and preserves nested unknown fields', () => {
+    const root = JSON.parse('{"id":"root","kind":"active","skills":["child"],"extension":{"nested":{"futureField":[1,{"kept":true}]},"__proto__":{"polluted":true}}}') as JsonRecord
+    const child = { id: 'child', kind: 'passive', extension: { nested: { childOnly: true } } }
+    const input = { skills: { root, child }, rules: {}, pieces: {} }
+    const before = JSON.stringify(input)
+    const result = buildSkillCluster(input, { collection: 'skills', id: 'root' })
+    expect(result.members.extensions).toHaveLength(2)
+    const rootExtension = result.members.extensions.find(member => member.source?.path === 'skills.root.extension')
+    expect(rootExtension?.definition).toMatchObject({ nested: { futureField: [1, { kept: true }] } })
+    expect(Object.prototype.hasOwnProperty.call(rootExtension?.definition ?? {}, '__proto__')).toBe(true)
+    expect(Object.getPrototypeOf(rootExtension?.definition)).toBe(Object.prototype)
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+    expect(JSON.stringify(input)).toBe(before)
+  })
+
+  it('retains the strongest explicit membership relation after dependency traversal', () => {
+    const result = buildSkillCluster({
+      skills: {
+        root: {
+          id: 'root', kind: 'active', rules: ['shared-rule'],
+          cluster: { links: [{ collection: 'rules', id: 'shared-rule', relation: 'owned', source: 'review' }] },
+        },
+      },
+      rules: { 'shared-rule': { id: 'shared-rule' } },
+      pieces: {},
+    }, { collection: 'skills', id: 'root' })
+    expect(result.members.rules[0]).toMatchObject({ id: 'shared-rule', relation: 'owned' })
+    expect(result.members.rules[0].execution).toBe('reference-only')
+  })
+
+  it('can limit catalog menu roots without changing universal single-root support', () => {
+    const input = {
+      skills: { skill: { id: 'skill', kind: 'active' } },
+      rules: { rule: { id: 'rule' } },
+      pieces: {},
+      cards: { card: { id: 'card' } },
+    }
+    const rulesOnly = buildSkillClusterCatalog(input, { rootCollections: ['rules'] })
+    expect(rulesOnly.clusters.map(cluster => cluster.clusterId)).toEqual(['rules:rule'])
+    expect(buildSkillCluster(input, { collection: 'cards', id: 'card' }).members.cards).toHaveLength(1)
   })
 
   it('traverses piece-root Cluster links and retains explicit relation provenance', () => {

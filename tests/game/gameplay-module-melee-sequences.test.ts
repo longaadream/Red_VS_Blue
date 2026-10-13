@@ -21,7 +21,6 @@ function run(id: string, semantic: boolean, scenario: string) {
   const runtime = new RuleRuntime({ rootSeed: 594 })
   const result = withRuleRuntime(runtime, () => executeSkillFunction(definition, { piece: source, skill: definition, battle, target: scenario === 'pending' ? null : target, targetPosition: null, targets: scenario === 'pending' ? [] : [{ info: target, pos: null }] } as any, battle))
   const state = JSON.parse(JSON.stringify(battle)); delete state.skillsById
-  for (const piece of [...state.pieces, ...state.graveyard]) piece.rules = piece.rules.map((rule: any) => rule.id)
   return { result, state, random: runtime.snapshot() }
 }
 describe('composable sequential melee effects', () => {

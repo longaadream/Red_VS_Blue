@@ -18,6 +18,27 @@ function shown(state: ReturnType<typeof fixture>, viewer?:string) { return toPub
 const bind = {id:'mask',audience:'public' as const,targetId:'copy',sourceId:'source',fields:['health','statuses','name'] as const,mode:'live' as const,onSourceMissing:'snapshot' as const}
 
 describe('skill presentation authority and projection',()=>{
+  it('projects only visible presentation fields from authored status snapshots',()=>{
+    const state=fixture()
+    api(state).setDisplay('copy',{statusTags:[
+      {id:'hidden',type:'secret',visible:false,stacks:9},
+      {id:'visible',type:'shield',visible:true,stacks:2,extension:{privateBinding:'source'}},
+    ]})
+    expect(shown(state,'enemy').bindings[0].display.statusTags).toEqual([{type:'shield',stacks:2}])
+    expect(JSON.stringify(shown(state,'enemy'))).not.toContain('privateBinding')
+  })
+  it('keeps display overrides for different targets independent within one skill',()=>{
+    const state=fixture(), presentation=api(state)
+    presentation.setDisplay('copy',{name:'分身'})
+    presentation.setDisplay('source',{name:'本体显示'})
+    const bindings=shown(state,'enemy').bindings
+    expect(bindings).toHaveLength(2)
+    expect(bindings.find((item: any)=>item.targetId==='copy').display.name).toBe('分身')
+    expect(bindings.find((item: any)=>item.targetId==='source').display.name).toBe('本体显示')
+    presentation.setDisplay('copy',{name:'再次修改'})
+    expect(shown(state,'enemy').bindings).toHaveLength(2)
+    expect(shown(state,'enemy').bindings.find((item: any)=>item.targetId==='copy').display.name).toBe('再次修改')
+  })
   it('keeps private declarations out of real terminal replay checkpoints and preserves checkpoint hashes',async()=>{
     const duel=await createDebugDuel({seed:202,beginPhase:false}), state=duel.state
     const target=state.pieces.find(p=>p.currentHp>0 && p.x!==null)!

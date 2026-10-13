@@ -5,6 +5,7 @@ export const GAMEPLAY_MODULE_REGISTRY: Readonly<Record<string, unknown>>
 export function compileGameplayModuleGraph(graph: unknown, registry?: unknown): { code: string; surface: string; dependencies: unknown[] }
 export function applyGameplayModuleGraph(content: Record<string, unknown>, graph: unknown, field?: string): Record<string, unknown>
 export function applyGameplayModuleTextBindings(content: Record<string, unknown>, bindings: unknown): Record<string, unknown>
+export function getGameplayModuleTextSources(entries: Record<string, unknown>): Array<{source: Record<string, string>; label: string; value: string | number | boolean}>
 export function assertGameplayModuleDocument(content: unknown): void
 export function assertGameplayModuleTransition(previous: unknown, next: unknown): void
 export function getGameplayModuleGraph(content: unknown, field: string): unknown

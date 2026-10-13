@@ -1,0 +1,1291 @@
+{
+  "currentSkill": true,
+  "currentSkillText": "当前技能实例取得当前正在执行的实际技能实例；不存在有效实例时由运行时使语句失效。",
+  "categories": [
+    {
+      "id": "all",
+      "disabled": false,
+      "pressed": "true"
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": "false"
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "board",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "control",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "selection",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "calculation",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "combat",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "card-ability",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "status-rule",
+      "disabled": false,
+      "pressed": null
+    },
+    {
+      "id": "data",
+      "disabled": false,
+      "pressed": null
+    }
+  ]
+}

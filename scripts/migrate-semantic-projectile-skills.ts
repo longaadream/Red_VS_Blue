@@ -27,11 +27,23 @@ export const PROJECTILE_SKILL_IDS = [
   'blackwidow-lethal-strike',
   'grimmjow-panther-claw',
   'ichigo-getsuga-tensho',
+  'ulquiorra-cero',
   'shadow-bolt',
   'shadow-chaos-spear',
   'sasuke-chidori',
   'naruto-rasengan',
   'aizen-black-coffin',
+  'akaza-annihilation',
+  'akaza-disorder',
+  'blizzard',
+  'blizzard-damage',
+  'mortis-bat-support',
+  'biotic-grenade',
+  'earthshatter',
+  'muzan-blood-whip',
+  'sasuke-indra-arrow',
+  'hashirama-edo-wood-spike',
+  'hashirama-edo-wood-dragon',
 ] as const
 
 const literal = (value: GameplayJsonValue): GameplayValue => ({ kind: 'literal', value })
@@ -39,6 +51,7 @@ const out = (node: string, port: string): GameplayValue => ({ kind: 'output', no
 const input = (name: string): GameplayValue => ({ kind: 'input', name })
 const call = (id: string, module: string, inputs: Record<string, GameplayValue> = {}, parameters: Record<string, GameplayJsonValue> = {}): GameplayStatement => ({ kind: 'call', id, module, version: '1', inputs, parameters })
 const result = (id: string, success: GameplayValue, message: GameplayValue): GameplayStatement[] => [call(id, 'result.action', { success, message }), { kind: 'return', id: id + '-return', value: out(id, 'result') }]
+const resultWithUi = (id: string, success: GameplayValue, message: GameplayValue): GameplayStatement[] => [call(id, 'result.action-ui', { success, message }), { kind: 'return', id: id + '-return', value: out(id, 'result') }]
 const triggerResult = (id: string, success: GameplayValue, message: GameplayValue): GameplayStatement => ({ kind: 'return', id, values: { success, message } })
 
 const schema: GameplayRecordSchema = {
@@ -53,9 +66,9 @@ const schema: GameplayRecordSchema = {
   ],
 }
 
-function cellSelection(body: GameplayStatement[], range: number, filter: 'all' | 'enemy' | 'ally' = 'all'): void {
+function cellSelection(body: GameplayStatement[], range: number | GameplayValue, filter: 'all' | 'enemy' | 'ally' = 'all'): void {
   body.push(
-    call('choice', 'choice.target-cell', {}, { range, filter }),
+    typeof range === 'number' ? call('choice', 'choice.target-cell', {}, { range, filter }) : call('choice', 'choice.target-cell-by-range', { range }, { filter }),
     call('unresolved', 'choice.is-unresolved', { choice: out('choice', 'choice') }),
     {
       kind: 'if', id: 'return-selection', condition: out('unresolved', 'value'), then: [
@@ -927,6 +940,585 @@ function buildAizenBlackCoffinGraph(): GameplayModuleGraph {
   ])
 }
 
+function buildUlquiorraCeroGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  pieceSelection(body, 4, 'enemy')
+  body.push(
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('scaled', 'math.multiply', { left: out('attack', 'value'), right: out('multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('scaled', 'value') }),
+    call('damage', 'effect.damage', { source: out('source', 'piece'), target: out('target', 'piece'), amount: out('damage-value', 'value') }, { damageType: 'normal', legacyNormalSpelling: 'magical', skillId: 'ulquiorra-cero', inputPolicy: 'host' }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('damage-text', 'text.from-number', { value: out('damage', 'damage') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [out('source-name', 'text'), literal('释放虚闪，造成'), out('damage-text', 'text'), literal('点魔法伤害')])))
+  return skillGraph(body)
+}
+
+function buildAkazaDisorderGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  pieceSelection(body, 1, 'enemy')
+  body.push(
+    call('turn', 'turn.number'),
+    call('followup', 'status.has-source-turn', { source: out('source', 'piece'), target: out('target', 'piece'), turn: out('turn', 'value') }, { statusType: 'akaza-damaged' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('followup-multiplier', 'value.select-number', { condition: out('followup', 'value'), whenTrue: literal(1.5), whenFalse: out('multiplier', 'value') }),
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('scaled', 'math.multiply', { left: out('attack', 'value'), right: out('followup-multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('scaled', 'value') }),
+    call('damage', 'effect.damage', { source: out('source', 'piece'), target: out('target', 'piece'), amount: out('damage-value', 'value') }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'akaza-disorder', inputPolicy: 'host' }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('target-name', 'attribute.text', { piece: out('target', 'piece') }, { attribute: 'name' }),
+    call('damage-text', 'text.from-number', { value: out('damage', 'damage') }),
+    call('followup-text', 'value.select-text', { condition: out('followup', 'value'), whenTrue: literal('（追击）'), whenFalse: literal('') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [out('source-name', 'text'), literal('使用破坏杀·乱式对'), out('target-name', 'text'), literal('造成'), out('damage-text', 'text'), literal('点物理伤害'), out('followup-text', 'text')])))
+  return skillGraph(body)
+}
+
+function buildAkazaAnnihilationGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  cellSelection(body, 4, 'all')
+  body.push(
+    call('line', 'projectile.line-cells', { source: out('source', 'piece'), target: out('target', 'cell') }, { maxDistance: 4, clipToBoard: false }),
+    { kind: 'if', id: 'invalid-direction', condition: out('line', 'valid'), then: [], else: result('invalid-direction-result', literal(false), literal('请选择一个正方向')) },
+    call('captured-source', 'source.capture', { source: out('source', 'piece') }),
+    call('source-owner', 'source.captured-owner', { source: out('captured-source', 'source') }),
+    call('attack', 'source.captured-number', { source: out('captured-source', 'source') }, { field: 'attack' }),
+    call('hits', 'local.counter-create', { initial: literal(0) }),
+    call('total', 'local.counter-create', { initial: literal(0) }),
+  )
+  const multipliers = [1.25, 1, 0.5, 0.5]
+  multipliers.forEach((value, index) => {
+    const distance = index + 1
+    body.push(
+      call(`multiplier-${distance}`, 'projectile.distance-multiplier', { distance: literal(distance) }, { values: multipliers }),
+      call(`scaled-${distance}`, 'math.multiply', { left: out('attack', 'value'), right: out(`multiplier-${distance}`, 'value') }),
+      call(`amount-${distance}`, 'math.floor', { value: out(`scaled-${distance}`, 'value') }),
+      call(`enemies-${distance}`, 'query.enemies-on-index', { owner: out('source-owner', 'player'), cells: out('line', 'cells'), index: literal(index) }),
+      {
+        kind: 'foreach', id: `targets-${distance}`, items: out(`enemies-${distance}`, 'pieces'), item: 'target', body: [
+          call(`saved-target-${distance}`, 'source.capture', { source: input('target') }),
+          call(`damage-${distance}`, 'effect.damage-captured', { source: out('captured-source', 'source'), target: out(`saved-target-${distance}`, 'source'), amount: out(`amount-${distance}`, 'value') }, { damageType: 'physical', skillId: 'akaza-annihilation' }),
+          call(`dealt-${distance}`, 'effect.result-number', { result: out(`damage-${distance}`, 'result') }, { field: 'damage' }),
+          call(`count-hit-${distance}`, 'local.counter-add', { counter: out('hits', 'counter'), amount: literal(1) }),
+          call(`sum-damage-${distance}`, 'local.counter-add', { counter: out('total', 'counter'), amount: out(`dealt-${distance}`, 'value') }),
+        ],
+      },
+    )
+  })
+  body.push(
+    call('source-name', 'piece.captured-name', { source: out('captured-source', 'source') }),
+    call('hit-count', 'local.counter-read', { counter: out('hits', 'counter') }),
+    call('damage-total', 'local.counter-read', { counter: out('total', 'counter') }),
+    call('hit-text', 'text.from-number', { value: out('hit-count', 'value') }),
+    call('damage-text', 'text.from-number', { value: out('damage-total', 'value') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [out('source-name', 'value'), literal('使用破坏杀·灭式，命中'), out('hit-text', 'text'), literal('名敌军，造成'), out('damage-text', 'text'), literal('点物理伤害')])))
+  return skillGraph(body)
+}
+
+function buildBlizzardGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+    call('owner-ref', 'ref.player'),
+    call('owner', 'query.player', { playerId: out('owner-ref', 'player') }),
+  ]
+  body.push(
+    call('source-cell', 'spatial.piece-position', { piece: out('source', 'piece') }),
+    call('board-cells', 'spatial.map-cells'),
+    { kind: 'collection.reduce', id: 'board-range', items: out('board-cells', 'cells'), inputs: { origin: out('source-cell', 'cell') }, initial: literal(0), body: [
+      call('distance', 'spatial.cell-distance', { from: input('origin'), to: input('item') }),
+      call('maximum', 'math.max', { left: input('accumulator'), right: out('distance', 'distance') }),
+      { kind: 'return', id: 'range-result', value: out('maximum', 'value') },
+    ] },
+  )
+  cellSelection(body, out('board-range', 'value'), 'all')
+  body.push(
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('damage-value', 'math.multiply', { left: out('attack', 'value'), right: out('multiplier', 'value') }),
+    call('clock', 'identity.host-time'),
+    call('clock-text', 'text.from-number', { value: out('clock', 'value') }),
+    call('status-id', 'text.concat', { left: literal('blizzard-'), right: out('clock-text', 'text') }),
+    call('target-coordinates', 'spatial.cell-coordinates', { cell: out('target', 'cell') }),
+    {
+      kind: 'record.create', id: 'blizzard-record', schema: 'blizzard@1', fields: {
+        id: out('status-id', 'text'), type: literal('blizzard'), centerX: out('target-coordinates', 'x'), centerY: out('target-coordinates', 'y'), damage: out('damage-value', 'value'), ownerPlayerId: out('owner', 'player'),
+      },
+    },
+    call('apply-status', 'status.apply-player-record', { player: out('owner', 'player'), record: out('blizzard-record', 'value') }),
+    call('apply-rule', 'rule.apply-player', { target: out('owner', 'player') }, { ruleId: 'rule-blizzard-active' }),
+    call('add-skill', 'skill.add-player', { player: out('owner', 'player') }, { skillId: 'blizzard-damage' }),
+  )
+  const indexes = Array.from({ length: 49 }, (_, index) => index)
+  body.push({
+    kind: 'collection', id: 'blizzard-cells', method: 'map', items: literal(indexes), item: 'marker', index: 'marker-index', inputs: {
+      targetX: out('target-coordinates', 'x'), targetY: out('target-coordinates', 'y'),
+    }, body: [
+      call('x-div', 'math.divide', { left: input('marker-index'), right: literal(7) }),
+      call('x-index', 'math.floor', { value: out('x-div', 'value') }),
+      call('x-offset', 'math.subtract', { left: out('x-index', 'value'), right: literal(3) }),
+      call('y-index', 'math.modulo', { left: input('marker-index'), right: literal(7) }),
+      call('y-offset', 'math.subtract', { left: out('y-index', 'value'), right: literal(3) }),
+      call('x', 'math.add', { left: input('targetX'), right: out('x-offset', 'value') }),
+      call('y', 'math.add', { left: input('targetY'), right: out('y-offset', 'value') }),
+      call('cell', 'spatial.cell', { x: out('x', 'value'), y: out('y', 'value') }),
+      { kind: 'return', id: 'cell-result', value: out('cell', 'cell') },
+    ],
+  })
+  body.push(
+    call('add-tiles', 'tile.add-markers', { cells: out('blizzard-cells', 'value'), origin: out('target', 'cell'), sourceId: out('status-id', 'text'), ownerPlayerId: out('owner', 'player') }, {
+      effectType: 'blizzard', icon: '❄️', bgColor: 'rgba(96, 165, 250, 0.12)', boxShadow: 'inset 0 0 0 2px rgba(147, 197, 253, 0.65)', iconPosition: 'top-right',
+    }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('target-x-text', 'text.from-number', { value: out('target-coordinates', 'x') }),
+    call('target-y-text', 'text.from-number', { value: out('target-coordinates', 'y') }),
+    call('damage-text', 'text.from-number', { value: out('damage-value', 'value') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [out('source-name', 'text'), literal('使用了暴风雪，在('), out('target-x-text', 'text'), literal(','), out('target-y-text', 'text'), literal(')创造了暴风雪区域，将在对方回合结束时对7x7范围内的敌人造成'), out('damage-text', 'text'), literal('点伤害并使其冰冻')])))
+  return skillGraph(body, [{ id: 'blizzard@1', version: '1', fields: [
+    { name: 'id', type: 'string' }, { name: 'type', type: 'string' }, { name: 'centerX', type: 'number' }, { name: 'centerY', type: 'number' }, { name: 'damage', type: 'number' }, { name: 'ownerPlayerId', type: 'player' },
+  ] }])
+}
+
+function buildBlizzardDamageGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('owner-ref', 'ref.context-player'),
+    call('owner-exists', 'query.has-player', { playerId: out('owner-ref', 'player') }),
+    call('owner-not', 'logic.not', { value: out('owner-exists', 'exists') }),
+    { kind: 'if', id: 'owner-missing', condition: out('owner-not', 'value'), then: result('owner-missing-result', literal(false), literal('找不到暴风雪施法者')) },
+    call('owner', 'query.player', { playerId: out('owner-ref', 'player') }),
+    call('current-ref', 'turn.current-player'),
+    call('current', 'query.player', { playerId: out('current-ref', 'player') }),
+    call('allied', 'compare.allied-players', { left: out('current', 'player'), right: out('owner', 'player') }),
+    { kind: 'if', id: 'same-turn', condition: out('allied', 'value'), then: result('same-turn-result', literal(false), literal('暴风雪只在对方回合结束时触发')) },
+    call('has-status', 'status.has-player', { player: out('owner', 'player') }, { statusType: 'blizzard' }),
+    call('status-not', 'logic.not', { value: out('has-status', 'value') }),
+    { kind: 'if', id: 'status-missing', condition: out('status-not', 'value'), then: result('status-missing-result', literal(false), literal('没有暴风雪状态')) },
+    call('status-id', 'status.find-player-id', { player: out('owner', 'player') }, { statusType: 'blizzard' }),
+    call('center-x', 'status.read-player-number', { player: out('owner', 'player'), statusId: out('status-id', 'id'), fallback: literal(0) }, { field: 'centerX' }),
+    call('center-y', 'status.read-player-number', { player: out('owner', 'player'), statusId: out('status-id', 'id'), fallback: literal(0) }, { field: 'centerY' }),
+    call('damage-value', 'status.read-player-number', { player: out('owner', 'player'), statusId: out('status-id', 'id'), fallback: literal(0) }, { field: 'damage' }),
+    call('remove-status', 'status.remove-player-id', { player: out('owner', 'player'), statusId: out('status-id', 'id') }),
+    call('remove-rule', 'rule.remove-player', { target: out('owner', 'player') }, { ruleId: 'rule-blizzard-active' }),
+    call('remove-skill', 'skill.remove-player', { player: out('owner', 'player') }, { skillId: 'blizzard-damage' }),
+    call('remove-tiles', 'tile.remove-source-records', { sourceId: out('status-id', 'id') }),
+    call('center', 'spatial.cell', { x: out('center-x', 'value'), y: out('center-y', 'value') }),
+    call('enemies', 'query.pieces-around-cell', { center: out('center', 'cell'), owner: out('owner', 'player') }, { relation: 'enemy', metric: 'chebyshev', maximum: 3 }),
+    call('enemy-captures', 'source.capture-list', { pieces: out('enemies', 'pieces') }),
+    call('hits', 'local.counter-create', { initial: literal(0) }),
+    call('total', 'local.counter-create', { initial: literal(0) }),
+    {
+      kind: 'foreach', id: 'damage-enemies', items: out('enemy-captures', 'sources'), item: 'enemy', body: [
+        call('enemy-id', 'source.captured-identifier', { source: input('enemy') }),
+        call('enemy-present', 'query.has-piece-id', { id: out('enemy-id', 'value') }),
+        { kind: 'if', id: 'damage-present-enemy', condition: out('enemy-present', 'exists'), then: [
+          call('enemy-piece', 'source.captured-piece-reference', { source: input('enemy') }),
+          call('damage', 'effect.damage', { source: out('owner', 'player'), target: out('enemy-piece', 'piece'), amount: out('damage-value', 'value') }, { sourceType: 'player', damageType: 'normal', legacyNormalSpelling: 'magical', skillId: 'blizzard', inputPolicy: 'host' }),
+          {
+            kind: 'if', id: 'damage-success', condition: out('damage', 'success'), then: [
+              call('dealt', 'effect.result-number', { result: out('damage', 'result') }, { field: 'damage' }),
+              call('count-hit', 'local.counter-add', { counter: out('hits', 'counter'), amount: literal(1) }),
+              call('sum-damage', 'local.counter-add', { counter: out('total', 'counter'), amount: out('dealt', 'value') }),
+            ],
+          },
+          call('enemy-after-damage', 'query.has-piece-id', { id: out('enemy-id', 'value') }),
+          { kind: 'if', id: 'freeze-living-enemy', condition: out('enemy-after-damage', 'exists'), then: [
+            call('living-enemy', 'source.captured-piece-reference', { source: input('enemy') }),
+            call('clock', 'identity.host-time'),
+            call('clock-text', 'text.from-number', { value: out('clock', 'value') }),
+            call('freeze-prefix', 'text.concat', { left: literal('freeze-'), right: out('clock-text', 'text') }),
+            call('freeze-separator', 'text.concat', { left: out('freeze-prefix', 'text'), right: literal('-') }),
+            call('freeze-id', 'text.concat', { left: out('freeze-separator', 'text'), right: out('enemy-id', 'value') }),
+            { kind: 'record.create', id: 'freeze-record', schema: 'freeze@1', fields: { id: out('freeze-id', 'text'), type: literal('freeze'), currentDuration: literal(1), intensity: literal(1) } },
+            call('apply-freeze', 'status.apply-record', { target: out('living-enemy', 'piece'), record: out('freeze-record', 'value') }, { inputPolicy: 'host' }),
+            call('move-rule', 'rule.apply-piece', { target: out('living-enemy', 'piece') }, { ruleId: 'rule-freeze-prevent-move' }),
+            call('skill-rule', 'rule.apply-piece', { target: out('living-enemy', 'piece') }, { ruleId: 'rule-freeze-prevent-skill' }),
+            call('freeze-skill', 'skill.add', { piece: out('living-enemy', 'piece') }, { skillId: 'freeze-prevent' }),
+          ] },
+          call('show-freeze', 'piece.set-stored-flag', { id: out('enemy-id', 'value'), value: literal(true) }, { field: 'showFreezeEffect' }),
+        ] },
+      ],
+    },
+    call('hit-count', 'local.counter-read', { counter: out('hits', 'counter') }),
+    call('total-damage', 'local.counter-read', { counter: out('total', 'counter') }),
+    call('hit-text', 'text.from-number', { value: out('hit-count', 'value') }),
+    call('damage-text', 'text.from-number', { value: out('total-damage', 'value') }),
+    call('owner-name', 'player.display-name', { player: out('owner', 'player') }),
+    call('center-x-text', 'text.from-number', { value: out('center-x', 'value') }),
+    call('center-y-text', 'text.from-number', { value: out('center-y', 'value') }),
+    call('has-hits', 'compare.greater-than', { left: out('hit-count', 'value'), right: literal(0) }),
+  ]
+  const hitBody: GameplayStatement[] = []
+  const hitMessage = messageChain(hitBody, 'hit-message', [out('owner-name', 'text'), literal('的暴风雪效果（中心坐标：('), out('center-x-text', 'text'), literal(','), out('center-y-text', 'text'), literal(')）命中'), out('hit-text', 'text'), literal('名敌人，造成'), out('damage-text', 'text'), literal('点伤害并使其冰冻')])
+  hitBody.push(...resultWithUi('hit-success', literal(true), hitMessage))
+  const noHitBody: GameplayStatement[] = []
+  const noHitMessage = messageChain(noHitBody, 'no-hit-message', [out('owner-name', 'text'), literal('的暴风雪效果（中心坐标：('), out('center-x-text', 'text'), literal(','), out('center-y-text', 'text'), literal(')）没有对任何敌人造成伤害')])
+  noHitBody.push(...resultWithUi('no-hit-success', literal(true), noHitMessage))
+  body.push({ kind: 'if', id: 'hit-branch', condition: out('has-hits', 'value'), then: hitBody, else: noHitBody })
+  return skillGraph(body, [{ id: 'freeze@1', version: '1', fields: [
+    { name: 'id', type: 'string' }, { name: 'type', type: 'string' }, { name: 'currentDuration', type: 'number' }, { name: 'intensity', type: 'number' },
+  ] }])
+}
+
+function buildMortisBatSupportGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+    call('counter-id', 'status.find-id', { piece: out('source', 'piece') }, { statusType: 'mortis-damage-counter' }),
+    call('ready-charges', 'status.read-record-number', { piece: out('source', 'piece'), statusId: out('counter-id', 'id'), fallback: literal(0) }, { field: 'readyCharges' }),
+    call('intensity', 'status.read-record-number', { piece: out('source', 'piece'), statusId: out('counter-id', 'id'), fallback: literal(0) }, { field: 'intensity' }),
+    call('charges-present', 'compare.not-equal', { left: out('ready-charges', 'value'), right: literal(0) }),
+    call('charges', 'value.select-number', { condition: out('charges-present', 'value'), whenTrue: out('ready-charges', 'value'), whenFalse: out('intensity', 'value') }),
+    call('unlocked', 'compare.greater-than', { left: out('charges', 'value'), right: literal(0) }),
+    call('locked-not', 'logic.not', { value: out('unlocked', 'value') }),
+    { kind: 'if', id: 'locked', condition: out('locked-not', 'value'), then: result('locked-result', literal(false), literal('尚未解锁蝙蝠增援')) },
+  ]
+  cellSelection(body, 7, 'all')
+  body.push(
+    call('line', 'projectile.line-cells', { source: out('source', 'piece'), target: out('target', 'cell') }, { maxDistance: 7, clipToBoard: false }),
+    { kind: 'if', id: 'invalid-direction', condition: out('line', 'valid'), then: [], else: result('invalid-direction-result', literal(false), literal('请选择正方向')) },
+    call('enemies', 'query.enemies-on-cells', { source: out('source', 'piece'), cells: out('line', 'cells') }),
+    call('ready-next', 'math.subtract', { left: out('charges', 'value'), right: literal(1) }),
+    call('ready-clamped', 'math.max', { left: literal(0), right: out('ready-next', 'value') }),
+    call('save-ready', 'status.set-record-number', { piece: out('source', 'piece'), statusId: out('counter-id', 'id'), value: out('ready-clamped', 'value') }, { field: 'readyCharges' }),
+    call('save-intensity', 'status.set-record-number', { piece: out('source', 'piece'), statusId: out('counter-id', 'id'), value: out('ready-clamped', 'value') }, { field: 'intensity' }),
+    call('spent', 'compare.less-or-equal', { left: out('ready-clamped', 'value'), right: literal(0) }),
+    { kind: 'if', id: 'remove-spent-skill', condition: out('spent', 'value'), then: [call('remove-skill', 'skill.remove', { piece: out('source', 'piece') }, { skillId: 'mortis-bat-support' })] },
+    call('enemy-count', 'collection.piece-count', { pieces: out('enemies', 'pieces') }),
+    call('has-enemies', 'compare.greater-than', { left: out('enemy-count', 'value'), right: literal(0) }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('no-enemies-not', 'logic.not', { value: out('has-enemies', 'value') }),
+    call('damage', 'effect.damage-many', { source: out('source', 'piece'), targets: out('enemies', 'pieces'), amount: literal(4) }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'mortis-bat-support' }),
+    call('total-damage', 'effect.result-number', { result: out('damage', 'result') }, { field: 'totalDamage' }),
+    call('positive', 'compare.greater-than', { left: out('total-damage', 'value'), right: literal(0) }),
+    { kind: 'if', id: 'heal-source', condition: out('positive', 'value'), then: [call('heal', 'effect.heal', { source: out('source', 'piece'), target: out('source', 'piece'), amount: out('total-damage', 'value') }, { skillId: 'mortis-bat-support' })] },
+    call('enemy-count-text', 'text.from-number', { value: out('enemy-count', 'value') }),
+    call('damage-text', 'text.from-number', { value: out('total-damage', 'value') }),
+  )
+  const noEnemiesBody: GameplayStatement[] = []
+  const noEnemiesMessage = messageChain(noEnemiesBody, 'no-enemies-message', [out('source-name', 'text'), literal('释放蝙蝠增援，但7格内没有敌人')])
+  noEnemiesBody.push(...result('no-enemies-result', literal(true), noEnemiesMessage))
+  body.splice(27, 0, { kind: 'if', id: 'no-enemies', condition: out('no-enemies-not', 'value'), then: noEnemiesBody })
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [out('source-name', 'text'), literal('释放蝙蝠增援，对'), out('enemy-count-text', 'text'), literal('名敌人造成'), out('damage-text', 'text'), literal('点伤害并回复等量生命')])))
+  return skillGraph(body)
+}
+
+function buildBioticGrenadeGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+    call('owner', 'piece.owner', { piece: out('source', 'piece') }),
+  ]
+  cellSelection(body, 4, 'all')
+  body.push(
+    call('allies', 'query.pieces-in-rectangle', { origin: out('target', 'cell'), owner: out('owner', 'player') }, { relation: 'ally', width: 2, height: 2 }),
+    call('enemies', 'query.pieces-in-rectangle', { origin: out('target', 'cell'), owner: out('owner', 'player') }, { relation: 'enemy', width: 2, height: 2 }),
+    call('heal', 'effect.heal-many', { source: out('source', 'piece'), targets: out('allies', 'pieces'), amount: literal(4) }, { skillId: 'biotic-grenade' }),
+    call('damage', 'effect.damage-many', { source: out('source', 'piece'), targets: out('enemies', 'pieces'), amount: literal(1) }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'biotic-grenade' }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('ally-count', 'collection.piece-count', { pieces: out('allies', 'pieces') }),
+    call('enemy-count', 'collection.piece-count', { pieces: out('enemies', 'pieces') }),
+    call('group-count-product', 'math.multiply', { left: out('ally-count', 'value'), right: out('enemy-count', 'value') }),
+    call('has-both-groups', 'compare.greater-than', { left: out('group-count-product', 'value'), right: literal(0) }),
+    call('has-enemies', 'compare.greater-than', { left: out('enemy-count', 'value'), right: literal(0) }),
+  )
+  body.push(
+    {
+      kind: 'collection', id: 'healed-allies', method: 'filter', items: out('allies', 'pieces'), inputs: { healResult: out('heal', 'result') }, item: 'ally', body: [
+        call('ally-success', 'effect.batch-succeeded-for', { result: input('healResult'), target: input('ally') }),
+        { kind: 'return', id: 'keep-ally', value: out('ally-success', 'value') },
+      ],
+    },
+    {
+      kind: 'collection', id: 'ally-messages', method: 'map', items: out('healed-allies', 'value'), inputs: { healResult: out('heal', 'result') }, item: 'ally', body: [
+        call('ally-name', 'attribute.text', { piece: input('ally') }, { attribute: 'name' }),
+        call('ally-amount', 'effect.batch-number-for', { result: input('healResult'), target: input('ally') }, { field: 'heal' }),
+        call('ally-amount-text', 'text.from-number', { value: out('ally-amount', 'value') }),
+        call('ally-message', 'text.concat', { left: out('ally-name', 'text'), right: literal('恢复') }),
+        call('ally-message-amount', 'text.concat', { left: out('ally-message', 'text'), right: out('ally-amount-text', 'text') }),
+        call('ally-message-suffix', 'text.concat', { left: out('ally-message-amount', 'text'), right: literal('点生命值') }),
+        { kind: 'return', id: 'ally-message-value', value: out('ally-message-suffix', 'text') },
+      ],
+    },
+  )
+  body.push(
+    {
+      kind: 'foreach', id: 'apply-anti-heal', items: out('enemies', 'pieces'), item: 'enemy', body: [
+        call('enemy-success', 'effect.batch-succeeded-for', { result: out('damage', 'result'), target: input('enemy') }),
+        {
+          kind: 'if', id: 'successful-hit', condition: out('enemy-success', 'value'), then: [
+            call('clock', 'identity.host-time'),
+            call('clock-text', 'text.from-number', { value: out('clock', 'value') }),
+            call('status-id', 'text.concat', { left: literal('anti-heal-'), right: out('clock-text', 'text') }),
+            { kind: 'record.create', id: 'anti-heal-record', schema: 'anti-heal@1', fields: {
+              id: out('status-id', 'text'), type: literal('anti-heal'), currentDuration: literal(1), intensity: literal(1),
+              relatedRules: literal(['rule-anti-heal-block']),
+            } },
+            call('apply-status', 'status.apply-record', { target: input('enemy'), record: out('anti-heal-record', 'value') }, { inputPolicy: 'host' }),
+            call('apply-rule', 'rule.apply-piece', { target: input('enemy') }, { ruleId: 'rule-anti-heal-block' }),
+            call('add-skill', 'skill.add', { piece: input('enemy') }, { skillId: 'anti-heal-block' }),
+          ],
+        },
+      ],
+    },
+    {
+      kind: 'collection', id: 'damaged-enemies', method: 'filter', items: out('enemies', 'pieces'), inputs: { damageResult: out('damage', 'result') }, item: 'enemy', body: [
+        call('damaged-success', 'effect.batch-succeeded-for', { result: input('damageResult'), target: input('enemy') }),
+        { kind: 'return', id: 'keep-damaged', value: out('damaged-success', 'value') },
+      ],
+    },
+    {
+      kind: 'collection', id: 'enemy-messages', method: 'map', items: out('damaged-enemies', 'value'), inputs: { damageResult: out('damage', 'result') }, item: 'enemy', body: [
+        call('enemy-name', 'attribute.text', { piece: input('enemy') }, { attribute: 'name' }),
+        call('enemy-amount', 'effect.batch-number-for', { result: input('damageResult'), target: input('enemy') }, { field: 'damage' }),
+        call('enemy-amount-text', 'text.from-number', { value: out('enemy-amount', 'value') }),
+        call('enemy-message', 'text.concat', { left: out('enemy-name', 'text'), right: literal('受到') }),
+        call('enemy-message-amount', 'text.concat', { left: out('enemy-message', 'text'), right: out('enemy-amount-text', 'text') }),
+        call('enemy-message-suffix', 'text.concat', { left: out('enemy-message-amount', 'text'), right: literal('点伤害并被禁疗') }),
+        { kind: 'return', id: 'enemy-message-value', value: out('enemy-message-suffix', 'text') },
+      ],
+    },
+    call('ally-text', 'text.join-list', { items: out('ally-messages', 'value') }, { separator: '；' }),
+    call('enemy-text', 'text.join-list', { items: out('enemy-messages', 'value') }, { separator: '；' }),
+    call('separator', 'value.select-text', { condition: out('has-both-groups', 'value'), whenTrue: literal('；'), whenFalse: literal('') }),
+    call('body-text', 'text.concat', { left: out('ally-text', 'text'), right: out('separator', 'text') }),
+    call('body-text-enemies', 'text.concat', { left: out('body-text', 'text'), right: out('enemy-text', 'text') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [literal('生物手雷生效：'), out('body-text-enemies', 'text')])))
+  return skillGraph(body, [{ id: 'anti-heal@1', version: '1', fields: [
+    { name: 'id', type: 'string' }, { name: 'type', type: 'string' }, { name: 'currentDuration', type: 'number' },
+    { name: 'intensity', type: 'number' }, { name: 'relatedRules', type: { kind: 'list', element: 'string' } },
+  ] }])
+}
+
+function buildEarthshatterGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  cellSelection(body, 99, 'all')
+  body.push(
+    call('walkable', 'spatial.cell-walkable-safe', { cell: out('target', 'cell') }),
+    call('not-walkable', 'logic.not', { value: out('walkable', 'value') }),
+    { kind: 'if', id: 'invalid-terrain', condition: out('not-walkable', 'value'), then: result('invalid-terrain-result', literal(false), literal('目标格不可行走')) },
+    call('unoccupied', 'spatial.cell-unoccupied', { cell: out('target', 'cell') }),
+    call('occupied', 'logic.not', { value: out('unoccupied', 'value') }),
+    { kind: 'if', id: 'occupied-destination', condition: out('occupied', 'value'), then: result('occupied-result', literal(false), literal('该位置已有棋子')) },
+    call('displace', 'effect.displace', { piece: out('source', 'piece'), destination: out('target', 'cell') }, { kind: 'teleport', passAllies: true, passEnemies: true, terrain: 'any' }),
+    call('displace-failed', 'logic.not', { value: out('displace', 'success') }),
+    { kind: 'if', id: 'blocked-destination', condition: out('displace-failed', 'value'), then: result('blocked-result', literal(true), literal('位移被阻挡，本次位移效果取消')) },
+    call('owner', 'piece.owner', { piece: out('source', 'piece') }),
+    call('enemies', 'query.pieces-around-cell', { center: out('target', 'cell'), owner: out('owner', 'player') }, { relation: 'enemy', metric: 'chebyshev', minimum: 0, maximum: 1 }),
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('scaled', 'math.multiply', { left: out('attack', 'value'), right: out('multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('scaled', 'value') }),
+    call('enemy-count', 'collection.piece-count', { pieces: out('enemies', 'pieces') }),
+    call('has-enemies', 'compare.greater-than', { left: out('enemy-count', 'value'), right: literal(0) }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('enemy-count-text', 'text.from-number', { value: out('enemy-count', 'value') }),
+    call('damage-text', 'text.from-number', { value: out('damage-value', 'value') }),
+  )
+  body.push({
+    kind: 'if', id: 'damage-enemies', condition: out('has-enemies', 'value'), then: [
+      call('damage', 'effect.damage-many', { source: out('source', 'piece'), targets: out('enemies', 'pieces'), amount: out('damage-value', 'value') }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'earthshatter' }),
+    ],
+  })
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [
+    out('source-name', 'text'), literal('从天而降，对3x3区域内'), out('enemy-count-text', 'text'), literal('名敌人造成'), out('damage-text', 'text'), literal('点物理伤害'),
+  ])))
+  return skillGraph(body)
+}
+
+function buildMuzanBloodWhipGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+    call('source-capture', 'source.capture', { source: out('source', 'piece') }),
+    call('cells', 'projectile.cardinal-cells', { source: out('source', 'piece') }, { maxDistance: 3 }),
+    call('targets', 'query.enemies-on-ordered-cells', { source: out('source', 'piece'), cells: out('cells', 'cells') }),
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('scaled', 'math.multiply', { left: out('attack', 'value'), right: out('multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('scaled', 'value') }),
+    call('enemy-count', 'collection.piece-count', { pieces: out('targets', 'pieces') }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('enemy-count-text', 'text.from-number', { value: out('enemy-count', 'value') }),
+  ]
+  body.push({
+    kind: 'foreach', id: 'damage-targets', items: out('targets', 'pieces'), item: 'target', body: [
+      call('alive', 'piece.alive', { piece: input('target') }),
+      {
+        kind: 'if', id: 'alive-guard', condition: out('alive', 'alive'), then: [
+          call('target-capture', 'source.capture', { source: input('target') }),
+          call('damage', 'effect.damage-captured', { source: out('source-capture', 'source'), target: out('target-capture', 'source'), amount: out('damage-value', 'value') }, { damageType: 'physical', skillId: 'muzan-blood-whip' }),
+        ],
+      },
+    ],
+  })
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [
+    out('source-name', 'text'), literal('挥出血之鞭击，命中'), out('enemy-count-text', 'text'), literal('名敌人'),
+  ])))
+  return skillGraph(body)
+}
+
+function buildSasukeIndraArrowGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+    call('owner', 'piece.owner', { piece: out('source', 'piece') }),
+  ]
+  cellSelection(body, 99, 'all')
+  body.push(
+    call('line', 'projectile.line-cells', { source: out('source', 'piece'), target: out('target', 'cell') }, { maxDistance: 99, clipToBoard: true }),
+    { kind: 'if', id: 'same-cell', condition: out('line', 'sameCell'), then: result('same-cell-result', literal(false), literal('不能选择自身所在格子')) },
+    { kind: 'if', id: 'invalid-direction', condition: out('line', 'valid'), then: [], else: result('invalid-direction-result', literal(false), literal('因陀罗之矢只能瞄准同一行或同一列的格子')) },
+    call('added', 'tile.add-persistent-markers', { source: out('source', 'piece'), cells: out('line', 'cells'), tileSourceId: literal('amaterasu') }, { effectType: 'amaterasu', icon: '🌑', iconPosition: 'bottom-right', storageKey: 'amaterasuCells' }),
+    call('added-positive', 'compare.greater-than', { left: out('added', 'added'), right: literal(0) }),
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('added-text', 'text.from-number', { value: out('added', 'added') }),
+  )
+  body.push({
+    kind: 'if', id: 'new-coverage', condition: out('added-positive', 'value'), then: [
+      call('set-owner', 'extension.set-owner-if-empty', { player: out('owner', 'player') }, { storageKey: 'amaterasuOwnerPlayerId' }),
+      call('move-rule', 'rule.apply-player', { target: out('owner', 'player') }, { ruleId: 'rule-sasuke-amaterasu-move' }),
+      call('stack-rule', 'rule.apply-player', { target: out('owner', 'player') }, { ruleId: 'rule-sasuke-amaterasu-stack' }),
+      call('damage-rule', 'rule.apply-player', { target: out('owner', 'player') }, { ruleId: 'rule-sasuke-amaterasu-damage' }),
+    ],
+  })
+  body.push(
+    call('covered-message', 'text.concat', { left: out('source-name', 'text'), right: literal('射出因陀罗之矢，该方向的天照范围已完整覆盖') }),
+    call('added-message-prefix', 'text.concat', { left: out('source-name', 'text'), right: literal('射出因陀罗之矢，新增') }),
+    call('added-message-count', 'text.concat', { left: out('added-message-prefix', 'text'), right: out('added-text', 'text') }),
+    call('added-message', 'text.concat', { left: out('added-message-count', 'text'), right: literal('个地格为永久天照范围') }),
+    call('message', 'value.select-text', { condition: out('added-positive', 'value'), whenTrue: out('added-message', 'text'), whenFalse: out('covered-message', 'text') }),
+  )
+  body.push(...result('success', literal(true), out('message', 'text')))
+  return skillGraph(body)
+}
+
+function buildHashiramaWoodSpikeGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  pieceSelection(body, 4, 'enemy')
+  body.push(
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('target-name', 'attribute.text', { piece: out('target', 'piece') }, { attribute: 'name' }),
+    call('attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('scaled', 'math.multiply', { left: out('attack', 'value'), right: out('multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('scaled', 'value') }),
+    call('damage', 'effect.damage', { source: out('source', 'piece'), target: out('target', 'piece'), amount: out('damage-value', 'value') }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'hashirama-edo-wood-spike', inputPolicy: 'host' }),
+    call('killed', 'effect.result-killed', { result: out('damage', 'result') }),
+  )
+  body.push({
+    kind: 'if', id: 'killed-target', condition: out('killed', 'killed'), then: [
+      ...result('kill-result', literal(true), messageChain(body, 'kill-message', [
+        out('source-name', 'text'), literal('使用木遁·扦插之术，'), out('target-name', 'text'), literal('被击败'),
+      ])),
+    ],
+  })
+  body.push(
+    call('clear-statuses', 'status.clear-piece-tags', { piece: out('target', 'piece') }),
+    call('target-id', 'piece.identifier', { piece: out('target', 'piece') }),
+    call('silenced-id', 'text.concat', { left: literal('silenced-'), right: out('target-id', 'id') }),
+    { kind: 'record.create', id: 'silenced-record', schema: 'silenced@1', fields: {
+      id: out('silenced-id', 'text'), type: literal('silenced'), name: literal('沉默'), visible: literal(true),
+      remainingDuration: literal(1), remainingUses: literal(-1), intensity: literal(1), stacks: literal(1),
+      relatedRules: literal(['rule-silenced-block']),
+    } },
+    call('apply-status', 'status.apply-record', { target: out('target', 'piece'), record: out('silenced-record', 'value') }, { inputPolicy: 'host' }),
+    call('apply-rule', 'rule.apply-piece', { target: out('target', 'piece') }, { ruleId: 'rule-silenced-block' }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [
+    out('source-name', 'text'), literal('使用木遁·扦插之术，使'), out('target-name', 'text'), literal('沉默1回合'),
+  ])))
+  return skillGraph(body, [{ id: 'silenced@1', version: '1', fields: [
+    { name: 'id', type: 'string' }, { name: 'type', type: 'string' }, { name: 'name', type: 'string' }, { name: 'visible', type: 'boolean' },
+    { name: 'remainingDuration', type: 'number' }, { name: 'remainingUses', type: 'number' }, { name: 'intensity', type: 'number' }, { name: 'stacks', type: 'number' },
+    { name: 'relatedRules', type: { kind: 'list', element: 'string' } },
+  ] }])
+}
+
+function buildHashiramaWoodDragonGraph(): GameplayModuleGraph {
+  const body: GameplayStatement[] = [
+    call('source-ref', 'ref.holder'),
+    call('source', 'query.piece', { pieceId: out('source-ref', 'piece') }),
+  ]
+  pieceSelection(body, 6, 'enemy')
+  body.push(
+    call('source-name', 'attribute.text', { piece: out('source', 'piece') }, { attribute: 'name' }),
+    call('target-name', 'attribute.text', { piece: out('target', 'piece') }, { attribute: 'name' }),
+    call('source-attack', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'attack' }),
+    call('source-defense-raw', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'defense' }),
+    call('source-defense', 'value.number-or-zero', { value: out('source-defense-raw', 'value') }),
+    call('source-max-hp', 'attribute.read', { piece: out('source', 'piece') }, { attribute: 'maxHp' }),
+    call('target-attack', 'attribute.read', { piece: out('target', 'piece') }, { attribute: 'attack' }),
+    call('target-defense-raw', 'attribute.read', { piece: out('target', 'piece') }, { attribute: 'defense' }),
+    call('target-defense', 'value.number-or-zero', { value: out('target-defense-raw', 'value') }),
+    call('target-max-hp', 'attribute.read', { piece: out('target', 'piece') }, { attribute: 'maxHp' }),
+    call('target-current-hp', 'attribute.read', { piece: out('target', 'piece') }, { attribute: 'currentHp' }),
+    call('stolen-attack-raw', 'math.multiply', { left: out('target-attack', 'value'), right: literal(0.5) }),
+    call('stolen-attack', 'math.floor', { value: out('stolen-attack-raw', 'value') }),
+    call('stolen-defense-raw', 'math.multiply', { left: out('target-defense', 'value'), right: literal(0.5) }),
+    call('stolen-defense', 'math.floor', { value: out('stolen-defense-raw', 'value') }),
+    call('lost-hp-raw', 'math.subtract', { left: out('target-max-hp', 'value'), right: out('target-current-hp', 'value') }),
+    call('lost-hp', 'math.max', { left: literal(0), right: out('lost-hp-raw', 'value') }),
+    call('stolen-max-hp-raw', 'math.multiply', { left: out('lost-hp', 'value'), right: literal(0.5) }),
+    call('stolen-max-hp', 'math.floor', { value: out('stolen-max-hp-raw', 'value') }),
+    call('multiplier', 'skill.power-multiplier'),
+    call('damage-raw', 'math.multiply', { left: out('source-attack', 'value'), right: out('multiplier', 'value') }),
+    call('damage-value', 'math.floor', { value: out('damage-raw', 'value') }),
+    call('damage', 'effect.damage', { source: out('source', 'piece'), target: out('target', 'piece'), amount: out('damage-value', 'value') }, { damageType: 'normal', legacyNormalSpelling: 'physical', skillId: 'hashirama-edo-wood-dragon', inputPolicy: 'host' }),
+    call('target-attack-after', 'math.subtract', { left: out('target-attack', 'value'), right: out('stolen-attack', 'value') }),
+    call('target-attack-clamped', 'math.max', { left: literal(1), right: out('target-attack-after', 'value') }),
+    call('target-defense-after', 'math.subtract', { left: out('target-defense', 'value'), right: out('stolen-defense', 'value') }),
+    call('target-defense-clamped', 'math.max', { left: literal(0), right: out('target-defense-after', 'value') }),
+    call('source-attack-after', 'math.add', { left: out('source-attack', 'value'), right: out('stolen-attack', 'value') }),
+    call('source-defense-after', 'math.add', { left: out('source-defense', 'value'), right: out('stolen-defense', 'value') }),
+    call('write-target-attack', 'attribute.set', { piece: out('target', 'piece'), value: out('target-attack-clamped', 'value') }, { attribute: 'attack' }),
+    call('write-target-defense', 'attribute.set', { piece: out('target', 'piece'), value: out('target-defense-clamped', 'value') }, { attribute: 'defense' }),
+    call('write-source-attack', 'attribute.set', { piece: out('source', 'piece'), value: out('source-attack-after', 'value') }, { attribute: 'attack' }),
+    call('write-source-defense', 'attribute.set', { piece: out('source', 'piece'), value: out('source-defense-after', 'value') }, { attribute: 'defense' }),
+    call('has-stolen-max-hp', 'compare.greater-than', { left: out('stolen-max-hp', 'value'), right: literal(0) }),
+  )
+  const transferBranch: GameplayStatement[] = [
+    call('negative-stolen-max-hp', 'math.multiply', { left: out('stolen-max-hp', 'value'), right: literal(-1) }),
+    call('reduce-target-max-hp', 'attribute.adjust-max-hp', { piece: out('target', 'piece'), amount: out('negative-stolen-max-hp', 'value') }),
+    call('increase-source-max-hp', 'attribute.adjust-max-hp', { piece: out('source', 'piece'), amount: out('stolen-max-hp', 'value') }),
+    call('heal-source', 'effect.heal', { source: out('source', 'piece'), target: out('source', 'piece'), amount: out('stolen-max-hp', 'value') }, { skillId: 'hashirama-edo-wood-dragon' }),
+  ]
+  body.push({
+    kind: 'if', id: 'transfer-max-hp', condition: out('has-stolen-max-hp', 'value'), then: transferBranch,
+  })
+  body.push(
+    call('stolen-attack-text', 'text.from-number', { value: out('stolen-attack', 'value') }),
+    call('stolen-defense-text', 'text.from-number', { value: out('stolen-defense', 'value') }),
+    call('stolen-max-hp-text', 'text.from-number', { value: out('stolen-max-hp', 'value') }),
+  )
+  body.push(...result('success', literal(true), messageChain(body, 'success-message', [
+    out('source-name', 'text'), literal(' 使用木遁·木龙之术，从 '), out('target-name', 'text'), literal(' 汲取力量，夺取'),
+    out('stolen-attack-text', 'text'), literal(' 攻击、'), out('stolen-defense-text', 'text'), literal(' 防御、'),
+    out('stolen-max-hp-text', 'text'), literal(' 生命上限并恢复'), out('stolen-max-hp-text', 'text'), literal(' 生命'),
+  ])))
+  return skillGraph(body)
+}
+
 export function buildProjectileSkillGraph(id: string): GameplayModuleGraph {
   switch (id) {
     case 'sleep-dart': return buildSleepDartGraph()
@@ -936,6 +1528,7 @@ export function buildProjectileSkillGraph(id: string): GameplayModuleGraph {
     case 'blackwidow-lethal-strike': return buildBlackwidowLethalStrikeGraph()
     case 'grimmjow-panther-claw': return buildGrimmjowPantherClawGraph()
     case 'ichigo-getsuga-tensho': return buildIchigoGetsugaTenshoGraph()
+    case 'ulquiorra-cero': return buildUlquiorraCeroGraph()
     case 'colt-piercing': return buildColtPiercingGraph()
     case 'hand-cannon': return buildHandCannonGraph()
     case 'pulse-pistol': return buildPulsePistolGraph()
@@ -947,6 +1540,17 @@ export function buildProjectileSkillGraph(id: string): GameplayModuleGraph {
     case 'sasuke-chidori': return buildSasukeChidoriGraph()
     case 'naruto-rasengan': return buildNarutoRasenganGraph()
     case 'aizen-black-coffin': return buildAizenBlackCoffinGraph()
+    case 'akaza-annihilation': return buildAkazaAnnihilationGraph()
+    case 'akaza-disorder': return buildAkazaDisorderGraph()
+    case 'blizzard': return buildBlizzardGraph()
+    case 'blizzard-damage': return buildBlizzardDamageGraph()
+    case 'mortis-bat-support': return buildMortisBatSupportGraph()
+    case 'biotic-grenade': return buildBioticGrenadeGraph()
+    case 'earthshatter': return buildEarthshatterGraph()
+    case 'muzan-blood-whip': return buildMuzanBloodWhipGraph()
+    case 'sasuke-indra-arrow': return buildSasukeIndraArrowGraph()
+    case 'hashirama-edo-wood-spike': return buildHashiramaWoodSpikeGraph()
+    case 'hashirama-edo-wood-dragon': return buildHashiramaWoodDragonGraph()
     default: throw new Error('Unknown projectile skill ' + id)
   }
 }

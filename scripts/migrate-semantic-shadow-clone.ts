@@ -91,15 +91,15 @@ function ruleEmpty(id: string): GameplayStatement[] {
 export const SHADOW_CLONE_GAMEPLAY_REGISTRY: GameplayModuleRegistry = (() => {
   const descriptors = [...GAMEPLAY_MODULE_REGISTRY.descriptors, ...SUMMON_GAMEPLAY_MODULES]
   const byId = new Map<string, (typeof descriptors)[number]>()
-  for (const descriptor of descriptors) byId.set(descriptor.id, descriptor)
+  for (const descriptor of descriptors) byId.set(`${descriptor.id}@${descriptor.version}`, descriptor)
   return Object.freeze({
     descriptors: Object.freeze([...byId.values()]),
     get: (id: string, version?: string) => {
-      const descriptor = byId.get(id)
+      const descriptor = byId.get(`${id}@${version ?? '1'}`)
       return descriptor && (version === undefined || descriptor.version === version) ? descriptor : undefined
     },
     resolve: (id: string, version?: string) => {
-      const descriptor = byId.get(id)
+      const descriptor = byId.get(`${id}@${version ?? '1'}`)
       return descriptor && (version === undefined || descriptor.version === version) ? descriptor : undefined
     },
   })

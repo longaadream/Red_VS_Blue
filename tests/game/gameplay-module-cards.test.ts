@@ -71,11 +71,17 @@ type Scenario = {
   setup?: (state: any) => void
 }
 
+function cardPiece(overrides: Parameters<typeof makePiece>[0] = {}): ReturnType<typeof makePiece> {
+  const piece = makePiece(overrides)
+  if (Object.prototype.hasOwnProperty.call(overrides, 'name')) piece.name = overrides.name
+  return piece
+}
+
 function scenarioFor(id: string): Scenario {
-  const ally = makePiece({ instanceId: 'ally-1', templateId: 'ally-template', ownerPlayerId: 'player-red', name: '友方棋子', currentHp: 34, maxHp: 100, attack: 7, x: 1, y: 1 })
-  const enemy = makePiece({ instanceId: 'enemy-1', templateId: 'enemy-template', ownerPlayerId: 'player-blue', name: '敌方棋子', currentHp: 24, maxHp: 100, attack: 8, x: 2, y: 1 })
-  const watcher = makePiece({ instanceId: 'watcher-1', templateId: 'blue-watcher', ownerPlayerId: 'player-red', name: '观察者', currentHp: 80, maxHp: 80, attack: 9, x: 1, y: 2 })
-  const hashirama = makePiece({ instanceId: 'hashirama-1', templateId: 'hashirama-edo', ownerPlayerId: 'player-red', name: '柱间', currentHp: 40, maxHp: 100, attack: 12, x: 1, y: 1 })
+  const ally = cardPiece({ instanceId: 'ally-1', templateId: 'ally-template', ownerPlayerId: 'player-red', name: '友方棋子', currentHp: 34, maxHp: 100, attack: 7, x: 1, y: 1 })
+  const enemy = cardPiece({ instanceId: 'enemy-1', templateId: 'enemy-template', ownerPlayerId: 'player-blue', name: '敌方棋子', currentHp: 24, maxHp: 100, attack: 8, x: 2, y: 1 })
+  const watcher = cardPiece({ instanceId: 'watcher-1', templateId: 'blue-watcher', ownerPlayerId: 'player-red', name: '观察者', currentHp: 80, maxHp: 80, attack: 9, x: 1, y: 2 })
+  const hashirama = cardPiece({ instanceId: 'hashirama-1', templateId: 'hashirama-edo', ownerPlayerId: 'player-red', name: '柱间', currentHp: 40, maxHp: 100, attack: 12, x: 1, y: 1 })
   const cardInstance: any = {
     cardId: id,
     instanceId: `card-instance-${id}`,

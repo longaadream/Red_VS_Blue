@@ -2591,10 +2591,11 @@
         if (pendingSkill && pendingSkill.localChoiceDraft && pendingSkill.preparation
           && pendingSkill.preparation.kind === 'needOption') {
           const prep = pendingSkill.preparation
-          showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
-            localSkillDraft: true,
-            localSkillId: pendingSkill.skillId,
-          }))
+          if (prep.presentation === 'hand') renderLocalSkillPreparation(pendingSkill)
+          else showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
+              localSkillDraft: true,
+              localSkillId: pendingSkill.skillId,
+            }))
         }
       }
       return !!(pendingSkill || pendingCardAction)
@@ -4105,8 +4106,28 @@
       else if (typeof battleActionVignette.skip === 'function') battleActionVignette.skip()
     }
 
+    function getHandOptionSelection() {
+      if (!G) return null
+      if (G.pendingOptionSelection || G.pendingTargetSelection) return G.pendingOptionSelection || null
+      if (typeof pendingSkill === 'undefined' || !isLocalSkillDraft(pendingSkill)) return null
+      if (typeof SPECTATE_MODE !== 'undefined' && SPECTATE_MODE) return null
+      if (!G.turn || String(G.turn.currentPlayerId).toLowerCase() !== String(myPlayerId).toLowerCase()) return null
+      const prep = pendingSkill.preparation
+      if (!prep || prep.kind !== 'needOption' || prep.presentation !== 'hand') return null
+      const max = prep.maxSelections ?? prep.max ?? 1
+      return Object.assign({}, prep, {
+        localSkillDraft: true,
+        selectionId: prep.selectionId || prep.promptKey || ('local-hand:' + pendingSkill.skillId + ':' + localSkillChoices(pendingSkill).length),
+        selectionMode: prep.selectionMode || (max > 1 ? 'multi' : 'single'),
+        minSelections: prep.minSelections ?? prep.min ?? 1,
+        maxSelections: max,
+      })
+    }
+
     function isPendingHandSelection(pending) {
-      return !!(pending && pendingOptionSelectionForMe()
+      return !!(pending && (pending.localSkillDraft
+          ? getHandOptionSelection()?.selectionId === pending.selectionId
+          : pendingOptionSelectionForMe())
         && pending.presentation === 'hand'
         && (pending.selectionMode === 'single' || pending.selectionMode === 'multi'))
     }
@@ -4135,7 +4156,7 @@
     function renderPendingHandSelectionControls() {
       const controls = document.getElementById('handMultiSelectControls')
       if (!controls) return
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       const active = isPendingHandSelection(pending)
       controls.hidden = !active
       if (controls.style) controls.style.display = active ? 'flex' : 'none'
@@ -4161,7 +4182,7 @@
     }
 
     function togglePendingHandOption(cardInstanceId) {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending)) return
       syncPendingHandSelection(pending)
       const candidates = pendingHandCandidateValues(pending)
@@ -4186,7 +4207,7 @@
     }
 
     async function confirmPendingHandOptionSelection() {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending) || pendingHandOptionSelection.submitting) return
       syncPendingHandSelection(pending)
       const isSingle = pending.selectionMode === 'single'
@@ -4202,6 +4223,10 @@
       renderHand()
       renderActionBar()
       try {
+        if (pending.localSkillDraft) {
+          await advanceLocalSkillOption(isSingle ? selectedValues[0] : selectedValues)
+          return
+        }
         await doAction({
           type: 'pendingOptionSelect',
           playerId: pending.playerId || myPlayerId,
@@ -4210,7 +4235,7 @@
           stateRevision: pending.stateRevision,
         })
       } finally {
-        const current = G && G.pendingOptionSelection
+        const current = getHandOptionSelection()
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
         else syncPendingHandSelection(null)
         renderHand()
@@ -4219,11 +4244,15 @@
     }
 
     async function cancelPendingHandOptionSelection() {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending) || pending.canCancel === false || pendingHandOptionSelection.submitting) return
       pendingHandOptionSelection.submitting = true
       renderPendingHandSelectionControls()
       try {
+        if (pending.localSkillDraft) {
+          cancelTargetSelection()
+          return
+        }
         await doAction({
           type: 'cancelPendingSelection',
           playerId: pending.playerId || myPlayerId,
@@ -4231,7 +4260,7 @@
           stateRevision: pending.stateRevision,
         })
       } finally {
-        const current = G && G.pendingOptionSelection
+        const current = getHandOptionSelection()
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
         else syncPendingHandSelection(null)
         renderHand()
@@ -6511,6 +6540,16 @@
       _updatePendingSkillTargets()
       if (skill.preparation && skill.preparation.kind === 'needOption') {
         const prep = skill.preparation
+        if (prep.presentation === 'hand') {
+          flushPresentationBeforePendingSelection()
+          const overlay = document.getElementById('optionPickerOverlay')
+          if (overlay) overlay.classList.remove('show')
+          pendingOptionAction = null
+          _pickerOptions = []
+          syncPendingHandSelection(getHandOptionSelection())
+          renderHand(); renderActionBar(); renderTargetOverlay()
+          return
+        }
         showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
           localSkillDraft: true,
           localSkillId: skill.skillId,
@@ -7250,7 +7289,7 @@
           })
         }
       } else {
-        syncPendingHandSelection(null)
+        syncPendingHandSelection(getHandOptionSelection())
         _pendingChoiceShown = null
         if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
           pendingOptionAction = null
@@ -7988,7 +8027,7 @@
       ensureHandCardDisplayMetadata(hand)
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
-      const pendingHandSelection = G.pendingOptionSelection
+      const pendingHandSelection = getHandOptionSelection()
       const isHandSelection = isPendingHandSelection(pendingHandSelection)
       const progressiveBlocked = progressiveDeploymentPending(G) && !isHandSelection
       if (isHandSelection) syncPendingHandSelection(pendingHandSelection)
@@ -8067,7 +8106,7 @@
 
     function onCardClick(cardInstanceId, cardId, confirmed = false) {
       if (!G) return
-      if (isPendingHandSelection(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(getHandOptionSelection())) {
         togglePendingHandOption(cardInstanceId)
         return
       }
@@ -9473,7 +9512,7 @@
         setStatusMsg('上一条指令仍在等待权威确认')
         return
       }
-      if (isPendingHandSelection(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(getHandOptionSelection())) {
         await confirmPendingHandOptionSelection()
         return
       }
