@@ -19,9 +19,25 @@ export type GameplayTargetBindings = {
   readonly targets: readonly GameplayTargetBindingTarget[]
 }
 
+/**
+ * Compatibility metadata consumed by the pre-action target validator.  The
+ * graph is the source of truth for graph-owned targeting, but skill records
+ * still expose these fields to the legacy preparation path.  Optional target
+ * fields intentionally mean "remove the stale declaration" when no target
+ * remains in the graph.
+ */
+export type GameplayRootTargetMetadata = {
+  readonly targetType?: 'piece' | 'cell'
+  readonly filter?: 'enemy' | 'ally' | 'all'
+  /** Numeric legacy target ranges are compatibility fields; string UI range modes stay untouched. */
+  readonly range?: number | null
+  readonly requiresTarget: boolean
+}
+
 export type GameplayTargetBindingSync = {
   readonly targeting?: Record<string, unknown>
   readonly targetBindings?: GameplayTargetBindings
+  readonly rootTargetMetadata?: GameplayRootTargetMetadata
   readonly textBindings?: GameplayTextBindings
   readonly renderedText?: Record<string, string>
   readonly previewGraph?: unknown
@@ -417,6 +433,23 @@ function hasTargetChange(before: Interaction[], after: Interaction[]): boolean {
     || item.node !== after[index].node || !targetParametersEqual(item, after[index]))
 }
 
+function rootTargetMetadata(document: JsonRecord, before: Interaction[], after: Interaction[]): GameplayRootTargetMetadata | undefined {
+  const target = after.find(item => item.kind === 'target')
+  if (!target) {
+    // An option-only graph may still feed a legacy ref.target expression.  It
+    // has not taken ownership of root targeting, so preserve those fields.
+    if (!before.some(item => item.kind === 'target')) return undefined
+    return { ...(typeof document.range === 'number' ? { range: null } : {}), requiresTarget: false }
+  }
+  const range = numericParameter(target.statement, 'range', 5)
+  return {
+    targetType: target.type,
+    filter: enumParameter(target.statement, 'filter', target.type === 'cell' ? 'all' : 'enemy'),
+    ...(typeof document.range === 'number' && range !== undefined ? { range } : {}),
+    requiresTarget: true,
+  }
+}
+
 /**
  * Match an edited graph to the old declaration and return safe document
  * patches.  This function never invents a target declaration from an
@@ -430,6 +463,10 @@ export function synchronizeGameplayTargetBinding(
   entry: string,
 ): GameplayTargetBindingSync {
   if (!object(document)) return { warnings: [], diagnostics: ['内容不是可绑定的记录。'] }
+  // Only executable entries can own the document's targeting contract.  A
+  // preview or auxiliary graph must never rewrite (or reject on behalf of)
+  // runtime target metadata.
+  if (!BOUND_ENTRY_FIELDS.has(entry)) return { warnings: [], diagnostics: [] }
   const beforeResult = interactions(previousGraph)
   const afterResult = interactions(nextGraph)
   const declaredResult = staticSteps(document)
@@ -444,9 +481,15 @@ export function synchronizeGameplayTargetBinding(
   if (diagnostics.length) return { warnings, diagnostics }
   const declaration = declaredResult.values
   // A graph without a legacy/static targeting declaration is owned by the
-  // graph-backed targeting host.  Leave it untouched here instead of trying
-  // to infer an option map or target record from arbitrary expressions.
-  if (!declaration.length) return { warnings, diagnostics: [] }
+  // graph-backed targeting host.  Do not infer an option map or target record
+  // from arbitrary expressions, but do mirror the first unconditional target
+  // into the compatibility fields read by pre-action validation.  Those
+  // fields must also be cleared when a target is removed, otherwise a new
+  // graph-owned skill can retain the editor's default piece target.
+  if (!declaration.length) {
+    const rootMetadata = rootTargetMetadata(document, before, after)
+    return { warnings, ...(rootMetadata ? { rootTargetMetadata: rootMetadata } : {}), diagnostics: [] }
+  }
   const modules = object(document.gameplayModules) ? document.gameplayModules : undefined
   if (modules && own(modules, 'targetBindings') && modules.targetBindings !== undefined && !existingBinding(modules.targetBindings)) {
     return { warnings, diagnostics: ['targetBindings 元数据无效，未猜测替代节点。'] }

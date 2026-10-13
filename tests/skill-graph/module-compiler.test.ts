@@ -1,7 +1,9 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { compileGameplayModuleGraph, compileGameplayModuleGraphV1, GAMEPLAY_MODULE_COMPILER_VERSION } from '../../lib/skill-graph/module-compiler'
-import { GAMEPLAY_MODULE_GRAPH_VERSION, type GameplayModuleDescriptor, type GameplayModuleGraph, type GameplayModuleRegistry, type GameplayValue } from '../../lib/skill-graph/module-types'
+import { GAMEPLAY_MODULE_GRAPH_VERSION, type GameplayLiteral, type GameplayModuleDescriptor, type GameplayModuleGraph, type GameplayModuleRegistry, type GameplayValue } from '../../lib/skill-graph/module-types'
+import { GAMEPLAY_MODULE_REGISTRY } from '../../lib/skill-graph/module-registry'
+import { AUTHOR_PIECE_TEMPLATE_SCHEMA_ID, AUTHOR_SUMMON_RECORD_SCHEMAS } from '../../lib/game/author-summon-schema'
 
 const version = '1'
 
@@ -48,6 +50,230 @@ describe('semantic gameplay module compiler', () => {
     expect(compiled.dependencies).toEqual([{ id: 'math.add', version, kind: 'native' }])
     const execute = runInNewContext('(' + compiled.code + ')') as (context: unknown) => unknown
     expect(execute({})).toEqual({ result: 5 })
+  })
+
+  it('accepts an author map literal for a strongly typed map input', () => {
+    const optionsType = { kind: 'map' as const, key: 'string' as const, value: 'boolean' as const }
+    const choose = {
+      ...descriptor(
+        'test.choose',
+        [{ name: 'options', type: 'record' }],
+        [{ name: 'value', type: 'record' }],
+        ({ inputs }) => ({ expression: '({value: ' + inputs.options + '})' }),
+      ),
+      inputValueTypeBindings: { options: { parameter: 'optionsType' } },
+      outputValueTypeBindings: { value: { parameter: 'optionsType' } },
+      parameters: [{ name: 'optionsType', type: 'string' as const }],
+    }
+    const options = {
+      format: 'author-map/v1' as const,
+      entries: [
+        ['传送并在原地留下分身', true],
+        ['在目标格召唤分身', false],
+      ] as const,
+    }
+    const compiled = compileGameplayModuleGraph(graph('skill', [
+      { ...call('choose', choose.id, { options: { kind: 'literal', value: options } }), parameters: { optionsType: JSON.stringify(optionsType) } },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'choose', port: 'value' } },
+    ], { outputs: [{ name: 'value', type: optionsType }] }), registryOf(choose))
+    const execute = runInNewContext('(' + compiled.code + ')') as (context: unknown) => unknown
+    expect(execute({})).toEqual(options)
+  })
+
+  it('compiles the real choice v3 map input emitted by the recursive map editor', () => {
+    const compiled = compileGameplayModuleGraph(graph('skill', [
+      {
+        kind: 'call', id: 'choice', module: 'author.choice.option', version: '3',
+        inputs: {
+          options: {
+            kind: 'literal',
+            value: {
+              format: 'author-map/v1',
+              entries: [['传送并在原地留下分身', true], ['在目标格召唤分身', false]],
+            },
+          },
+        },
+        parameters: {
+          optionsType: '{"kind":"map","key":"string","value":"boolean"}',
+          valueType: 'boolean',
+          selectionMode: 'single',
+          title: '是否传送并在原地留下分身',
+          canCancel: false,
+        },
+      },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'choice', port: 'value' } },
+    ], { outputs: [{ name: 'value', type: 'boolean' }] }), GAMEPLAY_MODULE_REGISTRY)
+    expect(compiled.code).toContain('authorMapItems')
+  })
+
+  it('accepts plain JSON records in declared record fields while rejecting array values', () => {
+    const schema = AUTHOR_SUMMON_RECORD_SCHEMAS.find(entry => entry.id + '@' + entry.version === AUTHOR_PIECE_TEMPLATE_SCHEMA_ID)
+    if (!schema) throw new Error('author piece template schema is not registered')
+    const compileTemplate = (extension: GameplayLiteral | undefined) => compileGameplayModuleGraph(graph('skill', [
+      {
+        kind: 'record.create', id: 'template', schema: AUTHOR_PIECE_TEMPLATE_SCHEMA_ID,
+        fields: extension === undefined ? {} : { extension: { kind: 'literal', value: extension } },
+      },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'template', port: 'value' } },
+      ], { outputs: [{ name: 'value', type: { kind: 'record', schema: AUTHOR_PIECE_TEMPLATE_SCHEMA_ID } }] }), GAMEPLAY_MODULE_REGISTRY)
+    const extension = { '影分身标记': 'shadow-clone' }
+    const compiled = compileTemplate(extension)
+    const execute = runInNewContext('(' + compiled.code + ')') as (context: unknown) => unknown
+    expect(execute({})).toEqual({ extension })
+    expect(runInNewContext('(' + compileTemplate(undefined).code + ')')({})).toEqual({})
+    expect(runInNewContext('(' + compileTemplate({}).code + ')')({})).toEqual({ extension: {} })
+    expect(() => compileTemplate([])).toThrow(/record field "extension" expects record/)
+  })
+
+  it('does not treat an arbitrary json input or record.get result as a record', () => {
+    const sourceSchema = { id: 'json-source', version: '1', fields: [{ name: 'payload', type: 'json' as const }] }
+    const targetSchema = { id: 'json-target', version: '1', fields: [{ name: 'extension', type: 'record' as const }] }
+    const inputGraph = graph('skill', [
+      {
+        kind: 'record.create', id: 'target', schema: 'json-target@1',
+        fields: { extension: { kind: 'input', name: 'payload' } },
+      },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'target', port: 'value' } },
+    ], {
+      inputs: [{ name: 'payload', type: 'json' }],
+      inputBindings: { payload: 'runtime-json' },
+      schemas: [targetSchema],
+      outputs: [{ name: 'value', type: { kind: 'record', schema: 'json-target@1' } }],
+    })
+    expect(() => compileGameplayModuleGraph(inputGraph, registryOf())).toThrow(/record field "extension" expects record, got json/)
+
+    const getGraph = graph('skill', [
+      {
+        kind: 'record.create', id: 'source', schema: 'json-source@1',
+        fields: { payload: { kind: 'literal', value: { arbitrary: true } } },
+      },
+      { kind: 'record.get', id: 'payload', record: { kind: 'output', node: 'source', port: 'value' }, field: 'payload' },
+      {
+        kind: 'record.create', id: 'target', schema: 'json-target@1',
+        fields: { extension: { kind: 'output', node: 'payload', port: 'value' } },
+      },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'target', port: 'value' } },
+    ], {
+      schemas: [sourceSchema, targetSchema],
+      outputs: [{ name: 'value', type: { kind: 'record', schema: 'json-target@1' } }],
+    })
+    expect(() => compileGameplayModuleGraph(getGraph, registryOf())).toThrow(/record field "extension" expects record, got json/)
+  })
+
+  it('round-trips record node layout metadata without changing generated code', () => {
+    const schema = { id: 'layout-record', version: '1', fields: [{ name: 'value', type: 'number' as const }] }
+    const makeGraph = (layouts: Readonly<Record<string, unknown>> = {}) => ({
+      version: GAMEPLAY_MODULE_GRAPH_VERSION,
+      surface: 'skill' as const,
+      schemas: [schema],
+      outputs: [{ name: 'value', type: { kind: 'record' as const, schema: 'layout-record@1' } }],
+      body: [
+        {
+          kind: 'record.create' as const,
+          id: 'source',
+          schema: 'layout-record@1',
+          fields: { value: { kind: 'literal' as const, value: 1 } },
+          ...(layouts.create === undefined ? {} : { layout: layouts.create }),
+        },
+        {
+          kind: 'record.get' as const,
+          id: 'read',
+          record: { kind: 'output' as const, node: 'source', port: 'value' },
+          field: 'value',
+          ...(layouts.get === undefined ? {} : { layout: layouts.get }),
+        },
+        {
+          kind: 'record.with' as const,
+          id: 'updated',
+          record: { kind: 'output' as const, node: 'source', port: 'value' },
+          fields: { value: { kind: 'literal' as const, value: 2 } },
+          ...(layouts.with === undefined ? {} : { layout: layouts.with }),
+        },
+        { kind: 'return' as const, id: 'done', value: { kind: 'output' as const, node: 'updated', port: 'value' } },
+      ],
+    })
+    const plain = compileGameplayModuleGraph(makeGraph(), registryOf())
+    const layouts = {
+      create: { sentenceExpression: { owner: 'source', input: 'value' }, position: { x: 12, y: 34 } },
+      get: { sentenceExpression: { owner: 'read', input: 'record' }, tags: ['读取'] },
+      with: { sentenceExpression: { owner: 'updated', input: 'value' }, collapsed: false },
+    }
+    const saved = JSON.parse(JSON.stringify(makeGraph(layouts))) as unknown
+    const reloaded = compileGameplayModuleGraph(saved, registryOf())
+    expect((saved as { body: readonly { layout?: unknown }[] }).body.map(node => node.layout).filter(layout => layout !== undefined)).toEqual(Object.values(layouts))
+    expect(reloaded.code).toBe(plain.code)
+    const execute = runInNewContext('(' + reloaded.code + ')') as (context: unknown) => unknown
+    expect(execute({})).toEqual({ value: 2 })
+  })
+
+  it('rejects non-JSON record node layout metadata at the source boundary', () => {
+    const schema = { id: 'layout-record-malicious', version: '1', fields: [{ name: 'value', type: 'number' as const }] }
+    const makeGraph = (kind: 'record.create' | 'record.get' | 'record.with') => ({
+      version: GAMEPLAY_MODULE_GRAPH_VERSION,
+      surface: 'skill' as const,
+      schemas: [schema],
+      outputs: [{ name: 'value', type: { kind: 'record' as const, schema: 'layout-record-malicious@1' } }],
+      body: [
+        {
+          kind: 'record.create' as const,
+          id: 'source',
+          schema: 'layout-record-malicious@1',
+          fields: { value: { kind: 'literal' as const, value: 1 } },
+        },
+        kind === 'record.create'
+          ? { kind: 'record.create' as const, id: 'bad', schema: 'layout-record-malicious@1', layout: { editor: () => true } }
+          : kind === 'record.get'
+            ? { kind: 'record.get' as const, id: 'bad', record: { kind: 'output' as const, node: 'source', port: 'value' }, field: 'value', layout: { editor: () => true } }
+            : { kind: 'record.with' as const, id: 'bad', record: { kind: 'output' as const, node: 'source', port: 'value' }, fields: { value: { kind: 'literal' as const, value: 2 } }, layout: { editor: () => true } },
+        { kind: 'return' as const, id: 'done', value: { kind: 'output' as const, node: 'source', port: 'value' } },
+      ],
+    })
+    for (const kind of ['record.create', 'record.get', 'record.with'] as const) {
+      expect(() => compileGameplayModuleGraph(makeGraph(kind), registryOf())).toThrow(/functions and non-JSON values are not allowed/)
+    }
+  })
+
+  it('keeps graph schema order in lowering contexts when the registry has extra built-ins', () => {
+    const graphSchema = { id: 'graph-record', version: '1', fields: [{ name: 'value', type: 'number' as const }] }
+    const builtinSchema = { id: 'registry-record', version: '1', fields: [{ name: 'value', type: 'number' as const }] }
+    const inspect = {
+      ...descriptor('test.inspect-schemas', [], [{ name: 'value', type: 'string' }], ({ recordSchemas }) => ({
+        expression: JSON.stringify((recordSchemas ?? []).map(schema => schema.id + '@' + schema.version)),
+      })),
+      recordSchemas: [builtinSchema],
+    }
+    const registry = {
+      descriptors: [inspect],
+      get: (id: string, requestedVersion?: string) => id === inspect.id && (requestedVersion ?? version) === version ? inspect : undefined,
+    }
+    const compiled = compileGameplayModuleGraphV1(graph('skill', [
+      call('inspect', inspect.id),
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'inspect', port: 'value' } },
+    ], { outputs: [{ name: 'value', type: 'string' }], schemas: [graphSchema] }), registry)
+    expect(compiled.code).toContain('["graph-record@1"]')
+    expect(compiled.code).not.toContain('registry-record@1')
+  })
+
+  it.each([false, true])('adds transitive built-in schema dependencies (root already declared=%s)', declaredRoot => {
+    const dependencySchema = { id: 'registry-dependency', version: '1', fields: [{ name: 'value', type: 'number' as const }] }
+    const rootSchema = { id: 'registry-root', version: '1', fields: [{ name: 'child', type: { kind: 'record' as const, schema: 'registry-dependency@1' } }] }
+    const typed = {
+      ...descriptor('test.typed-schemas', [], [{ name: 'value', type: 'record' }], ({ recordSchemas }) => ({
+        expression: JSON.stringify((recordSchemas ?? []).map(schema => schema.id + '@' + schema.version)),
+      })),
+      recordSchemas: [rootSchema, dependencySchema],
+      outputValueTypeBindings: { value: { parameter: 'valueType' } },
+      parameters: [{ name: 'valueType', type: 'string' as const }],
+    }
+    const registry = {
+      descriptors: [typed],
+      get: (id: string, requestedVersion?: string) => id === typed.id && (requestedVersion ?? version) === version ? typed : undefined,
+    }
+    const compiled = compileGameplayModuleGraphV1(graph('skill', [
+      { ...call('typed', typed.id), parameters: { valueType: '{"kind":"record","schema":"registry-root@1"}' } },
+      { kind: 'return', id: 'done', value: { kind: 'output', node: 'typed', port: 'value' } },
+    ], { outputs: [{ name: 'value', type: 'record' }], ...(declaredRoot ? { schemas: [rootSchema] } : {}) }), registry)
+    expect(compiled.code).toContain('["registry-root@1","registry-dependency@1"]')
   })
 
   it('executes trusted statement lowerings with a result assignment', () => {

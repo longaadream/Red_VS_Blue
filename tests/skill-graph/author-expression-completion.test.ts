@@ -9,6 +9,17 @@ describe('author expression lexical suggestions', () => {
     expect(suggestions('坐标(1, ')).not.toHaveLength(0)
     expect(suggestions('')).not.toHaveLength(0)
   })
+  it('shows Chinese labels for built-in function arguments and literals', () => {
+    const values = suggestions('')
+    expect(values.find(item => item.value === '绝对值()')?.description).toBe('数值')
+    expect(values.find(item => item.value === '最小值()')?.description).toBe('左值，右值')
+    expect(values.find(item => item.value === '最大值()')?.description).toBe('左值，右值')
+    expect(values.find(item => item.value === '坐标()')?.description).toBe('横坐标，纵坐标')
+    expect(values).toContainEqual({ label: '真', value: '真', kind: '取值' })
+    expect(values).toContainEqual({ label: '假', value: '假', kind: '取值' })
+    expect(values).toContainEqual({ label: '空', value: '空', kind: '取值' })
+    expect(values.some(item => ['value', 'left', 'right', 'x', 'y', 'true', 'false', 'null'].includes(item.value))).toBe(false)
+  })
   it('infers the empty argument or comparison at the caret and inspects nested references', () => {
     const context = { surface: 'skill' as const }
     expect(authorExpressionParameterHint('坐标(1, ', context)?.type).toBe('数值')
@@ -40,6 +51,32 @@ describe('author expression lexical suggestions', () => {
   })
   it('carries locally created record schemas into nested completion', () => {
     expect(suggestions('{{amount:3}}.筛选(每项.')).toContainEqual({ label: '每项.amount', value: '每项.amount', kind: '数值' })
+  })
+  it('completes nested typed-record labels and falls back for ambiguous labels', () => {
+    const schemas = [
+      { id: 'piece-identity', version: '1', fields: [{ name: 'templateId', label: '模板引用', type: 'string' as const }] },
+      { id: 'piece-snapshot', version: '1', fields: [{ name: 'identity', label: '身份', type: { kind: 'record' as const, schema: 'piece-identity@1' } }] },
+    ] as const
+    const context = {
+      surface: 'skill' as const,
+      bindings: { 实例副本: { value: { kind: 'input' as const, name: 'snapshot' }, type: { kind: 'record' as const, schema: 'piece-snapshot@1' } } },
+      schemas,
+    }
+    expect(completeAuthorExpression('实例副本.', context)).toContainEqual({ label: '实例副本.身份', value: '实例副本.身份', kind: '结构体' })
+    expect(completeAuthorExpression('实例副本.身份.', context)).toContainEqual({ label: '实例副本.身份.模板引用', value: '实例副本.身份.模板引用', kind: '文本' })
+
+    const ambiguous = {
+      ...context,
+      schemas: [{ id: 'ambiguous-record', version: '1', fields: [
+        { name: 'first', label: '重复标签', type: 'string' as const },
+        { name: 'second', label: '重复标签', type: 'number' as const },
+      ] }],
+      bindings: { 实例副本: { value: { kind: 'input' as const, name: 'snapshot' }, type: { kind: 'record' as const, schema: 'ambiguous-record@1' } } },
+    }
+    const ambiguousValues = completeAuthorExpression('实例副本.', ambiguous)
+    expect(ambiguousValues.some(item => item.value === '实例副本.重复标签')).toBe(false)
+    expect(ambiguousValues).toContainEqual({ label: '实例副本.first', value: '实例副本.first', kind: '文本' })
+    expect(ambiguousValues).toContainEqual({ label: '实例副本.second', value: '实例副本.second', kind: '数值' })
   })
   it('offers only declared extensions after their owner is entered', () => {
     const context = { surface: 'skill' as const, extensions: [{ scope: 'player' as const, namespace: 'content', name: '奖励', type: 'number' as const }] }

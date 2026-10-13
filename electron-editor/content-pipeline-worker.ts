@@ -1,6 +1,6 @@
 import { runContentPipelineOperationV1 } from '../lib/content-pipeline/tooling'
 import { importResourceProject } from './content-import-worker'
-import { prepareTrainingPreview } from './training-preview-worker'
+import { prepareTrainingPreview, profileIdentityFromDraftSnapshot } from './training-preview-worker'
 import { prepareDraftTrainingPreview } from './training-draft-worker'
 
 const parentPort = process.parentPort
@@ -10,7 +10,10 @@ parentPort.on('message', (event) => {
   void Promise.resolve().then(async () => event.data?.operation === 'import-project'
     ? importResourceProject(event.data)
     : event.data?.operation === 'prepare-training-preview' ? prepareTrainingPreview(event.data)
-    : event.data?.operation === 'prepare-draft-training' ? prepareDraftTrainingPreview(event.data.workspace, event.data.request ?? { skillId: event.data.skillId, drafts: event.data.drafts })
+    : event.data?.operation === 'prepare-draft-training' ? (() => {
+      const snapshot = prepareDraftTrainingPreview(event.data.workspace, event.data.request ?? { skillId: event.data.skillId, drafts: event.data.drafts })
+      return { ...snapshot, profileIdentity: profileIdentityFromDraftSnapshot(snapshot) }
+    })()
     : runContentPipelineOperationV1(event.data))
     .then(result => parentPort.postMessage({ ok: true, result }))
     .catch((error) => parentPort.postMessage({

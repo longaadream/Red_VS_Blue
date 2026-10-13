@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>开发者工作台使用说明</title>
+<style>
+:root{font:16px/1.85 system-ui,"Microsoft YaHei",sans-serif;color:#253044;background:#fff;scroll-behavior:smooth}*{box-sizing:border-box}body{margin:0}main{max-width:1000px;margin:auto;padding:56px 48px 100px}h1{font-size:36px;letter-spacing:-1px;line-height:1.3;margin:12px 0}h2{margin:56px 0 18px;font-size:24px;scroll-margin-top:24px}h3{font-size:18px;margin-top:30px}p{margin:10px 0}a{color:#4663cb;text-decoration:none}a:hover{text-decoration:underline}.eyebrow{font-size:13px;letter-spacing:2px;color:#6d7792}.intro{font-size:18px;color:#667185}nav{display:flex;gap:10px 22px;flex-wrap:wrap;padding:24px 0;border-bottom:1px solid #e8ebf1}nav a{font-size:14px}.note{padding:18px 22px;background:#f4f6fc;border-radius:14px;margin:22px 0}.statement,pre{background:#f7f8fc;border-radius:12px;padding:20px 24px;white-space:pre-wrap;overflow-wrap:anywhere;font:15px/2 system-ui,sans-serif}.slot{color:#4663cb;background:#edf0ff;padding:3px 6px;border-radius:5px}code,kbd{font:14px/1.7 ui-monospace,Consolas,monospace;background:#f2f4f8;padding:2px 5px;border-radius:4px}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}th,td{text-align:left;vertical-align:top;padding:13px 14px;border-bottom:1px solid #e6eaf2}th{background:#f6f7fa}ol,ul{padding-left:24px}li{margin:8px 0}figure{margin:25px 0}figure img{max-width:100%;height:auto;border-radius:12px;box-shadow:0 6px 25px #24325114;border:1px solid #e6eaf2}figcaption{color:#6d7792;font-size:13px;margin-top:10px}.small{font-size:13px;color:#667185}@media(max-width:640px){main{padding:28px 22px}h1{font-size:28px}table{font-size:12px}th,td{padding:10px 6px}}@media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}}@media print{main{padding:0}nav{display:none}h2{break-after:avoid}figure,pre{break-inside:avoid}}
+</style>
+<main>
+<div class="eyebrow">内容工作台 · 作者指南</div>
+<h1>把一个技能写清楚，再亲手试一次</h1>
+<p class="intro">从新建内容、填写一句效果，到保存草稿、训练营重试和生成资源包。本说明对应编辑器中的中文句子界面。</p>
+<nav aria-label="说明目录"><a href="#start">从哪里开始</a><a href="#sentences">语句与表达式</a><a href="#objects">编辑结构</a><a href="#fireball">伤害技能</a><a href="#clone">影分身</a><a href="#rules">被动规则</a><a href="#display">局内说明与图标</a><a href="#drafts">保存与恢复</a><a href="#training">训练营</a><a href="#package">资源包</a><a href="#trouble">排查问题</a></nav>
+
+<h2 id="start">1. 从哪里开始</h2>
+<p>在右上角“项目”中创建空白项目，或复制官方内容。空白项目适合练习从零编写；复制官方内容适合修改现有棋子并比较实际效果。项目彼此独立。</p>
+<table><tr><th>目录</th><th>在这里做什么</th></tr><tr><td>棋子</td><td>编辑基础属性、初始技能与规则、状态和所属能力组。</td></tr><tr><td>能力组</td><td>围绕一项能力组织主动技能、被动规则、状态、衍生卡牌与扩展变量。主动技能与能力组不是同一种对象。</td></tr><tr><td>卡牌</td><td>编辑费用、描述以及使用时执行的效果。</td></tr><tr><td>规则</td><td>选择触发条件，编写触发后的语句。被动能力通常在这里实现。</td></tr><tr><td>素材</td><td>导入与选择图片。可见状态应配置图标。</td></tr><tr><td>训练营</td><td>运行当前有效草稿或已接受版本，重试同一个场景。</td></tr><tr><td>资源包</td><td>检查已保存内容并生成可安装的资源包。</td></tr></table>
+<p>点击“新建”，填写显示名称。内部引用由编辑器保存；重命名显示名称时，不需要手动重写其他内容的引用。</p>
+
+<h2 id="sentences">2. 一条语句、一个参数地编辑</h2>
+<div class="statement">对 <span class="slot">目标</span> 造成 <span class="slot">当前棋子.攻击力 × 1.5</span> 点 <span class="slot">普通</span> 伤害，来源为 <span class="slot">当前棋子</span>。</div>
+<p>“添加语句”按用途分类。先选要做的事情，再点击句子中的蓝色参数；只改这个参数，不必展开整条语句。条件和循环的内部语句可以收起。</p>
+<ul><li>输入区支持键盘编写复杂表达式，例如 <code>(当前棋子.攻击力 + 2) * 1.5</code>。</li><li>字段通过点号访问；输入对象后，联想才展开它的字段。中文句号会按字段点号处理。逻辑运算使用 <code>&amp;&amp;</code>、<code>||</code>、<code>!</code>。</li><li>联想浮层跟随输入位置；<kbd>Tab</kbd> 接受当前候选，<kbd>Esc</kbd> 关闭浮层。右侧展开栏是较大的编辑空间。</li><li>参数旁显示要求的类型。引用和函数的返回类型会影响后续候选；提示不是运行时取值。</li><li>需要复用结果时，点击“保存返回值”，填写变量名。后续语句可引用它；前面尚未产生的值不能提前读取。</li></ul>
+<p>变量名可自己命名。类型、内置字段、选项与参数说明由编辑器用中文展示。标签只是视觉分组，表达式仍应能按字符修改。</p>
+<table><tr><th>写法</th><th>含义</th></tr><tr><td><code>当前棋子.攻击力</code></td><td>读取当前棋子的攻击力。</td></tr><tr><td><code>目标.阵营 != 当前棋子.阵营</code></td><td>比较双方阵营。所属玩家和阵营不能混用。</td></tr><tr><td><code>{1, 2, 3}</code></td><td>有顺序的元组；第一项的下标为 1。</td></tr><tr><td><code>坐标(1, 0)</code></td><td>在相对范围中表示偏移；没有参考原点时表示绝对坐标。</td></tr><tr><td><code>列表.包含(目标)</code></td><td>查询容器是否包含某个值；使用当前入口支持的成员联想或等价函数。</td></tr></table>
+
+<h2 id="objects">3. 模板、显示选项和扩展都能逐字段编辑</h2>
+<p>多字段对象不是一块需要手写的原始文本。打开对象参数后，查看字段名称、类型和说明，逐项填写；列表可新增、删除条目，嵌套对象可继续展开。</p>
+<table><tr><th>填写状态</th><th>意义</th></tr><tr><td>未填写</td><td>不声明这个字段。只有接口约定了默认行为时，才使用默认行为。</td></tr><tr><td>数值 0 / 否</td><td>明确填写一个有效值，不等于未填写。</td></tr><tr><td>空容器</td><td>明确声明没有条目，例如召唤物的初始技能为空。</td></tr><tr><td>空值</td><td>明确声明无值；只有允许为空的字段才能使用。</td></tr></table>
+<p>棋子模板决定实际生命、移动力、技能与规则。显示选项决定玩家看到的字段，不赋予实际技能或生命。没有填写的显示字段继续使用正常显示。</p>
+<p>扩展变量用于存储自己声明的数据。先声明类型、名称和初值，再保存和读取。尽量使用棋子、玩家、技能或规则实例的引用，避免靠字符串拼接寻找对象。</p>
+<table><tr><th>结构</th><th>字段怎么理解</th></tr><tr><td>棋子模板</td><td>生命值是当前剩余生命；生命上限是可恢复到的上限。移动力、初始技能、初始状态和初始规则决定召唤物的实际行为。基础副本可提供未覆盖的属性，明确填写的字段覆盖副本中的对应字段。</td></tr><tr><td>显示选项</td><td>填写希望观察者看到的名称、生命、攻击力、技能等。每项都可单独配置；未填项保持正常显示。可按拥有者、友方、敌方和旁观者分别声明。</td></tr><tr><td>选项映射</td><td>每项左侧是玩家看到的选项名称，右侧是后续代码使用的值。可以加入任意多个选项，不限于两项。值可以是布尔值，也可以是当前接口允许的其他类型。</td></tr><tr><td>扩展</td><td>保存该对象需要的数据，例如分身标记、历史位置、计数和实例引用。字段名称由作者决定，读取时仍检查声明的类型。</td></tr></table>
+
+<h2 id="fireball">4. 先编写一个伤害技能</h2>
+<figure><img src="guide-images/fireball.png" alt="从空白创建并保存重开的火球术：选择五格内敌人，造成攻击力乘以一点五的普通伤害"><figcaption>实际从空白完成的两条效果语句。目标选择器的当前选择也可直接写成“目标”；需要多次保留选择时，再保存并命名返回值。</figcaption></figure>
+<ol><li>在“能力组”中新建主动能力，填写名称与描述，再设置行动点、充能点、冷却等基础信息。</li><li>添加目标选择语句，范围填 5，筛选敌方棋子。把选择结果保存为变量，例如 <code>target</code>。</li><li>添加造成伤害语句，目标填 <code>target</code>，数量填 <code>当前棋子.攻击力 * 1.5</code>，伤害类型选“普通”，来源选“当前棋子”。</li><li>先用较简单的固定数值验证选择和伤害，再改成表达式，便于区分流程错误和数值错误。</li><li>保存有效内容，关闭并重新打开，确认目标、表达式和返回变量仍在。点击“试用技能”，在训练营选择目标并核对实际生命变化。</li></ol>
+<p>不需要再手写“目标还活着吗”“距离是否合法”等通用补救判断。选择与效果的合法性由引擎处理；业务条件才写在语句里。</p>
+
+<h2 id="clone">5. 影分身：把复杂能力拆成明确的数据与动作</h2>
+<p>影分身的实际属性、外观和两种释放方式是三个独立问题。编写时先准备数据，再组合动作。</p>
+<figure><img src="guide-images/shadowclone.png" alt="从空白保存重开的影分身技能，选择地格和释放方式，再保存原位置并复制本体"><figcaption>实际操作示例先选落点，再选择释放方式。两步结果都能命名，后面的分支直接引用。</figcaption></figure>
+<ol><li><strong>准备选项。</strong>创建选项映射，显示“原地留下分身并传送”和“向目标位置召唤分身”。选项值可以用布尔值；显示文字不承担内部变体协议。</li><li><strong>选择地格。</strong>选择五格内可行走且未被占用的地格，保存选择结果。</li><li><strong>保存原位置。</strong>在传送前，把当前棋子的位置保存到变量。动作之后再读取，会得到新的位置。</li><li><strong>复制本体。</strong>把当前棋子的实例信息复制为独立副本，供模板和创建时显示使用。</li><li><strong>声明棋子模板。</strong>基础数据取自副本；移动力设为 0；初始技能和状态设为空；规则选择“受伤后消散”的规则；扩展字段记录分身标记。局中召唤默认是非核心棋子。</li><li><strong>声明显示。</strong>为其他观察者逐项设置创建时的本体显示值；所属玩家的显示可另外设置。显示快照不会随着本体后来的数值变化而自动刷新。</li><li><strong>组合分支。</strong>传送分支使用保存的原位置召唤分身；普通召唤分支使用所选地格。使用通用位移与召唤语句，不使用“传送型分身”这样的角色专用模块。</li><li><strong>在召唤时传入显示。</strong>不要先召唤一个明显不同的棋子、下一句才修改外观。创建时即可带上显示选项。</li></ol>
+<div class="note">检查“受伤后消散”规则是否已保存并被模板引用。它是规则，不是技能列表中的按钮。传送、召唤和受伤后触发应分别测试。</div>
+<figure><img src="guide-images/shadowclone-template.png" alt="棋子模板逐字段编辑，基础副本、移动力、初始技能、状态、规则及扩展分别设置"><figcaption>模板是可逐字段编辑的对象。也可以先把对象保存为“分身模板”，再在召唤的模板参数中点击“输入表达式”，填写这个变量名。</figcaption></figure>
+<p>消散规则选择“受到伤害后”，规则体填写“消灭当前棋子”。消灭会正式结算死亡，不需要把生命值改为零，也不需要先检查当前棋子是否仍存活。</p>
+<p>试用时分别检查：在目标格出现分身；传送后分身留在旧位置；分身不能普通移动；分身受到伤害后消散；对手看到的是创建时的本体数值。传送被阻止时，本体仍占着原位，引擎会使原位召唤无效，不需要再添加一层占用或成功判断。</p>
+
+<h2 id="rules">6. 被动能力从触发器开始</h2>
+<p>先选触发条件，再编写规则体。例如“受到伤害后”与“受到伤害前”不是同一个入口：前者读取结算结果，后者可在该事件允许的范围内修改事件。</p>
+<ol><li>新建规则，选择触发器、监听范围与优先级。</li><li>用“当前事件”读取目标、来源、伤害等当前入口提供的字段。只有相应入口的字段才有意义。</li><li>添加条件、赋值或效果；保存规则，关联到棋子或能力组。</li><li>用另一个技能触发它，查看训练营中的事件结果。仅看到规则在目录里，不代表规则已经部署到棋子身上。</li></ol>
+<p>多个动作需要先后执行时，按语句顺序排列；集合遍历用于对每项执行；条件用于真正的玩法分支。循环应有明确的结束条件，不能把引擎的循环上限当作正常业务流程。</p>
+<figure><img src="guide-images/passive-rule.png" alt="从空白创建并保存重开的受伤后消散规则，效果句为消灭当前棋子"><figcaption>从空白创建、保存并重新打开的规则。触发器在“属性”中设置，效果区只写发生什么。</figcaption></figure>
+
+<h2 id="display">7. 编辑玩家在局内看到的说明与图标</h2>
+<p>效果语句决定能力做什么，说明与图标决定玩家如何理解它。编辑同一份内容时，把两部分一起检查；修改数值不会自动把自由编写的说明改成相应数值。</p>
+<table><tr><th>内容</th><th>在哪里编辑</th><th>在哪里看到</th></tr><tr><td>主动技能</td><td>进入能力组，选择主动技能，在“属性”中填写名称和描述。</td><td>局内技能说明；主动技能不要求配置图标。</td></tr><tr><td>玩家级规则</td><td>进入规则，修改名称和描述，在“玩家规则表现”中开启“局内可见”并选择图标。</td><td>规则授予玩家后，出现在玩家状态栏，并提供该规则的说明。</td></tr><tr><td>可见状态</td><td>从使用该状态的能力组进入状态成员，选择图标素材；棋子的初始状态也可在棋子配置中编辑。</td><td>棋子状态、状态详情及使用图标的棋盘表现。</td></tr></table>
+<ol><li>先在“素材”中导入所需图片，回到要修改的规则或状态。</li><li>选择素材并查看实际预览。保存的是素材引用；显示名称改变不会把图片变成另一种状态或规则。</li><li>保存，再关闭并重开内容，确认描述和所选图片仍在。</li><li>在训练营让规则实际挂到玩家、或让棋子获得状态，核对局内说明和图标。只配置一个未授予的规则，不会凭空在战局里显示。</li><li>需要交付时生成资源包，确认内容和图像一并包含。</li></ol>
+<div class="note">清除图标后使用既有默认图标；素材不可用时会提示。更换图片不改变触发器、状态强度、持续时间或规则效果。</div>
+<p>玩家规则的名称、说明、图标和“局内可见”都属于这条规则本身。新规则默认隐藏，开启后才在局内显示；旧规则保留原有显示行为。隐藏规则仍正常触发和结算，适合后台计数等逻辑。</p>
+<figure><img src="guide-images/player-rule-display.png" alt="玩家规则编辑：中文名称、描述、局内可见复选框，以及素材库选择的裂魂图标"><figcaption>在规则本身设置表现。此例已保存、重启重开，并打包进入训练场。</figcaption></figure>
+<figure><img src="guide-images/training-display.png" alt="正式训练场显示作者设置的玩家规则图标与棋子状态图标"><figcaption>真实训练场使用资源包中的图片，说明和图标来自保存的规则与状态。</figcaption></figure>
+
+<h2 id="drafts">8. “保存草稿”和“保存”有不同用途</h2>
+<table><tr><th>操作</th><th>保存什么</th><th>能否进入运行和打包</th></tr><tr><td>保存草稿</td><td>未完成语句、尚未应用的输入和编辑状态，保存在项目独立草稿区。</td><td>不能。最后有效内容保持原样。</td></tr><tr><td>保存</td><td>通过语句与类型校验的内容定义。</td><td>可以继续做训练与资源包检查。</td></tr><tr><td>应用参数</td><td>将当前参数输入写入编辑中的语句。</td><td>不等于保存整个文档，也不等于应用到当前战局。</td></tr><tr><td>应用并重试</td><td>验证当前草稿，建立新的训练快照。</td><td>只重建训练战局，不覆盖正在进行的正式对局。</td></tr></table>
+<p>看到“草稿已保存 · 尚未应用”，表示编辑内容被保护，但正式内容尚未更新。重新打开同一项目可继续编辑。若文件被其他进程修改，编辑器应提示冲突，不能静默覆盖。</p>
+
+<h2 id="training">9. 在内嵌训练营调试</h2>
+<figure><img src="guide-images/training-controls.png" alt="训练营控件：选择初始行动方、打开已接受版本、打开当前草稿、应用并重试和关闭试玩"><figcaption>训练营实际控件。先运行一次，再修改草稿并点击“应用并重试”。</figcaption></figure>
+<ol><li>完成并应用正在填写的参数，在技能中点击“试用技能”，或进入“训练营”打开当前草稿。</li><li>选择初始行动方和场景，布置棋子并准备资源。开始正式操作前的场景调整会成为重试的初始场景。</li><li>运行一次技能，检查选择过程、生命和位置变化、资源与冷却、日志及状态。</li><li>返回编辑器修改参数，再进入训练营点击“应用并重试”。新战局使用新的有效草稿，沿用原场景和随机种子；上次结果可以比较。</li><li>若草稿有错误，先修正并应用输入。不能把未应用的半句表达式当作当前代码运行。</li></ol>
+<p>状态栏显示内容版本、随机种子、动作数量与状态指纹。相同种子保证可比较的随机过程；修改规则后，结果可能按新规则变化。</p>
+<figure><img src="guide-images/training-battle.png" alt="内嵌正式游戏棋盘，蓝方先手，棋子生命和行动点正常显示"><figcaption>实际训练棋盘。这里使用正式规则引擎；编辑器侧边记录动作、状态变化和重试结果。</figcaption></figure>
+<div class="note">第一次技能或移动操作后的临时调试调整只属于本次试玩，不回填到初始场景。要换一个测试场景，请关闭试玩并重新布置。切换目录时训练窗口会隐藏；回到训练营继续查看。</div>
+
+<h2 id="package">10. 生成资源包</h2>
+<ol><li>保存所有准备交付的有效内容；未完成草稿不会自动混入包内。</li><li>进入“资源包”，刷新当前项目，执行内容检查。</li><li>首次或一般内容更新选择完整资源包；只有明确有对应基础包时才选择增量更新。</li><li>生成后查看检查结果，再使用实际生成的包试玩。打包成功不等于所有技能都已逐项通过玩法验收。</li></ol>
+
+<h2 id="trouble">11. 出问题时按这几步检查</h2>
+<table><tr><th>现象</th><th>先检查</th></tr><tr><td>不能保存</td><td>是否有尚未应用的参数？目标、必填对象字段和返回值类型是否完整？可以先保存草稿。</td></tr><tr><td>找不到变量</td><td>是否在前面的语句保存了结果？是否越过了分支或循环的作用范围？</td></tr><tr><td>模板没有技能</td><td>显示技能和实际技能是不同字段；显示技能不会自动安装实际技能。</td></tr><tr><td>被动没有触发</td><td>规则是否已关联、部署？触发器与事件前后是否一致？条件是否满足？</td></tr><tr><td>召唤或位移没发生</td><td>检查实际落点和日志中的失效原因，不要先在作者代码外加一堆兜底。</td></tr><tr><td>改动后试玩仍像旧版</td><td>确认参数已应用、草稿可运行，再点击“应用并重试”，检查版本是否改变。</td></tr></table>
+<p>运行时失效的语句应被记录并跳过，不能无限等待；作者界面的输入与类型错误仍应尽早指出。遇到问题请保留技能、初始场景、种子、操作步骤和错误截图。</p>
+<p class="small">显示选项保证所声明字段的显示行为。原始通信数据中的实例标识并不因此成为匿名标识；这份指南不将视觉伪装等同于通信层的秘密身份保护。</p>
+</main>
+</html>

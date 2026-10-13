@@ -56,6 +56,20 @@
     currentCooldown: '当前冷却', usesRemaining: '剩余次数', level: '等级', owner: '所属棋子', abilityGroups: '能力组', kind: '发动方式', definitionExists: '已有定义', momentumGainOnUse: '使用时积累动量',
     spentPassives: '已消耗的被动能力', relatedRules: '相关规则', stacking: '叠加方式', visible: '可见', expiresAfterTurn: '到期回合', showFreezeEffect: '冻结表现标记',
     lastDamageTurn: '上次受伤回合', hitCount: '命中次数', readyCharges: '可用资格', remainingTurns: '剩余回合', grantedTurnNumber: '获得回合', createdTurnNumber: '创建回合', value: '数值',
+    actualDamage: '实际伤害', amount: '数量', boundPieceInstanceId: '绑定棋子实例', cancelled: '已取消', cardId: '卡牌标识',
+    centerX: '中心横坐标', centerY: '中心纵坐标', contactCells: '接触地格', contentState: '内容状态',
+    currentCardId: '当前卡牌标识', currentCardType: '当前卡牌类型', dx: '横向位移', dy: '纵向位移',
+    effectModifiers: '效果修正', extension: '扩展字段', extraValue: '额外数值', flightId: '飞行标识',
+    fromX: '起点横坐标', fromY: '起点纵坐标', isSinglePieceTargetAction: '是否单棋子目标行动', left: '左值',
+    legacyText: '旧文本', modifiedDamage: '修正伤害', modifiedHeal: '修正治疗', movementKind: '移动方式',
+    noKillCharge: '不积累击杀充能', occupied: '是否占用', pathCells: '路径地格', playerId: '玩家标识',
+    presentation: '表现批次', rawDamage: '原始伤害', rawHeal: '原始治疗', reservedCells: '保留地格',
+    resolvedDamage: '结算伤害', right: '右值', ruleOwnerPlayerId: '规则所属玩家',
+    ruleRewrittenPrimaryTargetPieceId: '规则改写的主要目标棋子', selectedOption: '已选选项', selectedTargets: '已选目标',
+    skillIds: '技能标识列表', skills: '技能列表', sourcePieceId: '来源棋子标识', statusId: '状态标识', statusType: '状态类型',
+    targetHp: '目标生命', targetId: '目标标识', targetX: '目标横坐标', targetY: '目标纵坐标', terrainType: '地形类型',
+    tileType: '地格类型', totalDamage: '总伤害', totalHeal: '总治疗', turns: '回合数',
+    velenHolyProphecy: '圣预言', velenHolyProphecyEnhanced: '强化圣预言', walkable: '可通行',
   })
 
   // Descriptors usually carry a domain label, but older catalog entries and
@@ -75,6 +89,48 @@
     skillId: '技能', left: '左值', right: '右值', whenTrue: '满足时的值', whenFalse: '不满足时的值',
     currentDuration: '持续时间', duration: '持续时间', stacks: '层数', currentUses: '可用次数',
     maxUses: '最大使用次数', statusType: '状态类型', inputPolicy: '输入策略',
+    variant: '变体', quantity: '数量', amountType: '数量类型', fields: '字段集合', fieldType: '字段类型',
+    templateType: '模板类型', displayType: '显示类型', destinationType: '目标地格类型', extensionType: '扩展字段类型',
+    definitionType: '定义类型', blockType: '代码块类型', argsType: '参数类型', optionsType: '选项类型',
+    sourceType: '来源类型', mode: '模式', scope: '作用范围', storageKey: '存储键', key: '键',
+    order: '顺序', comparison: '比较方式', attribution: '归属方式', flowStatePolicy: '流程状态策略',
+    lifetime: '生命周期', stacking: '叠加方式', relation: '关联方式', collection: '内容集合',
+    card: '卡牌', rule: '规则', status: '状态', block: '代码块', args: '参数', extension: '扩展字段',
+    definition: '定义', iconPath: '图标路径', duration: '持续时间', area: '范围', radius: '半径',
+    attackBonus: '攻击加成', cancelValue: '中止返回值', cardId: '卡牌标识', cell: '地格',
+    center: '中心地格', choice: '选择项', count: '数量', defaultValue: '默认值', description: '说明',
+    destination: '目的地', destinations: '目的地列表', direction: '方向', display: '显示设置', effect: '效果',
+    effects: '效果列表', end: '结束位置', entity: '实体', event: '事件', events: '事件列表', excludePiece: '排除棋子', blocked: '是否阻挡',
+    first: '首项', from: '起点', group: '能力组', id: '标识', ignoreA: '忽略左侧目标', ignoreB: '忽略右侧目标',
+    keys: '键列表', killerPlayer: '击杀玩家', map: '映射', maxDistance: '最大距离', maximum: '最大值', minimum: '最小值',
+    movement: '移动方式', offsets: '偏移列表', omitFields: '省略字段', options: '选项列表', origin: '起点地格',
+    originId: '起点标识', ownerId: '所有者标识', pieces: '棋子列表', playerId: '玩家标识', position: '位置',
+    records: '记录列表', root: '根节点', second: '第二项', selfDamage: '是否自伤', set: '集合', skill: '技能',
+    snapshot: '快照', sourceId: '来源标识', start: '起始位置', template: '模板', text: '文本', tiles: '地格列表',
+    to: '终点', turn: '回合', type: '类型', values: '值列表', x: '横坐标', y: '纵坐标',
+    audience: '显示对象', blockedTerrainTypes: '阻挡地形', containerType: '容器类型', currentHp: '当前生命',
+    entityKind: '实体类型', fieldsType: '字段类型', idPrefix: '标识前缀', includeCover: '包含掩体',
+    includeDead: '包含已失效对象', itemsType: '项目类型', keyType: '键类型', keysType: '键列表类型', kind: '方式',
+    legacyNormalSpelling: '旧伤害名称', metric: '距离度量', missing: '缺失值', operator: '运算符', ownerType: '所有者类型',
+    passAllies: '允许通过友方', passEnemies: '允许通过敌方', payloadSchema: '载荷结构', prefix: '前缀',
+    presentationBatch: '表现批次', preserveMissing: '保留缺失项', requireUnoccupied: '要求未占用',
+    requireWalkable: '要求可通行', resultType: '结果类型', ruleId: '规则标识', separator: '分隔符',
+    snapshotType: '快照类型', statusId: '状态标识', subfield: '子字段', templateId: '模板标识', terrain: '地形',
+    terrainPolicy: '地形策略', tileType: '地格类型', valuesType: '值列表类型',
+    accepted: '已接受', ally: '友军', beforeFirstEnemy: '首个敌人之前', cards: '卡牌列表', distance: '距离',
+    changed: '已变化', copied: '已复制', dx: '横向位移', dy: '纵向位移', encounters: '遭遇列表', enemy: '敌人',
+    enemyPieces: '敌方棋子列表', exists: '是否存在', faction: '阵营', firstEnemy: '首个敌人', firstEnemyDistance: '首个敌人距离',
+    groups: '能力组列表', hasHand: '是否有手牌', hasNewLandable: '是否有新可落点', lastLandable: '最后可落点', legal: '是否合法',
+    ownerPlayerId: '所属玩家', placement: '落点结果', players: '玩家列表', reachedTarget: '已到达目标', reference: '引用',
+    removed: '已移除', sameCell: '是否同格', steps: '步数', terrainBlocked: '地形受阻', valid: '是否有效',
+  })
+
+  const semanticModuleLabels = Object.freeze({
+    'author.effect.summon': '召唤棋子', 'author.piece.display': '设置棋子显示',
+    'author.effect.damage': '造成伤害', 'author.effect.heal': '进行治疗',
+    'record.create': '创建记录', 'record.get': '读取记录字段', 'record.with': '更新记录',
+    'record.empty': '创建空记录', 'collection.map': '映射集合', 'collection.filter': '筛选集合',
+    'collection.reduce': '汇总集合', 'collection.find': '查找集合', 'code-block.invoke': '执行代码块',
   })
 
   const expressionInfixOperators = Object.freeze({
@@ -109,7 +165,55 @@
   function semanticSlotLabel(definition, name) {
     if (name === 'canCancel') return '允许中止本次效果'
     if (name === 'resumeOnCancel') return '中止后继续流程'
-    return definition?.label || semanticSlotLabels[name] || name || '字段'
+    const provided = String(definition?.label || '').trim()
+    if (provided && provided !== name && /[\u3400-\u9fff]/u.test(provided)) return provided
+    return semanticSlotLabels[name] || provided || name || '字段'
+  }
+
+  function fieldDisplayLabel(definition) {
+    const name = String(definition?.name || '').trim()
+    const provided = String(definition?.label || '').trim()
+    if (provided && /[\u3400-\u9fff]/u.test(provided)) return provided
+    return fieldLabels[name] || provided || name || '字段'
+  }
+
+  const diagnosticFieldLabels = Object.freeze({
+    summonCapability: '召唤能力声明', amount: '数量', source: '来源', target: '目标',
+    template: '棋子模板', display: '显示选项', destination: '落点', message: '提示文字',
+    skillId: '技能', damageType: '伤害类型', resultType: '结果类型', sourceType: '来源类型',
+    targetType: '目标类型', amountType: '数量类型',
+  })
+
+  function authorDiagnostic(text) {
+    let value = String(text ?? '')
+    if (!value) return value
+    const diagnostics = typeof window !== 'undefined' ? window.AuthorDiagnostics : globalThis.AuthorDiagnostics
+    if (typeof diagnostics?.format === 'function') {
+      try {
+        const catalogCore = typeof window !== 'undefined' ? (window.ContentGraphCore || window.GameplayModuleCore) : null
+        const formatted = diagnostics.format(value, catalogCore ? descriptorSource(catalogCore) : undefined)
+        if (typeof formatted === 'string' && formatted.trim()) return formatted
+      } catch { /* retain the local fallback if the optional adapter is unavailable */ }
+    }
+    value = value.replace(/^Gameplay module document:\s*/iu, '内容流程文档：')
+    value = value.replace(/invalid summonCapability:\s*summonCapability must be a plain object/iu,
+      '召唤能力声明无效：该字段必须填写对象结构，或移除空值。')
+    value = value.replace(/missing input port\s+"([^"]+)"/giu, (_match, name) => `缺少输入“${diagnosticFieldLabels[name] || semanticSlotLabels[name] || name}”`)
+    value = value.replace(/\binput port\b/giu, '输入')
+    value = value.replace(/\bgraph\.body\[(\d+)\]\.inputs\b/giu, (_match, index) => `第${Number(index) + 1}条语句的输入`)
+    value = value.replace(/\b(?:summonCapability|displayType|templateType|destinationType|sourceType|targetType|amountType|resultType)\b/giu,
+      name => diagnosticFieldLabels[name] || name)
+    return value
+  }
+
+  function semanticModuleLabel(id, label) {
+    const value = String(label || '').trim()
+    // Registered descriptors normally provide a Chinese label.  A machine
+    // identifier is only a compatibility hint and must not become the
+    // author-facing sentence text when a known built-in has a semantic name.
+    if (semanticModuleLabels[id]) return semanticModuleLabels[id]
+    if (value && value !== id && !/^[a-z][a-z0-9]*(?:[.-][a-z0-9_-]+)+$/i.test(value)) return value
+    return '未注册模块'
   }
 
   function coreFor(options) {
@@ -530,6 +634,65 @@
     return next
   }
 
+  // New authoring documents may still carry the legacy content-field default
+  // `summonCapability: null`.  The document validator treats an explicitly
+  // present null as an invalid capability; an omitted optional capability is
+  // the supported representation.  Keep this normalization at the authoring
+  // boundary so the runnable graph and the user-facing draft stay identical.
+  function normalizeAuthorDraft(next) {
+    if (!record(next) || next.summonCapability !== null) return next
+    const normalized = clone(next)
+    delete normalized.summonCapability
+    return normalized
+  }
+
+  function graphWithDescriptorSchemas(graph, descriptor) {
+    const schemas = Array.isArray(descriptor?.recordSchemas) ? descriptor.recordSchemas : []
+    if (!record(graph) || !schemas.length) return graph
+    const merged = new Map()
+    for (const schema of Array.isArray(graph.schemas) ? graph.schemas : []) {
+      if (!record(schema)) continue
+      merged.set(`${schema.id || schema.name || ''}@${schema.version || ''}`, schema)
+    }
+    for (const schema of schemas) {
+      if (!record(schema)) continue
+      merged.set(`${schema.id || schema.name || ''}@${schema.version || ''}`, schema)
+    }
+    return { ...graph, schemas: [...merged.values()] }
+  }
+
+  // Author record modules carry the shared piece/template/display schemas on
+  // their descriptors.  A blank graph has no local schema declarations yet,
+  // so structural record editors must still see those declarations while an
+  // author is composing the graph.  Keep this as an editor-only projection:
+  // schemas become part of the executable graph only when a graph statement
+  // explicitly selects one (and the compiler receives its descriptor schema
+  // table in the normal way).
+  function graphWithAuthorSchemas(core, graph) {
+    const schemas = descriptorsFrom(descriptorSource(core)).flatMap(item => Array.isArray(item?.recordSchemas) ? item.recordSchemas : [])
+    return graphWithDescriptorSchemas(graph, { recordSchemas: schemas })
+  }
+
+  function authorSchemaForReference(core, reference) {
+    if (!reference) return null
+    const projected = graphWithAuthorSchemas(core, { schemas: [] })
+    return schemaForGraph(projected, reference)
+  }
+
+  // Selecting a shared structure is an explicit authoring action. Persist the
+  // selected declaration on the graph so record.create/get/with compile after
+  // the draft is saved; controls still obtain the metadata from the registry
+  // while the selection is being edited.
+  function ensureAuthorSchema(graph, core, reference) {
+    const schema = authorSchemaForReference(core, reference)
+    if (!schema || !record(graph)) return
+    if (!Array.isArray(graph.schemas)) graph.schemas = []
+    const key = `${schema.id || ''}@${schema.version || ''}`
+    const existing = graph.schemas.findIndex(item => `${item?.id || ''}@${item?.version || ''}` === key)
+    if (existing >= 0) graph.schemas[existing] = clone(schema)
+    else graph.schemas.push(clone(schema))
+  }
+
   function surfaceForField(options, field) {
     if (field === 'previewCode') return 'preview'
     if (field === 'effectCode') return 'pending'
@@ -639,6 +802,7 @@
       }
     }
     notifyTargetBindingWarnings(options, core, next)
+    next = normalizeAuthorDraft(next)
     options.__sentenceLastDiagnostic = diagnostic
     options.onChange?.(next)
     if (diagnostic) options.onDraftDiagnostic?.(diagnostic)
@@ -691,6 +855,7 @@
     }
     const derivedDescription = textState?.description || (graphPattern(nextGraph) && typeof next.description === 'string' ? next.description : '')
     if (derivedDescription) next = updatePreviewDescription(next, derivedDescription, core, options)
+    next = normalizeAuthorDraft(next)
     diagnostic = diagnostic || options.__sentenceLastDiagnostic || ''
     options.__sentenceLastDiagnostic = diagnostic
     options.onChange?.(next)
@@ -841,7 +1006,9 @@
       const schema = (Array.isArray(scopeGraph.schemas) ? scopeGraph.schemas : []).find(Boolean)
         || (Array.isArray(nextGraph.schemas) ? nextGraph.schemas : []).find(Boolean)
       statement = { kind, id, schema: schema ? `${schema.id}@${schema.version}` : '', fields: {} }
-      for (const field of Array.isArray(schema?.fields) ? schema.fields : []) statement.fields[field.name] = literal(defaultLiteralFor(field, scopeGraph))
+      for (const field of Array.isArray(schema?.fields) ? schema.fields : []) {
+        if (own(field, 'default')) statement.fields[field.name] = literal(clone(field.default))
+      }
     } else if (kind === 'record.get') statement = { kind, id, record: literal(null), field: '' }
     else if (kind === 'record.with') statement = { kind, id, record: literal(null), fields: {} }
     else if (kind === 'collection' || kind === 'collection.map' || kind === 'collection.filter' || kind === 'collection.reduce' || kind === 'collection.find') {
@@ -966,21 +1133,30 @@
    * the descriptor's declared inputs and parameters; they do not interpret or
    * execute a graph and they leave unrecognised fields untouched.
    */
+  const builtinSchemaLabels = Object.freeze({
+    'author.piece-skill@1': '技能实例', 'author.piece-status@1': '状态实例',
+    'author.piece-rule@1': '规则实例', 'author.piece-buff@1': '增益', 'author.piece-debuff@1': '减益',
+    'author.piece-identity@1': '棋子身份', 'author.piece-snapshot-fields@1': '棋子字段副本',
+    'author.piece-flow-state@1': '已存扩展变量', 'author.piece-instance@1': '棋子实例副本',
+    'author.piece-display@1': '棋子显示选项', 'author.piece-display-audiences@1': '各方显示选项',
+    'author.piece-display-plan@1': '棋子显示方案', 'author.piece-template@1': '棋子模板',
+  })
   const typeLabel = type => {
     const labels = {
       number: '数值', boolean: '布尔值', string: '文本', piece: '棋子', player: '玩家',
       cell: '地格', path: '路径', card: '卡牌', content: '内容', status: '状态',
-      event: '事件', choice: '选择', record: '记录', null: '空值', never: '空', unknown: '未知', any: '任意值',
+      event: '事件', choice: '选择', record: '记录', object: '对象', list: '元组', set: '集合',
+      map: '映射', nullable: '可空值', enum: '选项', json: '任意数据', null: '空值', never: '空', unknown: '未知', any: '任意值',
     }
     if (record(type)) {
       if (type.kind === 'list') return `元组<${typeLabel(type.element)}>`
       if (type.kind === 'set') return `集合<${typeLabel(type.element)}>`
       if (type.kind === 'map') return `映射<${typeLabel(type.key)}, ${typeLabel(type.value)}>`
       if (type.kind === 'nullable') return `可空${typeLabel(type.value)}`
-      if (type.kind === 'record') return type.schema ? `记录 · ${type.schema}` : '记录'
-      return type.kind ? String(type.kind) : '未知'
+      if (type.kind === 'record') return builtinSchemaLabels[type.schema] || (type.schema ? '结构化记录' : '记录')
+      return labels[type.kind] || '未知类型'
     }
-    return labels[type] || String(type || '未知')
+    return labels[type] || '未知类型'
   }
   const authorDomainLabel = domain => ({
     'card-instance': '手牌实例',
@@ -996,14 +1172,18 @@
     if (port?.nullable && !(record(type) && type.kind === 'nullable')) return { kind: 'nullable', value: type }
     return type
   }
-  // Literal controls are recursive.  A record literal is safe only when its
-  // type names a registered schema; the editor resolves that schema below and
-  // never asks authors to paste JSON.  Lists/nullable values may contain any
-  // recursively editable literal type.
-  const literalType = type => type === 'null' || ['number', 'boolean', 'string', 'any', 'unknown'].includes(type)
+  // Literal controls are recursive.  Named records resolve their fields from
+  // the active graph; a generic record opens the shared object editor so an
+  // author can choose a declared structure before entering fields.  Lists and
+  // nullable values may contain any recursively editable literal type.
+  const literalType = type => type === 'null' || ['number', 'boolean', 'string', 'json', 'any', 'unknown', 'record', 'object'].includes(type)
     || (record(type) && type.kind === 'record' && Boolean(type.schema))
     || (record(type) && type.kind === 'nullable' && literalType(type.value))
     || (record(type) && type.kind === 'list' && literalType(type.element))
+    || (record(type) && type.kind === 'set' && literalType(type.element))
+    || (record(type) && type.kind === 'map' && literalType(type.key) && literalType(type.value))
+  const structuredLiteralType = type => type === 'record' || type === 'object' || type === 'json'
+    || (record(type) && ['record', 'object', 'nullable', 'list', 'array', 'set', 'map'].includes(type.kind))
   const defaultForType = definition => {
     if (own(definition, 'default')) return clone(definition.default)
     if (Array.isArray(definition?.enum) && definition.enum.length) return clone(definition.enum[0])
@@ -1012,7 +1192,10 @@
     if (type === 'boolean') return false
     if (type === 'number') return 0
     if (type === 'string') return ''
+    if (type === 'json') return {}
     if (record(type) && type.kind === 'list') return []
+    if (record(type) && type.kind === 'set') return { format: 'author-set/v1', items: [] }
+    if (record(type) && type.kind === 'map') return { format: 'author-map/v1', entries: [] }
     return null
   }
   function defaultLiteralFor(definition, graph, depth = 0) {
@@ -1023,7 +1206,12 @@
       const schema = schemaForGraph(graph, type.schema)
       if (!schema) return null
       const value = {}
-      for (const field of Array.isArray(schema.fields) ? schema.fields : []) value[field.name] = defaultLiteralFor(field, graph, depth + 1)
+      // Start a newly selected record empty.  The shared object editor owns
+      // field presence, so optional fields remain omitted until the author
+      // explicitly chooses a value (including an explicit empty value).
+      for (const field of Array.isArray(schema.fields) ? schema.fields : []) {
+        if (own(field, 'default')) value[field.name] = clone(field.default)
+      }
       return value
     }
     return defaultForType(definition)
@@ -1078,15 +1266,95 @@
     if (typeof value === 'boolean') return value ? '是' : '否'
     if (Array.isArray(value)) return value.map(literalDisplay).join('、') || '空列表'
     if (typeof value === 'object') {
-      try { return JSON.stringify(value) } catch { return '结构化值' }
+      const count = Object.keys(value).length
+      return count ? `结构化记录（${count} 个字段）` : '空记录'
     }
     const labels = {
+      ...fieldLabels,
       enemy: '敌方', ally: '友方', all: '全部', normal: '普通', true: '真实', toxin: '毒素',
       attack: '攻击力', defense: '防御力', moveRange: '移动范围', currentHp: '当前生命', maxHp: '最大生命',
       name: '名称', faction: '阵营',
-      physical: '物理', magical: '魔法', floor: '取整后', host: '宿主输入',
+      physical: '物理', magical: '魔法', floor: '向下取整', flow: '流程输入', host: '宿主输入',
+      public: '公开', owner: '所属玩家', allies: '友方', spectators: '观战者',
+      piece: '棋子', player: '玩家', cell: '地格', card: '卡牌', record: '记录',
+      'new-instance': '新建棋子', 'return-instance': '原实例回场', declaration: '使用当前内容声明',
+      add: '增加', atLeast: '至少达到', teleport: '传送', summon: '召唤', dash: '冲刺', walk: '步行',
+      push: '推动', pull: '拉拽', swap: '交换', current: '沿用当前归属', unattributed: '无技能归属',
+      cleanup: '清理状态', preserve: '保留状态', numeric: '按数值', text: '按文本', locale: '按本地化文本',
+      manhattan: '曼哈顿距离', chebyshev: '切比雪夫距离', undefined: '未定义',
+      '==': '等于', '!=': '不等于', ascending: '升序', descending: '降序',
+      enemies: '敌方', direct: '立即表现', queue: '统一表现队列', tileEffectAdded: '地格效果添加', tileEffectRemoved: '地格效果移除',
+      live: '实时值', stored: '已保存值', single: '单选', multi: '多选',
+      string: '文本', target: '目标', source: '来源',
+      'floor-or-cover': '地面或掩体', walkable: '可通行', projectile: '弹道', any: '任意', 'lethal-toxin': '致命毒素',
     }
     return labels[value] || String(value)
+  }
+
+  // Enum values are serialized machine identifiers.  Keep those identifiers
+  // in the graph while translating their author-facing meaning at the point
+  // where the parameter gives the value its context.  Unknown values are
+  // intentionally left alone so user-defined names remain recoverable.
+  const enumValueLabels = Object.freeze({
+    attribute: Object.freeze({ attack: '攻击力', defense: '防御力', moveRange: '移动范围' }),
+    attribution: Object.freeze({ current: '沿用当前归属', unattributed: '无技能归属' }),
+    audience: Object.freeze({ public: '公开', owner: '所属玩家', allies: '友方', enemies: '敌方', spectators: '观战者' }),
+    comparison: Object.freeze({ numeric: '按数值', text: '按文本', locale: '按本地化文本' }),
+    damageType: Object.freeze({ normal: '普通伤害', true: '真实伤害', toxin: '毒素伤害' }),
+    entityKind: Object.freeze({ card: '卡牌实例', cluster: '能力组实例', rule: '规则实例', skill: '技能实例', status: '状态实例', 'tile-effect': '地格效果' }),
+    filter: filterLabels,
+    flowStatePolicy: Object.freeze({ cleanup: '清理状态', preserve: '保留状态' }),
+    inputPolicy: Object.freeze({ floor: '向下取整', flow: '流程输入', host: '宿主输入' }),
+    kind: Object.freeze({ teleport: '传送', summon: '召唤', dash: '冲刺', walk: '步行', push: '推动', pull: '拉拽', swap: '交换' }),
+    legacyNormalSpelling: Object.freeze({ physical: '物理伤害', magical: '魔法伤害' }),
+    metric: Object.freeze({ manhattan: '曼哈顿距离', chebyshev: '切比雪夫距离' }),
+    missing: Object.freeze({ undefined: '未定义', null: '空值' }),
+    mode: Object.freeze({ add: '增加', atLeast: '至少达到', 'new-instance': '新建棋子', 'return-instance': '原实例回场', declaration: '使用当前内容声明' }),
+    operator: Object.freeze({ '==': '等于', '!=': '不等于' }),
+    order: Object.freeze({ ascending: '升序', descending: '降序' }),
+    ownerType: Object.freeze({ piece: '棋子', player: '玩家' }),
+    presentationBatch: Object.freeze({ direct: '立即表现', queue: '统一表现队列', tileEffectAdded: '地格效果添加', tileEffectRemoved: '地格效果移除' }),
+    relation: Object.freeze({ all: '全体', ally: '友方', enemy: '敌方' }),
+    resource: Object.freeze({ actionPoints: '行动点', chargePoints: '充能点' }),
+    scope: Object.freeze({ live: '实时值', stored: '已保存值' }),
+    selectionMode: Object.freeze({ single: '单选', multi: '多选' }),
+    sourceType: Object.freeze({ piece: '棋子来源', player: '玩家来源', card: '卡牌来源', record: '本次执行来源' }),
+    targetType: Object.freeze({ piece: '棋子目标', record: '本次执行目标', string: '文本目标' }),
+    terrain: Object.freeze({ walkable: '可通行', projectile: '弹道', any: '任意' }),
+    terrainPolicy: Object.freeze({ 'floor-or-cover': '地面或掩体', walkable: '可通行地形' }),
+    tileType: Object.freeze({ 'lethal-toxin': '致命毒素' }),
+  })
+
+  const typeParameterNames = new Set([
+    'valueType', 'amountType', 'argsType', 'blockType', 'containerType', 'definitionType', 'destinationType',
+    'displayType', 'extensionType', 'fieldsType', 'itemsType', 'keyType', 'keysType', 'optionsType',
+    'payloadSchema', 'resultType', 'snapshotType', 'targetType', 'templateType', 'valuesType',
+  ])
+
+  function enumTypeDisplay(value, name) {
+    if (!typeParameterNames.has(name)) return undefined
+    const parsed = serializedValueType(value, undefined)
+    if (parsed === undefined) return undefined
+    if (name === 'targetType' && record(parsed) && parsed.kind === 'list' && parsed.element === 'piece') return '棋子目标列表'
+    return typeLabel(parsed)
+  }
+
+  function enumValueDisplay(value, definition = {}) {
+    const name = definition?.name
+    const declared = !Array.isArray(definition?.enum) || definition.enum.some(item => item === value
+      || (record(item) && record(value) && jsonValue(item) === jsonValue(value))
+      || (typeof item === 'string' && record(value) && item === jsonValue(value)))
+    if (!declared) return undefined
+    if (name === 'field' || name === 'attribute') return fieldLabels[value]
+    const labels = enumValueLabels[name]
+    if (labels && Object.prototype.hasOwnProperty.call(labels, value)) return labels[value]
+    if (name === 'targetType') {
+      const parsed = serializedValueType(value, undefined)
+      if (record(parsed) && parsed.kind === 'list' && parsed.element === 'piece') return '棋子目标列表'
+    }
+    const typed = enumTypeDisplay(value, name)
+    if (typed) return typed
+    return undefined
   }
 
   const movementKindLabels = Object.freeze({
@@ -1102,10 +1370,6 @@
     projectile: '弹道',
     any: '任意',
   })
-  const damageAttributionLabels = Object.freeze({
-    current: '沿用当前归属',
-    unattributed: '无技能归属',
-  })
   const enumContains = (definition, value) => Array.isArray(definition?.enum) && definition.enum.includes(value)
   const movementEnumDisplay = (value, definition) => {
     if (definition?.name === 'kind' && enumContains(definition, value)) return movementKindLabels[value]
@@ -1113,8 +1377,12 @@
     return undefined
   }
   const enumLiteralDisplay = (value, definition) => {
-    if (['field', 'attribute'].includes(definition?.name)) return fieldLabels[value] || literalDisplay(value)
-    if (definition?.name === 'attribution' && enumContains(definition, value)) return damageAttributionLabels[value]
+    const declared = !Array.isArray(definition?.enum) || definition.enum.some(item => item === value
+      || (record(item) && record(value) && jsonValue(item) === jsonValue(value))
+      || (typeof item === 'string' && record(value) && item === jsonValue(value)))
+    if (!declared) return String(value)
+    const mapped = enumValueDisplay(value, definition)
+    if (mapped) return mapped
     const movement = movementEnumDisplay(value, definition)
     if (movement) return movement
     if (definition?.name === 'kind' && (value === 'teleport' || value === 'summon')) return value === 'teleport' ? '传送' : '召唤'
@@ -1172,7 +1440,10 @@
   function updateStatementById(graph, id, mutate, scopePath = []) {
     const location = statementLocationForLexicalId(graph, id, scopePath)
     if (!location?.statement) return false
-    mutate(location.statement)
+    // The second argument is the owning graph root. Existing mutators only
+    // use the statement; structural record editors use the root to persist a
+    // shared schema declaration when one is selected.
+    mutate(location.statement, graph)
     return true
   }
 
@@ -1497,7 +1768,7 @@
 
   function outputLabel(descriptor, port) {
     const output = descriptor?.outputs?.find(item => item.name === port)
-    return output?.label || semanticSlotLabels[output?.name] || semanticSlotLabels[port] || output?.name || port || '结果'
+    return semanticSlotLabel(output, port) || '结果'
   }
 
   function outputValueType(core, graph, value, scopePath = [], trail = new Set()) {
@@ -1540,6 +1811,145 @@
     return (Array.isArray(graph?.schemas) ? graph.schemas : []).find(schema => schema?.id === reference || `${schema?.id}@${schema?.version}` === reference) || null
   }
 
+  // These are the shared author schemas whose string fields are content
+  // references.  The mapping is deliberately schema-scoped so an ordinary
+  // author string named `id`, `rules`, or `templateId` remains a normal text
+  // value in a custom record.
+  const authorReferenceFields = Object.freeze({
+    'author.piece-template@1': Object.freeze({ templateId: 'pieces', rules: 'rules' }),
+    'author.piece-skill@1': Object.freeze({ skillId: 'skills', abilityGroupIds: 'clusters' }),
+    'author.piece-status@1': Object.freeze({ id: 'statusTags', relatedRules: 'rules' }),
+    'author.piece-rule@1': Object.freeze({ id: 'rules' }),
+    'author.piece-identity@1': Object.freeze({ templateId: 'pieces' }),
+    'author.piece-snapshot-fields@1': Object.freeze({ templateId: 'pieces' }),
+    'author.piece-display@1': Object.freeze({ templateId: 'pieces' }),
+  })
+
+  function authorContentReference(field, path, context = {}) {
+    void path
+    const schema = String(context.schema || '')
+    const candidates = [schema, schema && !schema.includes('@') ? `${schema}@1` : '']
+    const declared = field?.referenceCollection || field?.contentCollection
+    const collection = (typeof declared === 'string' && declared.trim())
+      ? declared.trim()
+      : candidates.map(reference => authorReferenceFields[reference]?.[field?.name]).find(Boolean)
+    return collection ? { collection } : null
+  }
+
+  function authorReferenceSourceHasData(source) {
+    if (source instanceof Map) return source.size > 0
+    if (Array.isArray(source)) return source.length > 0
+    if (!record(source)) return false
+    if (['id', 'ruleId', 'skillId', 'statusId', 'templateId', 'clusterId', 'cardId', 'contentId']
+      .some(key => typeof source[key] === 'string' && source[key].trim())) return true
+    for (const key of ['items', 'rawItems', 'documents', 'dataMap', 'entries']) {
+      if (source[key] !== undefined && authorReferenceSourceHasData(source[key])) return true
+    }
+    return Object.keys(source).length > 0
+  }
+
+  function authorReferenceCatalog(catalog) {
+    if (!record(catalog)) return catalog
+    const aliases = ['statusTags', 'statuses', 'status-effects']
+    const existingAliases = aliases.filter(key => Object.prototype.hasOwnProperty.call(catalog, key))
+    if (existingAliases.length) {
+      // Prefer an explicitly supplied canonical collection, but do not let an
+      // empty placeholder hide a populated legacy alias from an older shell.
+      const preferred = existingAliases.find(key => authorReferenceSourceHasData(catalog[key])) || existingAliases[0]
+      return preferred === 'statusTags' ? catalog : { ...catalog, statusTags: catalog[preferred] }
+    }
+    const statusTags = []
+    const seen = new Set()
+    for (const collection of ['skills', 'pieces']) {
+      const source = catalog[collection]
+      const documents = Array.isArray(source) ? source : record(source) ? Object.values(source) : []
+      for (const document of documents) {
+        if (!record(document)) continue
+        const values = [document.statusTag, document.initialStatusTags, document.statusTags]
+        for (const value of values) {
+          const items = Array.isArray(value) ? value : record(value) ? [value] : []
+          for (const item of items) {
+            if (!record(item) || typeof item.id !== 'string' || !item.id.trim() || seen.has(item.id)) continue
+            seen.add(item.id); statusTags.push(item)
+          }
+        }
+      }
+    }
+    return { ...catalog, statusTags }
+  }
+
+  function authorReferenceCollectionSource(catalog, collection) {
+    if (!record(catalog)) return undefined
+    const requested = String(collection || '').trim()
+    const aliases = requested === 'statusTags' ? ['statusTags', 'statuses', 'status-effects']
+      : requested === 'clusters' || requested === 'cluster' ? ['clusters', 'cluster']
+        : [requested]
+    const values = aliases.map(key => catalog[key]).filter(value => value !== undefined)
+    return values.find(authorReferenceSourceHasData) || values[0]
+  }
+
+  // The editor shell normally supplies an ID map, while tests, embedded
+  // panels, and older shells may expose arrays or {items/dataMap/entries}.
+  // Resolve all of those shapes here without changing the serialized value.
+  function authorReferenceEntries(catalog, collection) {
+    const source = authorReferenceCollectionSource(catalog, collection)
+    if (source === undefined) return []
+    const entries = []
+    const seen = new Set()
+    const add = (candidate, fallbackId = '') => {
+      if (typeof candidate === 'string' && candidate.trim()) candidate = { id: candidate.trim() }
+      if (!record(candidate)) return
+      const id = [candidate.id, candidate.ruleId, candidate.skillId, candidate.statusId,
+        candidate.templateId, candidate.clusterId, candidate.cardId, candidate.contentId]
+        .find(item => typeof item === 'string' && item.trim()) || fallbackId
+      if (typeof id !== 'string' || !id.trim() || seen.has(id)) return
+      seen.add(id)
+      const label = [candidate.name, candidate.title, candidate.label, candidate.displayName]
+        .find(item => typeof item === 'string' && item.trim()) || ''
+      entries.push({ id, label: String(label).trim() })
+    }
+    const visit = (value, fallbackId = '') => {
+      if (value instanceof Map) { value.forEach((item, id) => visit(item, String(id))); return }
+      if (Array.isArray(value)) { value.forEach(item => visit(item)); return }
+      if (!record(value)) return
+      let expanded = false
+      for (const key of ['items', 'rawItems', 'documents']) {
+        if (value[key] !== undefined) { visit(value[key]); expanded = true }
+      }
+      for (const key of ['dataMap', 'entries']) {
+        if (value[key] !== undefined) { visit(value[key]); expanded = true }
+      }
+      if (typeof value.id === 'string' || typeof value.ruleId === 'string' || typeof value.skillId === 'string'
+        || typeof value.templateId === 'string' || typeof value.clusterId === 'string' || typeof value.cardId === 'string') {
+        add(value, fallbackId); expanded = true
+      }
+      if (!expanded) Object.entries(value).forEach(([id, item]) => add(item, id))
+    }
+    visit(source)
+    return entries
+  }
+
+  function authorReferenceValueInfo(value, collection, catalog) {
+    if (Array.isArray(value)) {
+      if (!value.length) return { text: '空列表', missing: false, raw: value }
+      const parts = value.map(item => authorReferenceValueInfo(item, collection, catalog))
+      if (parts.some(item => !item)) return null
+      return {
+        text: parts.map(item => item.text).join('、'),
+        missing: parts.some(item => item.missing),
+        raw: value,
+      }
+    }
+    const raw = record(value)
+      ? [value.id, value.ruleId, value.skillId, value.statusId, value.templateId, value.clusterId, value.cardId, value.contentId].find(item => typeof item === 'string' && item.trim())
+      : value
+    if (typeof raw !== 'string' || !raw.trim()) return null
+    const entry = authorReferenceEntries(catalog, collection).find(item => item.id === raw)
+    if (!entry) return { text: '未找到引用', missing: true, raw }
+    const collectionLabels = { pieces: '棋子模板', skills: '技能', rules: '规则', statusTags: '状态', clusters: '能力组', cards: '卡牌' }
+    return { text: entry.label || `未命名${collectionLabels[collection] || '内容'}`, missing: false, raw }
+  }
+
   function recordSchemaType(core, graph, value, trail = new Set(), scopePath = []) {
     if (!record(value)) return null
     if (value.kind === 'input') {
@@ -1556,6 +1966,14 @@
     const nextTrail = new Set(trail); nextTrail.add(value.node)
     if (source.kind === 'record.create') return { kind: 'record', schema: source.schema }
     if (source.kind === 'record.with') return recordSchemaType(core, graph, source.record, nextTrail, sourceScopePath)
+    // A record.get can itself return a structured record (for example the
+    // snapshot fields inside a copied piece). Preserve that schema while
+    // walking a chain of field reads so the next record.get exposes the
+    // shared field definitions in the author editor.
+    if (source.kind === 'record.get') {
+      const fieldType = recordFieldType(core, graph, source.record, source.field, sourceScopePath)
+      return record(fieldType) && fieldType.kind === 'record' ? fieldType : null
+    }
     if (source.kind === 'call') {
       const type = descriptorOutputType(descriptorForGraphStatement(core, graph, source, sourceScopePath), value.port, source, input => outputValueType(core, graph, input, sourceScopePath, new Set(nextTrail)))
       return record(type) && type.kind === 'record' ? type : null
@@ -1565,7 +1983,7 @@
 
   function recordFieldType(core, graph, value, fieldName, scopePath = []) {
     const type = recordSchemaType(core, graph, value, new Set(), scopePath)
-    const schema = schemaForGraph(schemaGraphForScope(graph, scopePath), type?.schema)
+    const schema = schemaForGraph(graphWithAuthorSchemas(core, schemaGraphForScope(graph, scopePath)), type?.schema)
     const field = schema?.fields?.find(item => item?.name === fieldName)
     if (!field) return null
     return field.nullable ? { kind: 'nullable', value: field.type || 'unknown' } : (field.type || 'unknown')
@@ -1604,7 +2022,7 @@
     const active = scopeDefinition(graph, scopePath)
     const scopeGraph = active.graph || graph
     let rootRefs = (Array.isArray(scopeGraph?.inputs) ? scopeGraph.inputs : []).map(input => ({
-      value: { kind: 'input', name: input.name }, type: portValueType(input), label: `输入 · ${input.label || input.name}`,
+      value: { kind: 'input', name: input.name }, type: portValueType(input), label: `输入 · ${semanticSlotLabel(input, input.name)}`,
     }))
     const lastFrame = Array.isArray(scopePath) && scopePath.length ? scopePath[scopePath.length - 1] : null
     if (lastFrame?.kind === 'branch' && active.parent) {
@@ -1658,10 +2076,10 @@
           local.push({ value: reference(statement.id, 'value'), type: collectionOutputType(core, graph, statement, scopePath), label: '集合结果' })
         } else if (statement.kind === 'call') {
           const descriptor = descriptorForGraphStatement(core, graph, statement, scopePath)
-          for (const output of Array.isArray(descriptor?.outputs) ? descriptor.outputs : []) local.push({ value: reference(statement.id, output.name), type: descriptorOutputType(descriptor, output.name, statement, input => outputValueType(core, graph, input, scopePath)), label: `${descriptor?.label || statement.module} · ${outputLabel(descriptor, output.name)}` })
-        } else if (statement.kind === 'record.create') local.push({ value: reference(statement.id, 'value'), type: { kind: 'record', schema: statement.schema }, label: `记录 · ${statement.schema}` })
+          for (const output of Array.isArray(descriptor?.outputs) ? descriptor.outputs : []) local.push({ value: reference(statement.id, output.name), type: descriptorOutputType(descriptor, output.name, statement, input => outputValueType(core, graph, input, scopePath)), label: `${semanticModuleLabel(statement.module, descriptor?.label)} · ${outputLabel(descriptor, output.name)}` })
+        } else if (statement.kind === 'record.create') local.push({ value: reference(statement.id, 'value'), type: { kind: 'record', schema: statement.schema }, label: '记录结果' })
         else if (statement.kind === 'record.with') local.push({ value: reference(statement.id, 'value'), type: recordSchemaType(core, graph, statement.record, new Set(), scopePath) || 'unknown', label: '更新后的记录' })
-        else if (statement.kind === 'record.get') local.push({ value: reference(statement.id, 'value'), type: recordFieldType(core, graph, statement.record, statement.field, scopePath) || 'unknown', label: `记录字段 · ${statement.field || 'value'}` })
+        else if (statement.kind === 'record.get') local.push({ value: reference(statement.id, 'value'), type: recordFieldType(core, graph, statement.record, statement.field, scopePath) || 'unknown', label: `记录字段 · ${fieldLabels[statement.field] || statement.field || '字段'}` })
       }
       return null
     }
@@ -1701,6 +2119,31 @@
       byKey.set(key, { ...composite, label: composite.label || composite.id, description: composite.description || '当前模块图中的组合模块', inputs: Array.isArray(composite.inputs) ? composite.inputs : [], outputs: Array.isArray(composite.outputs) ? composite.outputs : [], parameters: Array.isArray(composite.parameters) ? composite.parameters : [], allowedSurfaces: Array.isArray(composite.allowedSurfaces) ? composite.allowedSurfaces : (surface ? [surface] : []), __composite: true })
     }
     return [...byKey.values()]
+  }
+
+  function compareDescriptorVersions(left, right) {
+    const a = String(left ?? '').split(/[^0-9]+/u).filter(Boolean).map(Number)
+    const b = String(right ?? '').split(/[^0-9]+/u).filter(Boolean).map(Number)
+    const length = Math.max(a.length, b.length)
+    for (let index = 0; index < length; index += 1) {
+      const difference = (a[index] || 0) - (b[index] || 0)
+      if (difference) return difference
+    }
+    return String(left ?? '').localeCompare(String(right ?? ''), undefined, { numeric: true, sensitivity: 'base' })
+  }
+
+  // The authoring catalogue exposes one current authoring shape per module.
+  // Older versions remain resolvable for existing graphs, but showing every
+  // version under the same data-sentence-module selector makes a blank
+  // insertion pick an arbitrary legacy shape.  Prefer the highest registered
+  // version while retaining the catalogue's first-seen order.
+  function authoringPickerDescriptors(descriptors) {
+    const byId = new Map()
+    for (const descriptor of Array.isArray(descriptors) ? descriptors : []) {
+      const previous = byId.get(descriptor?.id)
+      if (!previous || compareDescriptorVersions(descriptor.version, previous.version) > 0) byId.set(descriptor.id, descriptor)
+    }
+    return [...byId.values()]
   }
 
   function graphRefs(core, graph, statementId, scopePath = []) {
@@ -1744,11 +2187,13 @@
     }
     if (statement.kind === 'record.get' && inputName === 'record') { statement.record = value; return true }
     if (statement.kind === 'record.with') {
-      if (inputName === 'record') statement.record = value
-      else {
-        const fieldName = inputName.startsWith('field:') ? inputName.slice('field:'.length) : inputName
+      // Keep the explicit field namespace ahead of the source-record name.
+      // A valid schema may contain a field literally named "record".
+      if (inputName.startsWith('field:')) {
+        const fieldName = inputName.slice('field:'.length)
         statement.fields = { ...(statement.fields || {}), [fieldName]: value }
-      }
+      } else if (inputName === 'record') statement.record = value
+      else statement.fields = { ...(statement.fields || {}), [inputName]: value }
       return true
     }
     if (statement.kind === 'collection' || statement.kind?.startsWith?.('collection.')) {
@@ -1759,6 +2204,32 @@
     }
     if (statement.kind === 'defer-choice') { statement[inputName] = value; return true }
     return false
+  }
+
+  // Most record fields historically used their bare field name as the
+  // author-expression metadata key. Keep that format for compatibility, but
+  // reserve the explicit key for record.with's field named `record`, where a
+  // bare `record` key would collide with the wrapped source value.
+  function authorExpressionMetadataName(statement, inputName) {
+    if (statement?.kind === 'record.with' && inputName === 'field:record') return inputName
+    return inputName?.startsWith?.('field:') ? inputName.slice('field:'.length) : inputName
+  }
+
+  function legacyAuthorExpressionMetadataMatches(statement, legacy, current) {
+    if (!legacy || jsonValue(legacy.value) !== jsonValue(current)) return false
+    // A legacy bare `record` entry is ambiguous. If it points at the same
+    // output as record.with's source, it is the source metadata, not a field
+    // entry eligible for migration or cleanup.
+    return jsonValue(legacy.value) !== jsonValue(statement?.record)
+  }
+
+  function authorExpressionMetadataEntry(statement, metadataName, current) {
+    const direct = statement?.layout?.authorExpressions?.[metadataName]
+    if (direct) return { entry: direct, legacy: false, name: metadataName }
+    const legacyName = metadataName?.startsWith?.('field:') ? metadataName.slice('field:'.length) : ''
+    const legacy = legacyName ? statement?.layout?.authorExpressions?.[legacyName] : null
+    if (legacyAuthorExpressionMetadataMatches(statement, legacy, current)) return { entry: legacy, legacy: true, name: legacyName }
+    return { entry: null, legacy: false, name: metadataName }
   }
 
   function createPureExpression(options, consumerId, inputName, expectedType, moduleId, moduleVersion, scopePath = options.__sentenceScopePath || []) {
@@ -1784,7 +2255,7 @@
       const compatible = refs.find(ref => compatibleType(ref.type, type))
       if (compatible) inputs[port.name] = clone(compatible.value)
       else if (literalType(type) || port.nullable || type.kind === 'nullable') inputs[port.name] = literal(defaultLiteralFor({ ...port, type }, schemaGraphForScope(graph, consumerScopePath)))
-      else if (!port.optional) throw new Error(`“${descriptor.label || moduleId}”的${port.label || port.name}还没有可用的同类型引用。`)
+      else if (!port.optional) throw new Error(`“${semanticModuleLabel(moduleId, descriptor.label)}”的${semanticSlotLabel(port, port.name)}还没有可用的同类型引用。`)
     }
     const statement = {
       kind: 'call', id: nextStatementId(graph, 'sentence-expression'), module: descriptor.id,
@@ -1807,7 +2278,7 @@
   function expressionValueLabel(core, graph, value, trail = new Set(), scopePath = []) {
     if (!record(value)) return '未设置'
     if (value.kind === 'literal') return literalDisplay(value.value)
-    if (value.kind === 'input') return `输入 · ${semanticSlotLabels[value.name] || value.name}`
+    if (value.kind === 'input') return `输入 · ${semanticSlotLabel(null, value.name)}`
     if (value.kind === 'output') {
       const sourceLocation = statementLocationForLexicalId(graph, value.node, scopePath)
       const source = sourceLocation?.statement
@@ -1816,6 +2287,16 @@
       const owner = author && statementForLexicalId(graph, author.owner, sourceScopePath)
       const authored = owner?.layout?.authorExpressions?.[author?.input]
       if (authored && jsonValue(authored.value) === jsonValue(value)) return authored.source
+      if (source?.layout?.resultNames?.[value.port]) return source.layout.resultNames[value.port]
+      if (source?.kind === 'record.get' && !trail.has(value.node)) {
+        const nextTrail = new Set(trail); nextTrail.add(value.node)
+        const parent = expressionValueLabel(core, graph, source.record, nextTrail, sourceScopePath)
+        const type = recordSchemaType(core, graph, source.record, new Set(), sourceScopePath)
+        const schema = schemaForGraph(graphWithAuthorSchemas(core, graph), type?.schema)
+        const field = schema?.fields?.find(item => item.name === source.field)
+        return `${parent}.${field?.label || semanticSlotLabel(field, source.field)}`
+      }
+      if (source?.kind === 'record.create') return typeLabel({ kind: 'record', schema: source.schema })
       const descriptor = descriptorForGraphStatement(core, graph, source, sourceScopePath)
       const output = descriptor?.outputs?.find(item => item.name === value.port)
       if (source?.kind === 'call') {
@@ -1924,18 +2405,18 @@
         for (const input of Array.isArray(descriptor?.inputs) ? descriptor.inputs : []) {
           if (!own(source.inputs, input.name) && input.optional) continue
           const current = own(source.inputs, input.name) ? source.inputs[input.name] : undefined
-          args.push(`${input.label || semanticSlotLabels[input.name] || input.name}：${expressionValueLabel(core, graph, current, nextTrail, sourceScopePath)}`)
+          args.push(`${semanticSlotLabel(input, input.name)}：${expressionValueLabel(core, graph, current, nextTrail, sourceScopePath)}`)
         }
         const parameters = []
         for (const parameter of Array.isArray(descriptor?.parameters) ? descriptor.parameters : []) {
           if (!own(source.parameters, parameter.name)) continue
-          parameters.push(`${parameter.label || parameter.name}：${literalDisplay(source.parameters[parameter.name])}`)
+          parameters.push(`${semanticSlotLabel(parameter, parameter.name)}：${literalDisplay(source.parameters[parameter.name])}`)
         }
-        const label = descriptor?.label || source.module || value.node
+        const label = semanticModuleLabel(source.module, descriptor?.label)
         const suffix = parameters.length ? ` · ${parameters.join('，')}` : ''
         return `${label}${suffix}${args.length ? `（${args.join('，')}）` : ''}`
       }
-      return `${descriptor?.label || source?.module || value.node} · ${output?.label || semanticSlotLabels[output?.name] || semanticSlotLabels[value.port] || output?.name || value.port || '结果'}`
+      return `${semanticModuleLabel(source?.module, descriptor?.label)} · ${semanticSlotLabel(output, output?.name || value.port || 'result')}`
     }
     return '未设置'
   }
@@ -2049,10 +2530,33 @@
       for (const child of wrapper.querySelectorAll('input,select,button,textarea')) child.disabled = Boolean(value)
     }
     wrapper.setDisabled = applyDisabled
-    const emit = value => { if (!Boolean(disabled)) onChange(value) }
+    const emit = (value, metadata) => { if (!Boolean(disabled)) onChange(value, metadata) }
     const maxDepth = Number.isFinite(context.maxLiteralDepth) ? context.maxLiteralDepth : 8
     if (depth > maxDepth) {
       wrapper.append(node('span', '结构化常量层级过深。', 'sentence-literal-unavailable'))
+    } else if ((type === 'record' || type === 'object' || type === 'json' || (record(type) && ['record', 'object', 'map', 'set'].includes(type.kind))) && window.AuthorObjectEditor?.mount) {
+      const host = node('div', undefined, 'sentence-literal-object-editor')
+      const objectEditor = window.AuthorObjectEditor.mount(host, {
+        value: current,
+        type,
+        definition,
+        schemas: context.graph?.schemas || [],
+        schemaRegistry: context.schemaRegistry,
+        catalog: authorReferenceCatalog(context.catalog),
+        getCatalog: typeof context.getCatalog === 'function' ? () => authorReferenceCatalog(context.getCatalog()) : undefined,
+        referenceResolver: context.referenceResolver || authorContentReference,
+        allowSchemaSelect: type === 'record' || type === 'object',
+        label: definition?.label || '记录值',
+        description: definition?.description,
+        readonly: Boolean(disabled),
+        maxDepth: maxDepth - depth,
+        onChange: (value, metadata) => emit(value, metadata),
+      })
+      wrapper.setDisabled = value => {
+        wrapper.dataset.sentenceLiteralDisabled = String(Boolean(value))
+        objectEditor?.setReadonly?.(Boolean(value))
+      }
+      wrapper.append(host)
     } else if (Array.isArray(definition?.enum)) {
       const select = register(document.createElement('select'))
       select.dataset.sentenceLiteralEnum = definition.name || ''
@@ -2111,15 +2615,16 @@
         for (const field of schema.fields) {
           const fieldDefinition = { ...field, name: field.name, type: field.type || 'unknown', nullable: field.nullable }
           const fieldRow = node('label', undefined, 'sentence-editor-field sentence-literal-record-field')
-          fieldRow.append(node('span', `${field.label || field.name} · ${typeLabel(portValueType(fieldDefinition))}`, 'sentence-field-label'))
-          fieldRow.append(literalControl(object[field.name] ?? defaultLiteralFor(fieldDefinition, context.graph), fieldDefinition, value => { object[field.name] = value; emit({ ...object }) }, disabled, context, depth + 1))
+          fieldRow.append(node('span', `${semanticSlotLabel(field, field.name)} · ${typeLabel(portValueType(fieldDefinition))}`, 'sentence-field-label'))
+          const fieldValue = own(object, field.name) ? object[field.name] : defaultLiteralFor(fieldDefinition, context.graph)
+          fieldRow.append(literalControl(fieldValue, fieldDefinition, value => { object[field.name] = value; emit({ ...object }) }, disabled, context, depth + 1))
           fields.append(fieldRow)
         }
         for (const key of Object.keys(object).filter(key => !schema.fields.some(field => field.name === key))) {
           fields.append(node('span', `未登记字段：${key}（已保留）`, 'sentence-invalid-field'))
         }
         wrapper.append(fields)
-      } else wrapper.append(node('span', `记录结构 ${type.schema || '未声明'} 暂不可用；请先声明结构定义。`, 'sentence-literal-unavailable'))
+      } else wrapper.append(node('span', '记录结构暂不可用；请先声明结构定义。', 'sentence-literal-unavailable'))
     } else if (type === 'boolean') {
       const input = register(document.createElement('input')); input.type = 'checkbox'; input.checked = current === true
       input.onchange = () => emit(input.checked); wrapper.append(input)
@@ -2142,11 +2647,16 @@
   }
 
   function valueEditor(core, graph, statement, definition, current, onChange, disabled = false, controls = {}) {
-    if (!disabled && typeof controls.renderExpression === 'function' && typeof core?.lowerAuthorExpression === 'function' && window.ExpressionInput?.mount) return controls.renderExpression(graph, statement, definition, current)
-    const wrapper = node('div', undefined, 'sentence-value-editor')
     const expectedType = portValueType(definition)
+    // Structured values keep their recursive literal editor, but authors may
+    // also provide a typed expression for the whole value (for example a
+    // snapshot's 技能 or 状态 field).  The explicit force flag is set only
+    // after the author chooses the expression action, so ordinary nested
+    // object/list editing remains available.
+    if (!disabled && (controls.forceExpression || !structuredLiteralType(expectedType)) && typeof controls.renderExpression === 'function' && typeof core?.lowerAuthorExpression === 'function' && window.ExpressionInput?.mount) return controls.renderExpression(graph, statement, definition, current)
+    const wrapper = node('div', undefined, 'sentence-value-editor')
     const literalGraph = scopeDefinition(graph, controls.scopePath || []).graph || graph
-    const title = node('span', `${definition?.label || definition?.name || '输入'} · ${typeLabel(expectedType)}`, 'sentence-field-label')
+    const title = node('span', `${semanticSlotLabel(definition, definition?.name)} · ${typeLabel(expectedType)}`, 'sentence-field-label')
     const source = document.createElement('select')
     source.setAttribute('aria-label', title.textContent)
     source.dataset.sentenceValueSource = definition?.name || ''
@@ -2161,14 +2671,34 @@
       source.value = encoded
     } else if (currentKind === 'literal') source.value = 'literal'
     for (const [value, label] of choices) { const option = node('option', label); option.value = value; source.append(option) }
-    source.value = currentKind === 'literal' ? 'literal' : currentKind ? jsonValue(current) : ''
-    const literal = literalControl(currentKind === 'literal' ? current.value : defaultLiteralFor(definition, literalGraph), definition, value => onChange({ kind: 'literal', value }), disabled || source.value !== 'literal', { graph: literalGraph, maxLiteralDepth: 8 })
+    source.value = currentKind === 'literal' ? 'literal' : currentKind
+      ? jsonValue(current)
+      : structuredLiteralType(expectedType) ? 'literal' : ''
+    const literal = literalControl(currentKind === 'literal' ? current.value : defaultLiteralFor(definition, literalGraph), definition, (value, metadata) => {
+      onChange({ kind: 'literal', value })
+      controls.onLiteralTypeChange?.(metadata?.type)
+    }, disabled || source.value !== 'literal', {
+      graph: literalGraph,
+      maxLiteralDepth: 8,
+      schemaRegistry: controls.schemaRegistry,
+      catalog: controls.catalog,
+      getCatalog: controls.getCatalog,
+      referenceResolver: controls.referenceResolver || authorContentReference,
+      onLiteralTypeChange: controls.onLiteralTypeChange,
+    })
     source.disabled = Boolean(disabled)
     source.onchange = () => {
       if (source.value === 'literal') { literal.setDisabled?.(Boolean(disabled)); onChange({ kind: 'literal', value: defaultLiteralFor(definition, literalGraph) }) }
       else { literal.setDisabled?.(true); onChange(parseJsonValue(source.value)) }
     }
     const actionRow = node('span', undefined, 'sentence-value-actions')
+    if (!disabled && typeof controls.onAuthorExpression === 'function') {
+      const expression = action('输入表达式', controls.onAuthorExpression, 'sentence-value-action')
+      expression.dataset.sentenceDirectExpression = definition?.name || ''
+      expression.dataset.sentenceExpressionType = String(expectedType || 'unknown')
+      expression.title = '使用中文变量或字段表达式填写此值'
+      actionRow.append(expression)
+    }
     const canCompose = !disabled && controls.allowExpression !== false && seedablePureDescriptors(core, graph, expectedType, statement?.id, controls.scopePath || []).length > 0
     if (canCompose && typeof controls.onCompose === 'function') {
       const compose = action('＋ 组合表达式', controls.onCompose, 'sentence-value-action')
@@ -2192,7 +2722,15 @@
   }
 
   function mount(container, options = {}) {
-    if (!container) return { refresh() {}, destroy() {} }
+    if (!container) return {
+      refresh() {},
+      getEditorState() { return { version: 1, expressions: [], expressionDrafts: [], collapsedBlocks: [], openPopover: null, scopePath: [] } },
+      restoreEditorState() { return false },
+      hasUnappliedEdits() { return false },
+      getTrialRequest() { return { ok: false, request: null, error: '语句编辑器尚未挂载。' } },
+      startTrial() { return Promise.resolve() },
+      destroy() {},
+    }
     const core = coreFor(options)
     let destroyed = false
     let openPopover = null
@@ -2212,9 +2750,10 @@
     const primaryField = options.field || (collection === 'rules' ? 'skillCode' : 'code')
     const externalDraftDiagnostic = options.onDraftDiagnostic
     options.onDraftDiagnostic = text => {
-      message = `草稿尚不可保存：${text}`
+      const localized = authorDiagnostic(text)
+      message = `草稿尚不可保存：${localized}`
       messageKind = 'error'
-      externalDraftDiagnostic?.(text)
+      externalDraftDiagnostic?.(localized)
     }
     const externalDraftWarning = options.onDraftWarning
     options.onDraftWarning = text => {
@@ -2227,6 +2766,64 @@
     // active path on the options object so a legacy callback can still invoke
     // applyGraphChange without receiving a new public API argument.
     options.__sentenceScopePath = scopePath
+
+    // Editor-only state is intentionally kept outside the executable graph.
+    // Draft expressions can be temporarily invalid while an author is typing;
+    // serialise those strings separately so a session restore does not either
+    // lose the text or write it into a runnable graph.
+    function getEditorState() {
+      const expressions = [...expressionDrafts.entries()]
+        .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
+        .map(([key, value]) => [key, value])
+      return {
+        version: 1,
+        // `expressions` is the stable public name. Keep the older alias in
+        // the snapshot for callers that adopted the first editor-state draft.
+        expressions,
+        expressionDrafts: expressions.map(item => [...item]),
+        collapsedBlocks: [...collapsedBlocks.entries()]
+          .filter(([key]) => typeof key === 'string')
+          .map(([key, value]) => [key, Boolean(value)]),
+        openPopover: clone(openPopover),
+        scopePath: Array.isArray(scopePath) ? clone(scopePath) : [],
+        pendingCollapseFocusKey: typeof pendingCollapseFocusKey === 'string' ? pendingCollapseFocusKey : null,
+        pendingFocusTarget: clone(pendingFocusTarget),
+      }
+    }
+
+    function restoreEditorState(state, renderAfter = true) {
+      if (!record(state)) return false
+      expressionDrafts.clear()
+      const rawDrafts = state.expressions ?? state.expressionDrafts
+      const drafts = Array.isArray(rawDrafts)
+        ? rawDrafts
+        : record(rawDrafts) ? Object.entries(rawDrafts) : []
+      for (const item of drafts) {
+        if (!Array.isArray(item) || typeof item[0] !== 'string' || typeof item[1] !== 'string') continue
+        expressionDrafts.set(item[0], item[1])
+      }
+      collapsedBlocks.clear()
+      const collapsed = Array.isArray(state.collapsedBlocks)
+        ? state.collapsedBlocks
+        : record(state.collapsedBlocks) ? Object.entries(state.collapsedBlocks) : []
+      for (const item of collapsed) {
+        if (!Array.isArray(item) || typeof item[0] !== 'string') continue
+        collapsedBlocks.set(item[0], Boolean(item[1]))
+      }
+      openPopover = record(state.openPopover) ? clone(state.openPopover) : null
+      scopePath.splice(0, scopePath.length, ...(Array.isArray(state.scopePath)
+        ? state.scopePath.filter(item => typeof item === 'string' || record(item)).map(item => clone(item))
+        : []))
+      pendingCollapseFocusKey = typeof state.pendingCollapseFocusKey === 'string' ? state.pendingCollapseFocusKey : null
+      pendingFocusTarget = record(state.pendingFocusTarget) ? clone(state.pendingFocusTarget) : null
+      if (renderAfter) notifyEditorStateChange()
+      if (renderAfter) render()
+      return true
+    }
+
+    function notifyEditorStateChange() {
+      try { options.onEditorStateChange?.(getEditorState()) } catch { /* state persistence must not interrupt editing */ }
+    }
 
     function expressionBindings(graph, statement, path) {
       const bindings = {}
@@ -2247,16 +2844,17 @@
           'ref.current-rule': 'rule-instance',
         }
         const domain = domainByModule[source?.module]
-        bindings[name] = { value: clone(ref.value), type: ref.type, ...(domain ? { domain } : {}) }
+        bindings[name] = { value: clone(ref.value), type: ref.type, ...(domain ? { domain } : {}),
+          generatedName: ref.value.kind === 'output' && !source?.layout?.resultNames?.[ref.value.port] }
         if (ref.label.startsWith('当前项')) bindings.每项 = { value: clone(ref.value), type: ref.type }
       }
       return bindings
     }
 
-    // Structural data statements do not accept a layout field in the graph
-    // schema. Keep expression ownership on lowered executable calls and only
-    // attach consumer metadata to statement kinds that support it.
-    const authorExpressionLayoutKinds = new Set(['call', 'if', 'foreach', 'while', 'return'])
+    // Expression ownership is editing metadata, including expressions used
+    // inside a typed object. Keep it with both the field and generated reads
+    // so editing a single field replaces its previous expression cleanly.
+    const authorExpressionLayoutKinds = new Set(['call', 'if', 'foreach', 'while', 'return', 'record.create', 'record.get', 'record.with'])
     const supportsAuthorExpressionLayout = statement => authorExpressionLayoutKinds.has(statement?.kind)
 
     function expressionLiteral(value) {
@@ -2550,14 +3148,17 @@
       return cells ? `{${cells.map(cell => `坐标(${cell.x}, ${cell.y})`).join(', ')}}` : null
     }
 
-    function expressionText(graph, statement, definition, current, path, bindings) {
-      const saved = statement.layout?.authorExpressions?.[definition.name]
-      if (saved && jsonValue(saved.value) === jsonValue(current)) return saved.source
+    function expressionText(graph, statement, definition, current, path, bindings, metadataName = definition.name) {
+      const metadata = authorExpressionMetadataEntry(statement, metadataName, current)
+      const legacyName = metadata.legacy ? metadata.name : ''
+      const legacyMatches = metadata.legacy
+      const savedExpression = metadata.entry
+      if (savedExpression && jsonValue(savedExpression.value) === jsonValue(current)) return savedExpression.source
       if (current?.kind === 'literal') return expressionLiteral(current.value)
       if (current?.kind === 'output') {
         const source = statementForLexicalId(graph, current.node, path)
         const authored = source?.layout?.authorExpression
-        if (authored?.owner === statement.id && authored.input === definition.name && typeof authored.source === 'string') return authored.source
+        if (authored?.owner === statement.id && (authored.input === metadataName || legacyMatches && authored.input === legacyName) && typeof authored.source === 'string') return authored.source
       }
       const expectedType = portValueType(definition)
       if (expectedType?.kind === 'list' && expectedType.element === 'cell') {
@@ -2771,10 +3372,15 @@
     }
 
     function renderAuthorExpression(graph, statement, definition, current, path = scopePath, renderOptions = {}) {
+      const originalDefinitionName = definition.name
+      const authorExpressionName = authorExpressionMetadataName(statement, originalDefinitionName)
+      if (['record.create', 'record.with'].includes(statement.kind) && definition.name.startsWith('field:')) {
+        definition = { ...definition, name: definition.name.slice('field:'.length) }
+      }
       if (!renderOptions.forceGeneric && statement.module === 'code-block.invoke' && definition.name === 'block') {
         return renderAuthorCodeBlockDefinitionEditor(graph, statement, definition, current, path)
       }
-      const key = `${documentScopeKey(options.getDraft?.())}:${scopePathKey(path)}:${statement.id}:${definition.name}`
+      const key = `${documentScopeKey(options.getDraft?.())}:${scopePathKey(path)}:${statement.id}:${authorExpressionName}`
       const bindings = expressionBindings(graph, statement, path)
       if (statement.module === 'local.write' && definition.name === 'handle') for (const [name, value] of Object.entries(bindings)) {
         if (value.local) bindings[name] = { ...value, type: 'record', local: false }
@@ -2842,15 +3448,15 @@
       wrapper.dataset.sentenceAuthorExpression = definition.name
       if (renderOptions.hidden) wrapper.hidden = true
       const header = node('div', undefined, 'sentence-author-expression-header')
-      const label = node('span', definition.label || semanticSlotLabel(null, definition.name), 'sentence-field-label')
+      const label = node('span', semanticSlotLabel(definition, definition.name), 'sentence-field-label')
       const status = node('span', `需要${typeLabel(expected)}`, 'sentence-author-expression-type')
       const editorHost = node('div')
       const footer = node('div', undefined, 'sentence-author-expression-footer')
       header.append(label, status); wrapper.append(header, editorHost, footer)
-      const schemas = schemaGraphForScope(graph, path).schemas || []
+      const schemas = graphWithAuthorSchemas(core, schemaGraphForScope(graph, path)).schemas || []
       const extensions = extensionMapDeclarations(graph, path, statement.id).filter(item => item.kind === 'value').map(item => ({ ...item, type: serializedValueType(item.valueType, 'record') }))
       const context = { surface: graph.surface, bindings, schemas, extensions, expectedType: expected }
-      let value = expressionDrafts.get(key) ?? expressionText(graph, statement, definition, current, path, bindings)
+      let value = expressionDrafts.get(key) ?? expressionText(graph, statement, definition, current, path, bindings, authorExpressionName)
       let valid = false
       const validate = () => {
         try {
@@ -2877,7 +3483,7 @@
             else delete nextBindings[name]
           }
           const prefix = nextStatementId(nextGraph, 'expr')
-          const lowered = core.lowerAuthorExpression(value, { ...context, bindings: nextBindings, schemas: owner.schemas || [], prefix })
+          const lowered = core.lowerAuthorExpression(value, { ...context, bindings: nextBindings, schemas: graphWithAuthorSchemas(core, schemaGraphForScope(nextGraph, path)).schemas || [], prefix })
           const inferred = inferredParameters(lowered.type)
           if (!inferred && (derivesChoiceMapType || !compatibleType(lowered.type, expected))) throw new Error(`此处需要${derivesChoiceMapType ? '文本键映射' : typeLabel(expected)}`)
           if (statement.module === 'local.write' && definition.name === 'handle') {
@@ -2887,20 +3493,29 @@
           if (inferred) location.statement.parameters = { ...(location.statement.parameters || {}), ...inferred }
           // Replace only nodes owned by this parameter. Intermediate outputs
           // are not offered as variables, so external author rows cannot bind them.
-          const prior = location.statement.layout?.authorExpressions?.[definition.name]
-          const oldIds = new Set(Array.isArray(prior?.nodes) ? prior.nodes : [])
+          const prior = location.statement.layout?.authorExpressions?.[authorExpressionName]
+          const legacyExpressionName = authorExpressionName?.startsWith?.('field:') ? authorExpressionName.slice('field:'.length) : ''
+          const legacyPrior = !prior && legacyExpressionName
+            ? location.statement.layout?.authorExpressions?.[legacyExpressionName]
+            : null
+          const legacyMatches = legacyAuthorExpressionMetadataMatches(location.statement, legacyPrior, current)
+          const priorNames = new Set([authorExpressionName, ...(legacyMatches ? [legacyExpressionName] : [])])
+          const oldIds = new Set([
+            ...(Array.isArray(prior?.nodes) ? prior.nodes : []),
+            ...(legacyMatches && Array.isArray(legacyPrior?.nodes) ? legacyPrior.nodes : []),
+          ])
           for (const item of location.statements) {
             const authored = item?.layout?.authorExpression
-            if (authored?.owner === statement.id && authored.input === definition.name) oldIds.add(item.id)
+            if (authored?.owner === statement.id && priorNames.has(authored.input)) oldIds.add(item.id)
           }
           for (let index = location.statements.length - 1; index >= 0; index -= 1) if (oldIds.has(location.statements[index].id)) location.statements.splice(index, 1)
           const consumerIndex = location.statements.findIndex(item => item.id === statement.id)
           for (const item of lowered.statements) if (supportsAuthorExpressionLayout(item)) {
-            item.layout = { ...(item.layout || {}), authorExpression: { owner: statement.id, input: definition.name, source: value } }
+            item.layout = { ...(item.layout || {}), authorExpression: { owner: statement.id, input: authorExpressionName, source: value } }
           }
           location.statements.splice(consumerIndex, 0, ...lowered.statements)
           owner.schemas = lowered.schemas
-          if (!setStatementValue(location.statement, definition.name, lowered.value)) throw new Error('此参数不支持表达式')
+          if (!setStatementValue(location.statement, authorExpressionName, lowered.value)) throw new Error('此参数不支持表达式')
            if (/^extension\.(declare|read|write)-instance$/.test(statement.module || '') && definition.name === 'entity') {
              const entityKind = entityKindForValue(nextGraph, lowered.value, path)
              if (entityKind) location.statement.parameters = { ...(location.statement.parameters || {}), entityKind }
@@ -2923,12 +3538,17 @@
           }
           if (hasOldReference(nextGraph)) throw new Error('其他语句正在引用此表达式的内部结果，请先修改该引用')
           if (supportsAuthorExpressionLayout(location.statement)) {
-            const priorLayout = location.statement.layout?.authorExpressions?.[definition.name]
+            const priorLayout = location.statement.layout?.authorExpressions?.[authorExpressionName]
+              || (legacyMatches ? legacyPrior : null)
+            const authorExpressions = {
+              ...(location.statement.layout?.authorExpressions || {}),
+            }
+            if (legacyMatches && legacyExpressionName !== authorExpressionName) delete authorExpressions[legacyExpressionName]
             location.statement.layout = {
               ...(location.statement.layout || {}),
               authorExpressions: {
-                ...(location.statement.layout?.authorExpressions || {}),
-                [definition.name]: {
+                ...authorExpressions,
+                [authorExpressionName]: {
                   ...(record(priorLayout) ? priorLayout : {}),
                   source: value,
                   value: lowered.value,
@@ -2938,7 +3558,7 @@
             }
           } else if (location.statement.layout?.authorExpressions) {
             const remaining = { ...(location.statement.layout.authorExpressions || {}) }
-            delete remaining[definition.name]
+            delete remaining[authorExpressionName]
             if (Object.keys(remaining).length) location.statement.layout = { ...location.statement.layout, authorExpressions: remaining }
             else {
               const nextLayout = { ...location.statement.layout }
@@ -2951,16 +3571,23 @@
             location.statement.parameters = { ...(location.statement.parameters || {}), valueType: statementForLexicalId(graph, lowered.value.node, path).parameters.valueType }
           }
           const result = commitGraphDraft(options, draft, nextGraph, field)
+          // This parameter was parsed, type-checked, lowered, and written to
+          // the graph. A separate incomplete sibling can still leave a graph
+          // diagnostic, but retaining this applied text in editorState would
+          // make Save/Trial report a false unapplied edit forever. Keep that
+          // sibling diagnostic while clearing this parameter's local draft.
           expressionDrafts.delete(key)
+          notifyEditorStateChange()
           if (!result.diagnostic) closePopover()
           else render()
         } catch (error) { status.textContent = error.message || String(error); status.dataset.valid = 'false' }
       }, 'sentence-author-expression-apply')
-      apply.dataset.sentenceApplyExpression = definition.name
+          apply.dataset.sentenceApplyExpression = authorExpressionName
       footer.append(node('small', 'Tab 补全 · Ctrl / ⌘ + Enter 应用'), apply)
       const widget = window.ExpressionInput.mount(editorHost, {
-        value, label: definition.label || definition.name, placeholder: `输入${typeLabel(expected)}表达式`,
-        getSuggestions: (_query, details) => core.completeAuthorExpression(details.prefix, context),
+        value, label: semanticSlotLabel(definition, definition.name), placeholder: `输入${typeLabel(expected)}表达式`,
+        getSuggestions: (_query, details) => core.completeAuthorExpression(details.prefix, context)
+          .filter(item => !bindings[item.value]?.generatedName),
         getParameterHint: details => core.authorExpressionParameterHint?.(details.prefix, context),
         onInspect: (reference, details) => {
           wrapper.querySelector('.sentence-expression-inspector')?.remove()
@@ -2976,7 +3603,7 @@
           } catch (error) { inspector.append(node('p', error.message || String(error))) }
           wrapper.append(inspector)
         },
-        onChange: text => { value = text; expressionDrafts.set(key, text); validate() },
+        onChange: text => { value = text; expressionDrafts.set(key, text); notifyEditorStateChange(); validate() },
         onExpand: () => { wrapper.classList.toggle('sentence-author-expression-expanded'); widget.focus() },
       })
       editorHost.addEventListener('keydown', event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); if (valid) apply.click() } })
@@ -3047,7 +3674,7 @@
           const tuple = '{' + [...selected.values()].map(cell => `坐标(${cell.x - origin.x}, ${cell.y - origin.y})`).join(', ') + '}'
           if (replaceSpan) widget.setValue(value.slice(0, replaceSpan[0]) + tuple + value.slice(replaceSpan[1]))
           else widget.insertText(tuple)
-          value = widget.getText(); expressionDrafts.set(key, value); validate()
+          value = widget.getText(); expressionDrafts.set(key, value); notifyEditorStateChange(); validate()
           panel.remove(); widget.focus()
         }, 'sentence-author-expression-apply')
         save.disabled = dynamicRange
@@ -3098,7 +3725,7 @@
         drafts.push({ collection: sourceCollection, document: clone(document) })
       }
       add(root.collection, root.id || draft?.id, draft)
-      if (typeof core?.buildSkillCluster !== 'function') throw new Error('当前编辑器未加载能力 Cluster。')
+      if (typeof core?.buildSkillCluster !== 'function') throw new Error('当前编辑器未加载能力组。')
       let cluster
       try {
         cluster = core.buildSkillCluster(catalog || { skills: {}, rules: {}, pieces: {}, cards: {} }, root)
@@ -3120,8 +3747,10 @@
       trialPending = true
       render()
       try {
+        const trialRequest = getTrialRequest()
+        if (!trialRequest.ok) throw new Error(trialRequest.error)
         const draft = clone(options.getDraft?.() || {})
-        const request = trialDrafts(draft)
+        const request = trialRequest.request
         if (!request.skillId) throw new Error('当前技能没有可用的 ID。')
         const invoke = options.skillTrial || window.editorAPI?.skillTrial
         if (typeof invoke !== 'function') throw new Error('当前编辑器未连接训练营试用。')
@@ -3142,9 +3771,21 @@
       }
     }
 
+    function getTrialRequest() {
+      if (expressionDrafts.size > 0) return { ok: false, request: null, error: '请先应用当前正在编辑的表达式，再开始训练营试用。' }
+      if (options.__sentenceLastDiagnostic) return { ok: false, request: null, error: authorDiagnostic(options.__sentenceLastDiagnostic) }
+      try {
+        const draft = clone(options.getDraft?.() || {})
+        return { ok: true, request: trialDrafts(draft), error: null }
+      } catch (error) {
+        return { ok: false, request: null, error: authorDiagnostic(error?.message || String(error)) }
+      }
+    }
+
     const report = (text, kind = 'info') => {
+      text = authorDiagnostic(text)
       if (kind === 'success' && options.__sentenceLastDiagnostic) {
-        text = `草稿尚不可保存：${options.__sentenceLastDiagnostic}`
+        text = `草稿尚不可保存：${authorDiagnostic(options.__sentenceLastDiagnostic)}`
         kind = 'error'
       }
       message = text
@@ -3378,7 +4019,7 @@
     function renderExpressionChooser(statement, graph, definition, path = scopePath) {
       const panel = node('div', undefined, 'sentence-expression-chooser')
       panel.dataset.sentenceExpressionChooser = definition?.name || ''
-      panel.append(node('strong', `为“${definition?.label || definition?.name || '输入'}”组合表达式`, 'sentence-inline-editor-title'))
+      panel.append(node('strong', `为“${semanticSlotLabel(definition, definition?.name)}”组合表达式`, 'sentence-inline-editor-title'))
       panel.append(node('p', '只显示纯模块；选择后会在当前语句之前生成一个有类型的输出引用。', 'sentence-inline-editor-copy'))
       const expectedType = portValueType(definition)
       const list = node('div', undefined, 'sentence-expression-options')
@@ -3387,17 +4028,18 @@
       for (const descriptor of descriptors) {
         const output = expressionOutput(descriptor, expectedType)
         const outputText = output ? `（返回${outputLabel(descriptor, output.name)}）` : ''
-        const item = action(`${descriptor.label || descriptor.id}${outputText}`, () => {
+        const descriptorLabel = semanticModuleLabel(descriptor.id, descriptor.label)
+        const item = action(`${descriptorLabel}${outputText}`, () => {
           try {
             const result = createPureExpression(options, statement.id, definition.name, expectedType, descriptor.id, descriptor.version, consumerScopePath)
             const returnPopover = openPopover?.returnPopover || openPopover
             openPopover = { control: 'statement', statementId: result.statement.id, scopePath: result.scopePath || consumerScopePath, ...(returnPopover ? { returnPopover } : {}) }
-            report(`已将“${descriptor.label || descriptor.id}”作为嵌套表达式。`, 'success')
+            report(`已将“${descriptorLabel}”作为嵌套表达式。`, 'success')
           } catch (error) { report(error.message || String(error), 'error') }
         }, 'sentence-expression-option')
         item.dataset.sentenceExpressionModule = descriptor.id
         item.dataset.sentenceExpressionOutput = output?.name || ''
-        item.title = descriptor.description || descriptor.id
+        item.title = descriptor.description || descriptorLabel
         list.append(item)
       }
       if (!descriptors.length) list.append(node('p', '没有可用的纯模块。', 'sentence-module-empty'))
@@ -3409,6 +4051,11 @@
       try {
         applyGraphChange(options, graph => {
           if (!updateStatementById(graph, statementId, mutate, path)) throw new Error('找不到要编辑的结构语句。')
+          const updated = statementForLexicalId(graph, statementId, path)
+          if (updated?.kind === 'record.create') ensureAuthorSchema(graph, core, updated.schema)
+          if (updated?.kind === 'record.get' || updated?.kind === 'record.with') {
+            ensureAuthorSchema(graph, core, recordSchemaType(core, graph, updated.record, new Set(), path)?.schema)
+          }
         }, undefined, path)
         render()
       } catch (error) { report(error.message || String(error), 'error') }
@@ -3421,9 +4068,22 @@
       const effective = definition?.type === 'any' && current?.kind === 'literal'
         ? { ...definition, type: literalTypeOfValue(current.value) }
         : definition
-      const editor = valueEditor(core, schemaGraphForScope(graph, path), statement, effective, current, assign, false, {
-        renderExpression: (g, s, d, v) => renderAuthorExpression(graph, s, d, v, path),
+      const editorGraph = graphWithAuthorSchemas(core, schemaGraphForScope(graph, path))
+      const editor = valueEditor(core, editorGraph, statement, effective, current, assign, false, {
+        renderExpression: (g, s, d, v) => renderAuthorExpression(editorGraph, s, d, v, path),
         scopePath: path,
+        schemaRegistry: options.schemaRegistry || options.objectSchemaRegistry,
+        catalog: authorReferenceCatalog(options.catalog),
+        getCatalog: typeof options.getCatalog === 'function' ? () => authorReferenceCatalog(options.getCatalog()) : undefined,
+        referenceResolver: authorContentReference,
+        forceExpression: openPopover?.control === 'expression'
+          && openPopover.statementId === statement.id
+          && openPopover.inputName === definition.name,
+        onAuthorExpression: () => {
+          const returnPopover = openPopover?.returnPopover || openPopover
+          openPopover = { control: 'expression', statementId: statement.id, inputName: definition.name, slotKind: 'input', slotName: definition.name, scopePath: path, ...(returnPopover ? { returnPopover } : {}) }
+          render()
+        },
         onCompose: () => {
           const returnPopover = openPopover?.returnPopover || openPopover
           openPopover = { control: 'expression', statementId: statement.id, inputName: definition.name, slotKind: 'input', slotName: definition.name, scopePath: path, ...(returnPopover ? { returnPopover } : {}) }
@@ -3432,7 +4092,7 @@
         onOpenSource: () => openSourceExpression(current, path, openPopover?.returnPopover || openPopover),
       })
       if (!current) return editor
-      const actual = current.kind === 'literal' ? literalTypeOfValue(current.value) : outputValueType(core, graph, current, path)
+      const actual = current.kind === 'literal' ? literalTypeOfValue(current.value) : outputValueType(core, editorGraph, current, path)
       const expected = portValueType(effective)
       if (!actual || compatibleType(actual, expected)) return editor
       const wrapper = node('div', undefined, 'sentence-structural-value-field')
@@ -3443,7 +4103,7 @@
       return wrapper
     }
 
-    function selectField(parent, label, value, values, change, datasetName) {
+    function selectField(parent, label, value, values, change, datasetName, currentLabel = '') {
       const field = node('label', undefined, 'sentence-editor-field')
       const select = document.createElement('select')
       if (datasetName) select.dataset[datasetName] = ''
@@ -3454,7 +4114,7 @@
         select.append(option)
       }
       if (value && !values.some(item => item.value === value)) {
-        const option = node('option', `当前值 · ${value}`); option.value = value; select.append(option)
+        const option = node('option', currentLabel || '当前值（已保存）'); option.value = value; select.append(option)
       }
       select.value = value || ''
       select.onchange = () => change(select.value)
@@ -3466,6 +4126,14 @@
     function graphSchemas(graph) {
       const local = Array.isArray(graph?.schemas) ? graph.schemas : []
       return local
+    }
+
+    function schemaDisplayLabel(schema) {
+      const builtin = builtinSchemaLabels[`${schema?.id}@${schema?.version}`]
+      if (builtin) return builtin
+      const value = String(schema?.label || schema?.title || schema?.name || '').trim()
+      if (value && !/^[a-z][a-z0-9]*(?:[.-][a-z0-9_-]+)+$/i.test(value)) return value
+      return '未命名记录结构'
     }
 
     function continuationDefinition(graph, referenceValue) {
@@ -3487,8 +4155,18 @@
       const slotHeading = node('strong', `编辑${semanticSlotLabel(null, focus?.slotName)}`, 'sentence-inline-editor-title')
       top.append(slotHeading, action('关闭编辑', closePopover, 'sentence-popover-close'))
       panel.append(top)
-      const editorGraph = schemaGraphForScope(graph, path)
+      const editorGraph = graphWithAuthorSchemas(core, schemaGraphForScope(graph, path))
       const name = focus?.slotName || ''
+      const isRecordStatement = statement.kind === 'record.create' || statement.kind === 'record.with'
+      const recordFieldName = name.startsWith('field:') ? name.slice('field:'.length) : name
+      const recordSchemaRef = isRecordStatement
+        ? statement.kind === 'record.create'
+          ? statement.schema
+          : recordSchemaType(core, graph, statement.record, new Set(), path)?.schema
+        : ''
+      const recordFieldDefinition = isRecordStatement && recordFieldName
+        ? recordFieldDefinitions(editorGraph, recordSchemaRef).fields.find(field => field.name === recordFieldName)
+        : null
       let expressionDefinition = null
       const input = (label, type, value, assign) => {
         expressionDefinition = { name, label, type: type === 'any' && value?.kind === 'literal' ? literalTypeOfValue(value.value) : type }
@@ -3526,17 +4204,20 @@
       } else if (statement.kind === 'record.get' && name === 'field') {
         const type = recordSchemaType(core, graph, statement.record, new Set(), path)
         const definitions = recordFieldDefinitions(editorGraph, type?.schema).fields
-        if (definitions.length) selectField(panel, '字段名', statement.field || '', definitions.map(field => ({ value: field.name, label: `${field.label || field.name} · ${typeLabel(portValueType(field))}` })), value => updateStructural(statement.id, item => { item.field = value }, path), 'sentenceRecordField')
+        if (definitions.length) selectField(panel, '字段名', statement.field || '', definitions.map(field => ({ value: field.name, label: `${fieldDisplayLabel(field)} · ${typeLabel(portValueType(field))}` })), value => updateStructural(statement.id, item => { item.field = value }, path), 'sentenceRecordField')
         else panel.append(node('p', `请先选择可解析的记录；字段“${statement.field || '未设置'}”会继续保留。`, 'sentence-invalid-field sentence-pending-field'))
       } else if (statement.kind === 'record.create' && name === 'schema') {
-        const values = graphSchemas(editorGraph).map(item => ({ value: `${item.id}@${item.version}`, label: item.label ? `${item.label} · ${item.id}@${item.version}` : `${item.id}@${item.version}` }))
-        selectField(panel, '结构定义', statement.schema || '', values, value => updateStructural(statement.id, item => {
+        const values = graphSchemas(editorGraph).map(item => ({ value: `${item.id}@${item.version}`, label: schemaDisplayLabel(item) }))
+        selectField(panel, '结构定义', statement.schema || '', values, value => updateStructural(statement.id, (item, ownerGraph) => {
           item.schema = value
+          ensureAuthorSchema(ownerGraph, core, value)
           const selected = schemaForGraph(editorGraph, value)
           const fields = { ...(item.fields || {}) }
-          for (const field of Array.isArray(selected?.fields) ? selected.fields : []) if (!own(fields, field.name)) fields[field.name] = literal(defaultLiteralFor(field, editorGraph))
+          for (const field of Array.isArray(selected?.fields) ? selected.fields : []) {
+            if (!own(fields, field.name) && own(field, 'default')) fields[field.name] = literal(clone(field.default))
+          }
           item.fields = fields
-        }, path), 'sentenceRecordSchema')
+        }, path), 'sentenceRecordSchema', '当前记录结构（已保存）')
       } else if (statement.kind === 'record.with' && name === 'record') {
         const type = recordSchemaType(core, graph, statement.record, new Set(), path) || { kind: 'record', schema: '' }
         input('记录值', type, statement.record, value => updateStructural(statement.id, item => {
@@ -3549,27 +4230,23 @@
             item.fields = { ...(item.fields || {}) }
             const schema = schemaForGraph(editorGraph, selected.schema)
             for (const field of Array.isArray(schema?.fields) ? schema.fields : []) {
-              if (!own(item.fields, field.name)) item.fields[field.name] = literal(defaultLiteralFor(field, editorGraph))
+              if (!own(item.fields, field.name) && own(field, 'default')) item.fields[field.name] = literal(clone(field.default))
             }
           }
         }, path))
-      } else if ((statement.kind === 'record.create' || statement.kind === 'record.with') && name.startsWith('field:')) {
-        const fieldName = name.slice('field:'.length)
-        const schemaRef = statement.kind === 'record.create'
-          ? statement.schema
-          : recordSchemaType(core, graph, statement.record, new Set(), path)?.schema
-        const definition = recordFieldDefinitions(editorGraph, schemaRef).fields.find(field => field.name === fieldName)
-          || { name: fieldName, label: fieldName, type: 'any' }
-        input(definition.label || fieldName, portValueType(definition), statement.fields?.[fieldName], value => updateStructural(statement.id, item => { item.fields = { ...(item.fields || {}), [fieldName]: value } }, path))
+      } else if (isRecordStatement && (name.startsWith('field:') || recordFieldDefinition)) {
+        const fieldName = recordFieldName
+        const definition = recordFieldDefinition || { name: fieldName, label: fieldName, type: 'any' }
+        input(semanticSlotLabel(definition, fieldName), portValueType(definition), statement.fields?.[fieldName], value => updateStructural(statement.id, item => { item.fields = { ...(item.fields || {}), [fieldName]: value } }, path))
       } else if (statement.kind === 'return' && name.startsWith('return:')) {
         const outputName = name.slice('return:'.length)
         const output = (scopeDefinition(graph, path).graph?.outputs || []).find(item => item.name === outputName)
-        input(output?.label || outputName, output?.type || 'any', statement.values?.[outputName], value => updateStructural(statement.id, item => { item.values = { ...(item.values || {}), [outputName]: value } }, path))
+        input(semanticSlotLabel(output, outputName), output?.type || 'any', statement.values?.[outputName], value => updateStructural(statement.id, item => { item.values = { ...(item.values || {}), [outputName]: value } }, path))
       } else if (statement.kind === 'defer-choice' && name === 'title') input('提示', 'string', statement.title, value => updateStructural(statement.id, item => { item.title = value }, path))
       else if (statement.kind === 'return' && name === 'value') input('返回值', 'any', statement.value, value => updateStructural(statement.id, item => { item.value = value }, path))
       else if (statement.kind === 'defer-choice' && name === 'graph') {
         const ownerGraph = scopeDefinition(graph, path).graph || graph
-        const values = (Array.isArray(ownerGraph?.continuations) ? ownerGraph.continuations : []).map(item => ({ value: `${item.id}@${item.version}`, label: `${item.id}@${item.version}` }))
+        const values = (Array.isArray(ownerGraph?.continuations) ? ownerGraph.continuations : []).map(item => ({ value: `${item.id}@${item.version}`, label: item.label || item.name || '未命名续接流程' }))
         selectField(panel, '续接流程', statement.graph || '', values, value => updateStructural(statement.id, item => { item.graph = value }, path), 'sentenceContinuationRef')
       } else if (statement.kind === 'defer-choice' && name === 'payload') {
         const continuation = continuationDefinition(scopeDefinition(graph, path).graph || graph, statement.graph)
@@ -3611,7 +4288,10 @@
         panel.append(node('p', '这条记录还没有字段。', 'sentence-inline-editor-copy'))
         return panel
       }
-      const schema = schemaForGraph(schemaGraphForScope(graph, path), statement.schema)
+      const schemaRef = statement.kind === 'record.create'
+        ? statement.schema
+        : recordSchemaType(core, graph, statement.record, new Set(), path)?.schema
+      const schema = schemaForGraph(graphWithAuthorSchemas(core, schemaGraphForScope(graph, path)), schemaRef)
       const definitions = new Map((Array.isArray(schema?.fields) ? schema.fields : []).map(field => [field.name, field]))
       const list = node('div', undefined, 'sentence-record-fields-list')
       for (const fieldName of fields) {
@@ -3619,8 +4299,11 @@
         const definition = definitions.get(fieldName)
         const label = definition?.label || fieldName
         field.append(node('span', `${label}：`, 'sentence-field-label'))
-        field.append(slotToken(recordFieldValueLabel(statement, statement.fields[fieldName], graph, path), statement.id, 'property', `field:${fieldName}`, path, label, {
+        const referenceInfo = recordFieldReferenceInfo(statement, fieldName, statement.fields[fieldName], graph, path)
+        const display = referenceInfo?.text || recordFieldValueLabel(statement, statement.fields[fieldName], graph, path, fieldName)
+        field.append(slotToken(display, statement.id, 'property', `field:${fieldName}`, path, label, {
           returnPopover: { control: 'record-fields', statementId: statement.id, scopePath: path },
+          ...(referenceInfo?.missing ? { referenceMissing: true, referenceId: Array.isArray(referenceInfo.raw) ? referenceInfo.raw.join('、') : referenceInfo.raw } : {}),
         }))
         list.append(field)
       }
@@ -3639,7 +4322,7 @@
       panel.append(top)
       const active = scopeDefinition(graph, path)
       const ownerGraph = active.graph || graph
-      const editorGraph = schemaGraphForScope(graph, path)
+      const editorGraph = graphWithAuthorSchemas(core, schemaGraphForScope(graph, path))
       if (statement.kind === 'if') {
         panel.append(node('h4', '条件表达式', 'sentence-inline-editor-section'))
         panel.append(structuralValue(graph, statement, { name: 'condition', label: '条件', type: 'boolean' }, statement.condition, value => updateStructural(statement.id, item => { item.condition = value }, path), path))
@@ -3679,7 +4362,7 @@
       } else if (statement.kind === 'record.create' || statement.kind === 'record.with') {
         let schemaRef = statement.schema || ''
         if (statement.kind === 'record.with') schemaRef = recordSchemaType(core, graph, statement.record, new Set(), path)?.schema || schemaRef
-        const schemaValues = graphSchemas(editorGraph).map(item => ({ value: `${item.id}@${item.version}`, label: `${item.id}@${item.version}` }))
+        const schemaValues = graphSchemas(editorGraph).map(item => ({ value: `${item.id}@${item.version}`, label: schemaDisplayLabel(item) }))
         if (statement.kind === 'record.with') {
           const recordType = recordSchemaType(core, graph, statement.record, new Set(), path) || { kind: 'record', schema: schemaRef }
           panel.append(structuralValue(graph, statement, { name: 'record', label: '记录值', type: recordType }, statement.record, value => updateStructural(statement.id, item => {
@@ -3688,16 +4371,21 @@
             if (selected?.schema) {
               item.fields = { ...(item.fields || {}) }
               const schema = schemaForGraph(editorGraph, selected.schema)
-              for (const field of Array.isArray(schema?.fields) ? schema.fields : []) if (!own(item.fields, field.name)) item.fields[field.name] = literal(defaultLiteralFor(field, editorGraph))
+              for (const field of Array.isArray(schema?.fields) ? schema.fields : []) {
+                if (!own(item.fields, field.name) && own(field, 'default')) item.fields[field.name] = literal(clone(field.default))
+              }
             }
           }, path), path))
         }
         if (statement.kind === 'record.create') {
-          selectField(panel, '结构定义', schemaRef, schemaValues, value => updateStructural(statement.id, item => {
+          selectField(panel, '结构定义', schemaRef, schemaValues, value => updateStructural(statement.id, (item, ownerGraph) => {
             item.schema = value
+            ensureAuthorSchema(ownerGraph, core, value)
             const selected = schemaForGraph(editorGraph, value)
             const fields = { ...(item.fields || {}) }
-            for (const field of Array.isArray(selected?.fields) ? selected.fields : []) if (!own(fields, field.name)) fields[field.name] = literal(defaultLiteralFor(field, editorGraph))
+            for (const field of Array.isArray(selected?.fields) ? selected.fields : []) {
+              if (!own(fields, field.name) && own(field, 'default')) fields[field.name] = literal(clone(field.default))
+            }
             item.fields = fields
           }, path), 'sentenceRecordSchema')
         }
@@ -3708,7 +4396,7 @@
       } else if (statement.kind === 'record.get') {
         const recordType = recordSchemaType(core, graph, statement.record, new Set(), path)
         const definitions = recordFieldDefinitions(editorGraph, recordType?.schema).fields
-        if (definitions.length) selectField(panel, '字段名', statement.field || '', definitions.map(field => ({ value: field.name, label: `${field.label || field.name} · ${typeLabel(portValueType(field))}` })), value => updateStructural(statement.id, item => { item.field = value }, path), 'sentenceRecordField')
+        if (definitions.length) selectField(panel, '字段名', statement.field || '', definitions.map(field => ({ value: field.name, label: `${fieldDisplayLabel(field)} · ${typeLabel(portValueType(field))}` })), value => updateStructural(statement.id, item => { item.field = value }, path), 'sentenceRecordField')
         else panel.append(node('p', `请先选择可解析的记录；字段“${statement.field || '未设置'}”会继续保留并参与诊断。`, 'sentence-invalid-field sentence-pending-field'))
         const recordDefinition = recordType || { kind: 'record', schema: '' }
         panel.append(structuralValue(graph, statement, { name: 'record', label: '记录值', type: recordDefinition }, statement.record, value => updateStructural(statement.id, item => { item.record = value }, path), path))
@@ -3732,7 +4420,7 @@
         panel.append(node('p', '集合体内语句会在“执行内容”分支中编辑；编译器负责校验 data-only 限制。', 'sentence-inline-editor-copy'))
       } else if (statement.kind === 'defer-choice') {
         const continuations = Array.isArray(ownerGraph?.continuations) ? ownerGraph.continuations : []
-        selectField(panel, '续接流程', statement.graph || '', continuations.map(item => ({ value: `${item.id}@${item.version}`, label: `${item.id}@${item.version}` })), value => updateStructural(statement.id, item => { item.graph = value }, path), 'sentenceContinuationRef')
+        selectField(panel, '续接流程', statement.graph || '', continuations.map(item => ({ value: `${item.id}@${item.version}`, label: item.label || item.name || '未命名续接流程' })), value => updateStructural(statement.id, item => { item.graph = value }, path), 'sentenceContinuationRef')
         const continuation = continuationDefinition(ownerGraph, statement.graph)
         const payloadType = continuation?.payloadType || continuation?.payload || continuation?.graph?.hostBindings?.payload || 'any'
         const fields = [
@@ -3811,8 +4499,8 @@
       if (focusedSlot) {
         panel.dataset.sentenceSlotEditor = `${focusedSlot.slotKind || 'input'}:${focusedSlot.slotName || ''}`
       }
-      const editorGraph = schemaGraphForScope(graph, path)
       const descriptor = descriptorForCurrent(graph, statement, path)
+      const editorGraph = graphWithDescriptorSchemas(schemaGraphForScope(graph, path), descriptor)
       const stableEditorTarget = editorOptions.activatePopover
         ? { control: 'statement', statementId: statement.id, scopePath: path }
         : null
@@ -3829,18 +4517,20 @@
       top.append(node('strong', focusedSlot ? `编辑${focusedSlot.slotKind === 'parameter' ? '参数' : '输入'}：${focusedLabel}` : '编辑模块', 'sentence-inline-editor-title'))
       const close = action('关闭编辑', closePopover, 'sentence-popover-close')
       top.append(close); panel.append(top)
-      const descriptors = moduleDescriptors(graphOwner(graph, path)).filter(item => !isCompatibilityDescriptor(item)
-        || (item.id === statement.module && item.version === statement.version))
+      const allDescriptors = moduleDescriptors(graphOwner(graph, path))
+      const authorDescriptors = authoringPickerDescriptors(allDescriptors.filter(item => !isCompatibilityDescriptor(item)))
+      const currentDescriptor = allDescriptors.find(item => item.id === statement.module && item.version === statement.version)
+      const descriptors = [...authorDescriptors, ...(currentDescriptor && !authorDescriptors.some(item => item.id === currentDescriptor.id && item.version === currentDescriptor.version) ? [currentDescriptor] : [])]
       if (!focusedSlot) {
         const select = document.createElement('select')
         select.dataset.gameplayModuleModule = 'true'
         select.dataset.sentenceModuleSelect = statement.id || ''
         for (const item of descriptors) {
-          const option = node('option', `${item.label || item.id} · ${item.id}`)
+          const option = node('option', semanticModuleLabel(item.id, item.label))
           option.value = `${item.id}\0${item.version}`; select.append(option)
         }
         if (statement.module && !descriptors.some(item => item.id === statement.module && item.version === statement.version)) {
-          const option = node('option', `当前引用 · ${statement.module}@${statement.version}`)
+          const option = node('option', '当前模块引用（已保存）')
           option.value = `${statement.module}\0${statement.version}`; select.append(option)
         }
         select.value = `${statement.module || ''}\0${statement.version || ''}`
@@ -3867,7 +4557,7 @@
         panel.append(moduleField)
       }
       if (!descriptor) {
-        panel.append(node('p', `当前模块未注册：${statement.module || '（空）'}@${statement.version || '（空）'}`, 'sentence-message error'))
+        panel.append(node('p', '当前模块未注册；可从上方菜单选择可用模块。', 'sentence-message error'))
         return panel
       }
       if (!focusedSlot && (descriptor.description || descriptor.uiDescription)) panel.append(node('p', descriptor.uiDescription || descriptor.description, 'sentence-inline-editor-copy'))
@@ -3924,6 +4614,11 @@
       const isVisibleInput = input => Boolean(isAuthorableInput(input)) && (!focusedSlot || (focusedSlot.slotKind === 'input' && focusedSlot.slotName === input.name))
       const isInternalAuthorParameter = parameter => descriptor.id === 'author.choice.option' && String(statement.version) === '3' && parameter?.name === 'optionsType'
         || sentenceParameterIsDerived(descriptor, statement, parameter?.name)
+        // These values are compiler bindings or compatibility spellings. They
+        // remain in the graph for deterministic lowering, while authors edit
+        // the typed inputs and Chinese semantic choices instead.
+        || ['sourceType', 'targetType', 'amountType', 'resultType', 'templateType', 'destinationType', 'displayType', 'extensionType', 'definitionType', 'blockType', 'argsType', 'legacyNormalSpelling', 'entityKind'].includes(parameter?.name)
+        || ['author.effect.damage', 'author.effect.heal'].includes(descriptor.id) && parameter?.name === 'skillId'
         // Older editor bundles had no sentence metadata API. Keep this narrow
         // fallback so a legacy catalog still hides the instance discriminator.
         || extensionInstanceDescriptor && parameter?.name === 'entityKind'
@@ -3969,11 +4664,36 @@
           }, path)
         }, false, {
           renderExpression: (g, s, d, v) => renderAuthorExpression(graph, s, d, v, path),
+          forceExpression: openPopover?.control === 'expression' && openPopover.directExpression === true
+            && openPopover.statementId === statement.id && openPopover.inputName === input.name,
+          onAuthorExpression: () => {
+            const returnPopover = stableEditorTarget || openPopover?.returnPopover || openPopover
+            openPopover = { control: 'expression', directExpression: true, statementId: statement.id, inputName: input.name, slotKind: 'input', slotName: input.name, scopePath: path, ...(returnPopover ? { returnPopover } : {}) }
+            render()
+          },
           scopePath: path,
+          schemaRegistry: options.schemaRegistry || options.objectSchemaRegistry,
+          catalog: authorReferenceCatalog(options.catalog),
+          getCatalog: typeof options.getCatalog === 'function' ? () => authorReferenceCatalog(options.getCatalog()) : undefined,
+          referenceResolver: authorContentReference,
           onCompose: () => {
             const returnPopover = stableEditorTarget || openPopover?.returnPopover || openPopover
             openPopover = { control: 'expression', statementId: statement.id, inputName: input.name, slotKind: 'input', slotName: input.name, scopePath: path, ...(returnPopover ? { returnPopover } : {}) }
             render()
+          },
+          onLiteralTypeChange: nextType => {
+            if (!nextType || nextType === 'record' || nextType === 'object') return
+            const typeParameter = {
+              'author.effect.summon': { source: 'sourceType', template: 'templateType', destination: 'destinationType', display: 'displayType' },
+              'author.piece.display': { display: 'displayType' },
+              'content.materialize-template': { fields: 'fieldsType', extension: 'extensionType' },
+              'author.card.gain': { extension: 'extensionType' },
+              'author.cluster.acquire': { definition: 'definitionType' },
+              'code-block.invoke': { block: 'blockType', args: 'argsType' },
+            }[descriptor.id]?.[input.name]
+            if (!typeParameter) return
+            const encoded = typeof nextType === 'string' ? nextType : JSON.stringify(nextType)
+            updateCall(statement.id, item => { item.parameters = { ...(item.parameters || {}), [typeParameter]: encoded } }, path)
           },
           onOpenSource: () => openSourceExpression(current, path, stableEditorTarget || openPopover?.returnPopover || openPopover),
         }))
@@ -4034,15 +4754,16 @@
       const currentExtensionDeclaration = () => mapDeclarations.find(item => item.namespace === statement.parameters?.namespace && item.name === statement.parameters?.name)
       const schemaValues = graphSchemas(editorGraph).map(schema => ({
         value: `${schema.id}@${schema.version}`,
-        label: schema.label ? `${schema.label} · ${schema.id}@${schema.version}` : `${schema.id}@${schema.version}`,
+        label: schemaDisplayLabel(schema),
       }))
       const selectParameter = (parameter, values, current, onChange, disabled = false) => {
         const select = document.createElement('select')
         select.dataset.sentenceParameterPicker = parameter.name
         select.dataset.sentenceModuleParameterPicker = parameter.name
-        select.setAttribute('aria-label', parameter.label || parameter.name)
-        const options = [['', `请选择${parameter.label || parameter.name}`], ...values.map(item => [item.value, item.label])]
-        if (current !== undefined && current !== null && current !== '' && !options.some(item => item[0] === current)) options.push([String(current), `当前值 · ${current}`])
+        const parameterLabel = semanticSlotLabel(parameter, parameter.name)
+        select.setAttribute('aria-label', parameterLabel)
+        const options = [['', `请选择${parameterLabel}`], ...values.map(item => [item.value, item.label])]
+        if (current !== undefined && current !== null && current !== '' && !options.some(item => item[0] === current)) options.push([String(current), '当前值（已保存）'])
         for (const [value, label] of options) { const option = node('option', label); option.value = value; select.append(option) }
         select.value = current == null ? '' : String(current)
         select.disabled = disabled
@@ -4057,7 +4778,10 @@
       }
       const keyFieldValues = () => {
         const selectedSchema = schemaForGraph(editorGraph, statement.parameters?.schema)
-        return (Array.isArray(selectedSchema?.fields) ? selectedSchema.fields : []).map(field => ({ value: field.name, label: field.label ? `${field.label} · ${field.name}` : field.name }))
+        return (Array.isArray(selectedSchema?.fields) ? selectedSchema.fields : []).map(field => ({
+          value: field.name,
+          label: fieldDisplayLabel(field),
+        }))
       }
       const appendExtensionSuggestions = (control, parameter) => {
         const operation = extensionValueOperation || mapDescriptor
@@ -4109,6 +4833,19 @@
           activateEditorPopover()
           updateCall(statement.id, item => {
             mutate(item)
+            // Before an options map exists, the author-facing return type can
+            // establish the map value type. Keep this compiler binding
+            // synchronized without exposing it as a separate control.
+            if (descriptor?.id === 'author.choice.option' && String(item?.version || statement.version) === '3'
+              && parameter.name === 'valueType' && !own(item.inputs || {}, 'options')) {
+              try {
+                const raw = item.parameters?.optionsType
+                const parsed = typeof raw === 'string' && raw.trimStart().startsWith('{') ? JSON.parse(raw) : raw
+                const selectedRaw = item.parameters?.valueType
+                const selected = typeof selectedRaw === 'string' && selectedRaw.trimStart().startsWith('{') ? JSON.parse(selectedRaw) : selectedRaw
+                if (parsed?.kind === 'map' && parsed.key === 'string' && parsed.value === 'string') item.parameters.optionsType = JSON.stringify({ ...parsed, value: selected })
+              } catch { /* retain the registered default until map editing */ }
+            }
             // Choice v3 derives its public result shape from the typed map
             // input. Keep that shape synchronized when an author changes the
             // single/multi return form after the options expression exists.
@@ -4135,7 +4872,13 @@
           control.dataset.sentenceKeyFieldParameter = parameter.name
           if (!values.length) control.title = '请先选择已声明的记录类型。'
         } else {
-          control = literalControl(statement.parameters?.[parameter.name] ?? defaultForType(effectiveParameter), effectiveParameter, value => updateParameter(item => { item.parameters = { ...(item.parameters || {}), [parameter.name]: value } }), false, { graph: editorGraph })
+          control = literalControl(statement.parameters?.[parameter.name] ?? defaultForType(effectiveParameter), effectiveParameter, value => updateParameter(item => { item.parameters = { ...(item.parameters || {}), [parameter.name]: value } }), false, {
+            graph: editorGraph,
+            schemaRegistry: options.schemaRegistry || options.objectSchemaRegistry,
+            catalog: authorReferenceCatalog(options.catalog),
+            getCatalog: typeof options.getCatalog === 'function' ? () => authorReferenceCatalog(options.getCatalog()) : undefined,
+            referenceResolver: authorContentReference,
+          })
           if ((extensionValueOperation || extensionOperation) && (parameter.name === 'namespace' || parameter.name === 'name')) appendExtensionSuggestions(control, parameter)
         }
         // Schema/type selectors expose the domain value directly below. Their
@@ -4230,7 +4973,7 @@
           panel.append(advance)
         }
       }
-      if (openPopover?.control === 'expression' && openPopover.statementId === statement.id) {
+      if (openPopover?.control === 'expression' && !openPopover.directExpression && openPopover.statementId === statement.id) {
         const definition = descriptorInputDefinition(descriptor, inputs.find(input => input.name === openPopover.inputName), statement)
         if (definition) panel.append(renderExpressionChooser(statement, editorGraph, definition, path))
       }
@@ -4248,6 +4991,10 @@
       button.dataset.sentenceSlotEditor = `${statementId || ''}:${slotKind}:${slotName || ''}`
       button.dataset.sentenceSlotKind = slotKind
       button.dataset.sentenceSlotName = slotName || ''
+      if (tokenOptions.referenceMissing) {
+        button.dataset.sentenceReferenceMissing = 'true'
+        if (tokenOptions.referenceId) button.dataset.sentenceReferenceId = String(tokenOptions.referenceId)
+      }
       const selected = ['slot', 'expression'].includes(openPopover?.control)
         && openPopover?.statementId === statementId
         && openPopover?.slotKind === slotKind
@@ -4255,9 +5002,11 @@
       button.classList.toggle('is-selected', selected)
       button.setAttribute('aria-pressed', selected ? 'true' : 'false')
       const displayLabel = label || semanticSlotLabel(null, slotName)
-      button.title = tokenOptions.pending
-        ? `前置选择未完成，原值已保留；编辑${displayLabel}`
-        : `编辑${displayLabel || (slotKind === 'parameter' ? '参数' : '输入')}`
+      button.title = tokenOptions.referenceMissing
+        ? `未找到引用${tokenOptions.referenceId ? `（已保存标识：${tokenOptions.referenceId}）` : ''}；编辑${displayLabel}`
+        : tokenOptions.pending
+          ? `前置选择未完成，原值已保留；编辑${displayLabel}`
+          : `编辑${displayLabel || (slotKind === 'parameter' ? '参数' : '输入')}`
       if (tokenOptions.pending) {
         button.classList.add('sentence-pending-slot', 'sentence-invalid-token')
         button.setAttribute('aria-invalid', 'true')
@@ -4266,14 +5015,14 @@
     }
 
     function genericTemplate(descriptor, statement) {
-      const fragments = [{ text: `执行“${descriptor?.label || statement.module || '未注册模块'}”` }]
+      const fragments = [{ text: `执行“${semanticModuleLabel(statement.module, descriptor?.label)}”` }]
       for (const parameter of Array.isArray(descriptor?.parameters) ? descriptor.parameters : []) {
         if (!own(statement.parameters || {}, parameter.name) && parameter.optional) continue
-        fragments.push({ text: `，${parameter.label || parameter.name}为` }, { kind: 'parameter', name: parameter.name })
+        fragments.push({ text: `，${semanticSlotLabel(parameter, parameter.name)}为` }, { kind: 'parameter', name: parameter.name })
       }
       for (const input of Array.isArray(descriptor?.inputs) ? descriptor.inputs : []) {
         if (!own(statement.inputs || {}, input.name) && input.optional) continue
-        fragments.push({ text: `，${input.label || input.name}为` }, { kind: 'input', name: input.name })
+        fragments.push({ text: `，${semanticSlotLabel(input, input.name)}为` }, { kind: 'input', name: input.name })
       }
       return fragments
     }
@@ -4297,10 +5046,15 @@
       if (movement) return movement
       if (name === 'kind' && (value === 'teleport' || value === 'summon')) return value === 'teleport' ? '传送' : '召唤'
       if (name === 'attribute' || name === 'field') return fieldLabels[value] || literalDisplay(value)
+      const enumText = enumValueDisplay(value, { ...(definition || {}), name })
+      if (enumText !== undefined) return enumText
       const labels = {
         currentDuration: '持续时间', duration: '持续时间', stacks: '层数', currentUses: '可用次数',
         maxUses: '最大使用次数', field: '字段', statusType: '状态类型', inputPolicy: '输入策略',
         resource: '资源', attribute: '属性', filter: '筛选条件', targetType: '目标类型',
+        sourceType: '来源类型', templateType: '模板类型', displayType: '显示类型',
+        destinationType: '目标地格类型', extensionType: '扩展字段类型', definitionType: '定义类型',
+        blockType: '代码块类型', argsType: '参数类型', optionsType: '选项类型',
       }
       const label = labels[value]
       return label || literalDisplay(value)
@@ -4320,12 +5074,13 @@
         else if (own(statement, name)) value = statement[name]
       }
       if ((value === undefined || value === null || value === '') && own(definition, 'default')) value = definition.default
-      const empty = fragment?.empty || definition?.label || name || '待填写'
-      if (value === undefined || value === null || value === '') return { text: empty, kind, name, label: definition?.label || name }
+      const semanticLabel = semanticSlotLabel(definition, name)
+      const empty = fragment?.empty || semanticLabel || '待填写'
+      if (value === undefined || value === null || value === '') return { text: empty, kind, name, label: semanticLabel }
       const display = kind === 'parameter'
         ? (statement?.kind === 'record.create' && name === 'schema' ? recordCreateDisplayLabel(statement, graph, path) : semanticParameterDisplay(name, value, definition))
         : record(value) ? projectionValueLabel(statement, fragment, value, graph, path) : contextualLiteralDisplay(statement, value, graph, path)
-      return { text: display || empty, kind, name, label: definition?.label || name }
+      return { text: display || empty, kind, name, label: semanticLabel }
     }
 
     function sentenceFragmentAvailability(descriptor, statement, fragment) {
@@ -4346,9 +5101,9 @@
     function recordCreateDisplayLabel(statement, graph, path = scopePath) {
       const reference = String(statement?.schema || '')
       const schema = schemaForGraph(schemaGraphForScope(graph, path), reference)
-      if (schema?.label) return schema.label
       const usedByChoice = choiceRecordValueInfo(graph, path).recordIds.has(statement?.id)
-      return usedByChoice ? '选项内容' : '记录内容'
+      if (usedByChoice) return '选项内容'
+      return schema ? schemaDisplayLabel(schema) : '记录内容'
     }
 
     function choiceRecordValueInfo(graph, path = scopePath) {
@@ -4375,7 +5130,7 @@
         for (const field of Array.isArray(schema?.fields) ? schema.fields : []) {
           const value = candidate.fields?.[field.name]
           if (value?.kind !== 'literal' || typeof value.value !== 'string') continue
-          labels.set(value.value, field.label || field.name)
+          labels.set(value.value, fieldDisplayLabel(field))
         }
       }
       return { labels, recordIds }
@@ -4391,9 +5146,29 @@
       return choiceRecordValueInfo(graph, path).labels.get(value.value) || raw
     }
 
-    function recordFieldValueLabel(statement, value, graph, path = scopePath) {
+    function recordFieldReferenceInfo(statement, fieldName, value, graph, path = scopePath) {
+      if (!record(value) || value.kind !== 'literal') return null
+      const schemaRef = statement?.kind === 'record.create'
+        ? statement.schema
+        : recordSchemaType(core, graph, statement?.record, new Set(), path)?.schema
+      const schema = schemaForGraph(graphWithAuthorSchemas(core, schemaGraphForScope(graph, path)), schemaRef)
+      const definition = (Array.isArray(schema?.fields) ? schema.fields : []).find(field => field?.name === fieldName)
+      const reference = authorContentReference(definition, fieldName, { schema: schemaRef, type: definition?.type })
+      if (!reference?.collection) return null
+      let catalog = options.catalog
+      if (typeof options.getCatalog === 'function') {
+        try { catalog = options.getCatalog() || catalog } catch { /* retain the last catalog snapshot */ }
+      }
+      const info = authorReferenceValueInfo(value.value, reference.collection, authorReferenceCatalog(catalog))
+      return info ? { ...info, collection: reference.collection } : null
+    }
+
+    function recordFieldValueLabel(statement, value, graph, path = scopePath, fieldName = '') {
       const raw = valueLabel(core, graph, value, path)
-      if (!record(value) || value.kind !== 'literal' || typeof value.value !== 'string') return raw
+      if (!record(value) || value.kind !== 'literal') return raw
+      const reference = recordFieldReferenceInfo(statement, fieldName, value, graph, path)
+      if (reference) return reference.text
+      if (typeof value.value !== 'string') return raw
       const info = choiceRecordValueInfo(graph, path)
       return info.recordIds.has(statement?.id) ? (info.labels.get(value.value) || raw) : raw
     }
@@ -4479,7 +5254,8 @@
         syncMenuActions()
       })
       menu.append(actions)
-      const descriptor = statement?.kind === 'call' ? descriptorForCurrent(graphFor(core, options.getDraft?.() || {}, options.field || primaryField), statement, path) : null
+      const graph = graphFor(core, options.getDraft?.() || {}, options.field || primaryField)
+      const descriptor = statement?.kind === 'call' ? descriptorForCurrent(graph, statement, path) : null
       const technical = node('details', undefined, 'sentence-row-details')
       const technicalSummary = node('summary', '查看技术信息')
       technicalSummary.setAttribute('aria-label', '查看技术信息')
@@ -4488,8 +5264,7 @@
       if (statement?.kind === 'call' && own(statement.inputs || {}, 'amount')) {
         const amountText = node('p', undefined, 'sentence-inline-editor-output')
         amountText.append(node('span', '伤害量：', 'sentence-field-label'))
-        const currentGraph = graphFor(core, options.getDraft?.() || {}, options.field || primaryField)
-        amountText.append(slotToken(valueLabel(core, currentGraph, statement.inputs.amount, path), statement.id, 'input', 'amount', path, '伤害量'))
+        amountText.append(slotToken(valueLabel(core, graph, statement.inputs.amount, path), statement.id, 'input', 'amount', path, '伤害量'))
         technicalBody.append(amountText)
       }
       if (descriptor?.description || descriptor?.uiDescription) technicalBody.append(node('p', descriptor.uiDescription || descriptor.description, 'sentence-row-description'))
@@ -4506,7 +5281,8 @@
         technicalBody.append(outputText)
       }
       if (statement?.kind === 'record.create' && statement.schema) {
-        technicalBody.append(node('p', `结构定义：${statement.schema}`, 'sentence-inline-editor-output'))
+        const visibleSchema = schemaForGraph(graphWithAuthorSchemas(core, schemaGraphForScope(graph, path)), statement.schema)
+        technicalBody.append(node('p', `结构定义：${schemaDisplayLabel(visibleSchema)}`, 'sentence-inline-editor-output'))
       }
       if (technicalBody.childElementCount) {
         technicalBody.hidden = true
@@ -4577,8 +5353,8 @@
         expression.setAttribute('role', 'button')
         expression.tabIndex = 0
         expression.title = descriptor
-          ? `编辑${descriptor.label || '此模块'}`
-          : `当前模块未注册：${statement.module || '（空）'}@${statement.version || '（空）'}；打开菜单修复此语句。`
+          ? `编辑${semanticModuleLabel(statement.module, descriptor.label)}`
+          : '当前模块未注册；打开菜单修复此语句。'
         expression.onclick = event => {
           if (event.target !== expression) return
           openPopover = { control: 'statement', statementId: statement.id, scopePath: path }
@@ -4593,7 +5369,7 @@
         }
         if (expressionMeta) {
           expression.append(node('span', '表达式', 'sentence-expression-owned-label'))
-          expression.append(node('span', `由${descriptor?.label || statement.module || '未注册模块'}生成`, 'sentence-template-text'))
+          expression.append(node('span', `由${semanticModuleLabel(statement.module, descriptor?.label)}生成`, 'sentence-template-text'))
         } else appendSentenceTemplate(expression, descriptor, statement, graph, path)
       } else if (statement?.kind === 'if') {
         expression.append(node('span', '如果', 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.condition, path), statement.id, 'input', 'condition', path, '条件'), node('span', '成立，则执行以下步骤。', 'sentence-template-text'))
@@ -4629,14 +5405,15 @@
         expression.append(node('span', '返回结果', 'sentence-template-text'))
         const outputs = Object.keys(statement.values || {})
         for (const name of outputs) {
-          expression.append(node('span', `，${semanticSlotLabels[name] || name}为`, 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.values[name], path), statement.id, 'input', `return:${name}`, path, semanticSlotLabels[name] || name))
+          expression.append(node('span', `，${semanticSlotLabel(null, name)}为`, 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.values[name], path), statement.id, 'input', `return:${name}`, path, semanticSlotLabel(null, name)))
         }
       } else {
         expression.append(node('strong', statementKindLabels[statement?.kind] || '结构化步骤', 'sentence-row-label'))
       }
       row.append(expression)
-      if (editable && statement.kind === 'call' && statement.module !== 'local.declare') {
-        const descriptor = descriptorForCurrent(graph, statement, path)
+      if (editable && ['call', 'record.create', 'record.get', 'record.with'].includes(statement.kind) && statement.module !== 'local.declare') {
+        const descriptor = statement.kind === 'call' ? descriptorForCurrent(graph, statement, path)
+          : { outputs: [{ name: 'value', label: statement.kind === 'record.get' ? '字段值' : '记录' }] }
         const outputs = (descriptor?.outputs || []).filter(output => output.name !== 'success' || descriptor.outputs.length === 1)
         if (outputs.length) {
           const results = node('details', undefined, 'sentence-result-names')
@@ -4644,7 +5421,7 @@
           for (const output of outputs) {
             const label = node('label', `${outputLabel(descriptor, output.name)} → `)
             const defaultName = `${statement.id}_${output.name}`.replace(/[^\p{L}\p{N}_]/gu, '_').replace(/^(?=\d)/u, '_')
-            const input = node('input'); input.type = 'text'; input.placeholder = defaultName
+            const input = node('input'); input.type = 'text'; input.placeholder = '为此结果命名'
             input.value = statement.layout?.resultNames?.[output.name] || ''
             input.setAttribute('aria-label', `${outputLabel(descriptor, output.name)}变量名`)
             input.addEventListener('change', () => {
@@ -4813,7 +5590,7 @@
         : (record(current) ? current.kind : (typeof current === 'string' ? current : 'string'))
       mode.value = modes.some(item => item[0] === currentMode) ? currentMode : 'string'
       const nested = node('div', undefined, 'sentence-type-nested')
-      const schemaValues = graphSchemas(graph).map(item => ({ value: `${item.id}@${item.version}`, label: `${item.id}@${item.version}` }))
+      const schemaValues = graphSchemas(graph).map(item => ({ value: `${item.id}@${item.version}`, label: schemaDisplayLabel(item) }))
       const renderNested = value => {
         nested.replaceChildren()
         if (value === 'list' || value === 'set' || value === 'nullable') {
@@ -4827,7 +5604,7 @@
           const select = document.createElement('select'); select.dataset.sentenceRecordType = ''
           for (const item of schemaValues) { const option = node('option', item.label); option.value = item.value; select.append(option) }
           const selected = record(current) && current.kind === 'record' ? current.schema : ''
-          if (selected && !schemaValues.some(item => item.value === selected)) { const option = node('option', `当前结构 · ${selected}`); option.value = selected; select.append(option) }
+          if (selected && !schemaValues.some(item => item.value === selected)) { const option = node('option', '当前记录结构（已保存）'); option.value = selected; select.append(option) }
           select.value = selected || schemaValues[0]?.value || ''
           select.onchange = () => onChange({ kind: 'record', schema: select.value })
           nested.append(select)
@@ -4919,7 +5696,12 @@
         if (key === 'inputs' && ownerIsGraph) {
           const binding = node('label', undefined, 'sentence-config-binding')
           binding.append(node('span', `静态绑定 · ${port.name}`, 'sentence-field-label'))
-          binding.append(literalControl(owner.inputBindings?.[port.name] ?? defaultForType(port), port, value => mutateGraph(graphValue => { const target = graphOwner(graphValue, path); target.inputBindings = { ...(target.inputBindings || {}), [port.name]: value } }, path), false, { graph: schemaGraphForScope(graph, path) }))
+          binding.append(literalControl(owner.inputBindings?.[port.name] ?? defaultForType(port), port, value => mutateGraph(graphValue => { const target = graphOwner(graphValue, path); target.inputBindings = { ...(target.inputBindings || {}), [port.name]: value } }, path), false, {
+            graph: schemaGraphForScope(graph, path),
+            catalog: authorReferenceCatalog(options.catalog),
+            getCatalog: typeof options.getCatalog === 'function' ? () => authorReferenceCatalog(options.getCatalog()) : undefined,
+            referenceResolver: authorContentReference,
+          }))
           section.append(binding)
         }
       }
@@ -4947,6 +5729,20 @@
       } else heading.append(node('span', '组合模块沿用主流程的结构定义，请返回主流程编辑。', 'sentence-inline-editor-copy'))
       section.append(heading)
       for (const [index, schema] of schemas.entries()) {
+        const builtin = authorSchemaForReference(core, `${schema.id}@${schema.version}`)
+        if (builtin) {
+          const card = node('details', undefined, 'sentence-schema-card')
+          card.dataset.sentenceSchema = `${schema.id}@${schema.version}`
+          card.append(node('summary', schemaDisplayLabel(schema), 'sentence-schema-summary'))
+          card.append(node('p', '这是内置结构。创建对象时可逐项填写；这里用于查看字段含义。', 'sentence-inline-editor-copy'))
+          for (const field of schema.fields || []) {
+            const row = node('div', undefined, 'sentence-config-row sentence-schema-field')
+            row.append(node('span', semanticSlotLabel(field, field.name)), node('span', typeLabel(field.type)), node('span', field.optional ? '可省略' : '必填'))
+            card.append(row)
+          }
+          section.append(card)
+          continue
+        }
         const card = node('details', undefined, 'sentence-schema-card'); card.open = true; card.dataset.sentenceSchema = `${schema.id || index}@${schema.version || ''}`
         const summary = node('summary', `${schema.id || '未命名'}@${schema.version || ''}`, 'sentence-schema-summary'); card.append(summary)
         const identity = node('div', undefined, 'sentence-config-row')
@@ -4954,7 +5750,7 @@
         const version = document.createElement('input'); version.type = 'text'; version.value = schema.version || ''; version.dataset.sentenceSchemaVersion = ''; version.disabled = !editable
         const rename = () => mutateGraph(graphValue => { const target = graphOwner(graphValue, path); const next = target.schemas?.[index]; if (next) { next.id = id.value.trim() || next.id; next.version = version.value.trim() || next.version } }, path)
         id.onchange = rename; version.onchange = rename
-        identity.append(node('span', 'ID', 'sentence-field-label'), id, node('span', '版本', 'sentence-field-label'), version)
+        identity.append(node('span', '结构名称', 'sentence-field-label'), id, node('span', '版本', 'sentence-field-label'), version)
         if (editable) {
           const remove = action('删除结构定义', () => mutateGraph(graphValue => { const target = graphOwner(graphValue, path); target.schemas = (target.schemas || []).filter((_item, itemIndex) => itemIndex !== index) }, path), 'sentence-config-remove'); identity.append(remove)
         }
@@ -5217,13 +6013,13 @@
     }
 
     function graphDiagnostic(graph) {
-      if (options.__sentenceLastDiagnostic) return options.__sentenceLastDiagnostic
+      if (options.__sentenceLastDiagnostic) return authorDiagnostic(options.__sentenceLastDiagnostic)
       if (!record(graph) || !core) return ''
       try {
         if (typeof core.compileGameplayModuleGraph === 'function') core.compileGameplayModuleGraph(graph, core.GAMEPLAY_MODULE_REGISTRY)
         else if (typeof core.assertGameplayModuleGraph === 'function') core.assertGameplayModuleGraph(graph)
         return ''
-      } catch (error) { return error?.message || String(error) }
+      } catch (error) { return authorDiagnostic(error?.message || String(error)) }
     }
 
     function renderGraphConfiguration(parent, graph, path = scopePath) {
@@ -5307,7 +6103,7 @@
       const allDescriptors = moduleDescriptors(catalogGraph)
       // Compatibility adapters stay available to the graph editor for loading
       // and editing old content, but never enter an author-facing picker.
-      const visibleDescriptors = allDescriptors.filter(descriptor => !isCompatibilityDescriptor(descriptor))
+      const visibleDescriptors = authoringPickerDescriptors(allDescriptors.filter(descriptor => !isCompatibilityDescriptor(descriptor)))
       const category = authoringCategoryOrder.includes(openPopover?.category) ? openPopover.category : 'all'
       const categoryCounts = new Map(authoringCategoryOrder.map(value => [value, 0]))
       for (const descriptor of visibleDescriptors) categoryCounts.set(authoringCategoryFor(descriptor), (categoryCounts.get(authoringCategoryFor(descriptor)) || 0) + 1)
@@ -5339,7 +6135,7 @@
       })
       const list = node('div', undefined, 'sentence-module-options')
       for (const descriptor of descriptors) {
-        const label = descriptor.label || descriptor.id
+        const label = semanticModuleLabel(descriptor.id, descriptor.label)
         const item = action('', () => {
           try {
             const statementId = addModule(options, descriptor.id, descriptor.version, openPopover?.insertInto || { kind: 'root' }, scopePath)
@@ -5351,7 +6147,7 @@
         item.append(node('small', descriptor.uiDescription || descriptor.description || '按声明输入后即可继续编辑。', 'sentence-module-option-help'))
         item.dataset.sentenceModule = descriptor.id
         item.dataset.sentenceModuleCategory = authoringCategoryFor(descriptor)
-        item.title = descriptor.description || descriptor.id
+        item.title = descriptor.description || label
         item.setAttribute('aria-label', `${label}：${descriptor.uiDescription || descriptor.description || '按声明输入后即可继续编辑。'}`)
         list.append(item)
       }
@@ -5618,13 +6414,19 @@
       }
     }
 
+    if (options.initialEditorState) restoreEditorState(options.initialEditorState, false)
     render()
     return {
       refresh: render,
+      getEditorState,
+      restoreEditorState,
+      hasUnappliedEdits() { return expressionDrafts.size > 0 },
+      getTrialRequest,
       startTrial,
       destroy() { destroyed = true; openPopover = null; for (const editor of expressionEditors) editor.destroy(); expressionEditors.clear(); expressionDrafts.clear(); container.replaceChildren() },
     }
   }
 
   window.SkillSentenceEditor = { mount }
+  window.SkillSentenceEditor.localizeDiagnostic = authorDiagnostic
 })()

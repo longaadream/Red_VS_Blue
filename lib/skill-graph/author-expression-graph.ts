@@ -33,6 +33,36 @@ const encodedType = (type: GameplayValueType) => typeof type === 'string' ? type
 const sameType = (a: GameplayValueType, b: GameplayValueType) => JSON.stringify(a) === JSON.stringify(b)
 const own = <T>(object: Readonly<Record<string, T>>, key: string): T | undefined => Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined
 const number: GameplayValueType = 'number'
+
+/**
+ * Resolve a typed-record field without changing the field name written to the
+ * graph. Canonical names always win so a label that happens to be another
+ * field's name cannot redirect an expression. Labels are only accepted when
+ * they identify exactly one field; this keeps ambiguous author text from
+ * silently selecting a different field after a schema edit.
+ */
+export function resolveAuthorRecordField(schema: GameplayRecordSchema | undefined, requested: string): { field?: GameplayRecordSchema['fields'][number]; ambiguous: boolean } {
+  if (!schema) return { ambiguous: false }
+  const exact = schema.fields.find(field => field.name === requested)
+  if (exact) return { field: exact, ambiguous: false }
+  const labeled = schema.fields.filter(field => field.label === requested)
+  if (labeled.length === 1) return { field: labeled[0], ambiguous: false }
+  return { ambiguous: labeled.length > 1 }
+}
+
+/**
+ * Pick the author-facing name for completion. A label is inserted only when
+ * the graph resolver can resolve it unambiguously; otherwise the canonical
+ * field name remains the safe completion value.
+ */
+export function authorRecordFieldDisplayName(schema: GameplayRecordSchema, field: GameplayRecordSchema['fields'][number]): string {
+  const label = field.label
+  if (!label) return field.name
+  const labelMatches = schema.fields.filter(candidate => candidate.label === label)
+  const exactOtherField = schema.fields.some(candidate => candidate !== field && candidate.name === label)
+  return labelMatches.length === 1 && !exactOtherField ? label : field.name
+}
+
 export const authorFieldAliases: Readonly<Record<string, string>> = {
   名称: 'name', 阵营: 'faction', 所属玩家: 'ownerPlayerId', 生命值: 'currentHp', 当前生命: 'currentHp', 当前生命值: 'currentHp', 生命上限: 'maxHp', 最大生命: 'maxHp', 攻击力: 'attack', 防御力: 'defense', 移动速度: 'moveRange', 移动范围: 'moveRange',
   核心棋子: 'isCore', 实例标识: 'instanceId', 模板: 'templateId', 状态: 'statusTags', 状态列表: 'statusTags', 规则: 'rules', 技能: 'skills',
@@ -44,7 +74,7 @@ export const authorFieldAliases: Readonly<Record<string, string>> = {
 }
 const operators: Readonly<Record<string, string>> = { '+': 'math.add', '-': 'math.subtract', '*': 'math.multiply', '/': 'math.divide', '%': 'math.modulo', '^': 'math.power', '<': 'compare.less-than', '<=': 'compare.less-or-equal', '>': 'compare.greater-than', '>=': 'compare.greater-or-equal', '&&': 'logic.and', '||': 'logic.or' }
 export const authorFunctionSpecs: Readonly<Record<string, { module: string; port?: string; args: readonly string[]; labels?: readonly string[] }>> = {
-  绝对值: { module: 'math.abs', args: ['value'] }, 最小值: { module: 'math.min', args: ['left', 'right'] }, 最大值: { module: 'math.max', args: ['left', 'right'] },
+  绝对值: { module: 'math.abs', args: ['value'], labels: ['数值'] }, 最小值: { module: 'math.min', args: ['left', 'right'], labels: ['左值', '右值'] }, 最大值: { module: 'math.max', args: ['left', 'right'], labels: ['左值', '右值'] },
   集合: { module: 'set.create', args: ['items'], labels: ['元组'] }, 映射: { module: 'map.create', args: ['keys', 'values'], labels: ['键元组', '值元组'] },
   数量: { module: 'collection.length', args: ['items'], labels: ['容器'] }, 反转: { module: 'collection.reverse', args: ['items'], labels: ['容器'], port: 'items' },
   随机项目: { module: 'collection.random', args: ['items'], labels: ['容器'] }, 去重: { module: 'collection.distinct', args: ['items'], labels: ['容器'], port: 'value' },
@@ -57,7 +87,7 @@ export const authorFunctionSpecs: Readonly<Record<string, { module: string; port
   相对地格范围: { module: 'spatial.relative-cells', args: ['center', 'offsets'], labels: ['中心地格', '相对坐标'], port: 'cells' },
   查询棋子: { module: 'author.query.pieces', args: ['center', 'maximum', 'minimum'], labels: ['中心地格', '最大距离', '最小距离'], port: 'items' }, 查询地格: { module: 'author.query.cells', args: ['center', 'maximum', 'minimum'], labels: ['中心地格', '最大距离', '最小距离'], port: 'items' },
   状态强度: { module: 'status.strength', args: ['piece', 'statusType'], labels: ['棋子', '状态类型'] },
-  坐标: { module: 'spatial.cell', args: ['x', 'y'], port: 'cell' }, 距离: { module: 'spatial.cell-distance', args: ['from', 'to'], labels: ['起点', '终点'], port: 'distance' },
+  坐标: { module: 'spatial.cell', args: ['x', 'y'], labels: ['横坐标', '纵坐标'], port: 'cell' }, 距离: { module: 'spatial.cell-distance', args: ['from', 'to'], labels: ['起点', '终点'], port: 'distance' },
 }
 
 /** Translate syntax into registered nodes; never execute author text or embed it as code. */
@@ -306,14 +336,20 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
         if (declarations.some(item => !sameType(item.type, declarations[0].type) || item.namespace !== declarations[0].namespace)) return fail(node, '此扩展变量存在不同声明，请明确当前对象的类型')
         const declaration = declarations[0]
         let type: GameplayValueType | undefined = declaration?.type
-        for (const field of path) {
+        for (const [pathIndex, field] of path.entries()) {
           if (!type) break
           const ownerType: GameplayValueType = typeof type === 'object' && type.kind === 'nullable' ? type.value : type
           if (ownerType !== 'record' && !(typeof ownerType === 'object' && ownerType.kind === 'record')) return fail(node, '此扩展值没有字段 ' + field)
           const reference: string | undefined = typeof ownerType === 'object' && ownerType.kind === 'record' ? ownerType.schema : undefined
           const schema: GameplayRecordSchema | undefined = reference ? schemas.find(item => item.id === reference || `${item.id}@${item.version}` === reference) : undefined
-          if (schema && !schema.fields.some(item => item.name === field)) return fail(node, '此扩展结构中没有字段 ' + field)
-          type = schema?.fields.find(item => item.name === field)?.type
+          if (schema) {
+            const selected = resolveAuthorRecordField(schema, field)
+            if (!selected.field) return fail(node, selected.ambiguous ? `此扩展结构中的字段标签「${field}」有歧义，请使用字段原名` : '此扩展结构中没有字段 ' + field)
+            path[pathIndex] = selected.field.name
+            type = selected.field.type
+          } else {
+            type = undefined
+          }
         }
         type = type ?? expected
         if (!type || type === 'unknown' || type === 'any') return fail(node, '请声明此扩展变量的类型，或在明确类型的参数中使用')
@@ -338,10 +374,10 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
       if (type === 'piece' || type === 'player') return call(body, `${type}.field`, { [type]: object }, { field }, 'value', type === 'piece' ? '2' : '1')
       if (typeof type === 'object' && type.kind === 'record') {
         const schema = schemas.find(item => item.id === type.schema || `${item.id}@${item.version}` === type.schema)
-        const selected = schema?.fields.find(item => item.name === node.field)
-        if (!selected) return fail(node, `记录没有字段「${node.field}」`)
-        const nodeId = id(); body.push({ kind: 'record.get', id: nodeId, record: object.value, field: node.field })
-        return { value: { kind: 'output', node: nodeId, port: 'value' }, type: selected.type }
+        const selected = resolveAuthorRecordField(schema, node.field)
+        if (!selected.field) return fail(node, selected.ambiguous ? `记录字段标签「${node.field}」有歧义，请使用字段原名` : `记录没有字段「${node.field}」`)
+        const nodeId = id(); body.push({ kind: 'record.get', id: nodeId, record: object.value, field: selected.field.name })
+        return { value: { kind: 'output', node: nodeId, port: 'value' }, type: selected.field.type }
       }
       if (type === 'record') return call(body, 'data.field', { record: object }, { field }, 'value', '2')
       if (type === 'cell' && ['x', 'y'].includes(field)) return call(body, 'spatial.cell-coordinates', { cell: object }, {}, field)

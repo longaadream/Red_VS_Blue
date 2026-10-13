@@ -182,6 +182,70 @@ describe('battle page runtime source', () => {
     ])
   })
 
+  it('does not request editor-only profile identity on the ordinary training route', async () => {
+    const html = readBattlePage()
+    const fetch = vi.fn()
+    const createInitialBattleForPlayers = vi.fn(async () => ({
+      pieces: [],
+      players: [
+        { playerId: 'training-red', faction: 'red' },
+        { playerId: 'training-blue', faction: 'blue' },
+      ],
+      turn: { currentPlayerId: 'training-red' },
+      skillsById: {},
+    }))
+    const context = vm.createContext({
+      window: { RvBGameEngine: { ensure: async () => ({ createInitialBattleForPlayers }) } },
+      location: { protocol: 'http:' },
+      fetch,
+      TUTORIAL_MODE: false,
+      skillsById: {},
+      resolveTrainingInitialPieces: (alignment: string) => [{ id: `${alignment}-piece` }],
+    })
+    new vm.Script(`async ${runtimeFunction(html, 'trainingApiFetch')}`).runInContext(context)
+
+    await context.trainingApiFetch('POST', {
+      firstPlayerId: 'training-red', firstFaction: 'red', secondFaction: 'blue',
+    })
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('passes the explicit root seed into formal training actions', async () => {
+    const html = readBattlePage()
+    const initial = {
+      pieces: [{ instanceId: 'training-red-core' }],
+      skillsById: {},
+      turn: { currentPlayerId: 'training-red' },
+    }
+    const runBattleAction = vi.fn(() => ({ state: { ...initial, pieces: [{ instanceId: 'training-red-core' }] } }))
+    const recordBattlePresentation = vi.fn((_state: unknown, callback: () => unknown) => callback())
+    const Engine = {
+      safeCloneBattleState: (state: unknown) => structuredClone(state),
+      runBattleAction,
+      recordBattlePresentation,
+    }
+    const context = vm.createContext({
+      window: { RvBGameEngine: { ensure: async () => Engine } },
+      TUTORIAL_MODE: false,
+      skillsById: {},
+    })
+    new vm.Script(`async ${runtimeFunction(html, 'trainingApiFetch')}`).runInContext(context)
+
+    await (context).trainingApiFetch('PUT', {
+      rootSeed: 321,
+      action: { type: 'beginPhase', playerId: 'training-red' },
+      battleState: initial,
+    })
+
+    expect(recordBattlePresentation).toHaveBeenCalledOnce()
+    expect(runBattleAction).toHaveBeenCalledWith(
+      expect.anything(),
+      { type: 'beginPhase', playerId: 'training-red' },
+      { rootSeed: 321 },
+    )
+  })
+
   it('uses the instance-aware display description in the card detail modal', () => {
     expect(runtimeFunction(readBattlePage(), 'showCardDetail'))
       .toMatch(/cardDisplayDescription\(cardInstance, def\)/)
@@ -241,6 +305,21 @@ describe('battle page runtime source', () => {
       usesRemaining: -1,
       presentationOnly: true,
     })
+  })
+
+  it('keeps creation-time display skills on a clone with no executable skills', () => {
+    const context = vm.createContext({
+      G: {},
+      BattleSkillPresentation: {
+        display: () => ({ skills: [{ skillId: 'source-skill', currentCooldown: 2, usesRemaining: 1 }] }),
+      },
+    })
+    new vm.Script([
+      runtimeFunction(readBattlePage(), 'pieceDispSkills'),
+      runtimeFunction(readBattlePage(), 'skillIdOf'),
+    ].join('\n')).runInContext(context)
+    const displayed = context.pieceDispSkills({ instanceId: 'clone', skills: [] })
+    expect(displayed).toMatchObject([{ skillId: 'source-skill', currentCooldown: 2, usesRemaining: 1 }])
   })
 
   it('defers receipt-driven target and option dialogs until animation completion', () => {

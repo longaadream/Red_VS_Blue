@@ -84,6 +84,7 @@ var ContentGraphCore = (() => {
         authorExpressionParameterHint: () => authorExpressionParameterHint,
         authorFieldAliases: () => authorFieldAliases,
         authorFunctionSpecs: () => authorFunctionSpecs,
+        authorRecordFieldDisplayName: () => authorRecordFieldDisplayName,
         authorTypeLabel: () => authorTypeLabel,
         buildSkillCluster: () => buildSkillCluster,
         buildSkillClusterCatalog: () => buildSkillClusterCatalog,
@@ -105,6 +106,7 @@ var ContentGraphCore = (() => {
         lowerAuthorExpression: () => lowerAuthorExpression,
         parseAuthorExpression: () => parseAuthorExpression,
         renderGameplayModuleText: () => renderGameplayModuleText,
+        resolveAuthorRecordField: () => resolveAuthorRecordField,
         synchronizeGameplayTargetBinding: () => synchronizeGameplayTargetBinding,
         validateSkillClusterDefinition: () => validateSkillClusterDefinition,
         validateSkillClusterMetadata: () => validateSkillClusterMetadata
@@ -366,6 +368,7 @@ var ContentGraphCore = (() => {
         "event",
         "choice",
         "record",
+        "json",
         "null",
         "unknown",
         "any"
@@ -475,11 +478,30 @@ var ContentGraphCore = (() => {
       }
       function rejectUnschematizedRecord(value, path) {
         if (value === null || typeof value !== "object") return;
+        if (isAuthorMap(value)) {
+          for (let index = 0; index < value.entries.length; index += 1) {
+            const entry = value.entries[index];
+            rejectUnschematizedRecord(entry[0], path + ".entries[" + index + "][0]");
+            rejectUnschematizedRecord(entry[1], path + ".entries[" + index + "][1]");
+          }
+          return;
+        }
+        if (isAuthorSet(value)) {
+          for (let index = 0; index < value.items.length; index += 1) rejectUnschematizedRecord(value.items[index], path + ".items[" + index + "]");
+          return;
+        }
         if (Array.isArray(value)) {
           for (let index = 0; index < value.length; index += 1) rejectUnschematizedRecord(value[index], path + "[" + index + "]");
           return;
         }
         fail22("structured literal requires a registered record schema", path, "GAMEPLAY_MODULE_UNTYPED_RECORD");
+      }
+      function normalizedAuthorMap(value) {
+        if (!isObject2(value) || value.format !== "author-map/v1" || !Array.isArray(value.entries)) return false;
+        return value.entries.every((entry) => Array.isArray(entry) && entry.length === 2);
+      }
+      function normalizedAuthorSet(value) {
+        return isObject2(value) && value.format === "author-set/v1" && Array.isArray(value.items);
       }
       function literalSource(value) {
         const text2 = JSON.stringify(value);
@@ -674,7 +696,7 @@ var ContentGraphCore = (() => {
         for (const key of Object.keys(record3)) result[key] = clone(record3[key]);
         return result;
       }
-      function valueRef(value, path) {
+      function valueRef(value, path, allowStructuredLiteral = false) {
         const record3 = plain(value, path);
         const kind = nonempty(record3.kind, path + ".kind");
         if (kind === "literal") {
@@ -682,7 +704,7 @@ var ContentGraphCore = (() => {
           if (!own3(record3, "value")) fail22("literal requires value", path, "GAMEPLAY_MODULE_INVALID_VALUE");
           const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
           json(record3.value, path + ".value", budget);
-          rejectUnschematizedRecord(record3.value, path + ".value");
+          if (!allowStructuredLiteral) rejectUnschematizedRecord(record3.value, path + ".value");
           return { kind: "literal", value: clone(record3.value) };
         }
         if (kind === "input") {
@@ -695,10 +717,10 @@ var ContentGraphCore = (() => {
         }
         fail22('unsupported value kind "' + kind + '"', path, "GAMEPLAY_MODULE_UNSAFE_VALUE");
       }
-      function valueMap(value, path) {
+      function valueMap(value, path, allowStructuredLiteral = false) {
         const record3 = plain(value, path);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const key of Object.keys(record3)) result[key] = valueRef(record3[key], path + "." + key);
+        for (const key of Object.keys(record3)) result[key] = valueRef(record3[key], path + "." + key, allowStructuredLiteral);
         return result;
       }
       function literalMap(value, path) {
@@ -714,7 +736,7 @@ var ContentGraphCore = (() => {
       }
       function recordFields(value, path) {
         if (value === void 0) return {};
-        return valueMap(value, path);
+        return valueMap(value, path, true);
       }
       function collectionStatement(value, path) {
         const record3 = plain(value, path);
@@ -802,31 +824,40 @@ var ContentGraphCore = (() => {
         }
         if (kind === "while") return whileStatement(value, path);
         if (kind === "record.create") {
-          allowed(record3, ["kind", "id", "schema", "fields"], path);
-          return {
+          allowed(record3, ["kind", "id", "schema", "fields", "layout"], path);
+          const node = {
             kind,
             id: safeName(record3.id, path + ".id"),
             schema: nonempty(record3.schema, path + ".schema"),
             fields: recordFields(record3.fields, path + ".fields")
           };
+          const nodeLayout = layout(record3.layout, path + ".layout");
+          if (nodeLayout !== void 0) node.layout = nodeLayout;
+          return node;
         }
         if (kind === "record.get") {
-          allowed(record3, ["kind", "id", "record", "field"], path);
-          return {
+          allowed(record3, ["kind", "id", "record", "field", "layout"], path);
+          const node = {
             kind,
             id: safeName(record3.id, path + ".id"),
             record: valueRef(record3.record, path + ".record"),
             field: safeName(record3.field, path + ".field")
           };
+          const nodeLayout = layout(record3.layout, path + ".layout");
+          if (nodeLayout !== void 0) node.layout = nodeLayout;
+          return node;
         }
         if (kind === "record.with") {
-          allowed(record3, ["kind", "id", "record", "fields"], path);
-          return {
+          allowed(record3, ["kind", "id", "record", "fields", "layout"], path);
+          const node = {
             kind,
             id: safeName(record3.id, path + ".id"),
             record: valueRef(record3.record, path + ".record"),
             fields: recordFields(record3.fields, path + ".fields")
           };
+          const nodeLayout = layout(record3.layout, path + ".layout");
+          if (nodeLayout !== void 0) node.layout = nodeLayout;
+          return node;
         }
         if (kind === "collection" || kind === "collection.map" || kind === "collection.filter" || kind === "collection.find" || kind === "collection.reduce") return collectionStatement(value, path);
         if (kind === "defer-choice") {
@@ -921,9 +952,15 @@ var ContentGraphCore = (() => {
       };
       function schema(value, path) {
         const record3 = plain(value, path);
-        allowed(record3, ["id", "version", "fields"], path);
+        allowed(record3, ["id", "version", "fields", "additionalFields"], path);
         if (!own3(record3, "fields")) fail22("record schema requires fields", path + ".fields", "GAMEPLAY_MODULE_SHAPE");
-        return { id: safeName(record3.id, path + ".id"), version: nonempty(record3.version, path + ".version"), fields: ports(record3.fields, path + ".fields") };
+        const result = {
+          id: safeName(record3.id, path + ".id"),
+          version: nonempty(record3.version, path + ".version"),
+          fields: ports(record3.fields, path + ".fields")
+        };
+        if (own3(record3, "additionalFields")) result.additionalFields = typeValue(record3.additionalFields, path + ".additionalFields");
+        return result;
       }
       function schemaList(value, path) {
         if (value === void 0) return [];
@@ -1053,6 +1090,29 @@ var ContentGraphCore = (() => {
         }
         return table;
       }
+      function registerDescriptorSchemas(table, descriptorValue, path) {
+        for (const entry of descriptorValue.recordSchemas ?? []) {
+          const key = moduleKey(entry.id, entry.version);
+          const previous2 = table.get(key);
+          if (previous2 && JSON.stringify(previous2) !== JSON.stringify(entry)) fail22("descriptor redeclares a record schema with different fields", path + "." + entry.id, "GAMEPLAY_MODULE_DUPLICATE_SCHEMA");
+          table.set(key, entry);
+        }
+        for (const entry of descriptorValue.recordSchemas ?? []) validateRecordSchema(entry, table, path + "." + entry.id + "@" + entry.version);
+      }
+      function registryRecordSchemas(registry) {
+        const table = /* @__PURE__ */ new Map();
+        const rawDescriptors = [];
+        if (registry instanceof Map) {
+          for (const value of registry.values()) rawDescriptors.push(...Array.isArray(value) ? value : [value]);
+        } else if (Array.isArray(registry.descriptors)) {
+          rawDescriptors.push(...registry.descriptors);
+        }
+        for (const raw of rawDescriptors) {
+          if (!isObject2(raw) || typeof raw.id !== "string" || typeof raw.version !== "string") continue;
+          registerDescriptorSchemas(table, descriptor(raw, raw.id, raw.version), "registry." + raw.id + ".recordSchemas");
+        }
+        return table;
+      }
       function schemaFor(table, reference, path) {
         const matches = [...table.values()].filter((entry) => entry.id === reference || moduleKey(entry.id, entry.version) === reference || entry.id + "@" + entry.version === reference);
         if (!matches.length) fail22('unknown record schema "' + reference + '"', path, "GAMEPLAY_MODULE_UNKNOWN_SCHEMA");
@@ -1073,12 +1133,16 @@ var ContentGraphCore = (() => {
       function validatePortSchemas(value, table, path) {
         value.forEach((entry, index) => validateTypeSchemas(effective(entry), table, path + "[" + index + "].type"));
       }
+      function validateRecordSchema(value, table, path) {
+        validatePortSchemas(value.fields, table, path + ".fields");
+        if (value.additionalFields !== void 0) validateTypeSchemas(value.additionalFields, table, path + ".additionalFields");
+      }
       function validateGraphSchemas(graphValue, inherited = /* @__PURE__ */ new Map(), path = "graph", active3 = /* @__PURE__ */ new Set()) {
         if (active3.has(graphValue)) fail22("continuation graph cycle detected", path, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
         const nextActive = new Set(active3);
         nextActive.add(graphValue);
         const table = schemaTable(graphValue, inherited);
-        for (const schemaValue of graphValue.schemas) validatePortSchemas(schemaValue.fields, table, path + ".schemas." + schemaValue.id + "@" + schemaValue.version + ".fields");
+        for (const schemaValue of graphValue.schemas) validateRecordSchema(schemaValue, table, path + ".schemas." + schemaValue.id + "@" + schemaValue.version);
         validatePortSchemas(graphValue.inputs, table, path + ".inputs");
         validatePortSchemas(graphValue.outputs, table, path + ".outputs");
         for (const [name, value] of Object.entries(graphValue.hostBindings)) validateTypeSchemas(value, table, path + ".hostBindings." + name);
@@ -1163,25 +1227,26 @@ var ContentGraphCore = (() => {
         if (Array.isArray(value)) {
           if (value.length === 0) return { kind: "list", element: "never" };
           const element = typeOfLiteral(value[0]);
-          for (let i = 1; i < value.length; i += 1) if (!assignable(typeOfLiteral(value[i]), element) || !assignable(element, typeOfLiteral(value[i]))) return { kind: "list", element: "record" };
+          for (let i = 1; i < value.length; i += 1) if (!assignable(typeOfLiteral(value[i]), element) || !assignable(element, typeOfLiteral(value[i]))) return { kind: "list", element: "json" };
           return { kind: "list", element };
         }
-        if (isAuthorSet(value)) {
+        if (isAuthorSet(value) || normalizedAuthorSet(value)) {
           const items2 = typeOfLiteral(value.items);
           if (typeof items2 === "object" && items2.kind === "list") return { kind: "set", element: items2.element };
         }
-        if (isAuthorMap(value)) {
+        if (isAuthorMap(value) || normalizedAuthorMap(value)) {
           const keys = typeOfLiteral(value.entries.map((entry) => entry[0]));
           const values = typeOfLiteral(value.entries.map((entry) => entry[1]));
           if (typeof keys === "object" && keys.kind === "list" && typeof values === "object" && values.kind === "list") return { kind: "map", key: keys.element, value: values.element };
         }
-        return "record";
+        return "json";
       }
       function assignable(actual, expected) {
         if (typeof expected === "string") {
           if (expected === "unknown" || expected === "any") return true;
           if (actual === "never") return true;
           if (expected === "null") return actual === "null";
+          if (expected === "json") return jsonAssignable(actual);
           if (typeof actual === "string") return actual === expected;
           if (expected === "record" && actual.kind === "record") return true;
           return false;
@@ -1199,6 +1264,20 @@ var ContentGraphCore = (() => {
         if (typeof actual !== "object" || actual.kind !== "list") return false;
         return expected.kind === "list" && (actual.element === "never" || assignable(actual.element, expected.element));
       }
+      function assignableDeclaredRecordField(value, actual, expected) {
+        if (actual === "json" && value.kind === "literal" && isObject2(value.value)) {
+          if (expected === "record") return true;
+          if (typeof expected === "object" && expected.kind === "nullable") return assignableDeclaredRecordField(value, actual, expected.value);
+        }
+        return assignable(actual, expected);
+      }
+      function jsonAssignable(actual) {
+        if (typeof actual === "string") return ["number", "boolean", "string", "null", "json", "never"].includes(actual);
+        if (actual.kind === "list") return jsonAssignable(actual.element);
+        if (actual.kind === "nullable") return jsonAssignable(actual.value);
+        if (actual.kind === "record") return true;
+        return false;
+      }
       function typeName(value) {
         if (typeof value === "string") return value;
         if (value.kind === "list") return "list<" + typeName(value.element) + ">";
@@ -1214,6 +1293,13 @@ var ContentGraphCore = (() => {
         const map = /* @__PURE__ */ new Map();
         for (const value of values) map.set(value.name, value);
         return map;
+      }
+      function recordField(schema3, name, path) {
+        const declared = schema3.fields.find((field3) => field3.name === name);
+        if (declared) return declared;
+        if (schema3.additionalFields === void 0) fail22('unknown record field "' + name + '"', path, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+        safeName(name, path);
+        return { name, type: schema3.additionalFields, optional: true };
       }
       function mapParams(values) {
         const map = /* @__PURE__ */ new Map();
@@ -1236,12 +1322,14 @@ var ContentGraphCore = (() => {
         if (!isObject2(value)) fail22("registry returned an invalid descriptor", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
         const record3 = value;
         for (const key of ["id", "version", "label", "inputs", "outputs", "allowedSurfaces", "effects", "lower"]) if (!own3(record3, key)) fail22("registry descriptor is missing " + key, "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-        allowed(record3, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "outputTypeBindings", "outputSchemaBindings", "inputSchemaBindings", "outputValueTypeBindings", "inputValueTypeBindings", "outputParameterTypeBindings", "parameters", "inspectReferences", "livingReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
+        allowed(record3, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "recordSchemas", "outputTypeBindings", "outputSchemaBindings", "inputSchemaBindings", "outputValueTypeBindings", "inputValueTypeBindings", "outputParameterTypeBindings", "parameters", "inspectReferences", "livingReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
         const actualId = nonempty(record3.id, "registry." + id + ".id");
         const actualVersion = nonempty(record3.version, "registry." + id + ".version");
         if (actualId !== id || actualVersion !== version) fail22("registry descriptor does not match requested module", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
         const inputPorts = ports(record3.inputs, "registry." + id + ".inputs", true);
         const result = { id: actualId, version: actualVersion, label: nonempty(record3.label, "registry." + id + ".label"), inputs: inputPorts, outputs: ports(record3.outputs, "registry." + id + ".outputs", true), allowedSurfaces: allowedSurfaces(record3.allowedSurfaces, "registry." + id + ".allowedSurfaces"), effects: validateEffects(record3.effects, "registry." + id + ".effects"), lower: record3.lower };
+        const descriptorSchemas = schemaList(record3.recordSchemas, "registry." + id + ".recordSchemas");
+        if (descriptorSchemas.length) result.recordSchemas = descriptorSchemas;
         for (const input45 of inputPorts) if (input45.type === "any" || input45.type === "unknown") fail22("universal input types are not allowed", "registry." + id + ".inputs", "GAMEPLAY_MODULE_INVALID_TYPE");
         for (const output of result.outputs) if ((output.type === "any" || output.type === "unknown") && !isObject2(record3.outputTypeBindings) && !isObject2(record3.outputParameterTypeBindings)) fail22("unbound universal output types are not allowed", "registry." + id + ".outputs", "GAMEPLAY_MODULE_INVALID_TYPE");
         if (record3.description !== void 0) result.description = nonempty(record3.description, "registry." + id + ".description");
@@ -1263,7 +1351,7 @@ var ContentGraphCore = (() => {
             const binding = plain(rawBinding, path);
             allowed(binding, ["input", "projection"], path);
             const input45 = nonempty(binding.input, path + ".input");
-            if (!result.outputs.some((port46) => port46.name === output) || !inputPorts.some((port46) => port46.name === input45 && !port46.optional)) fail22("type binding must name an output and a required input", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
+            if (!result.outputs.some((port47) => port47.name === output) || !inputPorts.some((port47) => port47.name === input45 && !port47.optional)) fail22("type binding must name an output and a required input", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
             if (binding.projection !== "same" && binding.projection !== "element" && binding.projection !== "singleton") fail22("unknown type binding projection", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
             normalized[output] = { input: input45, projection: binding.projection };
           }
@@ -1280,7 +1368,7 @@ var ContentGraphCore = (() => {
             allowed(binding, ["parameter", "list"], path);
             const parameter39 = nonempty(binding.parameter, path + ".parameter");
             const boundPorts = kind === "outputSchemaBindings" ? result.outputs : inputPorts;
-            if (!boundPorts.some((port46) => port46.name === name) || !params.some((port46) => port46.name === parameter39 && port46.type === "string")) fail22("schema binding must name a port and a string parameter", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
+            if (!boundPorts.some((port47) => port47.name === name) || !params.some((port47) => port47.name === parameter39 && port47.type === "string")) fail22("schema binding must name a port and a string parameter", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
             normalized[name] = { parameter: parameter39, ...binding.list === void 0 ? {} : { list: bool(binding.list, path + ".list") } };
           }
           result[kind] = normalized;
@@ -1296,7 +1384,7 @@ var ContentGraphCore = (() => {
             if (binding.nullable !== void 0 && typeof binding.nullable !== "boolean") fail22("nullable binding must be boolean", path + ".nullable");
             const parameter39 = nonempty(binding.parameter, path + ".parameter");
             const boundPorts = kind === "outputValueTypeBindings" ? result.outputs : inputPorts;
-            if (!boundPorts.some((port46) => port46.name === name) || !params.some((port46) => port46.name === parameter39 && port46.type === "string")) fail22("value type binding must name a port and a string parameter", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
+            if (!boundPorts.some((port47) => port47.name === name) || !params.some((port47) => port47.name === parameter39 && port47.type === "string")) fail22("value type binding must name a port and a string parameter", path, "GAMEPLAY_MODULE_REGISTRY_INVALID");
             normalized[name] = { parameter: parameter39, ...binding.nullable === void 0 ? {} : { nullable: binding.nullable } };
           }
           result[kind] = normalized;
@@ -1322,10 +1410,13 @@ var ContentGraphCore = (() => {
         if (Array.isArray(object3.descriptors)) return object3.descriptors.find((entry) => entry.id === id && entry.version === version);
         fail22("registry must expose get, resolve, descriptors, or Map lookup", "registry", "GAMEPLAY_MODULE_REGISTRY_INVALID");
       }
-      function makeResolver(value, registry, limits, inheritedSchemas = /* @__PURE__ */ new Map()) {
+      function makeResolver(value, registry, limits, inheritedSchemas = /* @__PURE__ */ new Map(), inheritedLoweringSchemas = /* @__PURE__ */ new Map()) {
         const composites = /* @__PURE__ */ new Map();
         for (const entry of value.composites) composites.set(moduleKey(entry.id, entry.version), entry);
-        return { graph: value, composites, native: /* @__PURE__ */ new Map(), calls: /* @__PURE__ */ new Map(), dependencies: /* @__PURE__ */ new Map(), expanded: [], limits, registry, schemas: schemaTable(value, inheritedSchemas), statementCount: 0 };
+        const schemas = schemaTable(value, inheritedSchemas);
+        const loweringSchemas = schemaTable(value, inheritedLoweringSchemas);
+        for (const entry of schemas.values()) validateRecordSchema(entry, schemas, "graph.schemas." + entry.id + "@" + entry.version);
+        return { graph: value, composites, native: /* @__PURE__ */ new Map(), calls: /* @__PURE__ */ new Map(), dependencies: /* @__PURE__ */ new Map(), expanded: [], limits, registry, schemas, loweringSchemas, statementCount: 0 };
       }
       function resolve(resolver, id, version, path) {
         const compositeValue = resolver.composites.get(moduleKey(id, version));
@@ -1334,6 +1425,7 @@ var ContentGraphCore = (() => {
         if (compositeValue) return { kind: "composite", definition: compositeValue };
         if (nativeValue) return { kind: "native", descriptor: nativeValue };
         const nativeDescriptor = descriptor(registryGet(resolver.registry, id, version), id, version);
+        registerDescriptorSchemas(resolver.schemas, nativeDescriptor, "registry." + id + ".recordSchemas");
         resolver.native.set(moduleKey(id, version), nativeDescriptor);
         return { kind: "native", descriptor: nativeDescriptor };
       }
@@ -1416,6 +1508,41 @@ var ContentGraphCore = (() => {
       function resolveRecordSchema(resolver, reference, path) {
         return schemaFor(resolver.schemas, reference, path);
       }
+      function loweringRecordSchemas(resolver, descriptorValue, metadata) {
+        const table = new Map(resolver.loweringSchemas);
+        const visited = /* @__PURE__ */ new Set();
+        const addSchema = (reference, path) => {
+          const schemaValue = schemaFor(resolver.schemas, reference, path);
+          const key = moduleKey(schemaValue.id, schemaValue.version);
+          if (visited.has(key)) return;
+          visited.add(key);
+          if (!table.has(key)) table.set(key, schemaValue);
+          for (const field3 of schemaValue.fields) addType(field3.type, path + "." + schemaValue.id + "." + field3.name);
+          if (schemaValue.additionalFields !== void 0) addType(schemaValue.additionalFields, path + "." + schemaValue.id + ".additionalFields");
+        };
+        const addType = (type, path) => {
+          if (typeof type === "string") return;
+          if (type.kind === "record") return addSchema(type.schema, path + ".schema");
+          if (type.kind === "list" || type.kind === "set") return addType(type.element, path + ".element");
+          if (type.kind === "map") {
+            addType(type.key, path + ".key");
+            addType(type.value, path + ".value");
+            return;
+          }
+          addType(type.value, path + ".value");
+        };
+        for (const [name, type] of metadata.inputTypes ?? []) addType(type, "inputs." + name);
+        for (const [name, type] of metadata.outputTypes) addType(type, "outputs." + name);
+        for (const [name, binding] of Object.entries(descriptorValue.inputSchemaBindings ?? {})) {
+          const reference = metadata.parameters[binding.parameter];
+          if (typeof reference === "string") addSchema(reference, "parameters." + binding.parameter + ".input." + name);
+        }
+        for (const [name, binding] of Object.entries(descriptorValue.outputSchemaBindings ?? {})) {
+          const reference = metadata.parameters[binding.parameter];
+          if (typeof reference === "string") addSchema(reference, "parameters." + binding.parameter + ".output." + name);
+        }
+        return [...table.values()];
+      }
       function collectionNames(node, method, path) {
         const item = node.item ?? "item";
         const index = node.index ?? "index";
@@ -1482,12 +1609,10 @@ var ContentGraphCore = (() => {
             if (typeof actual !== "object" || actual.kind !== "record") fail22("record.with requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
             const schemaValue = resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema");
             const fields5 = node.fields ?? {};
-            const declared = mapPorts(schemaValue.fields);
             for (const key of Object.keys(fields5)) {
-              const field3 = declared.get(key);
-              if (!field3) fail22('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+              const field3 = recordField(schemaValue, key, nodePath + ".fields." + key);
               const type = valueType(fields5[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
-              if (!assignable(type, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+              if (!assignableDeclaredRecordField(fields5[key], type, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
             }
             bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(actual.schema)]]));
           } else if (node.kind === "collection") {
@@ -1697,13 +1822,11 @@ var ContentGraphCore = (() => {
             bindings.set(node.id, outputTypes);
           } else if (node.kind === "record.create") {
             const schemaValue = resolveRecordSchema(resolver, node.schema, nodePath + ".schema");
-            const declared = mapPorts(schemaValue.fields);
             const fields5 = node.fields ?? {};
             for (const key of Object.keys(fields5)) {
-              const field3 = declared.get(key);
-              if (!field3) fail22('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+              const field3 = recordField(schemaValue, key, nodePath + ".fields." + key);
               const actual = valueType(fields5[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
-              if (!assignable(actual, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(actual), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+              if (!assignableDeclaredRecordField(fields5[key], actual, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(actual), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
             }
             for (const field3 of schemaValue.fields) if (!field3.optional && !own3(fields5, field3.name)) fail22('missing record field "' + field3.name + '"', nodePath + ".fields", "GAMEPLAY_MODULE_MISSING_FIELD");
             bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(node.schema)]]));
@@ -1718,12 +1841,10 @@ var ContentGraphCore = (() => {
             const actual = valueType(node.record, { inputs: environment.inputs, bindings }, nodePath + ".record");
             if (typeof actual !== "object" || actual.kind !== "record") fail22("record.with requires a typed record", nodePath + ".record", "GAMEPLAY_MODULE_UNTYPED_RECORD");
             const schemaValue = resolveRecordSchema(resolver, actual.schema, nodePath + ".record.schema");
-            const declared = mapPorts(schemaValue.fields);
             for (const key of Object.keys(node.fields ?? {})) {
-              const field3 = declared.get(key);
-              if (!field3) fail22('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+              const field3 = recordField(schemaValue, key, nodePath + ".fields." + key);
               const type = valueType(node.fields[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
-              if (!assignable(type, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+              if (!assignableDeclaredRecordField(node.fields[key], type, effective(field3))) fail22('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
             }
             bindings.set(node.id, /* @__PURE__ */ new Map([["value", actual]]));
           } else if (node.kind === "collection") {
@@ -1818,8 +1939,8 @@ var ContentGraphCore = (() => {
         if (value.kind === "input") {
           const type = environment.inputTypes?.get(value.name);
           if (type !== void 0) return type;
-          const port46 = resolver.graph.inputs.find((entry) => entry.name === value.name);
-          return port46 === void 0 ? void 0 : effective(port46);
+          const port47 = resolver.graph.inputs.find((entry) => entry.name === value.name);
+          return port47 === void 0 ? void 0 : effective(port47);
         }
         return value.kind === "output" ? environment.bindings.get(value.node)?.ports.get(value.port) : typeOfLiteral(value.value);
       }
@@ -1830,8 +1951,8 @@ var ContentGraphCore = (() => {
         }
         if (value.kind === "input") {
           const type2 = environment.inputTypes?.get(value.name) ?? (() => {
-            const port46 = resolver.graph.inputs.find((entry) => entry.name === value.name);
-            return port46 === void 0 ? void 0 : effective(port46);
+            const port47 = resolver.graph.inputs.find((entry) => entry.name === value.name);
+            return port47 === void 0 ? void 0 : effective(port47);
           })();
           return type2 && typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
         }
@@ -1903,7 +2024,7 @@ var ContentGraphCore = (() => {
         const result = nextVariable(state2, "module");
         let lowered;
         try {
-          lowered = descriptorValue.lower({ surface: state2.resolver.graph.surface, callId: node.id, moduleId: descriptorValue.id, moduleVersion: descriptorValue.version, inputs, parameters: metadata.parameters, outputPorts: descriptorValue.outputs, recordSchemas: [...state2.resolver.schemas.values()], emitLiteral: literalSource });
+          lowered = descriptorValue.lower({ surface: state2.resolver.graph.surface, callId: node.id, moduleId: descriptorValue.id, moduleVersion: descriptorValue.version, inputs, parameters: metadata.parameters, outputPorts: descriptorValue.outputs, recordSchemas: loweringRecordSchemas(state2.resolver, descriptorValue, metadata), emitLiteral: literalSource });
         } catch (error) {
           fail22("native lowering failed: " + (error instanceof Error ? error.message : "unknown failure"), "graph." + node.id, "GAMEPLAY_MODULE_LOWERING_FAILED");
         }
@@ -1955,7 +2076,15 @@ var ContentGraphCore = (() => {
         const schemaValue = resolveRecordSchema(resolver, node.schema, "graph." + node.id + ".schema");
         const fields5 = node.fields ?? {};
         const entries = [];
-        const suppliedFields = schemaValue.fields.filter((field3) => own3(fields5, field3.name));
+        const declaredNames = new Set(schemaValue.fields.map((field3) => field3.name));
+        const suppliedNames = [
+          ...schemaValue.fields.filter((field3) => own3(fields5, field3.name)).map((field3) => field3.name),
+          ...Object.keys(fields5).filter((name) => !declaredNames.has(name))
+        ];
+        const suppliedFields = suppliedNames.map((name) => ({
+          name,
+          field: recordField(schemaValue, name, "graph." + node.id + ".fields." + name)
+        }));
         if (!isFaultIsolatingEmitter(state2)) {
           for (const field3 of suppliedFields) entries.push(JSON.stringify(field3.name) + ": " + emit(fields5[field3.name], environment));
           return "({" + entries.join(", ") + "})";
@@ -1966,7 +2095,7 @@ var ContentGraphCore = (() => {
         const assignments = suppliedFields.map((field3, index) => {
           const parameter39 = parameters4[index];
           const assignment = "__gameplayRecord[" + JSON.stringify(field3.name) + "] = " + parameter39 + ";";
-          return field3.optional ? "if (" + parameter39 + " !== undefined) { " + assignment + " }" : assignment;
+          return field3.field.optional ? "if (" + parameter39 + " !== undefined) { " + assignment + " }" : assignment;
         });
         return "((function(" + parameters4.join(", ") + "){ " + (invalidGuard ? "if (" + invalidGuard + ") return __gameplayInvalid; " : "") + "var __gameplayRecord = {}; " + assignments.join(" ") + " return __gameplayRecord; })(" + values.join(", ") + "))";
       }
@@ -1980,6 +2109,25 @@ var ContentGraphCore = (() => {
         const recordValue = emit(node.record, environment);
         if (!schemaValue) return "__gameplayInvalid";
         const fields5 = node.fields ?? {};
+        if (schemaValue.additionalFields !== void 0) {
+          const suppliedFields2 = Object.keys(fields5).map((name) => ({
+            name,
+            field: recordField(schemaValue, name, "record.with.fields." + name)
+          }));
+          if (!isFaultIsolatingEmitter(state2)) {
+            const overrides = suppliedFields2.map((field3) => JSON.stringify(field3.name) + ": " + emit(fields5[field3.name], environment));
+            return "((function(__gameplayRecord){ return (__gameplayRecord === __gameplayInvalid || __gameplayRecord == null) ? __gameplayInvalid : Object.assign({}, __gameplayRecord, {" + overrides.join(", ") + "}); })(" + recordValue + "))";
+          }
+          const parameters5 = suppliedFields2.map((_field, index) => "__gameplayRecordWithValue" + String(index));
+          const values2 = suppliedFields2.map((field3) => emit(fields5[field3.name], environment));
+          const invalidGuard2 = parameters5.length === 0 ? void 0 : parameters5.map((parameter39) => "(" + parameter39 + " === __gameplayInvalid)").join(" || ");
+          const assignments2 = suppliedFields2.map((field3, index) => {
+            const parameter39 = parameters5[index];
+            const assignment = "__gameplayRecord[" + JSON.stringify(field3.name) + "] = " + parameter39 + ";";
+            return field3.field.optional ? "if (" + parameter39 + " !== undefined) { " + assignment + " }" : assignment;
+          });
+          return "((function(__gameplayRecordInput" + (parameters5.length ? ", " + parameters5.join(", ") : "") + "){ if (__gameplayRecordInput === __gameplayInvalid || __gameplayRecordInput == null) return __gameplayInvalid; " + (invalidGuard2 ? "if (" + invalidGuard2 + ") return __gameplayInvalid; " : "") + "var __gameplayRecord = Object.assign({}, __gameplayRecordInput); " + assignments2.join(" ") + " return __gameplayRecord; })(" + recordValue + (values2.length ? ", " + values2.join(", ") : "") + "))";
+        }
         if (!isFaultIsolatingEmitter(state2)) {
           const entries = [];
           for (const field3 of schemaValue.fields) entries.push(JSON.stringify(field3.name) + ": " + (own3(fields5, field3.name) ? emit(fields5[field3.name], environment) : "(" + recordValue + ")[" + JSON.stringify(field3.name) + "]"));
@@ -2096,7 +2244,7 @@ var ContentGraphCore = (() => {
         const key = moduleKey(continuation.id, continuation.version);
         if (state2.continuationStack.includes(key)) fail22("continuation graph cycle detected", path, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
         const child = continuation.graph;
-        const childResolver = makeResolver(child, state2.resolver.registry, state2.resolver.limits, state2.resolver.schemas);
+        const childResolver = makeResolver(child, state2.resolver.registry, state2.resolver.limits, state2.resolver.schemas, state2.resolver.loweringSchemas);
         childResolver.statementCount = state2.resolver.statementCount;
         validateGraphSchemas(child, state2.resolver.schemas, path + ".graph");
         const inputTypes = /* @__PURE__ */ new Map();
@@ -2330,9 +2478,10 @@ var ContentGraphCore = (() => {
       function compileGameplayModuleGraphVersioned(input45, registry, compilerOptions, compilerVersion) {
         const compileLimits = options(compilerOptions);
         const graphValue = graph(input45);
-        validateGraphSchemas(graphValue);
+        const registrySchemas = registryRecordSchemas(registry);
+        validateGraphSchemas(graphValue, registrySchemas);
         validateGraphLiteralBudget(graphValue, compileLimits.maxLiteralBytes);
-        const resolver = makeResolver(graphValue, registry, compileLimits);
+        const resolver = makeResolver(graphValue, registry, compileLimits, registrySchemas);
         const inputTypes = /* @__PURE__ */ new Map();
         for (const inputPort of graphValue.inputs) inputTypes.set(inputPort.name, effective(inputPort));
         validateBody(graphValue.body, resolver, { inputs: inputTypes, bindings: /* @__PURE__ */ new Map() }, graphValue.outputs, "graph.body", [], 0);
@@ -2946,11 +3095,12 @@ var ContentGraphCore = (() => {
             return;
           }
           if (value.kind === "nullable") return visit(value.value);
-          const schema2 = resolveRecordSchema2(value.schema, schemas);
-          if (!schema2) throw new Error("extension\uFF1A\u8BB0\u5F55\u7C7B\u578B\u5C1A\u672A\u58F0\u660E");
-          if (selected.some((item) => item.id === schema2.id && item.version === schema2.version)) return;
-          selected.push(schema2);
-          schema2.fields.forEach((field3) => visit(field3.type));
+          const schema3 = resolveRecordSchema2(value.schema, schemas);
+          if (!schema3) throw new Error("extension\uFF1A\u8BB0\u5F55\u7C7B\u578B\u5C1A\u672A\u58F0\u660E");
+          if (selected.some((item) => item.id === schema3.id && item.version === schema3.version)) return;
+          selected.push(schema3);
+          schema3.fields.forEach((field3) => visit(field3.type));
+          if (schema3.additionalFields) visit(schema3.additionalFields);
         };
         visit(type);
         return selected.sort((a, b) => (a.id + "@" + a.version).localeCompare(b.id + "@" + b.version));
@@ -3101,8 +3251,169 @@ var ContentGraphCore = (() => {
           return `({result:${flow42}.effects.apply(${JSON.stringify(kind)},${ctx.inputs.source},${ctx.emitLiteral(ctx.parameters.sourceType)},${ctx.inputs.target},${ctx.inputs.amount},${ctx.emitLiteral(ctx.parameters.damageType)},${skill}${killerAttribution})})`;
         }
       }));
+      var port4 = (name, type, optional = false, label) => ({ name, type, ...optional ? { optional: true } : {}, ...label ? { label } : {} });
+      var nullablePort = (name, type, label) => ({ ...port4(name, type, true, label), nullable: true });
+      var recordType2 = (schema3) => ({ kind: "record", schema: schema3 });
+      var listType = (element) => ({ kind: "list", element });
+      var AUTHOR_PIECE_SKILL_SCHEMA_ID = "author.piece-skill@1";
+      var AUTHOR_PIECE_STATUS_SCHEMA_ID = "author.piece-status@1";
+      var AUTHOR_PIECE_RULE_SCHEMA_ID = "author.piece-rule@1";
+      var AUTHOR_PIECE_BUFF_SCHEMA_ID = "author.piece-buff@1";
+      var AUTHOR_PIECE_DEBUFF_SCHEMA_ID = "author.piece-debuff@1";
+      var AUTHOR_PIECE_IDENTITY_SCHEMA_ID = "author.piece-identity@1";
+      var AUTHOR_PIECE_SNAPSHOT_FIELDS_SCHEMA_ID = "author.piece-snapshot-fields@1";
+      var AUTHOR_PIECE_FLOW_STATE_SCHEMA_ID = "author.piece-flow-state@1";
+      var AUTHOR_PIECE_INSTANCE_SCHEMA_ID = "author.piece-instance@1";
+      var AUTHOR_PIECE_DISPLAY_SCHEMA_ID = "author.piece-display@1";
+      var AUTHOR_PIECE_DISPLAY_AUDIENCES_SCHEMA_ID = "author.piece-display-audiences@1";
+      var AUTHOR_PIECE_DISPLAY_PLAN_SCHEMA_ID = "author.piece-display-plan@1";
+      var AUTHOR_PIECE_TEMPLATE_SCHEMA_ID = "author.piece-template@1";
+      var schema2 = (id, fields5, additionalFields) => ({
+        id: id.slice(0, id.lastIndexOf("@")),
+        version: id.slice(id.lastIndexOf("@") + 1),
+        fields: fields5,
+        ...additionalFields === void 0 ? {} : { additionalFields }
+      });
+      var AUTHOR_SUMMON_RECORD_SCHEMAS = Object.freeze([
+        schema2(AUTHOR_PIECE_SKILL_SCHEMA_ID, [
+          port4("skillId", "string", false, "\u6280\u80FD\u5F15\u7528"),
+          port4("instanceId", "string", true, "\u6280\u80FD\u5B9E\u4F8B"),
+          port4("level", "number", true, "\u7B49\u7EA7"),
+          port4("currentCooldown", "number", true, "\u5F53\u524D\u51B7\u5374"),
+          port4("usesRemaining", "number", true, "\u5269\u4F59\u6B21\u6570"),
+          port4("extension", "record", true, "\u6280\u80FD\u6269\u5C55"),
+          port4("abilityGroupIds", listType("string"), true, "\u80FD\u529B\u7EC4"),
+          port4("authorExtensionDeclarations", "record", true, "\u6269\u5C55\u58F0\u660E")
+        ]),
+        schema2(AUTHOR_PIECE_STATUS_SCHEMA_ID, [
+          port4("id", "string", false, "\u72B6\u6001\u5B9A\u4E49\u5F15\u7528"),
+          port4("type", "string", false, "\u72B6\u6001\u7C7B\u578B"),
+          port4("name", "string", true, "\u540D\u79F0"),
+          port4("instanceId", "string", true, "\u72B6\u6001\u5B9E\u4F8B"),
+          port4("intensity", "number", true, "\u5F3A\u5EA6"),
+          port4("stacks", "number", true, "\u5C42\u6570"),
+          port4("value", "number", true, "\u6570\u503C"),
+          port4("currentDuration", "number", true, "\u5F53\u524D\u6301\u7EED"),
+          port4("remainingDuration", "number", true, "\u5269\u4F59\u6301\u7EED"),
+          port4("currentUses", "number", true, "\u5F53\u524D\u6B21\u6570"),
+          port4("remainingUses", "number", true, "\u5269\u4F59\u6B21\u6570"),
+          port4("visible", "boolean", true, "\u53EF\u89C1"),
+          port4("stacking", "string", true, "\u53E0\u52A0\u65B9\u5F0F"),
+          port4("lifetime", "string", true, "\u751F\u547D\u5468\u671F"),
+          port4("appliedTurn", "number", true, "\u65BD\u52A0\u56DE\u5408"),
+          nullablePort("expiresAfterTurn", "number", "\u8FC7\u671F\u56DE\u5408"),
+          port4("lastDurationTickTurn", "number", true, "\u4E0A\u6B21\u6301\u7EED\u66F4\u65B0\u56DE\u5408"),
+          port4("relatedRules", listType("string"), true, "\u5173\u8054\u89C4\u5219"),
+          port4("statusAliases", listType("string"), true, "\u72B6\u6001\u522B\u540D"),
+          port4("extension", "record", true, "\u72B6\u6001\u6269\u5C55"),
+          port4("authorExtensionDeclarations", "record", true, "\u6269\u5C55\u58F0\u660E")
+        ], "json"),
+        schema2(AUTHOR_PIECE_RULE_SCHEMA_ID, [port4("id", "string", false, "\u89C4\u5219\u5F15\u7528")], "json"),
+        schema2(AUTHOR_PIECE_BUFF_SCHEMA_ID, [
+          port4("type", "string", false, "\u589E\u76CA\u7C7B\u578B"),
+          port4("value", "number", false, "\u589E\u76CA\u6570\u503C"),
+          port4("duration", "number", false, "\u6301\u7EED\u65F6\u95F4"),
+          port4("source", "string", false, "\u6765\u6E90")
+        ], "json"),
+        schema2(AUTHOR_PIECE_DEBUFF_SCHEMA_ID, [
+          port4("type", "string", false, "\u51CF\u76CA\u7C7B\u578B"),
+          port4("value", "number", false, "\u51CF\u76CA\u6570\u503C"),
+          port4("duration", "number", false, "\u6301\u7EED\u65F6\u95F4"),
+          port4("source", "string", false, "\u6765\u6E90")
+        ], "json"),
+        schema2(AUTHOR_PIECE_IDENTITY_SCHEMA_ID, [
+          port4("templateId", "string", false, "\u6A21\u677F\u5F15\u7528"),
+          port4("name", "string", false, "\u540D\u79F0"),
+          port4("faction", "string", false, "\u9635\u8425"),
+          port4("ownerPlayerId", "string", false, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("isCore", "boolean", true, "\u6838\u5FC3\u68CB\u5B50")
+        ]),
+        schema2(AUTHOR_PIECE_SNAPSHOT_FIELDS_SCHEMA_ID, [
+          port4("templateId", "string", true, "\u6A21\u677F\u5F15\u7528"),
+          port4("name", "string", true, "\u540D\u79F0"),
+          port4("ownerPlayerId", "string", true, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("faction", "string", true, "\u9635\u8425"),
+          port4("isCore", "boolean", true, "\u6838\u5FC3\u68CB\u5B50"),
+          port4("currentHp", "number", true, "\u5F53\u524D\u751F\u547D"),
+          port4("maxHp", "number", true, "\u6700\u5927\u751F\u547D"),
+          port4("attack", "number", true, "\u653B\u51FB\u529B"),
+          port4("defense", "number", true, "\u9632\u5FA1\u529B"),
+          port4("moveRange", "number", true, "\u79FB\u52A8\u529B"),
+          port4("skills", listType(recordType2(AUTHOR_PIECE_SKILL_SCHEMA_ID)), true, "\u6280\u80FD"),
+          port4("displaySkills", listType(recordType2(AUTHOR_PIECE_SKILL_SCHEMA_ID)), true, "\u663E\u793A\u6280\u80FD"),
+          port4("buffs", listType(recordType2(AUTHOR_PIECE_BUFF_SCHEMA_ID)), true, "\u589E\u76CA"),
+          port4("debuffs", listType(recordType2(AUTHOR_PIECE_DEBUFF_SCHEMA_ID)), true, "\u51CF\u76CA"),
+          port4("shield", "number", true, "\u62A4\u76FE"),
+          port4("ruleTags", listType("string"), true, "\u89C4\u5219\u6807\u7B7E"),
+          port4("statusTags", listType(recordType2(AUTHOR_PIECE_STATUS_SCHEMA_ID)), true, "\u72B6\u6001"),
+          port4("rules", listType(recordType2(AUTHOR_PIECE_RULE_SCHEMA_ID)), true, "\u89C4\u5219"),
+          port4("extension", "record", true, "\u6269\u5C55")
+        ], "json"),
+        schema2(AUTHOR_PIECE_FLOW_STATE_SCHEMA_ID, [
+          port4("schemaVersion", "number", false, "\u7248\u672C"),
+          port4("scope", "string", false, "\u6240\u5C5E\u8303\u56F4"),
+          port4("entityId", "string", false, "\u6240\u5C5E\u5B9E\u4F8B"),
+          port4("ownerPlayerId", "string", false, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("namespace", "string", false, "\u53D8\u91CF\u5206\u7EC4"),
+          port4("name", "string", false, "\u53D8\u91CF\u540D"),
+          port4("value", "json", false, "\u5B58\u50A8\u5185\u5BB9"),
+          port4("lifetime", "string", false, "\u4FDD\u7559\u65F6\u957F"),
+          port4("projectionVisibility", "string", false, "\u53EF\u89C1\u8303\u56F4")
+        ], "json"),
+        schema2(AUTHOR_PIECE_INSTANCE_SCHEMA_ID, [
+          port4("schemaVersion", "number", false, "\u7248\u672C"),
+          port4("kind", "string", false, "\u7C7B\u578B"),
+          port4("sourcePieceId", "string", false, "\u6765\u6E90\u5B9E\u4F8B"),
+          port4("ownerPlayerId", "string", false, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("identity", recordType2(AUTHOR_PIECE_IDENTITY_SCHEMA_ID), false, "\u8EAB\u4EFD"),
+          port4("fields", recordType2(AUTHOR_PIECE_SNAPSHOT_FIELDS_SCHEMA_ID), false, "\u5B57\u6BB5\u526F\u672C"),
+          port4("flowState", listType(recordType2(AUTHOR_PIECE_FLOW_STATE_SCHEMA_ID)), false, "\u6D41\u7A0B\u72B6\u6001")
+        ]),
+        schema2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID, [
+          port4("templateId", "string", true, "\u6A21\u677F\u5F15\u7528"),
+          port4("name", "string", true, "\u540D\u79F0"),
+          port4("currentHp", "number", true, "\u5F53\u524D\u751F\u547D"),
+          port4("maxHp", "number", true, "\u6700\u5927\u751F\u547D"),
+          port4("attack", "number", true, "\u653B\u51FB\u529B"),
+          port4("defense", "number", true, "\u9632\u5FA1\u529B"),
+          port4("moveRange", "number", true, "\u79FB\u52A8\u529B"),
+          port4("shield", "number", true, "\u62A4\u76FE"),
+          port4("skills", listType(recordType2(AUTHOR_PIECE_SKILL_SCHEMA_ID)), true, "\u6280\u80FD"),
+          port4("statusTags", listType(recordType2(AUTHOR_PIECE_STATUS_SCHEMA_ID)), true, "\u72B6\u6001"),
+          port4("isCore", "boolean", true, "\u6838\u5FC3\u68CB\u5B50"),
+          port4("ownerPlayerId", "string", true, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("faction", "string", true, "\u9635\u8425")
+        ]),
+        schema2(AUTHOR_PIECE_DISPLAY_AUDIENCES_SCHEMA_ID, [
+          port4("public", recordType2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID), true, "\u516C\u5F00"),
+          port4("owner", recordType2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID), true, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("allies", recordType2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID), true, "\u53CB\u65B9"),
+          port4("enemies", recordType2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID), true, "\u654C\u65B9"),
+          port4("spectators", recordType2(AUTHOR_PIECE_DISPLAY_SCHEMA_ID), true, "\u89C2\u6218\u8005")
+        ]),
+        schema2(AUTHOR_PIECE_DISPLAY_PLAN_SCHEMA_ID, [port4("audiences", recordType2(AUTHOR_PIECE_DISPLAY_AUDIENCES_SCHEMA_ID), false, "\u53EF\u89C1\u5BF9\u8C61")]),
+        schema2(AUTHOR_PIECE_TEMPLATE_SCHEMA_ID, [
+          port4("baseSnapshot", recordType2(AUTHOR_PIECE_INSTANCE_SCHEMA_ID), true, "\u57FA\u7840\u526F\u672C"),
+          port4("templateId", "string", true, "\u6A21\u677F\u5F15\u7528"),
+          port4("name", "string", true, "\u540D\u79F0"),
+          port4("maxHp", "number", true, "\u6700\u5927\u751F\u547D"),
+          port4("currentHp", "number", true, "\u5F53\u524D\u751F\u547D"),
+          port4("attack", "number", true, "\u653B\u51FB\u529B"),
+          port4("defense", "number", true, "\u9632\u5FA1\u529B"),
+          port4("moveRange", "number", true, "\u79FB\u52A8\u529B"),
+          port4("ownerPlayerId", "string", true, "\u6240\u5C5E\u73A9\u5BB6"),
+          port4("faction", "string", true, "\u9635\u8425"),
+          port4("isCore", "boolean", true, "\u6838\u5FC3\u68CB\u5B50"),
+          port4("skills", listType(recordType2(AUTHOR_PIECE_SKILL_SCHEMA_ID)), true, "\u521D\u59CB\u6280\u80FD"),
+          port4("rules", listType("string"), true, "\u521D\u59CB\u89C4\u5219"),
+          port4("statusTags", listType(recordType2(AUTHOR_PIECE_STATUS_SCHEMA_ID)), true, "\u521D\u59CB\u72B6\u6001"),
+          port4("extension", "record", true, "\u6269\u5C55")
+        ])
+      ]);
       var decode2 = (value) => typeof value === "string" && value.startsWith("{") ? JSON.parse(value) : value;
       var same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      var templateTypeDefault = JSON.stringify({ kind: "record", schema: AUTHOR_PIECE_TEMPLATE_SCHEMA_ID });
+      var displayTypeDefault = JSON.stringify({ kind: "record", schema: AUTHOR_PIECE_DISPLAY_SCHEMA_ID });
       var AUTHOR_SUMMON_MODULES = [{
         id: "author.effect.summon",
         version: "1",
@@ -3111,12 +3422,13 @@ var ContentGraphCore = (() => {
         inputs: [{ name: "source", type: "piece", label: "\u6765\u6E90" }, { name: "template", type: "record", label: "\u68CB\u5B50" }, { name: "destination", type: "cell", label: "\u843D\u70B9" }, { name: "display", type: "record", label: "\u663E\u793A\u9009\u9879", optional: true }],
         inputValueTypeBindings: { source: { parameter: "sourceType" }, template: { parameter: "templateType" }, destination: { parameter: "destinationType" }, display: { parameter: "displayType" } },
         outputs: [{ name: "result", type: "record", label: "\u53EC\u5524\u7ED3\u679C" }],
+        recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
         parameters: [
           { name: "mode", type: "string", label: "\u53EC\u5524\u65B9\u5F0F", enum: ["new-instance", "return-instance"], default: "new-instance" },
           { name: "sourceType", type: "string", label: "\u6765\u6E90\u7C7B\u578B", enum: ["piece", "record"], default: "piece" },
-          { name: "templateType", type: "string", default: "record", label: "\u68CB\u5B50\u7C7B\u578B" },
+          { name: "templateType", type: "string", default: templateTypeDefault, label: "\u68CB\u5B50\u7C7B\u578B" },
           { name: "destinationType", type: "string", default: "cell", label: "\u843D\u70B9\u7C7B\u578B" },
-          { name: "displayType", type: "string", default: "record", label: "\u663E\u793A\u7C7B\u578B" },
+          { name: "displayType", type: "string", default: displayTypeDefault, label: "\u663E\u793A\u7C7B\u578B" },
           { name: "currentHp", type: "number", optional: true, label: "\u56DE\u573A\u751F\u547D\u503C" }
         ],
         allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
@@ -3146,12 +3458,13 @@ var ContentGraphCore = (() => {
         ],
         inputValueTypeBindings: { source: { parameter: "sourceType" }, template: { parameter: "templateType" }, destination: { parameter: "destinationType" }, display: { parameter: "displayType" } },
         outputs: [{ name: "result", type: "record", label: "\u53EC\u5524\u7ED3\u679C" }],
+        recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
         parameters: [
           { name: "mode", type: "string", label: "\u53EC\u5524\u65B9\u5F0F", enum: ["new-instance", "return-instance", "declaration"], default: "new-instance" },
           { name: "sourceType", type: "string", label: "\u6765\u6E90\u7C7B\u578B", enum: ["piece", "record"], default: "piece" },
-          { name: "templateType", type: "string", default: "record", label: "\u68CB\u5B50\u7C7B\u578B" },
+          { name: "templateType", type: "string", default: templateTypeDefault, label: "\u68CB\u5B50\u7C7B\u578B" },
           { name: "destinationType", type: "string", default: "cell", label: "\u843D\u70B9\u7C7B\u578B" },
-          { name: "displayType", type: "string", default: "record", label: "\u663E\u793A\u7C7B\u578B" },
+          { name: "displayType", type: "string", default: displayTypeDefault, label: "\u663E\u793A\u7C7B\u578B" },
           { name: "currentHp", type: "number", optional: true, label: "\u56DE\u573A\u751F\u547D\u503C" }
         ],
         allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
@@ -3182,10 +3495,11 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u8BBE\u7F6E\u68CB\u5B50\u663E\u793A",
         description: "\u6309\u540C\u540D\u5B57\u6BB5\u66F4\u65B0\u663E\u793A\u5FEB\u7167\uFF1B\u4E0D\u6539\u53D8\u771F\u5B9E\u89C4\u5219\u6216\u6570\u503C\u3002",
+        recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
         inputs: [{ name: "target", type: "piece", label: "\u68CB\u5B50" }, { name: "display", type: "record", label: "\u663E\u793A\u9009\u9879" }],
         inputValueTypeBindings: { display: { parameter: "displayType" } },
         outputs: [{ name: "reference", type: "string", label: "\u663E\u793A\u5F15\u7528" }],
-        parameters: [{ name: "displayType", type: "string", default: "record", label: "\u663E\u793A\u7C7B\u578B" }, { name: "audience", type: "string", label: "\u53EF\u89C1\u5BF9\u8C61", default: "public", enum: ["public", "owner", "allies", "enemies", "spectators"] }],
+        parameters: [{ name: "displayType", type: "string", default: displayTypeDefault, label: "\u663E\u793A\u7C7B\u578B" }, { name: "audience", type: "string", label: "\u53EF\u89C1\u5BF9\u8C61", default: "public", enum: ["public", "owner", "allies", "enemies", "spectators"] }],
         allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
         effects: { pure: false, previewSafe: false, writes: ["presentation"] },
         ui: { category: "presentation", authoring: "standard" },
@@ -3193,7 +3507,7 @@ var ContentGraphCore = (() => {
       }];
       var CURRENT_SKILL_SURFACES = ["skill", "pending"];
       var ACTIVE_SURFACES2 = ["skill", "card", "rule", "triggerSkill", "pending"];
-      var recordType2 = "record";
+      var recordType3 = "record";
       var numberType2 = "number";
       var stringType2 = "string";
       var pieceType2 = "piece";
@@ -3206,7 +3520,7 @@ var ContentGraphCore = (() => {
         owner: pieceType2
       });
       var WRITABLE_CURRENT_SKILL_FIELDS = ["currentCooldown", "usesRemaining", "level"];
-      var port4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter2 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow4 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var input2 = (ctx, name) => {
@@ -3237,7 +3551,7 @@ var ContentGraphCore = (() => {
         label: "\u5F53\u524D\u6280\u80FD\u5B9E\u4F8B",
         description: "\u53D6\u5F97\u5F53\u524D\u6B63\u5728\u6267\u884C\u7684\u5B9E\u9645\u6280\u80FD\u5B9E\u4F8B\uFF1B\u4E0D\u5B58\u5728\u6709\u6548\u5B9E\u4F8B\u65F6\u7531\u8FD0\u884C\u65F6\u4F7F\u8BED\u53E5\u5931\u6548\u3002",
         inputs: [],
-        outputs: [port4("instance", recordType2, { label: "\u6280\u80FD\u5B9E\u4F8B" })],
+        outputs: [port5("instance", recordType3, { label: "\u6280\u80FD\u5B9E\u4F8B" })],
         allowedSurfaces: CURRENT_SKILL_SURFACES,
         effects: pureRead,
         ui: { category: "reference", authoring: "standard" },
@@ -3248,8 +3562,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u8BFB\u53D6\u6280\u80FD\u5B9E\u4F8B\u5B57\u6BB5",
         description: "\u8BFB\u53D6\u5B9E\u9645\u6280\u80FD\u5B9E\u4F8B\u7684\u767B\u8BB0\u5B57\u6BB5\uFF1B\u4E0D\u628A\u6280\u80FD\u5B9A\u4E49\u6216\u4EFB\u610F\u8BB0\u5F55\u5F53\u4F5C\u5B9E\u4F8B\u3002",
-        inputs: [port4("instance", recordType2, { label: "\u6280\u80FD\u5B9E\u4F8B" })],
-        outputs: [port4("value", "unknown"), port4("defined", booleanType2)],
+        inputs: [port5("instance", recordType3, { label: "\u6280\u80FD\u5B9E\u4F8B" })],
+        outputs: [port5("value", "unknown"), port5("defined", booleanType2)],
         parameters: [parameter2("field", stringType2, { enum: Object.keys(CURRENT_SKILL_FIELDS) })],
         outputParameterTypeBindings: {
           value: { parameter: "field", types: CURRENT_SKILL_FIELDS }
@@ -3267,8 +3581,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u5199\u5165\u6280\u80FD\u5B9E\u4F8B\u5B57\u6BB5",
         description: "\u5199\u5165\u5B9E\u9645\u6280\u80FD\u5B9E\u4F8B\u5141\u8BB8\u4FEE\u6539\u7684\u8FD0\u884C\u5B57\u6BB5\uFF1B\u51B7\u5374\u6CBF\u7528\u73B0\u6709\u5BBF\u4E3B\u5165\u53E3\uFF0C\u4E0D\u66FF\u6362\u6280\u80FD\u6807\u8BC6\u6216\u5B9A\u4E49\u5F15\u7528\u3002",
-        inputs: [port4("instance", recordType2, { label: "\u6280\u80FD\u5B9E\u4F8B" }), port4("value", numberType2, { label: "\u6570\u503C" })],
-        outputs: [port4("success", booleanType2, { label: "\u5199\u5165\u6210\u529F" })],
+        inputs: [port5("instance", recordType3, { label: "\u6280\u80FD\u5B9E\u4F8B" }), port5("value", numberType2, { label: "\u6570\u503C" })],
+        outputs: [port5("success", booleanType2, { label: "\u5199\u5165\u6210\u529F" })],
         parameters: [parameter2("field", stringType2, { enum: WRITABLE_CURRENT_SKILL_FIELDS })],
         allowedSurfaces: ACTIVE_SURFACES2,
         effects: {
@@ -3285,8 +3599,8 @@ var ContentGraphCore = (() => {
         skillInstanceField,
         skillInstanceWrite
       ]);
-      var recordType3 = "record";
-      var recordListType = { kind: "list", element: recordType3 };
+      var recordType4 = "record";
+      var recordListType = { kind: "list", element: recordType4 };
       var activeSurfaces = ["skill", "card", "rule", "triggerSkill", "pending"];
       function flow5(ctx) {
         return ctx.surface === "pending" ? "ctx.flow" : "flow";
@@ -3361,7 +3675,7 @@ var ContentGraphCore = (() => {
         pending: true,
         writes: ["execution-context"]
       });
-      var port5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter3 = (name, options2 = {}) => ({ name, type: AUTHOR_CODE_BLOCK_STRING, ...options2 });
       function input3(ctx, name) {
         const value = ctx.inputs[name];
@@ -3399,10 +3713,10 @@ var ContentGraphCore = (() => {
         label: "\u6267\u884C\u4EE3\u7801\u5757",
         description: "\u7ED1\u5B9A\u663E\u5F0F\u53C2\u6570\u5E76\u6267\u884C\u4E00\u4E2A\u7ED3\u6784\u5316\u3001\u6570\u636E\u5B9A\u4E49\u7684\u4EE3\u7801\u5757\u3002",
         inputs: [
-          port5("block", AUTHOR_CODE_BLOCK_RECORD, { label: "\u4EE3\u7801\u5757" }),
-          port5("args", AUTHOR_CODE_BLOCK_RECORD, { label: "\u53C2\u6570" })
+          port6("block", AUTHOR_CODE_BLOCK_RECORD, { label: "\u4EE3\u7801\u5757" }),
+          port6("args", AUTHOR_CODE_BLOCK_RECORD, { label: "\u53C2\u6570" })
         ],
-        outputs: [port5("result", AUTHOR_CODE_BLOCK_RECORD, { label: "\u8FD4\u56DE\u503C" })],
+        outputs: [port6("result", AUTHOR_CODE_BLOCK_RECORD, { label: "\u8FD4\u56DE\u503C" })],
         inputValueTypeBindings: {
           block: { parameter: "blockType" },
           args: { parameter: "argsType" }
@@ -3480,14 +3794,14 @@ var ContentGraphCore = (() => {
       });
       var SURFACES = ["skill", "card", "rule", "triggerSkill", "pending"];
       var PURE = { pure: true, previewSafe: true };
-      var recordType4 = "record";
+      var recordType5 = "record";
       var booleanType3 = "boolean";
       var stringType3 = "string";
       var pieceType3 = "piece";
       var playerType2 = "player";
       var nullableStringType = { kind: "nullable", value: stringType3 };
-      var recordListType2 = { kind: "list", element: recordType4 };
-      var port6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordListType2 = { kind: "list", element: recordType5 };
+      var port7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input4 = (ctx, name) => {
         const value = ctx.inputs[name];
@@ -3515,7 +3829,7 @@ var ContentGraphCore = (() => {
           label: "\u521B\u5EFA\u7A7A\u8BB0\u5F55",
           description: "\u521B\u5EFA\u4E00\u4E2A\u65B0\u7684\u7A7A\u8BB0\u5F55\uFF0C\u4F9B\u901A\u7528\u5B57\u6BB5\u6784\u9020\u539F\u8BED\u9010\u9879\u586B\u5145\u3002",
           inputs: [],
-          outputs: [port6("record", recordType4)],
+          outputs: [port7("record", recordType5)],
           allowedSurfaces: SURFACES,
           effects: PURE,
           lower: () => "({})",
@@ -3526,8 +3840,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BBE\u7F6E\u8BB0\u5F55\u5B57\u6BB5",
           description: "\u590D\u5236\u8BB0\u5F55\u5E76\u8BBE\u7F6E\u4E00\u4E2A\u5B89\u5168\u7684\u76F4\u63A5\u5B57\u6BB5\uFF1B\u672A\u77E5\u5B57\u6BB5\u4FDD\u6301\u539F\u6837\u3002",
-          inputs: [port6("record", recordType4), port6("value", recordType4)],
-          outputs: [port6("record", recordType4)],
+          inputs: [port7("record", recordType5), port7("value", recordType5)],
+          outputs: [port7("record", recordType5)],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
           parameters: [parameter4("field", stringType3), parameter4("valueType", stringType3, { default: "record" })],
           allowedSurfaces: SURFACES,
@@ -3540,8 +3854,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u89E3\u6790\u68CB\u5B50\u53CA\u5386\u53F2\u6765\u6E90",
           description: "\u6309\u7A33\u5B9A\u68CB\u5B50\u6807\u8BC6\u4ECE\u573A\u4E0A\u6216\u5893\u5730\u8BFB\u53D6\u6765\u6E90\u5F52\u5C5E\uFF1B\u4FDD\u7559\u672A\u627E\u5230\u65F6\u7684\u539F\u59CB\u6807\u8BC6\u3002",
-          inputs: [port6("piece", pieceType3, { nullable: true })],
-          outputs: [port6("id", nullableStringType), port6("ownerPlayerId", { kind: "nullable", value: playerType2 })],
+          inputs: [port7("piece", pieceType3, { nullable: true })],
+          outputs: [port7("id", nullableStringType), port7("ownerPlayerId", { kind: "nullable", value: playerType2 })],
           // Historical sources may no longer be present in the live query surface;
           // the lowering resolves active pieces and graveyard entries itself.
           inspectReferences: ["piece"],
@@ -3556,10 +3870,10 @@ var ContentGraphCore = (() => {
           label: "\u539F\u5B50\u63D0\u4EA4\u6269\u5C55\u548C\u5730\u683C\u8868\u73B0",
           description: "\u5728\u6821\u9A8C\u6269\u5C55\u8BB0\u5F55\u548C\u5730\u683C\u8868\u73B0\u8BB0\u5F55\u540E\u540C\u65F6\u66FF\u6362\u4E24\u4E2A\u5168\u5C40\u6570\u7EC4\uFF1B\u5019\u9009\u5FC5\u987B\u5148\u7531\u56FE\u4E2D\u7684\u6709\u6548\u5F15\u7528\u5206\u652F\u8BA1\u7B97\u3002",
           inputs: [
-            port6("root", recordListType2),
-            port6("tiles", recordListType2)
+            port7("root", recordListType2),
+            port7("tiles", recordListType2)
           ],
-          outputs: [port6("success", booleanType3)],
+          outputs: [port7("success", booleanType3)],
           parameters: [parameter4("storageKey", stringType3)],
           allowedSurfaces: SURFACES,
           effects: { pure: false, previewSafe: false, reads: ["extensions"], writes: ["extensions", "tile-effects"] },
@@ -3571,8 +3885,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u539F\u5B50\u63D0\u4EA4\u6269\u5C55\u548C\u5730\u683C\u8868\u73B0",
           description: "\u6821\u9A8C\u540E\u6574\u4F53\u63D0\u4EA4\u6269\u5C55\u8BB0\u5F55\u4E0E\u5730\u683C\u6548\u679C\uFF0C\u4FDD\u7559\u5730\u683C\u589E\u5220\u7684\u8868\u73B0\u6279\u6B21\u548C\u53D1\u751F\u987A\u5E8F\u3002",
-          inputs: [port6("root", recordListType2), port6("tiles", recordListType2)],
-          outputs: [port6("success", booleanType3)],
+          inputs: [port7("root", recordListType2), port7("tiles", recordListType2)],
+          outputs: [port7("success", booleanType3)],
           parameters: [parameter4("storageKey", stringType3), parameter4("presentationBatch", stringType3, {
             enum: ["direct", "tileEffectRemoved", "tileEffectAdded"],
             default: "direct"
@@ -3588,7 +3902,7 @@ var ContentGraphCore = (() => {
       var recordListType3 = { kind: "list", element: "record" };
       var statusType = "status";
       var booleanType4 = "boolean";
-      var port7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow7 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var input5 = (ctx, name) => {
         const value = ctx.inputs[name];
@@ -3607,8 +3921,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u63D0\u4EA4\u5730\u683C\u6548\u679C\u8BB0\u5F55\u6279\u6B21",
           description: "\u628A\u56FE\u4E2D\u5DF2\u7ECF\u6784\u9020\u5E76\u6821\u9A8C\u7684\u5730\u683C\u6548\u679C\u8BB0\u5F55\u4EA4\u7ED9\u6743\u5A01\u6279\u6B21\u63D0\u4EA4\u5668\u3002",
-          inputs: [port7("records", recordListType3)],
-          outputs: [port7("success", booleanType4)],
+          inputs: [port8("records", recordListType3)],
+          outputs: [port8("success", booleanType4)],
           allowedSurfaces: ACTIVE,
           effects: tileWrites(["tileEffectAdded"]),
           lower: (ctx) => `Boolean(${flow7(ctx)}.effects.tileBatchRecords(${input5(ctx, "records")}))`,
@@ -3619,8 +3933,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u63D0\u4EA4\u5730\u683C\u6548\u679C\u8BB0\u5F55\u6279\u6B21",
           description: "\u63D0\u4EA4\u5DF2\u6784\u9020\u7684\u5730\u683C\u6548\u679C\u8BB0\u5F55\uFF0C\u5E76\u4FDD\u7559\u6307\u5B9A\u7684\u7EDF\u4E00\u8868\u73B0\u6279\u6B21\u3002",
-          inputs: [port7("records", recordListType3)],
-          outputs: [port7("success", booleanType4)],
+          inputs: [port8("records", recordListType3)],
+          outputs: [port8("success", booleanType4)],
           parameters: [{ name: "presentationBatch", type: "string", enum: ["direct", "queue"], default: "direct" }],
           allowedSurfaces: ACTIVE,
           effects: tileWrites(["tileEffectAdded"]),
@@ -3632,8 +3946,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u66FF\u6362\u5730\u683C\u6548\u679C\u8BB0\u5F55",
           description: "\u4EE5\u6574\u6570\u7EC4\u63D0\u4EA4\u5DF2\u7ECF\u7531\u56FE\u7B5B\u9009\u51FA\u7684\u5730\u683C\u6548\u679C\uFF1B\u5BBF\u4E3B\u8D1F\u8D23\u6821\u9A8C\u3001\u590D\u5236\u548C\u79FB\u9664\u8868\u73B0\u4E8B\u4EF6\u3002",
-          inputs: [port7("effects", recordListType3)],
-          outputs: [port7("success", booleanType4)],
+          inputs: [port8("effects", recordListType3)],
+          outputs: [port8("success", booleanType4)],
           allowedSurfaces: ACTIVE,
           effects: tileWrites(["tileEffectRemoved"]),
           lower: (ctx) => `Boolean(${flow7(ctx)}.effects.replaceTileEffects(${input5(ctx, "effects")}))`,
@@ -3644,8 +3958,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u6309\u72B6\u6001\u5B9E\u4F8B\u751F\u547D\u5468\u671F\u79FB\u9664",
           description: "\u6309\u5F53\u524D\u6267\u884C\u4E2D\u4FDD\u7559\u7684\u4E0D\u900F\u660E\u72B6\u6001\u53E5\u67C4\u8C03\u7528\u5BBF\u4E3B\u751F\u547D\u5468\u671F\u79FB\u9664\uFF1B\u4E0D\u6309\u6807\u8BC6\u91CD\u65B0\u5339\u914D\u3002",
-          inputs: [port7("status", statusType)],
-          outputs: [port7("removed", booleanType4)],
+          inputs: [port8("status", statusType)],
+          outputs: [port8("removed", booleanType4)],
           allowedSurfaces: ACTIVE,
           effects: { pure: false, previewSafe: false, writes: ["statuses", "rules", "events"], events: ["afterStatusRemoved"] },
           lower: (ctx) => `${flow7(ctx)}.status.removeInstanceLifecycle(${input5(ctx, "status")})`,
@@ -3654,11 +3968,11 @@ var ContentGraphCore = (() => {
       ]);
       var ACTIVE2 = ["skill", "card", "rule", "triggerSkill", "pending"];
       var ENTITY_KINDS = ["skill", "status", "rule", "card", "cluster", "tile-effect"];
-      var recordType5 = "record";
+      var recordType6 = "record";
       var stringType4 = "string";
       var entityType = "record";
       var kindType = "string";
-      var port8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow8 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var input6 = (ctx, name) => {
@@ -3678,7 +3992,7 @@ var ContentGraphCore = (() => {
       ];
       var readParameters = [...commonParameters.slice(0, 3), parameter5("path", stringType4, { default: "", optional: true }), commonParameters[3]];
       var pureRead2 = { pure: true, previewSafe: false, reads: ["entity-extensions"] };
-      var entityInput = port8("entity", entityType, { label: "\u5B9E\u4F53\u5B9E\u4F8B" });
+      var entityInput = port9("entity", entityType, { label: "\u5B9E\u4F53\u5B9E\u4F8B" });
       function declarationSchemas(ctx, type) {
         return JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? []));
       }
@@ -3687,8 +4001,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u58F0\u660E\u5B9E\u4F53\u5B9E\u4F8B\u6269\u5C55\u53D8\u91CF",
         description: "\u5728\u5177\u4F53\u6280\u80FD\u3001\u72B6\u6001\u3001\u89C4\u5219\u3001\u624B\u724C\u3001\u80FD\u529B\u7EC4\u6216\u5730\u683C\u6548\u679C\u5B9E\u4F8B\u4E0A\u58F0\u660E\u6269\u5C55\u53D8\u91CF\uFF1B\u65E7\u5B9E\u4F8B\u9996\u6B21\u58F0\u660E\u65F6\u4FDD\u7559\u539F\u503C\u3002",
-        inputs: [entityInput, port8("value", recordType5, { label: "\u521D\u59CB\u503C" })],
-        outputs: [port8("value", recordType5, { label: "\u503C" })],
+        inputs: [entityInput, port9("value", recordType6, { label: "\u521D\u59CB\u503C" })],
+        outputs: [port9("value", recordType6, { label: "\u503C" })],
         outputValueTypeBindings: { value: { parameter: "valueType" } },
         inputValueTypeBindings: { value: { parameter: "valueType" } },
         parameters: commonParameters,
@@ -3703,7 +4017,7 @@ var ContentGraphCore = (() => {
         label: "\u8BFB\u53D6\u5B9E\u4F53\u5B9E\u4F8B\u6269\u5C55\u53D8\u91CF",
         description: "\u8BFB\u53D6\u5177\u4F53\u5B9E\u4F53\u5B9E\u4F8B\u4E0A\u5DF2\u58F0\u660E\u7684\u6269\u5C55\u5B57\u6BB5\uFF1B\u5B9E\u4F8B\u5931\u6548\u3001\u5B57\u6BB5\u7F3A\u5931\u6216\u58F0\u660E\u7C7B\u578B\u53D8\u5316\u4F1A\u4F7F\u8BED\u53E5\u5931\u6548\u3002",
         inputs: [entityInput],
-        outputs: [port8("value", recordType5, { label: "\u503C" })],
+        outputs: [port9("value", recordType6, { label: "\u503C" })],
         outputValueTypeBindings: { value: { parameter: "valueType" } },
         parameters: readParameters,
         allowedSurfaces: ACTIVE2,
@@ -3716,8 +4030,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u5199\u5165\u5B9E\u4F53\u5B9E\u4F8B\u6269\u5C55\u53D8\u91CF",
         description: "\u539F\u5B50\u5199\u5165\u5177\u4F53\u5B9E\u4F53\u5B9E\u4F8B\u4E0A\u5DF2\u58F0\u660E\u7684\u6269\u5C55\u5B57\u6BB5\uFF0C\u4FDD\u7559\u5B9E\u4F53\u5BF9\u8C61\u8EAB\u4EFD\u548C\u5176\u4ED6\u6269\u5C55\u5B57\u6BB5\u3002",
-        inputs: [entityInput, port8("value", recordType5, { label: "\u503C" })],
-        outputs: [port8("value", recordType5, { label: "\u503C" })],
+        inputs: [entityInput, port9("value", recordType6, { label: "\u503C" })],
+        outputs: [port9("value", recordType6, { label: "\u503C" })],
         outputValueTypeBindings: { value: { parameter: "valueType" } },
         inputValueTypeBindings: { value: { parameter: "valueType" } },
         parameters: readParameters,
@@ -3728,7 +4042,7 @@ var ContentGraphCore = (() => {
       };
       var AUTHOR_ENTITY_EXTENSION_MODULES = Object.freeze([declare, read3, write2]);
       var flow9 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
-      var recordType6 = "record";
+      var recordType7 = "record";
       var pureRead3 = {
         pure: true,
         previewSafe: false,
@@ -3740,7 +4054,7 @@ var ContentGraphCore = (() => {
         label: "\u5F53\u524D\u89C4\u5219\u5B9E\u4F8B",
         description: "\u53D6\u5F97\u5F53\u524D\u6B63\u5728\u6267\u884C\u7684\u5B9E\u9645\u89C4\u5219\u5B9E\u4F8B\uFF1B\u4E0D\u5B58\u5728\u6709\u6548\u5B9E\u4F8B\u65F6\u7531\u8FD0\u884C\u65F6\u4F7F\u8BED\u53E5\u5931\u6548\u3002",
         inputs: [],
-        outputs: [{ name: "instance", type: recordType6, label: "\u89C4\u5219\u5B9E\u4F8B" }],
+        outputs: [{ name: "instance", type: recordType7, label: "\u89C4\u5219\u5B9E\u4F8B" }],
         allowedSurfaces: ["rule", "triggerSkill", "pending"],
         effects: pureRead3,
         ui: { category: "reference", authoring: "standard" },
@@ -3755,7 +4069,7 @@ var ContentGraphCore = (() => {
       var nullableStringType2 = { kind: "nullable", value: stringType5 };
       var eventListType = { kind: "list", element: eventType };
       var anyListType = { kind: "list", element: "any" };
-      var port9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input7 = (ctx, name) => {
         const value = ctx.inputs[name];
         if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -3773,8 +4087,8 @@ var ContentGraphCore = (() => {
           id: "piece.raw-faction",
           label: "\u8BFB\u53D6\u68CB\u5B50\u767B\u8BB0\u9635\u8425",
           description: "\u8BFB\u53D6\u68CB\u5B50\u8BB0\u5F55\u672C\u8EAB\u7684 faction \u5B57\u6BB5\uFF1B\u7528\u4E8E\u4FDD\u7559\u65E7\u67E5\u8BE2\u7684\u5B57\u6BB5\u4E0D\u76F8\u7B49\u8BED\u4E49\uFF0C\u4E0D\u66FF\u6362\u4E3A\u73A9\u5BB6\u961F\u4F0D\u6620\u5C04\u3002",
-          inputs: [port9("piece", pieceType4)],
-          outputs: [port9("faction", nullableStringType2)],
+          inputs: [port10("piece", pieceType4)],
+          outputs: [port10("faction", nullableStringType2)],
           effects: pure3(["pieces"]),
           lower: (ctx) => `((function(pieceId){var piece=${flow10(ctx)}.query.piece(pieceId);return piece&&piece.faction==null?null:piece?String(piece.faction):null;})(${input7(ctx, "piece")}))`,
           ui: { category: "field", authoring: "standard" }
@@ -3783,8 +4097,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-piece-id",
           label: "\u8BFB\u53D6\u5F39\u9053\u4E8B\u4EF6\u68CB\u5B50\u6807\u8BC6",
           description: "\u4ECE\u6807\u51C6\u5F39\u9053\u4E8B\u4EF6\u6216\u79FB\u52A8\u8FFD\u8E2A encounter \u8BFB\u53D6\u68CB\u5B50\u5B9E\u4F8B\u6807\u8BC6\uFF1B\u4E0D\u9A8C\u8BC1\u6216\u5236\u9020\u68CB\u5B50\u5BF9\u8C61\u3002",
-          inputs: [port9("event", eventType)],
-          outputs: [port9("piece", pieceType4)],
+          inputs: [port10("event", eventType)],
+          outputs: [port10("piece", pieceType4)],
           effects: pure3(["pieces"]),
           lower: (ctx) => `(function(event){if(!event)return null;if(event.piece&&typeof event.piece.instanceId==='string')return event.piece.instanceId;return typeof event.pieceId==='string'?event.pieceId:null;})(${input7(ctx, "event")})`,
           ui: { category: "projectile", authoring: "standard" }
@@ -3793,14 +4107,14 @@ var ContentGraphCore = (() => {
           id: "projectile.trace-to-cell",
           label: "\u8BFB\u53D6\u53EF\u7A7F\u8D8A\u5F39\u9053\u4E8B\u4EF6",
           description: "\u8C03\u7528\u6743\u5A01\u79FB\u52A8\u8DEF\u5F84\u89C2\u5BDF\u5668\u7684\u5168\u7A7F\u8D8A\u6A21\u5F0F\uFF1B\u56FE\u53EA\u8D1F\u8D23\u6295\u5F71\u5176\u4E2D\u7684\u68CB\u5B50\u4E8B\u4EF6\u3002",
-          inputs: [port9("source", pieceType4), port9("target", cellType2)],
+          inputs: [port10("source", pieceType4), port10("target", cellType2)],
           outputs: [
-            port9("events", eventListType),
-            port9("dx", numberType3),
-            port9("dy", numberType3),
-            port9("valid", "boolean"),
-            port9("sameCell", "boolean"),
-            port9("distance", numberType3)
+            port10("events", eventListType),
+            port10("dx", numberType3),
+            port10("dy", numberType3),
+            port10("valid", "boolean"),
+            port10("sameCell", "boolean"),
+            port10("distance", numberType3)
           ],
           parameters: [{ name: "maxDistance", type: numberType3, default: 6, minimum: 0, maximum: 128 }],
           effects: pure3(["pieces", "players", "position"]),
@@ -3820,12 +4134,12 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u5730\u683C\u5C04\u7EBF\u4E8B\u4EF6",
           description: "\u8C03\u7528\u6743\u5A01\u5F39\u9053\u89C2\u5BDF\u5668\u8BFB\u53D6\u4ECE\u5730\u683C\u6CBF\u5355\u4F4D\u65B9\u5411\u7684\u4E8B\u4EF6\u5E8F\u5217\uFF1B\u56FE\u53EA\u8D1F\u8D23\u540E\u7EED\u7B5B\u9009\u548C\u622A\u65AD\u3002",
           inputs: [
-            port9("origin", cellType2),
-            port9("direction", cellType2),
-            port9("maxDistance", "number"),
-            port9("excludePiece", pieceType4, { nullable: true, optional: true })
+            port10("origin", cellType2),
+            port10("direction", cellType2),
+            port10("maxDistance", "number"),
+            port10("excludePiece", pieceType4, { nullable: true, optional: true })
           ],
-          outputs: [port9("events", eventListType)],
+          outputs: [port10("events", eventListType)],
           effects: pure3(["pieces", "position"]),
           lower: (ctx) => {
             const origin = input7(ctx, "origin");
@@ -3841,8 +4155,8 @@ var ContentGraphCore = (() => {
           id: "collection.shuffle",
           label: "\u6309\u6743\u5A01\u968F\u673A\u6E90\u6D17\u724C",
           description: "\u590D\u5236\u8F93\u5165\u96C6\u5408\u5E76\u6267\u884C Fisher-Yates \u6D17\u724C\uFF1B\u6BCF\u4E2A\u4EA4\u6362\u4F4D\u7F6E\u6070\u597D\u6D88\u8017\u4E00\u6B21\u6743\u5A01\u968F\u673A\u62BD\u6837\u3002",
-          inputs: [port9("items", anyListType)],
-          outputs: [port9("items", anyListType)],
+          inputs: [port10("items", anyListType)],
+          outputs: [port10("items", anyListType)],
           outputTypeBindings: { items: { input: "items", projection: "same" } },
           effects: { ...pure3(["random"]), random: true },
           lower: (ctx) => {
@@ -3932,8 +4246,8 @@ var ContentGraphCore = (() => {
       var numberType4 = "number";
       var booleanType5 = "boolean";
       var stringType6 = "string";
-      var recordType7 = "record";
-      var port10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordType8 = "record";
+      var port11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow11 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var battle4 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -3955,8 +4269,8 @@ var ContentGraphCore = (() => {
           id: "piece.identifier",
           label: "\u68CB\u5B50\u6807\u8BC6",
           description: "\u8BFB\u53D6\u7ECF\u67E5\u8BE2\u9A8C\u8BC1\u7684\u7A33\u5B9A\u68CB\u5B50\u5B9E\u4F8B\u6807\u8BC6\u3002",
-          inputs: [port10("piece", pieceType5)],
-          outputs: [port10("id", stringType6)],
+          inputs: [port11("piece", pieceType5)],
+          outputs: [port11("id", stringType6)],
           effects: pure4(["pieces"]),
           lower: (ctx) => `(${flow11(ctx)}.query.piece(${input8(ctx, "piece")}).instanceId)`,
           ui: { category: "query" }
@@ -3965,8 +4279,8 @@ var ContentGraphCore = (() => {
           id: "piece.alive",
           label: "\u68CB\u5B50\u5B58\u6D3B",
           description: "\u5224\u65AD\u68CB\u5B50\u5F15\u7528\u4ECD\u5728\u5F53\u524D\u6218\u6597\u4E14\u751F\u547D\u503C\u5927\u4E8E\u96F6\u3002",
-          inputs: [port10("piece", pieceType5, { nullable: true, optional: true })],
-          outputs: [port10("alive", booleanType5)],
+          inputs: [port11("piece", pieceType5, { nullable: true, optional: true })],
+          outputs: [port11("alive", booleanType5)],
           effects: pure4(["pieces"]),
           lower: (ctx) => `(${flow11(ctx)}.query.hasPiece(${ctx.inputs.piece ?? "null"}) && ${flow11(ctx)}.query.piece(${ctx.inputs.piece ?? "null"}).currentHp > 0)`,
           ui: { category: "query" }
@@ -3977,8 +4291,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell",
           label: "\u6784\u9020\u5730\u683C\u8BB0\u5F55",
           description: "\u7531\u4E24\u4E2A\u6709\u9650\u5750\u6807\u6784\u9020\u4E0D\u900F\u660E\u5730\u683C\u503C\u3002",
-          inputs: [port10("x", numberType4), port10("y", numberType4)],
-          outputs: [port10("cell", cellType3)],
+          inputs: [port11("x", numberType4), port11("y", numberType4)],
+          outputs: [port11("cell", cellType3)],
           effects: pure4(),
           lower: (ctx) => `({x: ${input8(ctx, "x")}, y: ${input8(ctx, "y")}})`,
           ui: { category: "position" }
@@ -3987,8 +4301,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-adjacent",
           label: "\u76F8\u90BB\u5730\u683C",
           description: "\u5224\u65AD\u4E24\u4E2A\u5730\u683C\u662F\u5426\u6B63\u4EA4\u76F8\u90BB\u3002",
-          inputs: [port10("left", cellType3), port10("right", cellType3)],
-          outputs: [port10("value", booleanType5)],
+          inputs: [port11("left", cellType3), port11("right", cellType3)],
+          outputs: [port11("value", booleanType5)],
           effects: pure4(),
           lower: (ctx) => `(Math.abs((${input8(ctx, "left")}).x - (${input8(ctx, "right")}).x) + Math.abs((${input8(ctx, "left")}).y - (${input8(ctx, "right")}).y) === 1)`,
           ui: { category: "position" }
@@ -3997,8 +4311,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-coordinates",
           label: "\u8BFB\u53D6\u5730\u683C\u5750\u6807",
           description: "\u8BFB\u53D6\u5DF2\u9A8C\u8BC1\u5730\u683C\u7684\u4E24\u4E2A\u5750\u6807\u4E8B\u5B9E\u3002",
-          inputs: [port10("cell", cellType3)],
-          outputs: [port10("x", numberType4), port10("y", numberType4)],
+          inputs: [port11("cell", cellType3)],
+          outputs: [port11("x", numberType4), port11("y", numberType4)],
           effects: pure4(),
           lower: (ctx) => `({x: (${input8(ctx, "cell")}).x, y: (${input8(ctx, "cell")}).y})`,
           ui: { category: "position" }
@@ -4008,11 +4322,11 @@ var ContentGraphCore = (() => {
           label: "\u5408\u6CD5\u843D\u70B9",
           description: "\u6309\u65E2\u6709\u843D\u70B9\u7EA6\u675F\u91CD\u65B0\u9A8C\u8BC1\u5730\u683C\u3001\u53EF\u884C\u8D70\u5730\u5F62\u548C\u5B58\u6D3B\u5360\u4F4D\uFF1B\u53EF\u5217\u51FA\u540C\u6B21\u4F4D\u79FB\u4E2D\u5C06\u79BB\u5F00\u7684\u68CB\u5B50\u3002",
           inputs: [
-            port10("cell", cellType3),
-            port10("ignoreA", pieceType5, { nullable: true, optional: true }),
-            port10("ignoreB", pieceType5, { nullable: true, optional: true })
+            port11("cell", cellType3),
+            port11("ignoreA", pieceType5, { nullable: true, optional: true }),
+            port11("ignoreB", pieceType5, { nullable: true, optional: true })
           ],
-          outputs: [port10("legal", booleanType5)],
+          outputs: [port11("legal", booleanType5)],
           parameters: [parameter6("terrainPolicy", stringType6, { enum: ["floor-or-cover", "walkable"] })],
           effects: pure4(["position", "pieces"]),
           lower: (ctx) => {
@@ -4031,8 +4345,8 @@ var ContentGraphCore = (() => {
           id: "tile.has-effect",
           label: "\u5730\u683C\u5177\u6709\u9644\u7740",
           description: "\u67E5\u8BE2\u767D\u540D\u5355\u5730\u683C\u9644\u7740\u7C7B\u578B\u5728\u6307\u5B9A\u5750\u6807\u662F\u5426\u5B58\u5728\u3002",
-          inputs: [port10("cell", cellType3)],
-          outputs: [port10("exists", booleanType5)],
+          inputs: [port11("cell", cellType3)],
+          outputs: [port11("exists", booleanType5)],
           parameters: [parameter6("effectType", stringType6)],
           effects: pure4(["tile-effects"]),
           lower: (ctx) => {
@@ -4045,8 +4359,8 @@ var ContentGraphCore = (() => {
           id: "tile.add-reservation",
           label: "\u6DFB\u52A0\u5730\u683C\u9884\u7559\u6807\u8BB0",
           description: "\u901A\u8FC7\u6743\u5A01 tileBatch \u6DFB\u52A0\u4E0D\u963B\u6321\u8FDB\u5165\u7684\u53CC\u5C3E\u98DE\u884C\u9884\u7559\u8BB0\u5F55\u3002",
-          inputs: [port10("cell", cellType3), port10("id", stringType6), port10("flightId", stringType6)],
-          outputs: [port10("success", booleanType5)],
+          inputs: [port11("cell", cellType3), port11("id", stringType6), port11("flightId", stringType6)],
+          outputs: [port11("success", booleanType5)],
           parameters: [parameter6("effectType", stringType6)],
           effects: writes(["tile-effects"], ["tileEffectAdded"]),
           lower: (ctx) => {
@@ -4059,8 +4373,8 @@ var ContentGraphCore = (() => {
           id: "tile.clear-flight-reservations",
           label: "\u6E05\u7406\u98DE\u884C\u9884\u7559",
           description: "\u53EA\u79FB\u9664\u6307\u5B9A flightId \u7684\u53CC\u5C3E\u98DE\u884C\u9884\u7559\uFF0C\u4FDD\u7559\u5176\u4ED6\u5730\u683C\u6548\u679C\u3002",
-          inputs: [port10("flightId", stringType6)],
-          outputs: [port10("success", booleanType5)],
+          inputs: [port11("flightId", stringType6)],
+          outputs: [port11("success", booleanType5)],
           parameters: [parameter6("effectType", stringType6)],
           effects: writes(["tile-effects"], ["tileEffectRemoved"]),
           lower: (ctx) => {
@@ -4076,8 +4390,8 @@ var ContentGraphCore = (() => {
           id: "effect.teleport-if-present",
           label: "\u6309\u5B58\u5728\u6027\u4F20\u9001",
           description: "\u68CB\u5B50\u5F15\u7528\u6709\u6548\u65F6\u901A\u8FC7\u73B0\u6709 flow.effects.move \u4F20\u9001\uFF1B\u65E0\u6548\u5F15\u7528\u8FD4\u56DE\u5931\u8D25\uFF0C\u4E0D\u65C1\u8DEF\u4FEE\u6539\u5750\u6807\u3002",
-          inputs: [port10("piece", pieceType5, { nullable: true }), port10("destination", cellType3)],
-          outputs: [port10("success", booleanType5)],
+          inputs: [port11("piece", pieceType5, { nullable: true }), port11("destination", cellType3)],
+          outputs: [port11("success", booleanType5)],
           effects: writes(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => {
             const piece = input8(ctx, "piece");
@@ -4093,8 +4407,8 @@ var ContentGraphCore = (() => {
           id: "status.apply-record",
           label: "\u9644\u52A0\u7ED3\u6784\u5316\u68CB\u5B50\u72B6\u6001",
           description: "\u5C06 graph-local typed record \u4EA4\u7ED9\u73B0\u6709 status lifecycle\uFF1B\u4E0D\u5EFA\u7ACB\u7B2C\u4E8C\u4EFD\u72B6\u6001\u5B58\u50A8\u3002",
-          inputs: [port10("target", pieceType5), port10("record", recordType7)],
-          outputs: [port10("success", booleanType5)],
+          inputs: [port11("target", pieceType5), port11("record", recordType8)],
+          outputs: [port11("success", booleanType5)],
           parameters: [{ name: "inputPolicy", type: "string", enum: ["flow", "host"], default: "flow" }],
           effects: writes(["status", "rule", "events"], ["afterStatusApplied"]),
           lower: (ctx) => `${flow11(ctx)}.status.add(${input8(ctx, "target")}, ${input8(ctx, "record")}, "piece"${ctx.parameters.inputPolicy === "host" ? ', "host"' : ""})`,
@@ -4104,18 +4418,18 @@ var ContentGraphCore = (() => {
           id: "status.find-flight",
           label: "\u8BFB\u53D6\u98DE\u884C\u8BB0\u5F55",
           description: "\u4ECE\u6301\u6709\u68CB\u5B50\u7684 statusTags \u4E2D\u8BFB\u53D6\u6307\u5B9A\u72EC\u7ACB\u98DE\u884C\u8BB0\u5F55\u7684\u767D\u540D\u5355\u5B57\u6BB5\u3002",
-          inputs: [port10("target", pieceType5)],
+          inputs: [port11("target", pieceType5)],
           outputs: [
-            port10("found", booleanType5),
-            port10("id", stringType6),
-            port10("flightId", stringType6),
-            port10("allyId", pieceType5, { nullable: true }),
-            port10("x", numberType4),
-            port10("y", numberType4),
-            port10("allyX", numberType4),
-            port10("allyY", numberType4),
-            port10("appliedTurn", numberType4),
-            port10("currentDuration", numberType4)
+            port11("found", booleanType5),
+            port11("id", stringType6),
+            port11("flightId", stringType6),
+            port11("allyId", pieceType5, { nullable: true }),
+            port11("x", numberType4),
+            port11("y", numberType4),
+            port11("allyX", numberType4),
+            port11("allyY", numberType4),
+            port11("appliedTurn", numberType4),
+            port11("currentDuration", numberType4)
           ],
           parameters: [parameter6("statusType", stringType6)],
           effects: pure4(["statuses", "pieces"]),
@@ -4131,8 +4445,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-by-flight",
           label: "\u6309\u98DE\u884C\u6807\u8BC6\u79FB\u9664\u72B6\u6001",
           description: "\u679A\u4E3E\u6307\u5B9A\u68CB\u5B50\u7684\u72EC\u7ACB\u98DE\u884C\u72B6\u6001\uFF0C\u5E76\u9010\u6761\u7ECF status lifecycle \u79FB\u9664\u3002",
-          inputs: [port10("target", pieceType5, { nullable: true, optional: true }), port10("flightId", stringType6)],
-          outputs: [port10("success", booleanType5)],
+          inputs: [port11("target", pieceType5, { nullable: true, optional: true }), port11("flightId", stringType6)],
+          outputs: [port11("success", booleanType5)],
           effects: writes(["status", "rule", "events"], ["afterStatusRemoved"]),
           lower: (ctx) => {
             const target = ctx.inputs.target ?? "null";
@@ -4157,7 +4471,7 @@ var ContentGraphCore = (() => {
       var numberType5 = "number";
       var booleanType6 = "boolean";
       var stringType7 = "string";
-      var port11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port12 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input9 = (ctx, name) => {
         const value = ctx.inputs[name];
@@ -4184,7 +4498,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8C\u9009\u4E00\u9009\u9879",
           description: "\u7528\u4E24\u4E2A\u6587\u672C\u503C\u6784\u9020\u65E2\u6709\u5355\u9009\u534F\u8BAE\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u9009\u9879\u6821\u9A8C\u4ECD\u7531\u6743\u5A01\u5BBF\u4E3B\u8D1F\u8D23\u3002",
           inputs: [],
-          outputs: [port11("choice", choiceType)],
+          outputs: [port12("choice", choiceType)],
           parameters: [
             parameter7("title", stringType7, { optional: true }),
             parameter7("firstLabel", stringType7),
@@ -4205,8 +4519,8 @@ var ContentGraphCore = (() => {
           id: "choice.option-value",
           label: "\u8BFB\u53D6\u9009\u9879\u503C",
           description: "\u5C06\u6743\u5A01\u5BBF\u4E3B\u8FD4\u56DE\u7684\u5DF2\u5B8C\u6210\u5355\u9009\u89E3\u6790\u4E3A\u6587\u672C\u503C\uFF1B\u6302\u8D77\u5206\u652F\u5FC5\u987B\u5148\u8FD4\u56DE\u3002",
-          inputs: [port11("choice", choiceType, { nullable: true, optional: true })],
-          outputs: [port11("value", stringType7)],
+          inputs: [port12("choice", choiceType, { nullable: true, optional: true })],
+          outputs: [port12("value", stringType7)],
           effects: pure5(["choice"]),
           lower: (ctx) => {
             const value = input9(ctx, "choice");
@@ -4220,8 +4534,8 @@ var ContentGraphCore = (() => {
           id: "spatial.piece-position",
           label: "\u8BFB\u53D6\u68CB\u5B50\u4F4D\u7F6E",
           description: "\u8BFB\u53D6\u7ECF\u6743\u5A01\u68CB\u5B50\u67E5\u8BE2\u9A8C\u8BC1\u540E\u7684\u5F53\u524D\u4F4D\u7F6E\u5FEB\u7167\uFF1B\u4E0D\u66B4\u9732\u53EF\u5199\u68CB\u5B50\u5BF9\u8C61\u3002",
-          inputs: [port11("piece", pieceType6)],
-          outputs: [port11("cell", cellType4)],
+          inputs: [port12("piece", pieceType6)],
+          outputs: [port12("cell", cellType4)],
           effects: pure5(["pieces", "position"]),
           lower: (ctx) => `${runtime(ctx)}.query.piece(${input9(ctx, "piece")}) && {x: ${runtime(ctx)}.query.piece(${input9(ctx, "piece")}).x, y: ${runtime(ctx)}.query.piece(${input9(ctx, "piece")}).y}`,
           ui: { category: "position" }
@@ -4230,8 +4544,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-distance",
           label: "\u5730\u683C\u66FC\u54C8\u987F\u8DDD\u79BB",
           description: "\u8BFB\u53D6\u4E24\u4E2A\u5DF2\u9A8C\u8BC1\u5730\u683C\u4E4B\u95F4\u7684\u66FC\u54C8\u987F\u8DDD\u79BB\u3002",
-          inputs: [port11("from", cellType4), port11("to", cellType4)],
-          outputs: [port11("distance", numberType5)],
+          inputs: [port12("from", cellType4), port12("to", cellType4)],
+          outputs: [port12("distance", numberType5)],
           effects: pure5(["position"]),
           lower: (ctx) => `Math.abs((${input9(ctx, "to")}).x - (${input9(ctx, "from")}).x) + Math.abs((${input9(ctx, "to")}).y - (${input9(ctx, "from")}).y)`,
           ui: { category: "position" }
@@ -4240,8 +4554,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-walkable",
           label: "\u68C0\u67E5\u5730\u683C\u53EF\u884C\u8D70",
           description: "\u6309\u5F53\u524D\u5730\u56FE\u8BFB\u53D6\u5730\u683C\u548C\u53EF\u884C\u8D70\u5C5E\u6027\uFF1B\u4E0D\u5224\u65AD\u68CB\u5B50\u5360\u4F4D\u3002",
-          inputs: [port11("cell", cellType4)],
-          outputs: [port11("walkable", booleanType6)],
+          inputs: [port12("cell", cellType4)],
+          outputs: [port12("walkable", booleanType6)],
           effects: pure5(["map"]),
           lower: (ctx) => {
             const state2 = battle5(ctx);
@@ -4253,11 +4567,23 @@ var ContentGraphCore = (() => {
       ];
       var LIFECYCLE_PRIMITIVES = [
         define6({
+          id: "lifecycle.destroy",
+          label: "\u6D88\u706D\u68CB\u5B50",
+          description: "\u76F4\u63A5\u6D88\u706D\u76EE\u6807\u5E76\u8FDB\u884C\u6B63\u5F0F\u6B7B\u4EA1\u7ED3\u7B97\uFF1B\u4E0D\u9020\u6210\u4F24\u5BB3\uFF0C\u4E0D\u7ECF\u8FC7\u62A4\u76FE\u6216\u4F24\u5BB3\u51CF\u514D\u3002\u76EE\u6807\u5DF2\u79BB\u573A\u65F6\u8DF3\u8FC7\u3002",
+          inputs: [port12("target", pieceType6, { label: "\u76EE\u6807" }), port12("source", pieceType6, { label: "\u6765\u6E90", optional: true })],
+          inputValueTypeBindings: { target: { parameter: "targetType" } },
+          parameters: [{ name: "targetType", type: stringType7, label: "\u76EE\u6807\u7C7B\u578B", default: "piece", enum: ["piece", '{"kind":"list","element":"piece"}'] }],
+          outputs: [port12("success", booleanType6, { label: "\u662F\u5426\u6D88\u706D" })],
+          effects: writes2(["pieces", "health", "graveyard"], ["onPieceDied"]),
+          lower: (ctx) => `${runtime(ctx)}.lifecycle.destroy(${input9(ctx, "target")}${ctx.inputs.source === void 0 ? "" : `, ${input9(ctx, "source")}`})`,
+          ui: { category: "lifecycle", authoring: "standard" }
+        }),
+        define6({
           id: "lifecycle.queue-summon",
           label: "\u6392\u961F\u58F0\u660E\u5F0F\u53EC\u5524",
           description: "\u5C06\u4E00\u4E2A\u6765\u6E90\u68CB\u5B50\u548C\u5730\u683C\u4EA4\u7ED9\u5F53\u524D\u5185\u5BB9\u58F0\u660E\u7684\u53EC\u5524\u961F\u5217\uFF1B\u6765\u6E90\u955C\u50CF\u80FD\u529B\u3001\u6570\u91CF\u548C\u53D8\u4F53\u7531\u5BBF\u4E3B\u58F0\u660E\u9A8C\u8BC1\u3002",
-          inputs: [port11("source", pieceType6), port11("destination", cellType4), port11("variant", stringType7)],
-          outputs: [port11("queued", numberType5)],
+          inputs: [port12("source", pieceType6), port12("destination", cellType4), port12("variant", stringType7)],
+          outputs: [port12("queued", numberType5)],
           effects: writes2(["summon", "queue"], ["summonQueued"]),
           lower: (ctx) => {
             const destination = input9(ctx, "destination");
@@ -4269,8 +4595,8 @@ var ContentGraphCore = (() => {
           id: "lifecycle.zero-health",
           label: "\u5C06\u68CB\u5B50\u751F\u547D\u7F6E\u96F6",
           description: "\u5728\u4F24\u5BB3\u89E6\u53D1\u8FB9\u754C\u5C06\u5DF2\u9A8C\u8BC1\u68CB\u5B50\u7684\u751F\u547D\u7F6E\u96F6\uFF0C\u8BA9\u73B0\u6709 DeathBatch \u7EE7\u7EED\u8D1F\u8D23\u6B63\u5F0F\u6B7B\u4EA1\u548C\u540E\u7EED\u89C4\u5219\uFF1B\u4E0D\u5199\u5165\u4F4D\u7F6E\u3002",
-          inputs: [port11("target", pieceType6)],
-          outputs: [port11("success", booleanType6)],
+          inputs: [port12("target", pieceType6)],
+          outputs: [port12("success", booleanType6)],
           effects: writes2(["health", "damage"]),
           allowedSurfaces: ["rule"],
           lower: (ctx) => {
@@ -4826,7 +5152,7 @@ var ContentGraphCore = (() => {
       var numberType6 = "number";
       var booleanType7 = "boolean";
       var choiceType2 = "choice";
-      var port12 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port13 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure6 = (reads = []) => ({ pure: true, previewSafe: false, reads });
       var pureValue = () => ({ pure: true, previewSafe: true });
@@ -4861,8 +5187,8 @@ var ContentGraphCore = (() => {
           id: "value.present-string",
           label: "\u6587\u672C\u5B58\u5728",
           description: "\u5224\u65AD\u4E00\u4E2A\u53EF\u7A7A\u6587\u672C\u53E5\u67C4\u662F\u5426\u5B58\u5728\u3002",
-          inputs: [port12("value", stringType8, { nullable: true })],
-          outputs: [port12("present", booleanType7)],
+          inputs: [port13("value", stringType8, { nullable: true })],
+          outputs: [port13("present", booleanType7)],
           allowedSurfaces: PURE_VALUE,
           effects: pureValue(),
           lower: (ctx) => `(${input10(ctx, "value")} !== null && ${input10(ctx, "value")} !== undefined)`,
@@ -4872,8 +5198,8 @@ var ContentGraphCore = (() => {
           id: "value.string-or-empty",
           label: "\u53EF\u7A7A\u6587\u672C\u8F6C\u7A7A\u6587\u672C",
           description: "\u628A\u7F3A\u5931\u7684\u767B\u8BB0\u6587\u672C\u503C\u5F52\u4E00\u4E3A\u7A7A\u6587\u672C\uFF0C\u4F9B\u540E\u7EED\u5C01\u95ED\u6A21\u5757\u5904\u7406\u3002",
-          inputs: [port12("value", stringType8, { nullable: true })],
-          outputs: [port12("text", stringType8)],
+          inputs: [port13("value", stringType8, { nullable: true })],
+          outputs: [port13("text", stringType8)],
           allowedSurfaces: PURE_VALUE,
           effects: pureValue(),
           lower: (ctx) => `((${input10(ctx, "value")}) == null ? "" : String(${input10(ctx, "value")}))`,
@@ -4883,8 +5209,8 @@ var ContentGraphCore = (() => {
           id: "choice.option-id-value",
           label: "\u5DF2\u9009\u9009\u9879\u6807\u8BC6",
           description: "\u8BFB\u53D6\u65E2\u6709\u9009\u9879\u534F\u8BAE\u8FD4\u56DE\u7684\u5B57\u7B26\u4E32\u3001id \u6216 value\uFF0C\u5F52\u4E00\u4E3A\u6587\u672C\u6807\u8BC6\u3002",
-          inputs: [port12("choice", choiceType2, { nullable: true, optional: true })],
-          outputs: [port12("text", stringType8)],
+          inputs: [port13("choice", choiceType2, { nullable: true, optional: true })],
+          outputs: [port13("text", stringType8)],
           allowedSurfaces: PURE_VALUE,
           effects: pureValue(),
           lower: (ctx) => `(function(value) { if (typeof value === "string") return value; if (value && typeof value.id === "string") return value.id; if (value && typeof value.value === "string") return value.value; return ""; })(${input10(ctx, "choice")})`,
@@ -4894,8 +5220,8 @@ var ContentGraphCore = (() => {
           id: "status.find-id-by-id",
           label: "\u6309\u6807\u8BC6\u67E5\u627E\u72B6\u6001",
           description: "\u6309\u7A33\u5B9A\u72B6\u6001\u6807\u8BC6\u8BFB\u53D6\u72B6\u6001\u53E5\u67C4\uFF0C\u4E0D\u628A\u53EF\u53D8\u72B6\u6001\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true, optional: true })],
-          outputs: [port12("id", stringType8, { nullable: true })],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true, optional: true })],
+          outputs: [port13("id", stringType8, { nullable: true })],
           parameters: [parameter8("statusId", stringType8, { optional: true })],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
@@ -4909,8 +5235,8 @@ var ContentGraphCore = (() => {
           id: "status.find-id-by-prefix",
           label: "\u6309\u6807\u8BC6\u524D\u7F00\u67E5\u627E\u72B6\u6001",
           description: "\u6309\u7A33\u5B9A\u6807\u8BC6\u524D\u7F00\u8BFB\u53D6\u9996\u4E2A\u72B6\u6001\u53E5\u67C4\u3002",
-          inputs: [port12("piece", pieceType7)],
-          outputs: [port12("id", stringType8, { nullable: true })],
+          inputs: [port13("piece", pieceType7)],
+          outputs: [port13("id", stringType8, { nullable: true })],
           parameters: [parameter8("prefix", stringType8)],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
@@ -4921,8 +5247,8 @@ var ContentGraphCore = (() => {
           id: "status.find-id-by-number",
           label: "\u6309\u72B6\u6001\u6570\u503C\u67E5\u627E\u72B6\u6001",
           description: "\u6309\u72B6\u6001\u7C7B\u578B\u548C\u767B\u8BB0\u7684\u6570\u503C\u5B57\u6BB5\u8BFB\u53D6\u9996\u4E2A\u5339\u914D\u72B6\u6001\u53E5\u67C4\u3002",
-          inputs: [port12("piece", pieceType7), port12("value", numberType6)],
-          outputs: [port12("id", stringType8, { nullable: true })],
+          inputs: [port13("piece", pieceType7), port13("value", numberType6)],
+          outputs: [port13("id", stringType8, { nullable: true })],
           parameters: [parameter8("statusType", stringType8), parameter8("field", stringType8, { enum: ["turnNumber"] })],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
@@ -4933,8 +5259,8 @@ var ContentGraphCore = (() => {
           id: "status.read-reference",
           label: "\u8BFB\u53D6\u72B6\u6001\u5173\u8054\u68CB\u5B50",
           description: "\u8BFB\u53D6\u72B6\u6001\u4E2D\u767B\u8BB0\u7684\u76EE\u6807\u6216\u6765\u6E90\u68CB\u5B50\u5F15\u7528\uFF0C\u5E76\u91CD\u65B0\u7ECF\u8FC7\u5BBF\u4E3B\u5B58\u5728\u6027\u6821\u9A8C\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true })],
-          outputs: [port12("reference", pieceType7, { nullable: true })],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true })],
+          outputs: [port13("reference", pieceType7, { nullable: true })],
           parameters: [parameter8("field", stringType8, { enum: ["targetId", "sourceId"] })],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses", "pieces"]),
@@ -4945,8 +5271,8 @@ var ContentGraphCore = (() => {
           id: "status.read-number-truthy",
           label: "\u6309\u65E7\u89C4\u5219\u771F\u503C\u8BFB\u53D6\u72B6\u6001\u6570\u503C",
           description: "\u4FDD\u7559\u65E7\u89C4\u5219\u7684 `value || fallback` \u8BED\u4E49\uFF1B\u96F6\u503C\u548C\u5176\u5B83\u5047\u503C\u4F7F\u7528\u56DE\u9000\u503C\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true }), port12("fallback", numberType6)],
-          outputs: [port12("value", numberType6)],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true }), port13("fallback", numberType6)],
+          outputs: [port13("value", numberType6)],
           parameters: [parameter8("field", stringType8, { enum: ["intensity", "stacks"] })],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
@@ -4957,8 +5283,8 @@ var ContentGraphCore = (() => {
           id: "status.read-uses",
           label: "\u8BFB\u53D6\u72B6\u6001\u4F7F\u7528\u6B21\u6570",
           description: "\u4FDD\u7559\u65E7\u89C4\u5219\u5148\u8BFB remainingUses\u3001\u7F3A\u5931\u65F6\u518D\u8BFB currentUses \u7684\u751F\u547D\u5468\u671F\u8BFB\u53D6\u987A\u5E8F\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true }), port12("fallback", numberType6)],
-          outputs: [port12("value", numberType6)],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true }), port13("fallback", numberType6)],
+          outputs: [port13("value", numberType6)],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
           lower: (ctx) => `(function(pieceId, statusId, fallback) { var tag = (${flow15(ctx)}.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && (tag.remainingUses !== undefined ? tag.remainingUses : (tag.currentUses !== undefined ? tag.currentUses : fallback)); return Number(raw); })(${input10(ctx, "piece")}, ${input10(ctx, "statusId")}, ${input10(ctx, "fallback")})`,
@@ -4968,8 +5294,8 @@ var ContentGraphCore = (() => {
           id: "status.read-duration",
           label: "\u8BFB\u53D6\u72B6\u6001\u6301\u7EED\u65F6\u95F4",
           description: "\u4FDD\u7559\u65E7\u89C4\u5219 remainingDuration \u4EC5\u5728 undefined \u65F6\u56DE\u9000 currentDuration \u7684\u751F\u547D\u5468\u671F\u8BFB\u53D6\u987A\u5E8F\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true }), port12("fallback", numberType6)],
-          outputs: [port12("value", numberType6)],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true }), port13("fallback", numberType6)],
+          outputs: [port13("value", numberType6)],
           allowedSurfaces: PURE2,
           effects: pure6(["statuses"]),
           lower: (ctx) => `(function(pieceId, statusId, fallback) { var tag = (${flow15(ctx)}.query.piece(pieceId).statusTags || []).find(function(item) { return item && item.id === statusId; }); var raw = tag && (tag.remainingDuration === undefined ? tag.currentDuration : tag.remainingDuration); return raw === undefined ? Number(fallback) : Number(raw); })(${input10(ctx, "piece")}, ${input10(ctx, "statusId")}, ${input10(ctx, "fallback")})`,
@@ -4979,8 +5305,8 @@ var ContentGraphCore = (() => {
           id: "status.consume-counter",
           label: "\u63A8\u8FDB\u72B6\u6001\u751F\u547D\u5468\u671F\u8BA1\u6570",
           description: "\u7531\u72B6\u6001\u5BBF\u4E3B\u63A8\u8FDB\u4E00\u4E2A\u767B\u8BB0\u7684\u751F\u547D\u5468\u671F\u8BA1\u6570\uFF0C\u5E76\u8FD4\u56DE\u63A8\u8FDB\u540E\u7684\u6570\u503C\u3002\u6301\u7EED\u65F6\u95F4\u548C\u4F7F\u7528\u6B21\u6570\u4E0D\u80FD\u901A\u8FC7\u901A\u7528\u72B6\u6001\u6570\u503C\u8BBE\u5B9A\u5668\u5199\u5165\u3002",
-          inputs: [port12("piece", pieceType7), port12("statusId", stringType8, { nullable: true })],
-          outputs: [port12("value", numberType6)],
+          inputs: [port13("piece", pieceType7), port13("statusId", stringType8, { nullable: true })],
+          outputs: [port13("value", numberType6)],
           parameters: [parameter8("field", stringType8, { enum: ["remainingTurns"] }), parameter8("fallback", numberType6, { default: 1 })],
           allowedSurfaces: ACTIVE4,
           effects: writes3(["statuses"], ["statusTicked"]),
@@ -4991,8 +5317,8 @@ var ContentGraphCore = (() => {
           id: "skill.adjust-cooldown",
           label: "\u8C03\u6574\u6280\u80FD\u51B7\u5374",
           description: "\u901A\u8FC7\u6280\u80FD\u751F\u547D\u5468\u671F\u6309\u589E\u52A0\u6216\u81F3\u5C11\u8BBE\u4E3A\u4E24\u79CD\u8BED\u4E49\u8C03\u6574\u5DF2\u6301\u6709\u6280\u80FD\u7684\u51B7\u5374\u3002",
-          inputs: [port12("piece", pieceType7), port12("skillId", stringType8, { nullable: true }), port12("amount", numberType6)],
-          outputs: [port12("success", booleanType7)],
+          inputs: [port13("piece", pieceType7), port13("skillId", stringType8, { nullable: true }), port13("amount", numberType6)],
+          outputs: [port13("success", booleanType7)],
           parameters: [parameter8("mode", stringType8, { enum: ["add", "atLeast"] })],
           allowedSurfaces: ACTIVE4,
           effects: writes3(["skills"], ["skillCooldownChanged"]),
@@ -5003,8 +5329,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-with-killer",
           label: "\u4EE5\u6307\u5B9A\u5F52\u5C5E\u63D0\u4EA4\u4F24\u5BB3",
           description: "\u901A\u8FC7\u6743\u5A01\u4F24\u5BB3\u6279\u6B21\u63D0\u4EA4\u4F24\u5BB3\uFF0C\u5E76\u4FDD\u7559\u65E7\u5185\u5BB9\u7684\u51FB\u6740\u5F52\u5C5E\u73A9\u5BB6\u3002",
-          inputs: [port12("source", pieceType7), port12("target", pieceType7), port12("amount", numberType6), port12("killerPlayer", playerType3, { nullable: true })],
-          outputs: [port12("result", "record"), port12("success", booleanType7), port12("damage", numberType6)],
+          inputs: [port13("source", pieceType7), port13("target", pieceType7), port13("amount", numberType6), port13("killerPlayer", playerType3, { nullable: true })],
+          outputs: [port13("result", "record"), port13("success", booleanType7), port13("damage", numberType6)],
           parameters: [parameter8("damageType", stringType8, { enum: ["normal", "true", "toxin"], default: "normal" }), parameter8("skillId", stringType8, { optional: true }), parameter8("inputPolicy", stringType8, { enum: ["floor", "host"], optional: true })],
           allowedSurfaces: ACTIVE4,
           effects: writes3(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
@@ -5022,8 +5348,8 @@ var ContentGraphCore = (() => {
           id: "choice.required-option-pair",
           label: "\u5FC5\u9009\u4E8C\u5143\u9009\u9879",
           description: "\u4F7F\u7528\u65E2\u6709\u9009\u9879\u534F\u8BAE\u5448\u73B0\u4E00\u4E2A\u4E0D\u53EF\u53D6\u6D88\u7684\u4E8C\u5143\u9009\u62E9\uFF0C\u5E76\u4FDD\u7559\u6307\u5B9A\u73A9\u5BB6\u3002",
-          inputs: [port12("player", playerType3, { nullable: true, optional: true }), port12("title", stringType8)],
-          outputs: [port12("choice", choiceType2)],
+          inputs: [port13("player", playerType3, { nullable: true, optional: true }), port13("title", stringType8)],
+          outputs: [port13("choice", choiceType2)],
           parameters: [parameter8("firstLabel", stringType8), parameter8("firstValue", stringType8), parameter8("secondLabel", stringType8), parameter8("secondValue", stringType8)],
           allowedSurfaces: ACTIVE4,
           effects: writes3(["pending"], ["pendingOptionSelection"]),
@@ -5042,7 +5368,7 @@ var ContentGraphCore = (() => {
       var stringType9 = "string";
       var choiceType3 = "choice";
       var stringListType = { kind: "list", element: stringType9 };
-      var port13 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port14 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure7 = (reads = []) => ({
         pure: true,
@@ -5096,7 +5422,7 @@ var ContentGraphCore = (() => {
           label: "\u9009\u62E9\u6587\u672C\u9009\u9879",
           description: "\u53EA\u4F20\u9012\u4F5C\u8005\u58F0\u660E\u7684\u9009\u62E9\u53C2\u6570\uFF0C\u672A\u58F0\u660E\u7684\u5355\u9009/\u591A\u9009\u3001\u53D6\u6D88\u548C\u6570\u91CF\u6CBF\u7528\u5BBF\u4E3B\u9ED8\u8BA4\u534F\u8BAE\u3002",
           inputs: [],
-          outputs: [port13("choice", choiceType3)],
+          outputs: [port14("choice", choiceType3)],
           parameters: [
             parameter9("options", stringListType),
             parameter9("labels", stringListType, { optional: true }),
@@ -5120,7 +5446,7 @@ var ContentGraphCore = (() => {
           label: "\u591A\u9009\u6587\u672C\u9009\u9879",
           description: "\u4F7F\u7528\u56FA\u5B9A\u6587\u672C\u9009\u9879\u8FDB\u5165\u73B0\u6709\u591A\u9009\u534F\u8BAE\uFF1B\u5019\u9009\u3001\u6570\u91CF\u3001\u53D6\u6D88\u548C\u6062\u590D\u4ECD\u7531\u6743\u5A01\u9009\u62E9\u5BBF\u4E3B\u5904\u7406\u3002",
           inputs: [],
-          outputs: [port13("choice", choiceType3)],
+          outputs: [port14("choice", choiceType3)],
           parameters: [
             parameter9("title", stringType9, { optional: true }),
             parameter9("options", stringListType),
@@ -5144,8 +5470,8 @@ var ContentGraphCore = (() => {
           id: "choice.as-string-list",
           label: "\u8BFB\u53D6\u591A\u9009\u6587\u672C",
           description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u591A\u9009\u7ED3\u679C\u89E3\u6790\u4E3A\u6587\u672C\u96C6\u5408\uFF1B\u6302\u8D77\u7ED3\u679C\u7531\u524D\u7F6E\u9009\u62E9\u5206\u652F\u4FDD\u7559\u3002",
-          inputs: [port13("choice", choiceType3, { nullable: true, optional: true })],
-          outputs: [port13("values", stringListType)],
+          inputs: [port14("choice", choiceType3, { nullable: true, optional: true })],
+          outputs: [port14("values", stringListType)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(["choice"]),
           lower: (ctx) => {
@@ -5158,8 +5484,8 @@ var ContentGraphCore = (() => {
           id: "choice.status-tags",
           label: "\u9009\u62E9\u68CB\u5B50\u72B6\u6001",
           description: "\u628A\u76EE\u6807\u68CB\u5B50\u7684\u72B6\u6001\u5217\u8868\u4EA4\u7ED9\u6743\u5A01\u5355\u9009\u534F\u8BAE\uFF1B\u9009\u9879\u5305\u542B\u7A33\u5B9A\u5E8F\u53F7\u548C\u4E0D\u79FB\u9664\u5165\u53E3\u3002",
-          inputs: [port13("target", pieceType8)],
-          outputs: [port13("choice", choiceType3)],
+          inputs: [port14("target", pieceType8)],
+          outputs: [port14("choice", choiceType3)],
           parameters: [parameter9("title", stringType9, { optional: true })],
           allowedSurfaces: ["skill", "card", "pending"],
           effects: writes4(["pending"], ["pendingOptionSelection"]),
@@ -5173,8 +5499,8 @@ var ContentGraphCore = (() => {
           id: "list.count",
           label: "\u96C6\u5408\u6570\u91CF",
           description: "\u8BFB\u53D6\u6709\u5E8F\u96C6\u5408\u7684\u6570\u91CF\u3002",
-          inputs: [port13("items", stringListType)],
-          outputs: [port13("count", numberType7)],
+          inputs: [port14("items", stringListType)],
+          outputs: [port14("count", numberType7)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
           lower: (ctx) => `Array.isArray(${input11(ctx, "items")}) ? ${input11(ctx, "items")}.length : 0`,
@@ -5184,8 +5510,8 @@ var ContentGraphCore = (() => {
           id: "list.has-duplicate",
           label: "\u96C6\u5408\u6709\u91CD\u590D\u9879",
           description: "\u6309\u7A33\u5B9A\u6587\u672C\u503C\u5224\u65AD\u96C6\u5408\u4E2D\u662F\u5426\u51FA\u73B0\u91CD\u590D\u9879\u3002",
-          inputs: [port13("items", stringListType)],
-          outputs: [port13("duplicate", booleanType8)],
+          inputs: [port14("items", stringListType)],
+          outputs: [port14("duplicate", booleanType8)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
           lower: (ctx) => `(function(items) { return Array.isArray(items) && new Set(items).size !== items.length; })(${input11(ctx, "items")})`,
@@ -5195,8 +5521,8 @@ var ContentGraphCore = (() => {
           id: "list.all-in",
           label: "\u96C6\u5408\u503C\u57DF\u6821\u9A8C",
           description: "\u5224\u65AD\u96C6\u5408\u4E2D\u7684\u6BCF\u4E2A\u6587\u672C\u503C\u662F\u5426\u5C5E\u4E8E\u767B\u8BB0\u7684\u5141\u8BB8\u503C\u96C6\u5408\u3002",
-          inputs: [port13("items", stringListType)],
-          outputs: [port13("valid", booleanType8)],
+          inputs: [port14("items", stringListType)],
+          outputs: [port14("valid", booleanType8)],
           parameters: [parameter9("allowed", stringListType)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
@@ -5207,8 +5533,8 @@ var ContentGraphCore = (() => {
           id: "list.sort-string",
           label: "\u6587\u672C\u7A33\u5B9A\u6392\u5E8F",
           description: "\u590D\u5236\u5E76\u6309 JavaScript \u5B57\u7B26\u4E32\u987A\u5E8F\u6392\u5E8F\uFF0C\u4E0D\u6539\u53D8\u6765\u6E90\u96C6\u5408\u3002",
-          inputs: [port13("items", stringListType)],
-          outputs: [port13("sorted", stringListType)],
+          inputs: [port14("items", stringListType)],
+          outputs: [port14("sorted", stringListType)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
           lower: (ctx) => `(Array.isArray(${input11(ctx, "items")}) ? ${input11(ctx, "items")}.slice().sort() : [])`,
@@ -5218,8 +5544,8 @@ var ContentGraphCore = (() => {
           id: "list.join",
           label: "\u96C6\u5408\u62FC\u63A5",
           description: "\u6309\u539F\u96C6\u5408\u987A\u5E8F\u62FC\u63A5\u6587\u672C\u503C\u3002",
-          inputs: [port13("items", stringListType)],
-          outputs: [port13("text", stringType9)],
+          inputs: [port14("items", stringListType)],
+          outputs: [port14("text", stringType9)],
           parameters: [parameter9("separator", stringType9, { default: "," })],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
@@ -5230,8 +5556,8 @@ var ContentGraphCore = (() => {
           id: "value.select-number",
           label: "\u6309\u6761\u4EF6\u9009\u62E9\u6570\u5B57",
           description: "\u5728\u4E24\u4E2A\u5DF2\u8BA1\u7B97\u6570\u5B57\u4E4B\u95F4\u6309\u5E03\u5C14\u6761\u4EF6\u9009\u62E9\u4E00\u4E2A\u503C\u3002",
-          inputs: [port13("condition", booleanType8), port13("whenTrue", numberType7), port13("whenFalse", numberType7)],
-          outputs: [port13("value", numberType7)],
+          inputs: [port14("condition", booleanType8), port14("whenTrue", numberType7), port14("whenFalse", numberType7)],
+          outputs: [port14("value", numberType7)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
           lower: (ctx) => `(${input11(ctx, "condition")} ? ${input11(ctx, "whenTrue")} : ${input11(ctx, "whenFalse")})`,
@@ -5241,8 +5567,8 @@ var ContentGraphCore = (() => {
           id: "text.optional-fragment",
           label: "\u6761\u4EF6\u6587\u672C\u7247\u6BB5",
           description: "\u6761\u4EF6\u6210\u7ACB\u65F6\u62FC\u63A5\u4E00\u4E2A\u56FA\u5B9A\u524D\u7F00\u3001\u503C\u548C\u540E\u7F00\uFF0C\u5426\u5219\u8FD4\u56DE\u7A7A\u6587\u672C\u3002",
-          inputs: [port13("condition", booleanType8), port13("value", stringType9)],
-          outputs: [port13("text", stringType9)],
+          inputs: [port14("condition", booleanType8), port14("value", stringType9)],
+          outputs: [port14("text", stringType9)],
           parameters: [parameter9("prefix", stringType9, { default: "" }), parameter9("suffix", stringType9, { default: "" })],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(),
@@ -5255,8 +5581,8 @@ var ContentGraphCore = (() => {
           id: "content.enemy-player",
           label: "\u67E5\u627E\u654C\u65B9\u73A9\u5BB6",
           description: "\u6309\u5F53\u524D\u5BF9\u5C40\u7684\u65E2\u6709\u73A9\u5BB6\u987A\u5E8F\u89E3\u6790\u4E00\u540D\u654C\u65B9\u73A9\u5BB6\uFF0C\u4E0D\u66B4\u9732\u73A9\u5BB6\u96C6\u5408\u7ED9\u4F5C\u8005\u56FE\u3002",
-          inputs: [port13("player", playerType4, { nullable: true, optional: true })],
-          outputs: [port13("enemy", playerType4, { nullable: true })],
+          inputs: [port14("player", playerType4, { nullable: true, optional: true })],
+          outputs: [port14("enemy", playerType4, { nullable: true })],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: pure7(["players"]),
           lower: (ctx) => `${flow16(ctx)}.content.enemyPlayer(${input11(ctx, "player")})`,
@@ -5266,8 +5592,8 @@ var ContentGraphCore = (() => {
           id: "content.filter-hand",
           label: "\u6309\u540D\u79F0\u6216 ID \u7B5B\u9009\u624B\u724C",
           description: "\u6309\u56FA\u5B9A\u7684\u540D\u79F0\u7247\u6BB5\u6216\u5361\u724C ID \u524D\u7F00\u7B5B\u9009\u6307\u5B9A\u73A9\u5BB6\u624B\u724C\uFF1B\u4FDD\u7559\u624B\u724C\u987A\u5E8F\u5E76\u62A5\u544A\u624B\u724C\u662F\u5426\u5B58\u5728\u3002",
-          inputs: [port13("player", playerType4, { nullable: true, optional: true })],
-          outputs: [port13("cards", stringListType), port13("hasHand", booleanType8)],
+          inputs: [port14("player", playerType4, { nullable: true, optional: true })],
+          outputs: [port14("cards", stringListType), port14("hasHand", booleanType8)],
           parameters: [parameter9("nameContains", stringType9, { optional: true }), parameter9("cardIdPrefix", stringType9, { optional: true })],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: pure7(["hand", "content"]),
@@ -5283,12 +5609,12 @@ var ContentGraphCore = (() => {
           label: "\u590D\u5236\u5361\u724C\u5B9A\u4E49",
           description: "\u6309\u6765\u6E90\u5361\u724C\u6807\u8BC6\u590D\u5236\u5DF2\u5B58\u5728\u7684\u52A8\u6001\u5361\u724C\u5B9A\u4E49\uFF1B\u9759\u6001\u5361\u724C\u6216\u7F3A\u5C11\u52A8\u6001\u5B9A\u4E49\u65F6\u6CBF\u7528\u6765\u6E90\u6807\u8BC6\u3002\u590D\u5236\u5E8F\u53F7\u53EA\u7528\u4E8E\u751F\u6210\u7A33\u5B9A\u7684\u65B0\u6807\u8BC6\uFF0C\u5361\u724C\u5B57\u6BB5\u548C\u6A21\u5757\u56FE\u7531\u5BBF\u4E3B\u6DF1\u590D\u5236\u5E76\u4FDD\u6301\u539F\u6837\u3002",
           inputs: [
-            port13("sourceId", stringType9, { label: "\u6765\u6E90\u5361\u724C\u6807\u8BC6", description: "\u5185\u5BB9\u5E93\u4E2D\u5DF2\u6709\u5361\u724C\u6216\u52A8\u6001\u5361\u724C\u5B9A\u4E49\u7684\u6807\u8BC6\u3002" }),
-            port13("index", numberType7, { label: "\u590D\u5236\u5E8F\u53F7", description: "\u5F53\u524D\u590D\u5236\u64CD\u4F5C\u7684\u975E\u8D1F\u6574\u6570\u5E8F\u53F7\u3002" })
+            port14("sourceId", stringType9, { label: "\u6765\u6E90\u5361\u724C\u6807\u8BC6", description: "\u5185\u5BB9\u5E93\u4E2D\u5DF2\u6709\u5361\u724C\u6216\u52A8\u6001\u5361\u724C\u5B9A\u4E49\u7684\u6807\u8BC6\u3002" }),
+            port14("index", numberType7, { label: "\u590D\u5236\u5E8F\u53F7", description: "\u5F53\u524D\u590D\u5236\u64CD\u4F5C\u7684\u975E\u8D1F\u6574\u6570\u5E8F\u53F7\u3002" })
           ],
           outputs: [
-            port13("cardId", stringType9, { label: "\u65B0\u5361\u724C\u6807\u8BC6", description: "\u590D\u5236\u6210\u529F\u65F6\u751F\u6210\u7684\u5361\u724C\u6807\u8BC6\uFF1B\u9759\u6001\u6765\u6E90\u590D\u5236\u5931\u8D25\u65F6\u8FD4\u56DE\u6765\u6E90\u6807\u8BC6\u3002" }),
-            port13("copied", booleanType8, { label: "\u662F\u5426\u590D\u5236\u6210\u529F", description: "\u6765\u6E90\u5B58\u5728\u52A8\u6001\u5B9A\u4E49\u5E76\u5B8C\u6210\u6DF1\u590D\u5236\u65F6\u4E3A\u771F\u3002" })
+            port14("cardId", stringType9, { label: "\u65B0\u5361\u724C\u6807\u8BC6", description: "\u590D\u5236\u6210\u529F\u65F6\u751F\u6210\u7684\u5361\u724C\u6807\u8BC6\uFF1B\u9759\u6001\u6765\u6E90\u590D\u5236\u5931\u8D25\u65F6\u8FD4\u56DE\u6765\u6E90\u6807\u8BC6\u3002" }),
+            port14("copied", booleanType8, { label: "\u662F\u5426\u590D\u5236\u6210\u529F", description: "\u6765\u6E90\u5B58\u5728\u52A8\u6001\u5B9A\u4E49\u5E76\u5B8C\u6210\u6DF1\u590D\u5236\u65F6\u4E3A\u771F\u3002" })
           ],
           parameters: [parameter9("idPrefix", stringType9, { label: "\u65B0\u5361\u724C\u6807\u8BC6\u524D\u7F00", description: "\u751F\u6210\u52A8\u6001\u5361\u724C\u6807\u8BC6\u65F6\u4F7F\u7528\u7684\u524D\u7F00\u3002", default: "content-copy-" })],
           allowedSurfaces: ACTIVE_SURFACES5,
@@ -5301,16 +5627,16 @@ var ContentGraphCore = (() => {
           label: "\u5B9E\u4F8B\u5316\u5361\u724C\u6A21\u677F",
           description: "\u6309\u53D7\u4FE1\u6A21\u677F\u548C\u7ED3\u6784\u5316\u7ED1\u5B9A\u521B\u5EFA\u52A8\u6001\u5361\u724C\u5B9A\u4E49\uFF1B\u751F\u6210\u5B57\u6BB5\u6765\u81EA\u6A21\u677F\u56FE\uFF0C\u4E0D\u63A5\u53D7\u6E90\u7801\u6587\u672C\u3002",
           inputs: [
-            port13("templateId", stringType9),
-            port13("cardId", stringType9),
-            port13("name", stringType9),
-            port13("description", stringType9),
-            port13("owner", playerType4, { nullable: true, optional: true }),
-            port13("extension", "record", { optional: true, label: "\u6269\u5C55\u53D8\u91CF" }),
-            port13("fields", "record", { optional: true, label: "\u5B57\u6BB5\u7ED1\u5B9A" }),
-            port13("omitFields", stringListType, { optional: true, label: "\u7701\u7565\u7684\u5C55\u793A\u5B57\u6BB5" })
+            port14("templateId", stringType9),
+            port14("cardId", stringType9),
+            port14("name", stringType9),
+            port14("description", stringType9),
+            port14("owner", playerType4, { nullable: true, optional: true }),
+            port14("extension", "record", { optional: true, label: "\u6269\u5C55\u53D8\u91CF" }),
+            port14("fields", "record", { optional: true, label: "\u5B57\u6BB5\u7ED1\u5B9A" }),
+            port14("omitFields", stringListType, { optional: true, label: "\u7701\u7565\u7684\u5C55\u793A\u5B57\u6BB5" })
           ],
-          outputs: [port13("cardId", stringType9), port13("success", booleanType8)],
+          outputs: [port14("cardId", stringType9), port14("success", booleanType8)],
           parameters: [parameter9("kind", stringType9, { enum: ["card"], default: "card" })],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["content"], ["contentCardMaterialized"]),
@@ -5323,16 +5649,16 @@ var ContentGraphCore = (() => {
             label: "\u6309\u6A21\u677F\u521B\u5EFA\u5361\u724C",
             description: "\u4EE5\u53D7\u4FE1\u5361\u724C\u6A21\u677F\u5F15\u7528\u3001\u7ED3\u6784\u5316\u5B57\u6BB5\u548C\u7ED3\u6784\u5316\u6269\u5C55\u521B\u5EFA\u52A8\u6001\u5361\u724C\u5B9A\u4E49\uFF1B\u8FD4\u56DE\u53EF\u76F4\u63A5\u4EA4\u7ED9\u201C\u83B7\u5F97\u624B\u724C\u201D\u7684\u5361\u724C\u5B9A\u4E49\u5F15\u7528\uFF0C\u4E0D\u63A5\u53D7\u6E90\u7801\u6216\u539F\u59CB JSON \u6587\u672C\u3002",
             inputs: [
-              port13("template", "content", { label: "\u5361\u724C\u6A21\u677F", description: "\u4ECE\u6A21\u677F\u5F15\u7528\u53E5\u5F0F\u53D6\u5F97\u7684\u53D7\u4FE1\u5361\u724C\u6A21\u677F\u3002" }),
-              port13("cardId", stringType9, { label: "\u751F\u6210\u5361\u724C\u6807\u8BC6", description: "\u53EF\u7531\u6587\u672C\u3001\u7F16\u53F7\u6216\u5176\u4ED6\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\u3002" }),
-              port13("name", stringType9, { label: "\u5361\u724C\u540D\u79F0", description: "\u53EF\u7531\u6587\u672C\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\u3002" }),
-              port13("description", stringType9, { optional: true, label: "\u5361\u724C\u8BF4\u660E", description: "\u53EF\u7531\u6587\u672C\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\uFF1B\u7701\u7565\u65F6\u4E3A\u7A7A\u3002" }),
-              port13("owner", playerType4, { nullable: true, optional: true, label: "\u5F52\u5C5E\u73A9\u5BB6" }),
-              port13("fields", "record", { optional: true, label: "\u6A21\u677F\u5B57\u6BB5" }),
-              port13("extension", "record", { optional: true, label: "\u521D\u59CB\u6269\u5C55\u53D8\u91CF" }),
-              port13("omitFields", stringListType, { optional: true, label: "\u7701\u7565\u7684\u5C55\u793A\u5B57\u6BB5" })
+              port14("template", "content", { label: "\u5361\u724C\u6A21\u677F", description: "\u4ECE\u6A21\u677F\u5F15\u7528\u53E5\u5F0F\u53D6\u5F97\u7684\u53D7\u4FE1\u5361\u724C\u6A21\u677F\u3002" }),
+              port14("cardId", stringType9, { label: "\u751F\u6210\u5361\u724C\u6807\u8BC6", description: "\u53EF\u7531\u6587\u672C\u3001\u7F16\u53F7\u6216\u5176\u4ED6\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\u3002" }),
+              port14("name", stringType9, { label: "\u5361\u724C\u540D\u79F0", description: "\u53EF\u7531\u6587\u672C\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\u3002" }),
+              port14("description", stringType9, { optional: true, label: "\u5361\u724C\u8BF4\u660E", description: "\u53EF\u7531\u6587\u672C\u8868\u8FBE\u5F0F\u52A8\u6001\u751F\u6210\uFF1B\u7701\u7565\u65F6\u4E3A\u7A7A\u3002" }),
+              port14("owner", playerType4, { nullable: true, optional: true, label: "\u5F52\u5C5E\u73A9\u5BB6" }),
+              port14("fields", "record", { optional: true, label: "\u6A21\u677F\u5B57\u6BB5" }),
+              port14("extension", "record", { optional: true, label: "\u521D\u59CB\u6269\u5C55\u53D8\u91CF" }),
+              port14("omitFields", stringListType, { optional: true, label: "\u7701\u7565\u7684\u5C55\u793A\u5B57\u6BB5" })
             ],
-            outputs: [port13("card", "card", { label: "\u52A8\u6001\u5361\u724C\u5B9A\u4E49" }), port13("success", booleanType8)],
+            outputs: [port14("card", "card", { label: "\u52A8\u6001\u5361\u724C\u5B9A\u4E49" }), port14("success", booleanType8)],
             inputValueTypeBindings: {
               fields: { parameter: "fieldsType" },
               extension: { parameter: "extensionType" }
@@ -5355,8 +5681,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-add-ref",
           label: "\u52A0\u5165\u52A8\u6001\u5361\u724C\u624B\u724C",
           description: "\u4F7F\u7528\u5DF2\u751F\u6210\u7684\u5361\u724C\u5B9A\u4E49 ID \u6CBF\u7528\u65E2\u6709\u624B\u724C\u5BB9\u91CF\u3001\u5B9E\u4F8B\u5316\u548C\u4E8B\u4EF6\u6D41\u7A0B\u3002",
-          inputs: [port13("player", playerType4), port13("cardId", stringType9)],
-          outputs: [port13("success", booleanType8)],
+          inputs: [port14("player", playerType4), port14("cardId", stringType9)],
+          outputs: [port14("success", booleanType8)],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["hand", "events"], ["cardAdded"]),
           lower: (ctx) => `${flow16(ctx)}.cards.add(${input11(ctx, "player")}, ${input11(ctx, "cardId")})`,
@@ -5368,8 +5694,8 @@ var ContentGraphCore = (() => {
           id: "attribute.set-current-hp",
           label: "\u8BBE\u5B9A\u5F53\u524D\u751F\u547D",
           description: "\u901A\u8FC7\u5BBF\u4E3B\u7684\u65E0\u4E8B\u4EF6\u751F\u547D\u5199\u5165\u53E3\u8BBE\u5B9A\u5F53\u524D\u751F\u547D\u503C\uFF1B\u7528\u4E8E\u56DE\u5408\u89C4\u5219\u7684\u76F4\u63A5\u6062\u590D\u8BED\u4E49\uFF0C\u4E0D\u89E6\u53D1\u6CBB\u7597\u4E8B\u4EF6\u3002",
-          inputs: [port13("piece", pieceType8), port13("value", numberType7)],
-          outputs: [port13("value", numberType7)],
+          inputs: [port14("piece", pieceType8), port14("value", numberType7)],
+          outputs: [port14("value", numberType7)],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["attributes"], []),
           lower: (ctx) => `${flow16(ctx)}.attributes.setCurrentHp(${input11(ctx, "piece")}, ${input11(ctx, "value")})`,
@@ -5379,8 +5705,8 @@ var ContentGraphCore = (() => {
           id: "piece.momentum",
           label: "\u8BFB\u53D6\u52A8\u91CF",
           description: "\u8BFB\u53D6\u68CB\u5B50\u767B\u8BB0\u7684\u52A8\u91CF\u6570\u503C\uFF1B\u7F3A\u7701\u503C\u6CBF\u7528\u65E7\u5185\u5BB9\u7684\u96F6\u503C\u89C4\u5219\u3002",
-          inputs: [port13("piece", pieceType8)],
-          outputs: [port13("value", numberType7)],
+          inputs: [port14("piece", pieceType8)],
+          outputs: [port14("value", numberType7)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(["pieces"]),
           lower: (ctx) => `Number(${flow16(ctx)}.query.piece(${input11(ctx, "piece")}).momentum || 0)`,
@@ -5390,8 +5716,8 @@ var ContentGraphCore = (() => {
           id: "status.count-all",
           label: "\u8BFB\u53D6\u72B6\u6001\u6570\u91CF",
           description: "\u8BFB\u53D6\u76EE\u6807\u68CB\u5B50\u7684\u5F53\u524D\u72B6\u6001\u6570\u91CF\uFF0C\u7528\u4E8E\u51B3\u5B9A\u662F\u5426\u8FDB\u5165\u72B6\u6001\u9009\u62E9\u534F\u8BAE\u3002",
-          inputs: [port13("target", pieceType8)],
-          outputs: [port13("count", numberType7)],
+          inputs: [port14("target", pieceType8)],
+          outputs: [port14("count", numberType7)],
           allowedSurfaces: PURE_SURFACES,
           effects: pure7(["status"]),
           lower: (ctx) => `${flow16(ctx)}.status.count(${input11(ctx, "target")})`,
@@ -5401,8 +5727,8 @@ var ContentGraphCore = (() => {
           id: "status.make-id",
           label: "\u751F\u6210\u72B6\u6001\u6807\u8BC6",
           description: "\u8BA9\u6743\u5A01\u72B6\u6001\u5BBF\u4E3B\u751F\u6210\u4E00\u4E2A\u53EF\u56DE\u653E\u7684\u552F\u4E00\u72B6\u6001\u6807\u8BC6\uFF1B\u4F5C\u8005\u56FE\u53EA\u63D0\u4F9B\u7A33\u5B9A\u524D\u7F00\u3002",
-          inputs: [port13("target", pieceType8)],
-          outputs: [port13("id", stringType9)],
+          inputs: [port14("target", pieceType8)],
+          outputs: [port14("id", stringType9)],
           parameters: [parameter9("prefix", stringType9)],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["status"], ["statusIdAllocated"]),
@@ -5413,8 +5739,8 @@ var ContentGraphCore = (() => {
           id: "status.append-record",
           label: "\u517C\u5BB9\u6027\u76F4\u5199\u68CB\u5B50\u72B6\u6001",
           description: "\u6309\u65E7\u5185\u5BB9\u7684\u76F4\u63A5 statusTags.push \u8BED\u4E49\u8FFD\u52A0\u7ED3\u6784\u5316\u72B6\u6001\uFF1B\u4E0D\u89E6\u53D1\u751F\u547D\u5468\u671F\u4E8B\u4EF6\uFF0C\u4E0D\u63A8\u65AD\u6765\u6E90\uFF0C\u4E5F\u4E0D\u81EA\u52A8\u5B89\u88C5\u89C4\u5219\u3002",
-          inputs: [port13("target", pieceType8), port13("record", "record")],
-          outputs: [port13("success", booleanType8)],
+          inputs: [port14("target", pieceType8), port14("record", "record")],
+          outputs: [port14("success", booleanType8)],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["status"], []),
           lower: (ctx) => `${flow16(ctx)}.status.appendRaw(${input11(ctx, "target")}, ${input11(ctx, "record")})`,
@@ -5424,8 +5750,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-choice",
           label: "\u6309\u9009\u62E9\u79FB\u9664\u72B6\u6001",
           description: "\u9A8C\u8BC1\u5E76\u6309\u65E7\u5185\u5BB9\u7684\u76F4\u63A5 statusTags.splice \u8BED\u4E49\u79FB\u9664\u4E00\u4E2A\u72B6\u6001\uFF1B\u53D6\u6D88\u9009\u9879\u4E0D\u6539\u53D8\u72B6\u6001\uFF0C\u4E5F\u4E0D\u89E6\u53D1\u751F\u547D\u5468\u671F\u4E8B\u4EF6\u3002",
-          inputs: [port13("target", pieceType8), port13("choice", choiceType3, { nullable: true, optional: true })],
-          outputs: [port13("valid", booleanType8), port13("removed", booleanType8), port13("name", stringType9)],
+          inputs: [port14("target", pieceType8), port14("choice", choiceType3, { nullable: true, optional: true })],
+          outputs: [port14("valid", booleanType8), port14("removed", booleanType8), port14("name", stringType9)],
           allowedSurfaces: ACTIVE_SURFACES5,
           effects: writes4(["status"], []),
           lower: (ctx) => `${flow16(ctx)}.status.removeChoice(${input11(ctx, "target")}, ${ctx.inputs.choice ?? "null"})`,
@@ -5435,8 +5761,8 @@ var ContentGraphCore = (() => {
           id: "status.refresh-temporary",
           label: "\u5237\u65B0\u4E34\u65F6\u72B6\u6001",
           description: "\u6309\u72B6\u6001\u7C7B\u578B\u67E5\u627E\u6216\u521B\u5EFA\u72B6\u6001\uFF0C\u5E76\u628A\u5F53\u524D\u56DE\u5408\u3001\u6301\u7EED\u65F6\u95F4\u548C\u4F7F\u7528\u6B21\u6570\u4EA4\u7ED9\u72B6\u6001\u5BBF\u4E3B\u66F4\u65B0\u3002",
-          inputs: [port13("target", pieceType8), port13("turn", numberType7)],
-          outputs: [port13("success", booleanType8)],
+          inputs: [port14("target", pieceType8), port14("turn", numberType7)],
+          outputs: [port14("success", booleanType8)],
           parameters: [
             parameter9("statusType", stringType9),
             parameter9("name", stringType9),
@@ -5470,7 +5796,7 @@ var ContentGraphCore = (() => {
       var choiceListType = { kind: "list", element: choiceType4 };
       var MARKER_STORAGE_KEYS = ["minatoAnchors"];
       var TURN_STORAGE_KEYS = ["turalyonLightforgedTurns"];
-      var port14 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port15 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input12 = (ctx, name, fallback) => {
         const value = ctx.inputs[name];
@@ -5520,7 +5846,7 @@ var ContentGraphCore = (() => {
           label: "\u5DF2\u9009\u76EE\u6807\u96C6\u5408",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u7ECF\u9A8C\u8BC1\u7684\u591A\u76EE\u6807\u9009\u62E9\u96C6\u5408\u3002",
           inputs: [],
-          outputs: [port14("targets", choiceListType)],
+          outputs: [port15("targets", choiceListType)],
           effects: pure8(["event", "choice"]),
           lower: (ctx) => `(Array.isArray(${host(ctx)}.selectedTargets) ? ${host(ctx)}.selectedTargets : [])`,
           ui: { category: "context" }
@@ -5530,7 +5856,7 @@ var ContentGraphCore = (() => {
           label: "\u5DF2\u9009\u9009\u9879",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u7ECF\u9A8C\u8BC1\u7684\u9009\u9879\u503C\uFF1B\u5C1A\u672A\u9009\u62E9\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
           inputs: [],
-          outputs: [port14("value", stringType10, { nullable: true })],
+          outputs: [port15("value", stringType10, { nullable: true })],
           effects: pure8(["event", "choice"]),
           lower: (ctx) => `(${host(ctx)}.selectedOption === undefined || ${host(ctx)}.selectedOption === null ? null : String(${host(ctx)}.selectedOption))`,
           ui: { category: "context" }
@@ -5540,7 +5866,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8B\u4EF6\u5361\u724C\u6807\u8BC6",
           description: "\u8BFB\u53D6\u5F53\u524D\u5361\u724C\u4E8B\u4EF6\u7684\u7A33\u5B9A\u6807\u8BC6\u3002",
           inputs: [],
-          outputs: [port14("value", stringType10, { nullable: true })],
+          outputs: [port15("value", stringType10, { nullable: true })],
           effects: pure8(["event"]),
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           lower: (ctx) => `(${host(ctx)}.cardId === undefined || ${host(ctx)}.cardId === null ? null : String(${host(ctx)}.cardId))`,
@@ -5551,7 +5877,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8B\u4EF6\u6280\u80FD\u6807\u8BC6",
           description: "\u8BFB\u53D6\u5F53\u524D\u6280\u80FD\u4E8B\u4EF6\u7684\u7A33\u5B9A\u6807\u8BC6\u3002",
           inputs: [],
-          outputs: [port14("value", stringType10, { nullable: true })],
+          outputs: [port15("value", stringType10, { nullable: true })],
           effects: pure8(["event"]),
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           lower: (ctx) => `(${host(ctx)}.skillId === undefined || ${host(ctx)}.skillId === null ? null : String(${host(ctx)}.skillId))`,
@@ -5562,7 +5888,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8B\u4EF6\u5DF2\u53D6\u6D88",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u7684\u53D6\u6D88\u4E8B\u5B9E\u3002",
           inputs: [],
-          outputs: [port14("value", booleanType9)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["event"]),
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           lower: (ctx) => `Boolean(${host(ctx)}.cancelled)`,
@@ -5573,7 +5899,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8B\u4EF6\u9884\u7559\u5730\u683C",
           description: "\u8BFB\u53D6\u5F53\u524D\u4F4D\u79FB\u4E8B\u4EF6\u63D0\u4F9B\u7684\u9884\u7559\u5730\u683C\u96C6\u5408\u3002",
           inputs: [],
-          outputs: [port14("cells", cellListType)],
+          outputs: [port15("cells", cellListType)],
           effects: pure8(["event", "position"]),
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           lower: (ctx) => `(Array.isArray(${host(ctx)}.reservedCells) ? ${host(ctx)}.reservedCells : [])`,
@@ -5585,8 +5911,8 @@ var ContentGraphCore = (() => {
           id: "choice.from-pieces",
           label: "\u68CB\u5B50\u5019\u9009\u96C6\u5408",
           description: "\u628A\u5DF2\u67E5\u8BE2\u5E76\u6309\u5B9E\u4F8B\u6807\u8BC6\u6392\u5E8F\u7684\u68CB\u5B50\u96C6\u5408\u8F6C\u6362\u4E3A\u76EE\u6807\u5019\u9009\u3002",
-          inputs: [port14("pieces", pieceListType)],
-          outputs: [port14("choices", choiceListType)],
+          inputs: [port15("pieces", pieceListType)],
+          outputs: [port15("choices", choiceListType)],
           effects: pure8(["pieces"]),
           lower: (ctx) => `((${input12(ctx, "pieces")} || []).map(function(value) { var id = value && typeof value === "object" ? value.instanceId : value; return {type: "piece", pieceId: id}; }).sort(function(a, b) { return String(a.pieceId).localeCompare(String(b.pieceId)); }))`,
           ui: { category: "choice" }
@@ -5595,8 +5921,8 @@ var ContentGraphCore = (() => {
           id: "choice.from-cells",
           label: "\u5730\u683C\u5019\u9009\u96C6\u5408",
           description: "\u628A\u5730\u683C\u96C6\u5408\u6309 y\u3001x \u7684\u7A33\u5B9A\u987A\u5E8F\u8F6C\u6362\u4E3A\u76EE\u6807\u5019\u9009\u3002",
-          inputs: [port14("cells", cellListType)],
-          outputs: [port14("choices", choiceListType)],
+          inputs: [port15("cells", cellListType)],
+          outputs: [port15("choices", choiceListType)],
           effects: pure8(["position"]),
           lower: (ctx) => `((${input12(ctx, "cells")} || []).map(function(cell) { return {type: "cell", x: cell.x, y: cell.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }))`,
           ui: { category: "choice" }
@@ -5605,8 +5931,8 @@ var ContentGraphCore = (() => {
           id: "choice.selected-pieces",
           label: "\u8BFB\u53D6\u5DF2\u9009\u68CB\u5B50",
           description: "\u4ECE\u5BBF\u4E3B\u76EE\u6807\u96C6\u5408\u4E2D\u8BFB\u53D6\u4ECD\u7136\u5B58\u5728\u7684\u68CB\u5B50\u5E76\u6309\u5B9E\u4F8B\u6807\u8BC6\u6392\u5E8F\u3002",
-          inputs: [port14("targets", choiceListType)],
-          outputs: [port14("pieces", pieceListType)],
+          inputs: [port15("targets", choiceListType)],
+          outputs: [port15("pieces", pieceListType)],
           effects: pure8(["pieces", "choice"]),
           lower: (ctx) => `(function(values) { var seen = {}; return (values || []).filter(function(value) { return value && value.type === "piece" && typeof value.pieceId === "string" && !seen[value.pieceId] && ${runtime2(ctx)}.query.hasPiece(value.pieceId) && ${runtime2(ctx)}.query.piece(value.pieceId).currentHp > 0 && (seen[value.pieceId] = true); }).map(function(value) { return value.pieceId; }).sort(function(a, b) { return String(a).localeCompare(String(b)); }); })(${input12(ctx, "targets")})`,
           ui: { category: "choice" }
@@ -5615,8 +5941,8 @@ var ContentGraphCore = (() => {
           id: "choice.selected-cell",
           label: "\u8BFB\u53D6\u5DF2\u9009\u5730\u683C",
           description: "\u4ECE\u5BBF\u4E3B\u76EE\u6807\u96C6\u5408\u4E2D\u8BFB\u53D6\u9996\u4E2A\u5408\u6CD5\u5730\u683C\u3002",
-          inputs: [port14("targets", choiceListType)],
-          outputs: [port14("cell", cellType5, { nullable: true })],
+          inputs: [port15("targets", choiceListType)],
+          outputs: [port15("cell", cellType5, { nullable: true })],
           effects: pure8(["choice"]),
           lower: (ctx) => `(function(values) { var cell = (values || []).find(function(value) { return value && value.type === "cell" && Number.isInteger(value.x) && Number.isInteger(value.y); }); return cell ? {x: cell.x, y: cell.y} : null; })(${input12(ctx, "targets")})`,
           ui: { category: "choice" }
@@ -5625,8 +5951,8 @@ var ContentGraphCore = (() => {
           id: "choice.binary-option",
           label: "\u4E8C\u5143\u9009\u9879",
           description: "\u4F7F\u7528\u73B0\u6709\u9009\u9879\u534F\u8BAE\u5448\u73B0\u4E00\u4E2A\u53EF\u53D6\u6D88\u7684\u4E8C\u5143\u9009\u62E9\u3002",
-          inputs: [port14("player", "player", { nullable: true, optional: true })],
-          outputs: [port14("choice", choiceType4)],
+          inputs: [port15("player", "player", { nullable: true, optional: true })],
+          outputs: [port15("choice", choiceType4)],
           parameters: [
             parameter10("title", stringType10),
             parameter10("yesLabel", stringType10),
@@ -5647,8 +5973,8 @@ var ContentGraphCore = (() => {
           id: "choice.raw-string-value",
           label: "\u5DF2\u9009\u9009\u9879\u503C",
           description: "\u8BFB\u53D6\u5DF2\u5B8C\u6210\u4E8C\u5143\u9009\u9879\u7684\u539F\u59CB\u503C\uFF1B\u5F85\u9009\u62E9\u6216\u53D6\u6D88\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
-          inputs: [port14("choice", choiceType4, { nullable: true, optional: true })],
-          outputs: [port14("value", stringType10, { nullable: true })],
+          inputs: [port15("choice", choiceType4, { nullable: true, optional: true })],
+          outputs: [port15("value", stringType10, { nullable: true })],
           effects: pure8(["choice"]),
           lower: (ctx) => `(typeof ${input12(ctx, "choice")} === "string" ? ${input12(ctx, "choice")} : null)`,
           ui: { category: "choice" }
@@ -5659,8 +5985,8 @@ var ContentGraphCore = (() => {
           id: "piece.is-core",
           label: "\u6838\u5FC3\u68CB\u5B50",
           description: "\u8BFB\u53D6\u5185\u5BB9\u6570\u636E\u58F0\u660E\u7684\u6838\u5FC3\u68CB\u5B50\u6807\u8BB0\u3002",
-          inputs: [port14("piece", pieceType9)],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("piece", pieceType9)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["pieces"]),
           lower: (ctx) => `(function(pieceId) { var piece = ${runtime2(ctx)}.query.piece(pieceId); return Boolean(piece && piece.isCore === true); })(${pieceId(ctx, "piece")})`,
           ui: { category: "query" }
@@ -5669,8 +5995,8 @@ var ContentGraphCore = (() => {
           id: "piece.has-position",
           label: "\u68CB\u5B50\u5177\u6709\u5730\u683C",
           description: "\u5224\u65AD\u68CB\u5B50\u5F53\u524D\u5177\u6709\u53EF\u7528\u4E8E\u79FB\u52A8\u7684\u6709\u9650\u5730\u683C\u5750\u6807\u3002",
-          inputs: [port14("piece", pieceType9)],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("piece", pieceType9)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["pieces", "position"]),
           lower: (ctx) => `(function(pieceId) { var piece = ${runtime2(ctx)}.query.piece(pieceId); return Boolean(piece && Number.isFinite(piece.x) && Number.isFinite(piece.y)); })(${pieceId(ctx, "piece")})`,
           ui: { category: "query" }
@@ -5679,8 +6005,8 @@ var ContentGraphCore = (() => {
           id: "piece.require",
           label: "\u89E3\u6790\u53EF\u7A7A\u68CB\u5B50",
           description: "\u628A\u5DF2\u7ECF\u901A\u8FC7\u5B58\u6D3B\u6216\u5B58\u5728\u68C0\u67E5\u7684\u53EF\u7A7A\u68CB\u5B50\u5F15\u7528\u89E3\u6790\u4E3A\u7EDF\u4E00\u68CB\u5B50 ID\u3002",
-          inputs: [port14("piece", pieceType9, { nullable: true })],
-          outputs: [port14("piece", pieceType9)],
+          inputs: [port15("piece", pieceType9, { nullable: true })],
+          outputs: [port15("piece", pieceType9)],
           effects: pure8(["pieces"]),
           lower: (ctx) => `(function(pieceId) { return pieceId && ${runtime2(ctx)}.query.hasPiece(pieceId) ? pieceId : null; })(${pieceId(ctx, "piece")})`,
           ui: { category: "query" }
@@ -5689,8 +6015,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-in-list",
           label: "\u5730\u683C\u5C5E\u4E8E\u5019\u9009",
           description: "\u6309\u5750\u6807\u5224\u65AD\u5730\u683C\u662F\u5426\u4ECD\u5C5E\u4E8E\u4E00\u7EC4\u5DF2\u8BA1\u7B97\u5019\u9009\u3002",
-          inputs: [port14("cell", cellType5, { nullable: true }), port14("cells", cellListType)],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("cell", cellType5, { nullable: true }), port15("cells", cellListType)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["position"]),
           lower: (ctx) => `(function(cell, cells) { return Boolean(cell) && (cells || []).some(function(candidate) { return candidate && candidate.x === cell.x && candidate.y === cell.y; }); })(${input12(ctx, "cell")}, ${input12(ctx, "cells")})`,
           ui: { category: "position" }
@@ -5700,7 +6026,7 @@ var ContentGraphCore = (() => {
           label: "\u53EF\u884C\u8D70\u5730\u683C\u96C6\u5408",
           description: "\u6309\u5730\u56FE\u987A\u5E8F\u8FD4\u56DE\u6240\u6709\u53EF\u884C\u8D70\u5730\u683C\u3002",
           inputs: [],
-          outputs: [port14("cells", cellListType)],
+          outputs: [port15("cells", cellListType)],
           effects: pure8(["position"]),
           lower: (ctx) => `((${battle6(ctx)}.map && Array.isArray(${battle6(ctx)}.map.tiles) ? ${battle6(ctx)}.map.tiles : []).filter(function(tile) { return tile && tile.props && tile.props.walkable; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }).map(function(tile) { return {x:tile.x,y:tile.y}; }))`,
           ui: { category: "position" }
@@ -5709,8 +6035,8 @@ var ContentGraphCore = (() => {
           id: "spatial.formation-selection-valid",
           label: "\u7F16\u961F\u9009\u62E9\u6709\u6548",
           description: "\u9A8C\u8BC1\u7F16\u961F\u9009\u62E9\u6570\u91CF\u3001\u5B58\u6D3B\u3001\u53CB\u65B9\u5173\u7CFB\u548C\u6838\u5FC3\u6807\u8BB0\u3002",
-          inputs: [port14("source", pieceType9), port14("selected", pieceListType)],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("source", pieceType9), port15("selected", pieceListType)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["pieces", "players"]),
           lower: (ctx) => {
             const selected = input12(ctx, "selected"), state2 = battle6(ctx), query = runtime2(ctx);
@@ -5722,8 +6048,8 @@ var ContentGraphCore = (() => {
           id: "query.adventure-allies",
           label: "\u8FDC\u5F81\u53EF\u5F71\u54CD\u53CB\u65B9",
           description: "\u6309\u8FDC\u5F81\u8FB9\u754C\u3001\u53CB\u65B9\u5173\u7CFB\u548C\u53EF\u5F71\u54CD\u89C4\u5219\u8BFB\u53D6\u7A33\u5B9A\u6392\u5E8F\u7684\u5B58\u6D3B\u53CB\u65B9\u68CB\u5B50\u3002",
-          inputs: [port14("source", pieceType9)],
-          outputs: [port14("pieces", pieceListType)],
+          inputs: [port15("source", pieceType9)],
+          outputs: [port15("pieces", pieceListType)],
           effects: pure8(["pieces", "players", "position"]),
           lower: (ctx) => {
             const state2 = battle6(ctx), query = runtime2(ctx);
@@ -5735,8 +6061,8 @@ var ContentGraphCore = (() => {
           id: "list.count-pieces",
           label: "\u68CB\u5B50\u96C6\u5408\u6570\u91CF",
           description: "\u8BFB\u53D6\u6709\u754C\u68CB\u5B50\u5217\u8868\u7684\u6570\u91CF\u3002",
-          inputs: [port14("items", pieceListType)],
-          outputs: [port14("value", numberType8)],
+          inputs: [port15("items", pieceListType)],
+          outputs: [port15("value", numberType8)],
           effects: pure8(),
           lower: (ctx) => `Array.isArray(${input12(ctx, "items")}) ? ${input12(ctx, "items")}.length : 0`,
           ui: { category: "query" }
@@ -5745,8 +6071,8 @@ var ContentGraphCore = (() => {
           id: "list.sort-pieces",
           label: "\u68CB\u5B50\u7A33\u5B9A\u6392\u5E8F",
           description: "\u590D\u5236\u68CB\u5B50\u6807\u8BC6\u96C6\u5408\u5E76\u6309\u5B9E\u4F8B\u6807\u8BC6\u7A33\u5B9A\u6392\u5E8F\u3002",
-          inputs: [port14("items", pieceListType)],
-          outputs: [port14("sorted", pieceListType)],
+          inputs: [port15("items", pieceListType)],
+          outputs: [port15("sorted", pieceListType)],
           effects: pure8(["pieces"]),
           lower: (ctx) => `(Array.isArray(${input12(ctx, "items")}) ? ${input12(ctx, "items")}.map(function(value) { return value && typeof value === "object" ? value.instanceId : value; }).slice().sort(function(left, right) { return String(left).localeCompare(String(right)); }) : [])`,
           ui: { category: "query" }
@@ -5755,8 +6081,8 @@ var ContentGraphCore = (() => {
           id: "list.first-piece",
           label: "\u68CB\u5B50\u96C6\u5408\u9996\u9879",
           description: "\u8BFB\u53D6\u7A33\u5B9A\u6392\u5E8F\u68CB\u5B50\u96C6\u5408\u7684\u9996\u4E2A\u5B9E\u4F8B\uFF1B\u7A7A\u96C6\u5408\u8FD4\u56DE\u7A7A\u5F15\u7528\u3002",
-          inputs: [port14("items", pieceListType)],
-          outputs: [port14("piece", pieceType9, { nullable: true })],
+          inputs: [port15("items", pieceListType)],
+          outputs: [port15("piece", pieceType9, { nullable: true })],
           effects: pure8(["pieces"]),
           lower: (ctx) => `(Array.isArray(${input12(ctx, "items")}) && ${input12(ctx, "items")}.length > 0 ? ${input12(ctx, "items")}[0] : null)`,
           ui: { category: "query" }
@@ -5765,8 +6091,8 @@ var ContentGraphCore = (() => {
           id: "list.count-cells",
           label: "\u5730\u683C\u96C6\u5408\u6570\u91CF",
           description: "\u8BFB\u53D6\u6709\u754C\u5730\u683C\u5217\u8868\u7684\u6570\u91CF\u3002",
-          inputs: [port14("items", cellListType)],
-          outputs: [port14("value", numberType8)],
+          inputs: [port15("items", cellListType)],
+          outputs: [port15("value", numberType8)],
           effects: pure8(),
           lower: (ctx) => `Array.isArray(${input12(ctx, "items")}) ? ${input12(ctx, "items")}.length : 0`,
           ui: { category: "query" }
@@ -5775,8 +6101,8 @@ var ContentGraphCore = (() => {
           id: "list.count-choices",
           label: "\u5019\u9009\u96C6\u5408\u6570\u91CF",
           description: "\u8BFB\u53D6\u6709\u754C\u5019\u9009\u5217\u8868\u7684\u6570\u91CF\u3002",
-          inputs: [port14("items", choiceListType)],
-          outputs: [port14("value", numberType8)],
+          inputs: [port15("items", choiceListType)],
+          outputs: [port15("value", numberType8)],
           effects: pure8(),
           lower: (ctx) => `Array.isArray(${input12(ctx, "items")}) ? ${input12(ctx, "items")}.length : 0`,
           ui: { category: "query" }
@@ -5785,8 +6111,8 @@ var ContentGraphCore = (() => {
           id: "value.present-cell",
           label: "\u5730\u683C\u5B58\u5728",
           description: "\u5224\u65AD\u4E00\u4E2A\u5EF6\u8FDF\u9009\u62E9\u6216\u4F4D\u79FB\u7ED3\u679C\u4E2D\u7684\u53EF\u7A7A\u5730\u683C\u662F\u5426\u5B58\u5728\u3002",
-          inputs: [port14("value", cellType5, { nullable: true })],
-          outputs: [port14("present", booleanType9)],
+          inputs: [port15("value", cellType5, { nullable: true })],
+          outputs: [port15("present", booleanType9)],
           effects: pure8(),
           lower: (ctx) => `(${input12(ctx, "value")} !== null && ${input12(ctx, "value")} !== undefined)`,
           ui: { category: "logic" }
@@ -5795,8 +6121,8 @@ var ContentGraphCore = (() => {
           id: "compare.equal-string-nullable",
           label: "\u53EF\u7A7A\u6587\u672C\u76F8\u7B49",
           description: "\u6BD4\u8F83\u53EF\u7A7A\u4E8B\u4EF6\u6587\u672C\u4E0E\u7A33\u5B9A\u6587\u672C\u6807\u8BC6\u3002",
-          inputs: [port14("left", stringType10, { nullable: true }), port14("right", stringType10)],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("left", stringType10, { nullable: true }), port15("right", stringType10)],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(),
           lower: (ctx) => `(${input12(ctx, "left")} === ${input12(ctx, "right")})`,
           ui: { category: "logic" }
@@ -5805,8 +6131,8 @@ var ContentGraphCore = (() => {
           id: "player.require",
           label: "\u89E3\u6790\u53EF\u7A7A\u73A9\u5BB6",
           description: "\u628A\u5EF6\u8FDF\u5BBF\u4E3B\u4E0A\u4E0B\u6587\u4E2D\u7684\u53EF\u7A7A\u73A9\u5BB6\u5F15\u7528\u89E3\u6790\u4E3A\u9009\u62E9\u534F\u8BAE\u9700\u8981\u7684\u73A9\u5BB6 ID\u3002",
-          inputs: [port14("player", "player", { nullable: true })],
-          outputs: [port14("player", "player")],
+          inputs: [port15("player", "player", { nullable: true })],
+          outputs: [port15("player", "player")],
           effects: pure8(["context"]),
           lower: (ctx) => `(${input12(ctx, "player")} || ${host(ctx)}.playerId)`,
           ui: { category: "context" }
@@ -5815,8 +6141,8 @@ var ContentGraphCore = (() => {
           id: "query.random-item",
           label: "\u786E\u5B9A\u6027\u968F\u673A\u68CB\u5B50",
           description: "\u901A\u8FC7\u89C4\u5219\u968F\u673A\u6E90\u9009\u62E9\u4E00\u4E2A\u68CB\u5B50\u96C6\u5408\u9879\u3002",
-          inputs: [port14("items", pieceListType)],
-          outputs: [port14("item", pieceType9)],
+          inputs: [port15("items", pieceListType)],
+          outputs: [port15("item", pieceType9)],
           effects: { ...pure8(["random"]), random: true },
           lower: (ctx) => `${runtime2(ctx)}.query.random(${input12(ctx, "items")})`,
           ui: { category: "query" }
@@ -5825,8 +6151,8 @@ var ContentGraphCore = (() => {
           id: "status.has-source-mark",
           label: "\u6765\u6E90\u6807\u8BB0\u5B58\u5728",
           description: "\u67E5\u8BE2\u76EE\u6807\u8EAB\u4E0A\u7531\u6307\u5B9A\u6765\u6E90\u65BD\u52A0\u7684\u72B6\u6001\u6807\u8BB0\u3002",
-          inputs: [port14("target", pieceType9, { nullable: true }), port14("source", pieceType9, { nullable: true })],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("target", pieceType9, { nullable: true }), port15("source", pieceType9, { nullable: true })],
+          outputs: [port15("value", booleanType9)],
           parameters: [parameter10("statusType", stringType10)],
           effects: pure8(["statuses"]),
           lower: (ctx) => `(function(targetId, sourceId) { if (!targetId || !sourceId) return false; var target = ${runtime2(ctx)}.query.piece(targetId); return Boolean(target && (target.statusTags || []).some(function(tag) { return tag && tag.type === ${stringLiteral3(ctx, "statusType")} && tag.sourceId === sourceId.toString() && (tag.stacks || 1) > 0; })); })(${pieceId(ctx, "target")}, ${pieceId(ctx, "source")})`,
@@ -5838,8 +6164,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-walkable-safe",
           label: "\u5730\u683C\u53EF\u884C\u8D70\uFF08\u53EF\u7A7A\uFF09",
           description: "\u6309\u5730\u56FE\u5730\u5F62\u8BFB\u53D6\u53EF\u884C\u8D70\u4E8B\u5B9E\uFF0C\u5E76\u5728\u5EF6\u8FDF\u76EE\u6807\u5931\u6548\u65F6\u8FD4\u56DE false\u3002",
-          inputs: [port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["position"]),
           lower: (ctx) => `(function(cell) { if (!cell) return false; var tile = ${battle6(ctx)}.map && Array.isArray(${battle6(ctx)}.map.tiles) ? ${battle6(ctx)}.map.tiles.find(function(item) { return item && item.x === cell.x && item.y === cell.y; }) : null; return Boolean(tile && tile.props && tile.props.walkable); })(${input12(ctx, "cell")})`,
           ui: { category: "position" }
@@ -5848,8 +6174,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-coordinates-safe",
           label: "\u8BFB\u53D6\u53EF\u7A7A\u5730\u683C\u5750\u6807",
           description: "\u8BFB\u53D6\u5EF6\u8FDF\u9009\u62E9\u4ECD\u53EF\u80FD\u5931\u6548\u7684\u5730\u683C\u5750\u6807\u3002",
-          inputs: [port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("x", numberType8), port14("y", numberType8)],
+          inputs: [port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("x", numberType8), port15("y", numberType8)],
           effects: pure8(),
           lower: (ctx) => `({x: (${input12(ctx, "cell")}) ? (${input12(ctx, "cell")}).x : 0, y: (${input12(ctx, "cell")}) ? (${input12(ctx, "cell")}).y : 0})`,
           ui: { category: "position" }
@@ -5858,8 +6184,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-require",
           label: "\u89E3\u6790\u53EF\u7A7A\u5730\u683C",
           description: "\u628A\u5DF2\u7ECF\u901A\u8FC7\u5408\u6CD5\u6027\u68C0\u67E5\u7684\u53EF\u7A7A\u5730\u683C\u89E3\u6790\u4E3A\u7EDF\u4E00\u5750\u6807\u8BB0\u5F55\u3002",
-          inputs: [port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("cell", cellType5)],
+          inputs: [port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("cell", cellType5)],
           effects: pure8(["position"]),
           lower: (ctx) => `(function(cell) { return cell && Number.isInteger(cell.x) && Number.isInteger(cell.y) ? {x:cell.x, y:cell.y} : null; })(${input12(ctx, "cell")})`,
           ui: { category: "position" }
@@ -5868,8 +6194,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cell-unoccupied",
           label: "\u5730\u683C\u65E0\u5B58\u6D3B\u68CB\u5B50",
           description: "\u8BFB\u53D6\u5730\u683C\u662F\u5426\u6CA1\u6709\u5B58\u6D3B\u5360\u4F4D\uFF0C\u53EF\u5FFD\u7565\u4E00\u4E2A\u68CB\u5B50\u3002",
-          inputs: [port14("cell", cellType5, { nullable: true }), port14("ignore", pieceType9, { nullable: true, optional: true })],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("cell", cellType5, { nullable: true }), port15("ignore", pieceType9, { nullable: true, optional: true })],
+          outputs: [port15("value", booleanType9)],
           effects: pure8(["position", "pieces"]),
           lower: (ctx) => `(function(cell, ignore) { if (!cell) return false; return !(${battle6(ctx)}.pieces || []).some(function(piece) { return piece && piece.currentHp > 0 && piece.x === cell.x && piece.y === cell.y && String(piece.instanceId) !== String(ignore || ""); }); })(${input12(ctx, "cell")}, ${pieceId(ctx, "ignore")})`,
           ui: { category: "position" }
@@ -5878,8 +6204,8 @@ var ContentGraphCore = (() => {
           id: "spatial.formation-candidates",
           label: "\u7F16\u961F\u96C6\u7ED3\u70B9",
           description: "\u6309\u4E2D\u5FC3\u53CA\u56DB\u4E2A\u6B63\u4EA4\u504F\u79FB\u8BA1\u7B97\u6EE1\u8DB3\u7F16\u961F\u5BB9\u91CF\u7684\u96C6\u7ED3\u70B9\u3002",
-          inputs: [port14("source", pieceType9), port14("selected", pieceListType)],
-          outputs: [port14("cells", cellListType)],
+          inputs: [port15("source", pieceType9), port15("selected", pieceListType)],
+          outputs: [port15("cells", cellListType)],
           parameters: [parameter10("range", numberType8, { default: 6, minimum: 0 })],
           effects: pure8(["position", "pieces"]),
           lower: (ctx) => {
@@ -5892,8 +6218,8 @@ var ContentGraphCore = (() => {
           id: "spatial.formation-slots",
           label: "\u7F16\u961F\u843D\u811A\u683C",
           description: "\u6309\u56FA\u5B9A\u4E2D\u5FC3\u3001\u4E0A\u3001\u5DE6\u3001\u53F3\u3001\u4E0B\u987A\u5E8F\u8FD4\u56DE\u53EF\u7528\u7F16\u961F\u843D\u811A\u683C\u3002",
-          inputs: [port14("center", cellType5), port14("selected", pieceListType)],
-          outputs: [port14("cells", cellListType)],
+          inputs: [port15("center", cellType5), port15("selected", pieceListType)],
+          outputs: [port15("cells", cellListType)],
           effects: pure8(["position", "pieces"]),
           lower: (ctx) => {
             const center = input12(ctx, "center"), selected = input12(ctx, "selected"), state2 = battle6(ctx);
@@ -5905,8 +6231,8 @@ var ContentGraphCore = (() => {
           id: "movement.adventure-destinations",
           label: "\u8FDC\u5F81\u79FB\u52A8\u843D\u70B9",
           description: "\u6CBF\u56DB\u4E2A\u6B63\u4EA4\u65B9\u5411\u8FFD\u8E2A\u53EF\u7ECF\u8FC7\u53CB\u519B\u7684\u8FDC\u5F81\u8DEF\u5F84\u5E76\u8BFB\u53D6\u5408\u6CD5\u843D\u70B9\u3002",
-          inputs: [port14("mover", pieceType9)],
-          outputs: [port14("cells", cellListType)],
+          inputs: [port15("mover", pieceType9)],
+          outputs: [port15("cells", cellListType)],
           effects: pure8(["position", "pieces"]),
           lower: (ctx) => {
             const query = runtime2(ctx), state2 = battle6(ctx);
@@ -5918,8 +6244,8 @@ var ContentGraphCore = (() => {
           id: "spatial.nearest-adjacent-landing",
           label: "\u6700\u8FD1\u76F8\u90BB\u843D\u70B9",
           description: "\u6309\u65E2\u6709\u76F8\u90BB\u504F\u79FB\u987A\u5E8F\u8BFB\u53D6\u8DDD\u53C2\u8003\u5730\u683C\u6700\u8FD1\u7684\u5408\u6CD5\u843D\u70B9\u3002",
-          inputs: [port14("target", pieceType9), port14("reference", cellType5, { nullable: true }), port14("ignore", pieceType9, { nullable: true, optional: true })],
-          outputs: [port14("cell", cellType5, { nullable: true })],
+          inputs: [port15("target", pieceType9), port15("reference", cellType5, { nullable: true }), port15("ignore", pieceType9, { nullable: true, optional: true })],
+          outputs: [port15("cell", cellType5, { nullable: true })],
           parameters: [parameter10("diagonal", booleanType9, { default: true })],
           effects: pure8(["position", "pieces"]),
           lower: (ctx) => {
@@ -5932,8 +6258,8 @@ var ContentGraphCore = (() => {
           id: "spatial.random-adjacent-landing",
           label: "\u968F\u673A\u76F8\u90BB\u843D\u70B9",
           description: "\u6309\u6743\u5A01\u968F\u673A\u6E90\u4ECE\u76EE\u6807\u7684\u6B63\u4EA4\u5408\u6CD5\u843D\u70B9\u4E2D\u9009\u62E9\u4E00\u683C\u3002",
-          inputs: [port14("target", pieceType9), port14("ignore", pieceType9, { nullable: true, optional: true })],
-          outputs: [port14("cell", cellType5, { nullable: true })],
+          inputs: [port15("target", pieceType9), port15("ignore", pieceType9, { nullable: true, optional: true })],
+          outputs: [port15("cell", cellType5, { nullable: true })],
           effects: { ...pure8(["position", "pieces", "random"]), random: true },
           lower: (ctx) => {
             const state2 = battle6(ctx), query = runtime2(ctx), context13 = host(ctx);
@@ -5945,8 +6271,8 @@ var ContentGraphCore = (() => {
           id: "movement.adventure-move",
           label: "\u8FDC\u5F81\u4F4D\u79FB",
           description: "\u6309\u8FDC\u5F81\u52A8\u4F5C\u63D0\u4EA4\u4E00\u540D\u68CB\u5B50\u7684\u7EDF\u4E00\u4F4D\u79FB\u3002",
-          inputs: [port14("mover", pieceType9), port14("destination", cellType5, { nullable: true })],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("mover", pieceType9), port15("destination", cellType5, { nullable: true })],
+          outputs: [port15("success", booleanType9)],
           effects: writes5(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => `(function(moverId, destination) { return destination ? ${runtime2(ctx)}.effects.freeMove(moverId, {x:destination.x, y:destination.y}).success : false; })(${pieceId(ctx, "mover")}, ${input12(ctx, "destination")})`,
           ui: { category: "effect" }
@@ -5957,8 +6283,8 @@ var ContentGraphCore = (() => {
           id: "effect.displace-many",
           label: "\u6279\u91CF\u4F4D\u79FB",
           description: "\u628A\u4E00\u7EC4\u68CB\u5B50\u6309\u56FA\u5B9A\u987A\u5E8F\u63D0\u4EA4\u7ED9\u7EDF\u4E00\u4F4D\u79FB\u5165\u53E3\u3002",
-          inputs: [port14("pieces", pieceListType), port14("destinations", cellListType)],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("pieces", pieceListType), port15("destinations", cellListType)],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("kind", stringType10, { enum: ["teleport", "dash"], default: "teleport" })],
           effects: writes5(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => {
@@ -5973,8 +6299,8 @@ var ContentGraphCore = (() => {
           id: "rule.append-reference",
           label: "\u8FFD\u52A0\u89C4\u5219\u5F15\u7528",
           description: "\u4EE5\u7A33\u5B9A\u7684\u89C4\u5219\u6807\u8BC6\u5F15\u7528\u8BB0\u5F55\u8FFD\u52A0\u68CB\u5B50\u89C4\u5219\uFF0C\u4FDD\u6301\u65E7\u5185\u5BB9\u7684\u8F7B\u91CF\u89C4\u5219\u5B58\u50A8\u5F62\u72B6\u3002",
-          inputs: [port14("target", pieceType9)],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("target", pieceType9)],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("ruleId", stringType10)],
           effects: writes5(["rule"]),
           lower: (ctx) => {
@@ -5989,8 +6315,8 @@ var ContentGraphCore = (() => {
           id: "marker.anchor-cells",
           label: "\u73B0\u6709\u951A\u70B9\u5730\u683C",
           description: "\u8BFB\u53D6\u6307\u5B9A\u6765\u6E90\u4ECD\u5B58\u5728\u7684\u7A7A\u95F4\u951A\u70B9\u3002",
-          inputs: [port14("source", pieceType9)],
-          outputs: [port14("cells", cellListType)],
+          inputs: [port15("source", pieceType9)],
+          outputs: [port15("cells", cellListType)],
           parameters: [parameter10("storageKey", stringType10, { enum: MARKER_STORAGE_KEYS })],
           effects: pure8(["extensions", "position"]),
           lower: (ctx) => `(function(sourceId, storageKey) { var records = ${battle6(ctx)}.extensions && Array.isArray(${battle6(ctx)}.extensions[storageKey]) ? ${battle6(ctx)}.extensions[storageKey] : []; return records.filter(function(anchor) { return anchor && anchor.sourceId === sourceId; }).map(function(anchor) { return {x:anchor.x, y:anchor.y}; }).sort(function(a, b) { return a.y - b.y || a.x - b.x; }); })(${pieceId(ctx, "source")}, ${stringLiteral3(ctx, "storageKey")})`,
@@ -6000,8 +6326,8 @@ var ContentGraphCore = (() => {
           id: "marker.anchor-exists",
           label: "\u951A\u70B9\u5B58\u5728",
           description: "\u67E5\u8BE2\u6307\u5B9A\u6765\u6E90\u5728\u6307\u5B9A\u5730\u683C\u662F\u5426\u6709\u7A7A\u95F4\u951A\u70B9\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true }), port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("value", booleanType9)],
+          inputs: [port15("source", pieceType9, { nullable: true }), port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("value", booleanType9)],
           parameters: [parameter10("storageKey", stringType10, { enum: MARKER_STORAGE_KEYS })],
           effects: pure8(["extensions"]),
           lower: (ctx) => `(function(sourceId, cell, storageKey) { return Boolean(cell) && (${battle6(ctx)}.extensions && Array.isArray(${battle6(ctx)}.extensions[storageKey]) ? ${battle6(ctx)}.extensions[storageKey] : []).some(function(anchor) { return anchor && anchor.sourceId === sourceId && anchor.x === cell.x && anchor.y === cell.y; }); })(${pieceId(ctx, "source")}, ${input12(ctx, "cell")}, ${stringLiteral3(ctx, "storageKey")})`,
@@ -6011,8 +6337,8 @@ var ContentGraphCore = (() => {
           id: "marker.anchor-candidates",
           label: "\u53EF\u6807\u8BB0\u951A\u70B9\u5730\u683C",
           description: "\u8BFB\u53D6\u8303\u56F4\u5185\u3001\u53EF\u884C\u8D70\u4E14\u65E0\u5B58\u6D3B\u5360\u4F4D\u7684\u951A\u70B9\u5019\u9009\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true })],
-          outputs: [port14("cells", cellListType)],
+          inputs: [port15("source", pieceType9, { nullable: true })],
+          outputs: [port15("cells", cellListType)],
           parameters: [parameter10("range", numberType8, { default: 7, minimum: 0 }), parameter10("order", stringType10, { enum: ["map", "yx"], default: "yx" })],
           effects: pure8(["extensions", "position", "pieces"]),
           lower: (ctx) => {
@@ -6025,8 +6351,8 @@ var ContentGraphCore = (() => {
           id: "marker.anchor-place",
           label: "\u653E\u7F6E\u7A7A\u95F4\u951A\u70B9",
           description: "\u5199\u5165\u65E2\u6709\u7A7A\u95F4\u951A\u70B9\u548C\u5BF9\u5E94\u5730\u683C\u8868\u73B0\uFF0C\u5E76\u6309\u6765\u6E90\u4FDD\u7559\u6700\u8FD1\u4E09\u4E2A\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true }), port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("source", pieceType9, { nullable: true }), port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("storageKey", stringType10, { enum: MARKER_STORAGE_KEYS }), parameter10("tileType", stringType10), parameter10("maxAnchors", numberType8, { default: 3, minimum: 1 })],
           effects: writes5(["extensions", "tile-effects"], ["tileEffectAdded", "tileEffectRemoved"]),
           lower: (ctx) => {
@@ -6039,8 +6365,8 @@ var ContentGraphCore = (() => {
           id: "marker.anchor-remove",
           label: "\u79FB\u9664\u7A7A\u95F4\u951A\u70B9",
           description: "\u79FB\u9664\u6307\u5B9A\u6765\u6E90\u548C\u5730\u683C\u7684\u951A\u70B9\u53CA\u5176\u5730\u683C\u8868\u73B0\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true }), port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("source", pieceType9, { nullable: true }), port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("storageKey", stringType10, { enum: MARKER_STORAGE_KEYS }), parameter10("tileType", stringType10)],
           effects: writes5(["extensions", "tile-effects"], ["tileEffectRemoved"]),
           lower: (ctx) => {
@@ -6054,8 +6380,8 @@ var ContentGraphCore = (() => {
           id: "marker.nearby-enemies",
           label: "\u951A\u70B9\u9644\u8FD1\u654C\u4EBA",
           description: "\u6309\u951A\u70B9\u5730\u683C\u548C\u6765\u6E90\u68CB\u5B50\u7684\u654C\u6211\u5173\u7CFB\u8BFB\u53D6\u5BBF\u4E3B\u987A\u5E8F\u654C\u4EBA\u96C6\u5408\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true }), port14("cell", cellType5, { nullable: true })],
-          outputs: [port14("pieces", pieceListType)],
+          inputs: [port15("source", pieceType9, { nullable: true }), port15("cell", cellType5, { nullable: true })],
+          outputs: [port15("pieces", pieceListType)],
           parameters: [parameter10("range", numberType8, { default: 3, minimum: 0 })],
           effects: pure8(["pieces", "position"]),
           lower: (ctx) => {
@@ -6068,8 +6394,8 @@ var ContentGraphCore = (() => {
           id: "marker.trigger-target",
           label: "\u98DE\u96F7\u795E\u89E6\u53D1\u76EE\u6807",
           description: "\u6309\u6807\u8BB0\u8005\u7684\u654C\u6211\u5173\u7CFB\u89E3\u6790\u65BD\u6CD5\u8005\u6216\u88AB\u6307\u5411\u76EE\u6807\u3002",
-          inputs: [port14("source", pieceType9, { nullable: true }), port14("marked", pieceType9, { nullable: true }), port14("origin", pieceType9, { nullable: true })],
-          outputs: [port14("target", pieceType9, { nullable: true })],
+          inputs: [port15("source", pieceType9, { nullable: true }), port15("marked", pieceType9, { nullable: true }), port15("origin", pieceType9, { nullable: true })],
+          outputs: [port15("target", pieceType9, { nullable: true })],
           effects: pure8(["pieces", "players"]),
           lower: (ctx) => {
             const query = runtime2(ctx);
@@ -6083,8 +6409,8 @@ var ContentGraphCore = (() => {
           id: "status.mark-apply",
           label: "\u5E94\u7528\u6765\u6E90\u6807\u8BB0",
           description: "\u9012\u589E\u5DF2\u6709\u6765\u6E90\u6807\u8BB0\uFF0C\u6216\u7ECF status lifecycle \u5B89\u88C5\u65B0\u7684\u6765\u6E90\u6807\u8BB0\u3002",
-          inputs: [port14("target", pieceType9, { nullable: true }), port14("source", pieceType9, { nullable: true })],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("target", pieceType9, { nullable: true }), port15("source", pieceType9, { nullable: true })],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("statusType", stringType10), parameter10("statusName", stringType10), parameter10("statusIdPrefix", stringType10)],
           effects: writes5(["status", "events"], ["afterStatusApplied"]),
           lower: (ctx) => {
@@ -6098,8 +6424,8 @@ var ContentGraphCore = (() => {
           id: "status.mark-remove",
           label: "\u79FB\u9664\u6765\u6E90\u6807\u8BB0",
           description: "\u79FB\u9664\u76EE\u6807\u8EAB\u4E0A\u6307\u5B9A\u6765\u6E90\u7684\u6807\u8BB0\u3002",
-          inputs: [port14("target", pieceType9, { nullable: true }), port14("source", pieceType9, { nullable: true })],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("target", pieceType9, { nullable: true }), port15("source", pieceType9, { nullable: true })],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("statusType", stringType10)],
           effects: writes5(["status"], ["afterStatusRemoved"]),
           lower: (ctx) => {
@@ -6114,8 +6440,8 @@ var ContentGraphCore = (() => {
           id: "turn.once-read",
           label: "\u56DE\u5408\u65D7\u6807\u67E5\u8BE2",
           description: "\u8BFB\u53D6\u6307\u5B9A\u68CB\u5B50\u5728\u5F53\u524D\u56DE\u5408\u662F\u5426\u5DF2\u7ECF\u4F7F\u7528\u8FC7\u4E00\u6B21\u6027\u4E8B\u4EF6\u3002",
-          inputs: [port14("source", pieceType9), port14("turn", numberType8)],
-          outputs: [port14("used", booleanType9)],
+          inputs: [port15("source", pieceType9), port15("turn", numberType8)],
+          outputs: [port15("used", booleanType9)],
           parameters: [parameter10("storageKey", stringType10, { enum: TURN_STORAGE_KEYS })],
           effects: pure8(["extensions", "turn"]),
           lower: (ctx) => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; return Boolean(${battle6(ctx)}.extensions && ${battle6(ctx)}.extensions[storageKey] && ${battle6(ctx)}.extensions[storageKey][sourceId] === turn); })(${input12(ctx, "source")}, ${input12(ctx, "turn")}, ${stringLiteral3(ctx, "storageKey")})`,
@@ -6125,8 +6451,8 @@ var ContentGraphCore = (() => {
           id: "turn.once-mark",
           label: "\u8BB0\u5F55\u56DE\u5408\u65D7\u6807",
           description: "\u8BB0\u5F55\u6307\u5B9A\u68CB\u5B50\u5728\u5F53\u524D\u56DE\u5408\u7684\u4E00\u6B21\u6027\u4E8B\u4EF6\u3002",
-          inputs: [port14("source", pieceType9), port14("turn", numberType8)],
-          outputs: [port14("success", booleanType9)],
+          inputs: [port15("source", pieceType9), port15("turn", numberType8)],
+          outputs: [port15("success", booleanType9)],
           parameters: [parameter10("storageKey", stringType10, { enum: TURN_STORAGE_KEYS })],
           effects: writes5(["extensions", "turn"]),
           lower: (ctx) => `(function(sourceId, turn, storageKey) { if (typeof sourceId !== "string" || !Number.isSafeInteger(turn) || typeof storageKey !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(storageKey)) return false; ${battle6(ctx)}.extensions = ${battle6(ctx)}.extensions || {}; ${battle6(ctx)}.extensions[storageKey] = ${battle6(ctx)}.extensions[storageKey] || {}; ${battle6(ctx)}.extensions[storageKey][sourceId] = turn; return true; })(${input12(ctx, "source")}, ${input12(ctx, "turn")}, ${stringLiteral3(ctx, "storageKey")})`,
@@ -6145,7 +6471,7 @@ var ContentGraphCore = (() => {
         ...TURN_PRIMITIVES
       ]);
       var input13 = (ctx, name) => ctx.inputs[name];
-      var port15 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port16 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var active2 = ["skill", "card", "rule", "triggerSkill", "pending"];
       var read4 = (domains) => ({ pure: true, previewSafe: false, reads: domains });
       var write3 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
@@ -6159,8 +6485,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "card.hand-count",
           label: "\u8BFB\u53D6\u624B\u724C\u6570\u91CF",
-          inputs: [port15("player", "player")],
-          outputs: [port15("value", "number")],
+          inputs: [port16("player", "player")],
+          outputs: [port16("value", "number")],
           effects: read4(["hand"]),
           lower: (ctx) => `(function(hand) { return Array.isArray(hand) ? hand.length : 0; })(${runtime3(ctx)}.cards.hand(${input13(ctx, "player")}))`
         }),
@@ -6168,24 +6494,24 @@ var ContentGraphCore = (() => {
           id: "query.players",
           label: "\u6309\u5BF9\u5C40\u987A\u5E8F\u67E5\u8BE2\u73A9\u5BB6",
           inputs: [],
-          outputs: [port15("players", { kind: "list", element: "player" })],
+          outputs: [port16("players", { kind: "list", element: "player" })],
           effects: read4(["players"]),
           lower: (ctx) => `${runtime3(ctx)}.query.players()`
         }),
         define14({
           id: "query.random-string",
           label: "\u6309\u79CD\u5B50\u968F\u673A\u9009\u62E9\u6807\u8BC6",
-          inputs: [port15("items", { kind: "list", element: "string" })],
-          outputs: [port15("value", "string")],
+          inputs: [port16("items", { kind: "list", element: "string" })],
+          outputs: [port16("value", "string")],
           effects: { ...read4(["random"]), random: true },
           lower: (ctx) => `(function(items) { if (!items.length) throw new Error('query.random-string requires a nonempty list'); return ${runtime3(ctx)}.query.random(items); })(${input13(ctx, "items")})`
         }),
         define14({
           id: "player.set-buff-record",
           label: "\u8BBE\u7F6E\u73A9\u5BB6\u589E\u76CA\u8BB0\u5F55",
-          inputs: [port15("player", "player"), port15("record", "record")],
-          outputs: [port15("success", "boolean")],
-          parameters: [port15("buffId", "string")],
+          inputs: [port16("player", "player"), port16("record", "record")],
+          outputs: [port16("success", "boolean")],
+          parameters: [port16("buffId", "string")],
           effects: write3(["player-buffs"]),
           lower: (ctx) => `${runtime3(ctx)}.cards.setPlayerBuff(${input13(ctx, "player")}, ${ctx.emitLiteral(ctx.parameters.buffId)}, ${input13(ctx, "record")})`
         }),
@@ -6193,7 +6519,7 @@ var ContentGraphCore = (() => {
           id: "source.capture-event-piece",
           label: "\u4FDD\u7559\u5F53\u524D\u4E8B\u4EF6\u68CB\u5B50",
           inputs: [],
-          outputs: [port15("source", "record", { nullable: true })],
+          outputs: [port16("source", "record", { nullable: true })],
           parameters: [{ name: "field", type: "string", enum: ["sourcePiece", "targetPiece", "piece", "rulePiece"] }],
           effects: write3(["execution-context"]),
           lower: (ctx) => `${runtime3(ctx)}.effects.captureEventPiece(${ctx.emitLiteral(ctx.parameters.field)})`,
@@ -6202,32 +6528,32 @@ var ContentGraphCore = (() => {
         define14({
           id: "source.is-present",
           label: "\u4E8B\u4EF6\u6765\u6E90\u5B58\u5728",
-          inputs: [port15("source", "record", { nullable: true })],
-          outputs: [port15("value", "boolean")],
+          inputs: [port16("source", "record", { nullable: true })],
+          outputs: [port16("value", "boolean")],
           effects: read4(["execution-context"]),
           lower: (ctx) => `(${input13(ctx, "source")} != null)`
         }),
         define14({
           id: "source.require-present",
           label: "\u89E3\u6790\u5DF2\u786E\u8BA4\u4E8B\u4EF6\u6765\u6E90",
-          inputs: [port15("source", "record", { nullable: true })],
-          outputs: [port15("source", "record")],
+          inputs: [port16("source", "record", { nullable: true })],
+          outputs: [port16("source", "record")],
           effects: read4(["execution-context"]),
           lower: (ctx) => `(function(source) { ${runtime3(ctx)}.effects.capturedOwner(source); return source; })(${input13(ctx, "source")})`
         }),
         define14({
           id: "source.captured-owner",
           label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u6765\u6E90\u5F52\u5C5E",
-          inputs: [port15("source", "record")],
-          outputs: [port15("player", "player")],
+          inputs: [port16("source", "record")],
+          outputs: [port16("player", "player")],
           effects: read4(["execution-context"]),
           lower: (ctx) => `${runtime3(ctx)}.effects.capturedOwner(${input13(ctx, "source")})`
         }),
         define14({
           id: "effect.damage-captured",
           label: "\u7ED3\u7B97\u5DF2\u4FDD\u7559\u4E8B\u4EF6\u5BF9\u8C61\u4F24\u5BB3",
-          inputs: [port15("source", "record"), port15("target", "record"), port15("amount", "number")],
-          outputs: [port15("result", "record")],
+          inputs: [port16("source", "record"), port16("target", "record"), port16("amount", "number")],
+          outputs: [port16("result", "record")],
           parameters: [{ name: "damageType", type: "string", enum: ["physical", "magical", "true"] }, { name: "skillId", type: "string" }],
           effects: write3(["damage", "events"]),
           lower: (ctx) => `${runtime3(ctx)}.effects.damageCaptured(${input13(ctx, "source")}, ${input13(ctx, "target")}, ${input13(ctx, "amount")}, ${ctx.emitLiteral(ctx.parameters.damageType)}, ${ctx.emitLiteral(ctx.parameters.skillId)})`
@@ -6235,9 +6561,9 @@ var ContentGraphCore = (() => {
         define14({
           id: "card.bound-living-template",
           label: "\u89E3\u6790\u7ED1\u5B9A\u7684\u5B58\u6D3B\u68CB\u5B50",
-          inputs: [port15("owner", "player", { nullable: true })],
-          outputs: [port15("piece", "piece", { nullable: true })],
-          parameters: [port15("templateId", "string"), port15("cardId", "string")],
+          inputs: [port16("owner", "player", { nullable: true })],
+          outputs: [port16("piece", "piece", { nullable: true })],
+          parameters: [port16("templateId", "string"), port16("cardId", "string")],
           effects: read4(["pieces", "card"]),
           lower: (ctx) => {
             const owner = input13(ctx, "owner");
@@ -6266,9 +6592,9 @@ var ContentGraphCore = (() => {
         define14({
           id: "query.living-template",
           label: "\u67E5\u8BE2\u73A9\u5BB6\u62E5\u6709\u7684\u5B58\u6D3B\u6A21\u677F\u68CB\u5B50",
-          inputs: [port15("owner", "player", { nullable: true })],
-          outputs: [port15("piece", "piece", { nullable: true })],
-          parameters: [port15("templateId", "string")],
+          inputs: [port16("owner", "player", { nullable: true })],
+          outputs: [port16("piece", "piece", { nullable: true })],
+          parameters: [port16("templateId", "string")],
           effects: read4(["pieces"]),
           lower: (ctx) => {
             const owner = input13(ctx, "owner");
@@ -6287,8 +6613,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "query.affectable-pieces",
           label: "\u67E5\u8BE2\u5361\u724C\u53EF\u5F71\u54CD\u7684\u5B58\u6D3B\u68CB\u5B50",
-          inputs: [port15("owner", "player", { nullable: true })],
-          outputs: [port15("pieces", { kind: "list", element: "piece" })],
+          inputs: [port16("owner", "player", { nullable: true })],
+          outputs: [port16("pieces", { kind: "list", element: "piece" })],
           parameters: [{ name: "relation", type: "string", enum: ["ally", "enemy"] }],
           effects: read4(["pieces", "target-policy"]),
           lower: (ctx) => {
@@ -6304,8 +6630,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "query.lowest-hp",
           label: "\u9009\u62E9\u751F\u547D\u503C\u6700\u4F4E\u7684\u68CB\u5B50",
-          inputs: [port15("pieces", { kind: "list", element: "piece" })],
-          outputs: [port15("piece", "piece", { nullable: true })],
+          inputs: [port16("pieces", { kind: "list", element: "piece" })],
+          outputs: [port16("piece", "piece", { nullable: true })],
           effects: read4(["pieces"]),
           lower: (ctx) => {
             const pieces2 = input13(ctx, "pieces");
@@ -6322,8 +6648,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "piece.display-name",
           label: "\u8BFB\u53D6\u5361\u724C\u6D88\u606F\u4E2D\u7684\u68CB\u5B50\u540D\u79F0",
-          inputs: [port15("piece", "piece", { nullable: true })],
-          outputs: [port15("value", "string")],
+          inputs: [port16("piece", "piece", { nullable: true })],
+          outputs: [port16("value", "string")],
           parameters: [{ name: "fallback", type: "string", enum: ["none", "templateId"], default: "none" }],
           effects: read4(["pieces"]),
           lower: (ctx) => {
@@ -6340,8 +6666,8 @@ var ContentGraphCore = (() => {
           id: "piece.captured-name",
           label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u68CB\u5B50\u540D\u79F0",
           description: "\u8BFB\u53D6\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\uFF1B\u5373\u4F7F\u68CB\u5B50\u968F\u540E\u79BB\u573A\uFF0C\u5F53\u524D\u6548\u679C\u4ECD\u53EF\u751F\u6210\u7A33\u5B9A\u6D88\u606F\u3002",
-          inputs: [port15("source", "record")],
-          outputs: [port15("value", "string")],
+          inputs: [port16("source", "record")],
+          outputs: [port16("value", "string")],
           parameters: [{ name: "fallback", type: "string", enum: ["none", "templateId"], default: "none" }],
           effects: read4(["execution-context"]),
           lower: (ctx) => `${runtime3(ctx)}.effects.capturedName(${input13(ctx, "source")}, ${ctx.emitLiteral(ctx.parameters.fallback ?? "none")})`
@@ -6350,8 +6676,8 @@ var ContentGraphCore = (() => {
           id: "attribute.adjust-captured",
           label: "\u8C03\u6574\u5DF2\u4FDD\u7559\u68CB\u5B50\u5C5E\u6027",
           description: "\u5BF9\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\u8C03\u6574\u5C5E\u6027\uFF1B\u68CB\u5B50\u79BB\u573A\u540E\u4ECD\u5B8C\u6210\u5DF2\u7ECF\u5F00\u59CB\u7684\u6548\u679C\u3002",
-          inputs: [port15("source", "record"), port15("amount", "number")],
-          outputs: [port15("value", "number")],
+          inputs: [port16("source", "record"), port16("amount", "number")],
+          outputs: [port16("value", "number")],
           parameters: [{ name: "attribute", type: "string", enum: ["attack", "defense", "moveRange"] }],
           effects: write3(["pieces", "execution-context"]),
           lower: (ctx) => `${runtime3(ctx)}.effects.capturedAttribute(${input13(ctx, "source")}, ${ctx.emitLiteral(ctx.parameters.attribute)}, ${input13(ctx, "amount")})`
@@ -6359,12 +6685,12 @@ var ContentGraphCore = (() => {
         define14({
           id: "effect.damage-from-player",
           label: "\u4EE5\u73A9\u5BB6\u6765\u6E90\u9020\u6210\u4F24\u5BB3",
-          inputs: [port15("owner", "player"), port15("target", "piece"), port15("amount", "number")],
-          outputs: [port15("result", "record"), port15("success", "boolean"), port15("damage", "number")],
+          inputs: [port16("owner", "player"), port16("target", "piece"), port16("amount", "number")],
+          outputs: [port16("result", "record"), port16("success", "boolean"), port16("damage", "number")],
           parameters: [
             { name: "kind", type: "string", enum: ["player", "environment"] },
-            port15("instanceId", "string"),
-            port15("name", "string"),
+            port16("instanceId", "string"),
+            port16("name", "string"),
             { name: "damageType", type: "string", enum: ["normal", "true", "toxin"], default: "normal" },
             { name: "legacyNormalSpelling", type: "string", enum: ["physical", "magical"], optional: true },
             { name: "skillId", type: "string", optional: true },
@@ -6388,8 +6714,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "effect.damage-from-piece",
           label: "\u4EE5\u68CB\u5B50\u6765\u6E90\u9020\u6210\u5361\u724C\u4F24\u5BB3",
-          inputs: [port15("source", "piece"), port15("target", "piece"), port15("amount", "number")],
-          outputs: [port15("result", "record"), port15("success", "boolean"), port15("damage", "number")],
+          inputs: [port16("source", "piece"), port16("target", "piece"), port16("amount", "number")],
+          outputs: [port16("result", "record"), port16("success", "boolean"), port16("damage", "number")],
           parameters: [
             { name: "damageType", type: "string", enum: ["normal", "true", "toxin"], default: "normal" },
             { name: "legacyNormalSpelling", type: "string", enum: ["physical", "magical"], optional: true },
@@ -6411,9 +6737,9 @@ var ContentGraphCore = (() => {
         define14({
           id: "player.consume-buff",
           label: "\u6D88\u8017\u73A9\u5BB6\u589E\u76CA\u5E76\u8FD4\u56DE\u500D\u7387",
-          inputs: [port15("player", "player")],
-          outputs: [port15("applied", "boolean"), port15("multiplier", "number")],
-          parameters: [port15("buffId", "string")],
+          inputs: [port16("player", "player")],
+          outputs: [port16("applied", "boolean"), port16("multiplier", "number")],
+          parameters: [port16("buffId", "string")],
           effects: write3(["player-buffs"]),
           lower: (ctx) => {
             const player = input13(ctx, "player");
@@ -6430,8 +6756,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "effect.status-record",
           label: "\u901A\u8FC7\u5361\u724C\u72B6\u6001\u751F\u547D\u5468\u671F\u5E94\u7528\u72B6\u6001\u8BB0\u5F55",
-          inputs: [port15("target", "piece"), port15("record", "record")],
-          outputs: [port15("success", "boolean")],
+          inputs: [port16("target", "piece"), port16("record", "record")],
+          outputs: [port16("success", "boolean")],
           parameters: [{ name: "inputPolicy", type: "string", enum: ["flow", "host"], default: "flow" }],
           effects: write3(["status"], ["status-applied"]),
           lower: (ctx) => {
@@ -6451,9 +6777,9 @@ var ContentGraphCore = (() => {
         define14({
           id: "summon.unique-template-available",
           label: "\u68C0\u67E5\u552F\u4E00\u50A8\u5B58\u53EC\u5524\u662F\u5426\u5C1A\u672A\u4E0A\u573A",
-          inputs: [port15("owner", "player", { nullable: true })],
-          outputs: [port15("available", "boolean")],
-          parameters: [port15("templateId", "string"), port15("storageExtensionKey", "string"), port15("ownerScopedStorageExtensionKey", "string")],
+          inputs: [port16("owner", "player", { nullable: true })],
+          outputs: [port16("available", "boolean")],
+          parameters: [port16("templateId", "string"), port16("storageExtensionKey", "string"), port16("ownerScopedStorageExtensionKey", "string")],
           effects: read4(["pieces", "extensions"]),
           lower: (ctx) => {
             const owner = input13(ctx, "owner");
@@ -6477,8 +6803,8 @@ var ContentGraphCore = (() => {
         define14({
           id: "card.cell-unoccupied",
           label: "\u68C0\u67E5\u5361\u724C\u53EC\u5524\u5730\u683C\u4E3A\u7A7A",
-          inputs: [port15("cell", "cell", { nullable: true })],
-          outputs: [port15("value", "boolean")],
+          inputs: [port16("cell", "cell", { nullable: true })],
+          outputs: [port16("value", "boolean")],
           effects: read4(["position", "pieces"]),
           lower: (ctx) => {
             const cell = input13(ctx, "cell");
@@ -6494,24 +6820,24 @@ var ContentGraphCore = (() => {
         define14({
           id: "card.piece-present",
           label: "\u68C0\u67E5\u68CB\u5B50\u5F15\u7528\u5B58\u5728",
-          inputs: [port15("value", "piece", { nullable: true })],
-          outputs: [port15("present", "boolean")],
+          inputs: [port16("value", "piece", { nullable: true })],
+          outputs: [port16("present", "boolean")],
           effects: read4([]),
           lower: (ctx) => `(${input13(ctx, "value")} !== null && ${input13(ctx, "value")} !== undefined && ${input13(ctx, "value")} !== __gameplayInvalid)`
         }),
         define14({
           id: "card.string-present",
           label: "\u68C0\u67E5\u6587\u672C\u5F15\u7528\u5B58\u5728",
-          inputs: [port15("value", "string", { nullable: true })],
-          outputs: [port15("present", "boolean")],
+          inputs: [port16("value", "string", { nullable: true })],
+          outputs: [port16("present", "boolean")],
           effects: read4([]),
           lower: (ctx) => `(${input13(ctx, "value")} !== null && ${input13(ctx, "value")} !== undefined && ${input13(ctx, "value")} !== __gameplayInvalid)`
         }),
         define14({
           id: "lifecycle.queue-stored-summon",
           label: "\u5728\u5DF2\u9A8C\u8BC1\u5730\u683C\u6392\u961F\u50A8\u5B58\u53EC\u5524",
-          inputs: [port15("source", "piece"), port15("cell", "cell")],
-          outputs: [port15("queued", "number")],
+          inputs: [port16("source", "piece"), port16("cell", "cell")],
+          outputs: [port16("queued", "number")],
           effects: write3(["summon"], ["summon-queued"]),
           lower: (ctx) => {
             const source = input13(ctx, "source");
@@ -6523,16 +6849,16 @@ var ContentGraphCore = (() => {
           id: "lifecycle.summon-captured",
           label: "\u6392\u961F\u53EC\u5524\u5DF2\u4FDD\u7559\u68CB\u5B50",
           description: "\u4F7F\u7528\u672C\u6B21\u7ED3\u7B97\u4E2D\u5DF2\u6355\u83B7\u7684\u68CB\u5B50\u6392\u961F\u53EC\u5524\uFF1B\u6765\u6E90\u968F\u540E\u79BB\u573A\u4E5F\u4E0D\u4F1A\u4E22\u5931\u53EC\u5524\u3002",
-          inputs: [port15("source", "record"), port15("cell", "cell")],
-          outputs: [port15("queued", "number")],
+          inputs: [port16("source", "record"), port16("cell", "cell")],
+          outputs: [port16("queued", "number")],
           effects: write3(["summon", "execution-context"], ["summon-queued"]),
           lower: (ctx) => `${runtime3(ctx)}.lifecycle.summonCaptured(${input13(ctx, "source")}, ${input13(ctx, "cell")})`
         }),
         define14({
           id: "effect.result-killed",
           label: "\u8BFB\u53D6\u4F24\u5BB3\u7ED3\u679C\u7684\u51FB\u6740\u6807\u8BB0",
-          inputs: [port15("result", "record")],
-          outputs: [port15("killed", "boolean")],
+          inputs: [port16("result", "record")],
+          outputs: [port16("killed", "boolean")],
           effects: read4(["damage"]),
           lower: (ctx) => {
             const result = input13(ctx, "result");
@@ -6547,13 +6873,13 @@ var ContentGraphCore = (() => {
       var pieceType10 = "piece";
       var cellType6 = "cell";
       var eventType2 = "event";
-      var recordType8 = "record";
+      var recordType9 = "record";
       var pieceListType2 = { kind: "list", element: pieceType10 };
       var cellListType2 = { kind: "list", element: cellType6 };
       var eventListType2 = { kind: "list", element: eventType2 };
       var numberListType = { kind: "list", element: numberType9 };
       var stringListType2 = { kind: "list", element: stringType11 };
-      var port16 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port17 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input14 = (ctx, name) => {
         const value = ctx.inputs[name];
@@ -6586,8 +6912,8 @@ var ContentGraphCore = (() => {
           id: "event.skill-cast-count",
           label: "\u8BFB\u53D6\u672C\u56DE\u5408\u6280\u80FD\u91CA\u653E\u6B21\u6570",
           description: "\u6309\u6743\u5A01\u52A8\u4F5C\u8BB0\u5F55\u7EDF\u8BA1\u5F53\u524D\u56DE\u5408\u3001\u5F53\u524D\u68CB\u5B50\u548C\u6307\u5B9A\u6280\u80FD\u7684\u672A\u4E2D\u65AD\u91CA\u653E\u6B21\u6570\u3002",
-          inputs: [port16("piece", pieceType10)],
-          outputs: [port16("count", numberType9)],
+          inputs: [port17("piece", pieceType10)],
+          outputs: [port17("count", numberType9)],
           parameters: [parameter11("skillId", stringType11)],
           effects: pure9(["actions", "turn"]),
           lower: (ctx) => {
@@ -6601,8 +6927,8 @@ var ContentGraphCore = (() => {
           id: "status.read-turn-number",
           label: "\u8BFB\u53D6\u72B6\u6001\u56DE\u5408\u7F16\u53F7",
           description: "\u8BFB\u53D6\u8FC1\u79FB\u767B\u8BB0\u72B6\u6001\u4E2D\u7684\u56FA\u5B9A turnNumber \u5B57\u6BB5\uFF0C\u4E0D\u5F00\u653E\u4EFB\u610F\u72B6\u6001\u8DEF\u5F84\u3002",
-          inputs: [port16("piece", pieceType10), port16("statusId", stringType11, { nullable: true }), port16("fallback", numberType9)],
-          outputs: [port16("value", numberType9)],
+          inputs: [port17("piece", pieceType10), port17("statusId", stringType11, { nullable: true }), port17("fallback", numberType9)],
+          outputs: [port17("value", numberType9)],
           effects: pure9(["statuses"]),
           lower: (ctx) => `(function(pieceId,statusId,fallback){if(statusId==null||!${flow17(ctx)}.query.hasPiece(pieceId))return fallback;var tags=${flow17(ctx)}.query.piece(pieceId).statusTags||[],tag=tags.find(function(item){return item&&item.id===statusId;}),value=tag&&tag.turnNumber;return value==null?fallback:Number(value);})(${input14(ctx, "piece")},${input14(ctx, "statusId")},${input14(ctx, "fallback")})`,
           ui: { category: "status" }
@@ -6611,8 +6937,8 @@ var ContentGraphCore = (() => {
           id: "projectile.line-cells",
           label: "\u751F\u6210\u6B63\u5411\u5730\u683C\u7EBF",
           description: "\u7531\u6765\u6E90\u68CB\u5B50\u4E0E\u5DF2\u9009\u5730\u683C\u8BA1\u7B97\u6B63\u4EA4\u65B9\u5411\uFF0C\u5E76\u6309\u56FA\u5B9A\u8DDD\u79BB\u751F\u6210\u5730\u683C\u5B9E\u4F8B\uFF1B\u53EF\u9009\u62E9\u5728\u5730\u56FE\u8FB9\u754C\u505C\u6B62\u3002",
-          inputs: [port16("source", pieceType10), port16("target", cellType6)],
-          outputs: [port16("cells", cellListType2), port16("dx", numberType9), port16("dy", numberType9), port16("valid", booleanType10), port16("sameCell", booleanType10), port16("distance", numberType9)],
+          inputs: [port17("source", pieceType10), port17("target", cellType6)],
+          outputs: [port17("cells", cellListType2), port17("dx", numberType9), port17("dy", numberType9), port17("valid", booleanType10), port17("sameCell", booleanType10), port17("distance", numberType9)],
           parameters: [parameter11("maxDistance", numberType9, { default: 6, minimum: 0, maximum: 128 }), parameter11("clipToBoard", booleanType10, { default: false })],
           effects: pure9(["pieces", "position"]),
           lower: (ctx) => {
@@ -6630,8 +6956,8 @@ var ContentGraphCore = (() => {
           id: "projectile.trace",
           label: "\u8BB0\u5F55\u6B63\u5411\u5F39\u9053",
           description: "\u6CBF\u6B63\u4EA4\u65B9\u5411\u8C03\u7528\u73B0\u6709\u5F39\u9053\u89C2\u5BDF\u5165\u53E3\uFF1B\u4E8B\u4EF6\u4E2D\u7684\u68CB\u5B50\u3001\u5730\u683C\u548C\u963B\u6321\u4E8B\u5B9E\u7531\u540E\u7EED\u6A21\u5757\u8BFB\u53D6\u3002",
-          inputs: [port16("source", pieceType10), port16("target", cellType6)],
-          outputs: [port16("events", eventListType2), port16("dx", numberType9), port16("dy", numberType9), port16("valid", booleanType10), port16("sameCell", booleanType10), port16("distance", numberType9)],
+          inputs: [port17("source", pieceType10), port17("target", cellType6)],
+          outputs: [port17("events", eventListType2), port17("dx", numberType9), port17("dy", numberType9), port17("valid", booleanType10), port17("sameCell", booleanType10), port17("distance", numberType9)],
           parameters: [parameter11("maxDistance", numberType9, { default: 99, minimum: 0, maximum: 128 })],
           effects: pure9(["pieces", "position"]),
           lower: (ctx) => {
@@ -6647,8 +6973,8 @@ var ContentGraphCore = (() => {
           id: "projectile.trace-enemies",
           label: "\u8BB0\u5F55\u53EF\u7A7F\u8D8A\u5F39\u9053\u654C\u4EBA",
           description: "\u6CBF\u6B63\u4EA4\u65B9\u5411\u4EE5\u53EF\u7A7F\u8D8A\u53CB\u519B\u3001\u654C\u4EBA\u548C\u5730\u5F62\u7684\u8DEF\u5F84\u8BFB\u53D6\u654C\u4EBA\u5B9E\u4F8B\uFF0C\u4FDD\u7559\u8DEF\u5F84\u4E8B\u4EF6\u987A\u5E8F\u3002",
-          inputs: [port16("source", pieceType10), port16("target", cellType6)],
-          outputs: [port16("pieces", pieceListType2), port16("valid", booleanType10), port16("sameCell", booleanType10), port16("distance", numberType9)],
+          inputs: [port17("source", pieceType10), port17("target", cellType6)],
+          outputs: [port17("pieces", pieceListType2), port17("valid", booleanType10), port17("sameCell", booleanType10), port17("distance", numberType9)],
           parameters: [parameter11("maxDistance", numberType9, { default: 6, minimum: 0, maximum: 128 })],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
@@ -6664,8 +6990,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-kind",
           label: "\u8BFB\u53D6\u5F39\u9053\u4E8B\u4EF6\u7C7B\u578B",
           description: "\u8BFB\u53D6\u89C2\u5BDF\u4E8B\u4EF6\u7684\u5C01\u95ED\u7C7B\u578B\u6807\u8BC6\u3002",
-          inputs: [port16("event", eventType2)],
-          outputs: [port16("kind", stringType11)],
+          inputs: [port17("event", eventType2)],
+          outputs: [port17("kind", stringType11)],
           effects: pure9(["position"]),
           lower: (ctx) => `String((${input14(ctx, "event")}&&${input14(ctx, "event")}.type)||'')`,
           ui: { category: "projectile" }
@@ -6674,8 +7000,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-piece",
           label: "\u8BFB\u53D6\u547D\u4E2D\u68CB\u5B50",
           description: "\u5C06\u547D\u4E2D\u4E8B\u4EF6\u4E2D\u7684\u68CB\u5B50\u8F6C\u6362\u4E3A\u4E0D\u900F\u660E\u5B9E\u4F8B ID\uFF1B\u8C03\u7528\u65B9\u5E94\u5148\u5224\u65AD\u4E8B\u4EF6\u7C7B\u578B\u3002",
-          inputs: [port16("event", eventType2)],
-          outputs: [port16("piece", pieceType10)],
+          inputs: [port17("event", eventType2)],
+          outputs: [port17("piece", pieceType10)],
           effects: pure9(["pieces"]),
           lower: (ctx) => `(${input14(ctx, "event")}&&${input14(ctx, "event")}.piece?${input14(ctx, "event")}.piece.instanceId:null)`,
           ui: { category: "projectile" }
@@ -6684,8 +7010,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-distance",
           label: "\u8BFB\u53D6\u5F39\u9053\u8DDD\u79BB",
           description: "\u8BFB\u53D6\u547D\u4E2D\u6216\u5730\u5F62\u4E8B\u4EF6\u8DDD\u6765\u6E90\u7684\u6574\u6570\u8DDD\u79BB\u3002",
-          inputs: [port16("event", eventType2)],
-          outputs: [port16("distance", numberType9)],
+          inputs: [port17("event", eventType2)],
+          outputs: [port17("distance", numberType9)],
           effects: pure9(["position"]),
           lower: (ctx) => `Number((${input14(ctx, "event")}&&${input14(ctx, "event")}.distance)||0)`,
           ui: { category: "projectile" }
@@ -6694,8 +7020,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-cell",
           label: "\u8BFB\u53D6\u5F39\u9053\u5730\u683C",
           description: "\u8BFB\u53D6\u89C2\u5BDF\u4E8B\u4EF6\u7684\u5750\u6807\u5730\u683C\u8BB0\u5F55\u3002",
-          inputs: [port16("event", eventType2)],
-          outputs: [port16("cell", cellType6)],
+          inputs: [port17("event", eventType2)],
+          outputs: [port17("cell", cellType6)],
           effects: pure9(["position"]),
           lower: (ctx) => `({x:Number(${input14(ctx, "event")}.x),y:Number(${input14(ctx, "event")}.y)})`,
           ui: { category: "projectile" }
@@ -6704,8 +7030,8 @@ var ContentGraphCore = (() => {
           id: "projectile.event-blocks",
           label: "\u8BFB\u53D6\u5F39\u9053\u963B\u6321\u4E8B\u5B9E",
           description: "\u8BFB\u53D6\u5730\u5F62\u4E8B\u4EF6\u662F\u5426\u963B\u6321\u5F39\u9053\u3002",
-          inputs: [port16("event", eventType2)],
-          outputs: [port16("blocks", booleanType10)],
+          inputs: [port17("event", eventType2)],
+          outputs: [port17("blocks", booleanType10)],
           effects: pure9(["position"]),
           lower: (ctx) => `Boolean(${input14(ctx, "event")}&&${input14(ctx, "event")}.blocksProjectile)`,
           ui: { category: "projectile" }
@@ -6714,8 +7040,8 @@ var ContentGraphCore = (() => {
           id: "query.pieces-in-square",
           label: "\u67E5\u8BE2\u65B9\u5F62\u8303\u56F4\u68CB\u5B50",
           description: "\u5728\u6765\u6E90\u68CB\u5B50\u5468\u56F4\u7684\u65B9\u5F62\u8303\u56F4\u5185\u67E5\u8BE2\u5B58\u6D3B\u68CB\u5B50\uFF0C\u5E76\u6309\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u4FDD\u7559\u5B9E\u4F8B ID\u3002",
-          inputs: [port16("origin", pieceType10)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("origin", pieceType10)],
+          outputs: [port17("pieces", pieceListType2)],
           parameters: [parameter11("relation", stringType11, { enum: ["all", "ally", "enemy"], default: "enemy" }), parameter11("halfExtent", numberType9, { default: 2, minimum: 0, maximum: 32 })],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
@@ -6733,8 +7059,8 @@ var ContentGraphCore = (() => {
           id: "query.pieces-in-rectangle",
           label: "\u6309\u5730\u683C\u987A\u5E8F\u67E5\u8BE2\u77E9\u5F62\u68CB\u5B50",
           description: "\u6309\u65E7\u9009\u62E9\u5668\u7684 dx \u5916\u5C42\u3001dy \u5185\u5C42\u987A\u5E8F\u8BFB\u53D6\u6BCF\u4E2A\u5730\u683C\u7684\u9996\u4E2A\u5B58\u6D3B\u68CB\u5B50\uFF0C\u5E76\u6309\u6765\u6E90\u73A9\u5BB6\u7B5B\u9009\u654C\u6211\u5173\u7CFB\u3002",
-          inputs: [port16("origin", cellType6), port16("owner", "player")],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("origin", cellType6), port17("owner", "player")],
+          outputs: [port17("pieces", pieceListType2)],
           parameters: [
             parameter11("relation", stringType11, { enum: ["all", "ally", "enemy"], default: "all" }),
             parameter11("width", numberType9, { default: 2, minimum: 1, maximum: 32 }),
@@ -6755,8 +7081,8 @@ var ContentGraphCore = (() => {
           id: "query.same-relation",
           label: "\u5224\u65AD\u68CB\u5B50\u654C\u6211\u5173\u7CFB",
           description: "\u4F7F\u7528\u73B0\u6709\u654C\u6211\u5173\u7CFB\u67E5\u8BE2\u5224\u65AD\u4E24\u4E2A\u68CB\u5B50\u662F\u5426\u5C5E\u4E8E\u6307\u5B9A\u5173\u7CFB\uFF0C\u517C\u5BB9\u961F\u4F0D\u6620\u5C04\u800C\u975E\u6BD4\u8F83\u73A9\u5BB6\u5B57\u7B26\u4E32\u3002",
-          inputs: [port16("source", pieceType10), port16("target", pieceType10)],
-          outputs: [port16("value", booleanType10)],
+          inputs: [port17("source", pieceType10), port17("target", pieceType10)],
+          outputs: [port17("value", booleanType10)],
           parameters: [parameter11("relation", stringType11, { enum: ["ally", "enemy"], default: "enemy" })],
           effects: pure9(["pieces", "players"]),
           lower: (ctx) => {
@@ -6771,8 +7097,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u5224\u65AD\u68CB\u5B50\u654C\u6211\u5173\u7CFB",
           description: "\u4F7F\u7528\u73B0\u6709\u654C\u6211\u5173\u7CFB\u67E5\u8BE2\u5224\u65AD\u4E24\u4E2A\u4ECD\u5728\u573A\u4E14\u5B58\u6D3B\u7684\u68CB\u5B50\u662F\u5426\u5C5E\u4E8E\u6307\u5B9A\u5173\u7CFB\uFF0C\u517C\u5BB9\u961F\u4F0D\u6620\u5C04\u800C\u975E\u6BD4\u8F83\u73A9\u5BB6\u5B57\u7B26\u4E32\u3002",
-          inputs: [port16("source", pieceType10), port16("target", pieceType10)],
-          outputs: [port16("value", booleanType10)],
+          inputs: [port17("source", pieceType10), port17("target", pieceType10)],
+          outputs: [port17("value", booleanType10)],
           livingReferences: ["source", "target"],
           parameters: [parameter11("relation", stringType11, { enum: ["ally", "enemy"], default: "enemy" })],
           effects: pure9(["pieces", "players"]),
@@ -6787,8 +7113,8 @@ var ContentGraphCore = (() => {
           id: "query.enemies-on-cells",
           label: "\u67E5\u8BE2\u5730\u683C\u7EBF\u654C\u4EBA",
           description: "\u6309\u6765\u6E90\u654C\u6211\u5173\u7CFB\u7B5B\u9009\u5360\u636E\u7ED9\u5B9A\u5730\u683C\u96C6\u5408\u7684\u5B58\u6D3B\u654C\u4EBA\uFF0C\u4FDD\u6301\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u3002",
-          inputs: [port16("source", pieceType10), port16("cells", cellListType2)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("source", pieceType10), port17("cells", cellListType2)],
+          outputs: [port17("pieces", pieceListType2)],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
             const source = input14(ctx, "source"), cells = input14(ctx, "cells"), query = flow17(ctx);
@@ -6800,8 +7126,8 @@ var ContentGraphCore = (() => {
           id: "query.enemies-on-ordered-cells",
           label: "\u6309\u5730\u683C\u987A\u5E8F\u67E5\u8BE2\u654C\u4EBA",
           description: "\u6309\u8F93\u5165\u5730\u683C\u987A\u5E8F\u3001\u518D\u6309\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u8BFB\u53D6\u6BCF\u683C\u5B58\u6D3B\u654C\u4EBA\uFF0C\u5E76\u53BB\u9664\u91CD\u590D\u5B9E\u4F8B\u3002",
-          inputs: [port16("source", pieceType10), port16("cells", cellListType2)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("source", pieceType10), port17("cells", cellListType2)],
+          outputs: [port17("pieces", pieceListType2)],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
             const source = input14(ctx, "source"), cells = input14(ctx, "cells"), state2 = battle8(ctx), query = flow17(ctx);
@@ -6813,8 +7139,8 @@ var ContentGraphCore = (() => {
           id: "projectile.cardinal-cells",
           label: "\u751F\u6210\u56DB\u5411\u987A\u5E8F\u5730\u683C",
           description: "\u4EE5\u53F3\u3001\u5DE6\u3001\u4E0B\u3001\u4E0A\u56DB\u4E2A\u65B9\u5411\u548C\u9012\u589E\u8DDD\u79BB\u751F\u6210\u56FA\u5B9A\u987A\u5E8F\u7684\u6B63\u4EA4\u5730\u683C\u3002",
-          inputs: [port16("source", pieceType10)],
-          outputs: [port16("cells", cellListType2)],
+          inputs: [port17("source", pieceType10)],
+          outputs: [port17("cells", cellListType2)],
           parameters: [parameter11("maxDistance", numberType9, { default: 3, minimum: 0, maximum: 128 })],
           effects: pure9(["pieces", "position"]),
           lower: (ctx) => {
@@ -6827,8 +7153,8 @@ var ContentGraphCore = (() => {
           id: "query.faction-enemies-on-cells",
           label: "\u6309\u9635\u8425\u67E5\u8BE2\u5730\u683C\u7EBF\u654C\u4EBA",
           description: "\u4FDD\u7559\u65E7\u5F39\u9053\u6309 faction \u4E0D\u76F8\u7B49\u5224\u5B9A\u654C\u4EBA\u7684\u8BED\u4E49\uFF0C\u5E76\u6309\u6218\u6597\u68CB\u5B50\u987A\u5E8F\u8FD4\u56DE\u5B58\u6D3B\u76EE\u6807\u3002",
-          inputs: [port16("source", pieceType10), port16("cells", cellListType2)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("source", pieceType10), port17("cells", cellListType2)],
+          outputs: [port17("pieces", pieceListType2)],
           effects: pure9(["pieces", "position"]),
           lower: (ctx) => {
             const source = input14(ctx, "source"), cells = input14(ctx, "cells"), state2 = battle8(ctx), query = flow17(ctx);
@@ -6840,8 +7166,8 @@ var ContentGraphCore = (() => {
           id: "query.enemies-on-cell",
           label: "\u67E5\u8BE2\u5355\u683C\u654C\u4EBA",
           description: "\u6309\u6765\u6E90\u654C\u6211\u5173\u7CFB\u7B5B\u9009\u5360\u636E\u5355\u4E2A\u5730\u683C\u7684\u5B58\u6D3B\u654C\u4EBA\uFF0C\u4FDD\u6301\u6743\u5A01\u68CB\u5B50\u987A\u5E8F\u3002",
-          inputs: [port16("source", pieceType10), port16("cell", cellType6)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("source", pieceType10), port17("cell", cellType6)],
+          outputs: [port17("pieces", pieceListType2)],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
             const source = input14(ctx, "source"), cell = input14(ctx, "cell"), query = flow17(ctx);
@@ -6853,8 +7179,8 @@ var ContentGraphCore = (() => {
           id: "query.enemies-on-index",
           label: "\u67E5\u8BE2\u5730\u683C\u7EBF\u5E8F\u53F7\u654C\u4EBA",
           description: "\u8BFB\u53D6\u6709\u9650\u5730\u683C\u7EBF\u6307\u5B9A\u5E8F\u53F7\u4E0A\u7684\u5B58\u6D3B\u654C\u4EBA\uFF1B\u8D8A\u8FC7\u5730\u56FE\u8FB9\u754C\u65F6\u8FD4\u56DE\u7A7A\u96C6\u5408\u3002",
-          inputs: [port16("source", pieceType10, { nullable: true, optional: true }), port16("owner", "player", { nullable: true, optional: true }), port16("cells", cellListType2), port16("index", numberType9)],
-          outputs: [port16("pieces", pieceListType2)],
+          inputs: [port17("source", pieceType10, { nullable: true, optional: true }), port17("owner", "player", { nullable: true, optional: true }), port17("cells", cellListType2), port17("index", numberType9)],
+          outputs: [port17("pieces", pieceListType2)],
           effects: pure9(["pieces", "players", "position"]),
           lower: (ctx) => {
             const source = ctx.inputs.source ?? "null", owner = ctx.inputs.owner ?? "null", cells = input14(ctx, "cells"), index = input14(ctx, "index"), query = flow17(ctx);
@@ -6866,8 +7192,8 @@ var ContentGraphCore = (() => {
           id: "query.piece-names",
           label: "\u8BFB\u53D6\u68CB\u5B50\u540D\u79F0\u96C6\u5408",
           description: "\u6309\u7ED9\u5B9A\u68CB\u5B50\u5B9E\u4F8B\u987A\u5E8F\u8BFB\u53D6\u540D\u79F0\u6587\u672C\uFF0C\u4F9B\u5F39\u9053\u7ED3\u679C\u6D88\u606F\u4FDD\u7559\u65E7\u547D\u4E2D\u987A\u5E8F\u3002",
-          inputs: [port16("pieces", pieceListType2)],
-          outputs: [port16("names", stringListType2)],
+          inputs: [port17("pieces", pieceListType2)],
+          outputs: [port17("names", stringListType2)],
           effects: pure9(["pieces"]),
           lower: (ctx) => `(Array.isArray(${input14(ctx, "pieces")}) ? ${input14(ctx, "pieces")} : []).map(function(pieceId) { var piece = ${flow17(ctx)}.query.piece(pieceId); return piece ? String(piece.name) : ''; })`,
           ui: { category: "query" }
@@ -6876,8 +7202,8 @@ var ContentGraphCore = (() => {
           id: "query.hand-card-instances",
           label: "\u67E5\u8BE2\u624B\u724C\u5B9E\u4F8B",
           description: "\u6309\u73A9\u5BB6\u624B\u724C\u987A\u5E8F\u8BFB\u53D6\u6307\u5B9A\u5361\u724C\u7684\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\uFF0C\u4E0D\u628A\u53EF\u53D8\u5361\u724C\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002",
-          inputs: [port16("player", "player")],
-          outputs: [port16("cards", stringListType2)],
+          inputs: [port17("player", "player")],
+          outputs: [port17("cards", stringListType2)],
           parameters: [parameter11("cardId", stringType11)],
           effects: pure9(["hand", "players"]),
           lower: (ctx) => `(function(playerId,cardId){var hand = ${flow17(ctx)}.cards.hand(playerId); return (Array.isArray(hand) ? hand : []).filter(function(card) { return card && card.cardId === cardId; }).map(function(card) { return card.instanceId; });})(${input14(ctx, "player")},${literal4(ctx, "cardId")})`,
@@ -6887,8 +7213,8 @@ var ContentGraphCore = (() => {
           id: "status.find-player-id",
           label: "\u67E5\u627E\u73A9\u5BB6\u72B6\u6001\u6807\u8BC6",
           description: "\u6309\u56FA\u5B9A\u72B6\u6001\u7C7B\u578B\u8BFB\u53D6\u73A9\u5BB6\u72B6\u6001\u7684\u7A33\u5B9A\u6807\u8BC6\uFF0C\u4E0D\u628A\u53EF\u53D8\u72B6\u6001\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002",
-          inputs: [port16("player", "player")],
-          outputs: [port16("id", stringType11, { nullable: true })],
+          inputs: [port17("player", "player")],
+          outputs: [port17("id", stringType11, { nullable: true })],
           parameters: [parameter11("statusType", stringType11)],
           effects: pure9(["statuses", "players"]),
           lower: (ctx) => `(function(playerId){var tags=${flow17(ctx)}.query.player(playerId).statusTags||[],tag=tags.find(function(item){return item&&item.type===${literal4(ctx, "statusType")};});return tag&&typeof tag.id==='string'?tag.id:null;})(${input14(ctx, "player")})`,
@@ -6898,8 +7224,8 @@ var ContentGraphCore = (() => {
           id: "status.read-player-number",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u72B6\u6001\u6570\u503C",
           description: "\u4ECE\u66B4\u98CE\u96EA\u7B49\u767B\u8BB0\u73A9\u5BB6\u72B6\u6001\u8BFB\u53D6\u56FA\u5B9A\u6570\u503C\u5B57\u6BB5\u3002",
-          inputs: [port16("player", "player"), port16("statusId", stringType11, { nullable: true }), port16("fallback", numberType9)],
-          outputs: [port16("value", numberType9)],
+          inputs: [port17("player", "player"), port17("statusId", stringType11, { nullable: true }), port17("fallback", numberType9)],
+          outputs: [port17("value", numberType9)],
           parameters: [parameter11("field", stringType11, { enum: ["centerX", "centerY", "damage"] })],
           effects: pure9(["statuses", "players"]),
           lower: (ctx) => `(function(playerId,statusId,fallback){if(statusId==null)return fallback;var tags=${flow17(ctx)}.query.player(playerId).statusTags||[],tag=tags.find(function(item){return item&&item.id===statusId;}),value=tag&&tag[${literal4(ctx, "field")}];return value==null?fallback:Number(value);})(${input14(ctx, "player")},${input14(ctx, "statusId")},${input14(ctx, "fallback")})`,
@@ -6909,8 +7235,8 @@ var ContentGraphCore = (() => {
           id: "status.has-source-turn",
           label: "\u68C0\u67E5\u6765\u6E90\u56DE\u5408\u72B6\u6001",
           description: "\u6309\u56FA\u5B9A\u7C7B\u578B\u3001\u6765\u6E90\u68CB\u5B50\u548C\u5F53\u524D\u56DE\u5408\u8BFB\u53D6\u8FFD\u51FB\u6807\u8BB0\uFF0C\u907F\u514D\u5F00\u653E\u4EFB\u610F\u72B6\u6001\u8DEF\u5F84\u3002",
-          inputs: [port16("source", pieceType10), port16("target", pieceType10), port16("turn", numberType9)],
-          outputs: [port16("value", booleanType10)],
+          inputs: [port17("source", pieceType10), port17("target", pieceType10), port17("turn", numberType9)],
+          outputs: [port17("value", booleanType10)],
           parameters: [parameter11("statusType", stringType11)],
           effects: pure9(["statuses", "pieces", "turn"]),
           lower: (ctx) => `(function(sourceId,targetId,turn){if(sourceId==null||targetId==null||!${flow17(ctx)}.query.hasPiece(targetId))return false;var tags=${flow17(ctx)}.query.piece(targetId).statusTags||[];return tags.some(function(tag){return tag&&tag.type===${literal4(ctx, "statusType")}&&tag.sourceId===sourceId&&Number(tag.lastDamageTurn)===Number(turn);});})(${input14(ctx, "source")},${input14(ctx, "target")},${input14(ctx, "turn")})`,
@@ -6920,8 +7246,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-player-id",
           label: "\u6309\u6807\u8BC6\u79FB\u9664\u73A9\u5BB6\u72B6\u6001",
           description: "\u901A\u8FC7\u73B0\u6709\u73A9\u5BB6\u72B6\u6001\u751F\u547D\u5468\u671F\u79FB\u9664\u4E00\u4E2A\u52A8\u6001\u6807\u8BC6\uFF0C\u4E0D\u590D\u7528\u68CB\u5B50\u72B6\u6001\u7AEF\u53E3\u3002",
-          inputs: [port16("player", "player"), port16("statusId", stringType11, { nullable: true })],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("player", "player"), port17("statusId", stringType11, { nullable: true })],
+          outputs: [port17("success", booleanType10)],
           effects: writes6(["statuses", "events"], ["afterStatusRemoved"]),
           lower: (ctx) => `(${input14(ctx, "statusId")}==null?false:Boolean(${flow17(ctx)}.status.remove(${input14(ctx, "player")},${input14(ctx, "statusId")},"player")))`,
           ui: { category: "status" }
@@ -6930,8 +7256,8 @@ var ContentGraphCore = (() => {
           id: "status.clear-piece-tags",
           label: "\u6E05\u7A7A\u68CB\u5B50\u72B6\u6001",
           description: "\u901A\u8FC7\u53D7\u63A7\u72B6\u6001\u751F\u547D\u5468\u671F\u524D\u7F6E\u6E05\u7A7A\u76EE\u6807\u68CB\u5B50\u5DF2\u6709\u72B6\u6001\u6807\u7B7E\uFF0C\u590D\u7528\u5C11\u6570\u65E7\u6280\u80FD\u7684\u66FF\u6362\u8BED\u4E49\u3002",
-          inputs: [port16("piece", pieceType10)],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("piece", pieceType10)],
+          outputs: [port17("success", booleanType10)],
           effects: writes6(["statuses", "events"], ["afterStatusRemoved"]),
           lower: (ctx) => `(function(pieceId){if(pieceId==null||!${flow17(ctx)}.query.hasPiece(pieceId))return false;${flow17(ctx)}.query.piece(pieceId).statusTags=[];return true;})(${input14(ctx, "piece")})`,
           ui: { category: "status" }
@@ -6940,8 +7266,8 @@ var ContentGraphCore = (() => {
           id: "piece.set-freeze-effect",
           label: "\u663E\u793A\u51BB\u7ED3\u8868\u73B0",
           description: "\u8BBE\u7F6E\u51BB\u7ED3\u547D\u4E2D\u540E\u7684\u53D7\u63A7\u8868\u73B0\u6807\u8BB0\uFF0C\u4FDD\u7559\u65E7\u6280\u80FD\u7684 UI \u72B6\u6001\u5B57\u6BB5\u3002",
-          inputs: [port16("piece", pieceType10)],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("piece", pieceType10)],
+          outputs: [port17("success", booleanType10)],
           effects: writes6(["presentation"]),
           lower: (ctx) => `(function(id){if(!${flow17(ctx)}.query.hasPiece(id))return false;${flow17(ctx)}.query.piece(id).showFreezeEffect=true;return true;})(${input14(ctx, "piece")})`,
           ui: { category: "presentation" }
@@ -6950,8 +7276,8 @@ var ContentGraphCore = (() => {
           id: "damage.batch-succeeded-at",
           label: "\u8BFB\u53D6\u672C\u6279\u6307\u5B9A\u76EE\u6807\u6210\u529F",
           description: "\u8BFB\u53D6\u6279\u91CF\u4F24\u5BB3\u7ED3\u679C\u4E2D\u4E0E\u76EE\u6807\u987A\u5E8F\u5BF9\u5E94\u7684\u6210\u529F\u4E8B\u5B9E\u3002",
-          inputs: [port16("result", recordType8), port16("index", numberType9)],
-          outputs: [port16("value", booleanType10)],
+          inputs: [port17("result", recordType9), port17("index", numberType9)],
+          outputs: [port17("value", booleanType10)],
           effects: pure9(["damage"]),
           lower: (ctx) => `Boolean(${input14(ctx, "result")}&&Array.isArray(${input14(ctx, "result")}.results)&&${input14(ctx, "result")}.results[${input14(ctx, "index")}]&&${input14(ctx, "result")}.results[${input14(ctx, "index")}].success)`,
           ui: { category: "effect" }
@@ -6960,8 +7286,8 @@ var ContentGraphCore = (() => {
           id: "effect.batch-succeeded-for",
           label: "\u8BFB\u53D6\u672C\u6279\u6307\u5B9A\u76EE\u6807\u6210\u529F",
           description: "\u6309\u7A33\u5B9A\u76EE\u6807\u5B9E\u4F8B\u6807\u8BC6\u8BFB\u53D6\u6279\u91CF\u4F24\u5BB3\u6216\u6CBB\u7597\u7ED3\u679C\u7684\u6210\u529F\u4E8B\u5B9E\uFF1B\u76EE\u6807\u79BB\u573A\u540E\u4ECD\u53EF\u8BFB\u53D6\u7ED3\u679C\u8BB0\u5F55\u3002",
-          inputs: [port16("result", recordType8), port16("target", pieceType10)],
-          outputs: [port16("value", booleanType10)],
+          inputs: [port17("result", recordType9), port17("target", pieceType10)],
+          outputs: [port17("value", booleanType10)],
           effects: pure9(["damage", "heal"]),
           lower: (ctx) => `(function(result,targetId){return Boolean(result&&Array.isArray(result.results)&&result.results.some(function(item){return item&&item.targetId===targetId&&item.success===true;}));})(${input14(ctx, "result")},${input14(ctx, "target")})`,
           ui: { category: "effect" }
@@ -6970,8 +7296,8 @@ var ContentGraphCore = (() => {
           id: "effect.batch-number-for",
           label: "\u8BFB\u53D6\u672C\u6279\u6307\u5B9A\u76EE\u6807\u6570\u503C",
           description: "\u6309\u7A33\u5B9A\u76EE\u6807\u5B9E\u4F8B\u6807\u8BC6\u8BFB\u53D6\u6279\u91CF\u4F24\u5BB3\u6216\u6CBB\u7597\u7ED3\u679C\u4E2D\u7684\u4F24\u5BB3\u6216\u6CBB\u7597\u91CF\u3002",
-          inputs: [port16("result", recordType8), port16("target", pieceType10)],
-          outputs: [port16("value", numberType9)],
+          inputs: [port17("result", recordType9), port17("target", pieceType10)],
+          outputs: [port17("value", numberType9)],
           parameters: [parameter11("field", stringType11, { enum: ["damage", "heal"], default: "damage" })],
           effects: pure9(["damage", "heal"]),
           lower: (ctx) => {
@@ -6984,8 +7310,8 @@ var ContentGraphCore = (() => {
           id: "result.action-ui",
           label: "\u6784\u9020\u5E26\u8868\u73B0\u63D0\u793A\u7684\u884C\u52A8\u7ED3\u679C",
           description: "\u4FDD\u7559\u65E7\u6280\u80FD\u6210\u529F\u7ED3\u679C\u4E2D\u7684 showUIEffects \u6807\u8BB0\uFF0C\u6D88\u606F\u548C\u6210\u529F\u5B57\u6BB5\u4ECD\u7531\u56FE\u63D0\u4F9B\u3002",
-          inputs: [port16("success", booleanType10), port16("message", stringType11)],
-          outputs: [port16("result", recordType8)],
+          inputs: [port17("success", booleanType10), port17("message", stringType11)],
+          outputs: [port17("result", recordType9)],
           effects: pure9(),
           lower: (ctx) => `({success:${input14(ctx, "success")},message:${input14(ctx, "message")},showUIEffects:true})`,
           ui: { category: "result" }
@@ -6994,8 +7320,8 @@ var ContentGraphCore = (() => {
           id: "skill.add-player",
           label: "\u73A9\u5BB6\u83B7\u5F97\u6280\u80FD",
           description: "\u901A\u8FC7\u73B0\u6709\u73A9\u5BB6\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\u6DFB\u52A0\u6280\u80FD\uFF1B\u6280\u80FD\u5B9A\u4E49\u548C\u53BB\u91CD\u4ECD\u7531\u5BBF\u4E3B\u6821\u9A8C\u3002",
-          inputs: [port16("player", "player")],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("player", "player")],
+          outputs: [port17("success", booleanType10)],
           parameters: [parameter11("skillId", stringType11)],
           effects: writes6(["skills"], ["skillAdded"]),
           lower: (ctx) => `Boolean(addPlayerSkillById(${input14(ctx, "player")},${literal4(ctx, "skillId")}))`,
@@ -7005,8 +7331,8 @@ var ContentGraphCore = (() => {
           id: "skill.remove-player",
           label: "\u73A9\u5BB6\u79FB\u9664\u6280\u80FD",
           description: "\u901A\u8FC7\u73B0\u6709\u73A9\u5BB6\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\u79FB\u9664\u6280\u80FD\u3002",
-          inputs: [port16("player", "player")],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("player", "player")],
+          outputs: [port17("success", booleanType10)],
           parameters: [parameter11("skillId", stringType11)],
           effects: writes6(["skills"], ["skillRemoved"]),
           lower: (ctx) => `Boolean(removePlayerSkillById(${input14(ctx, "player")},${literal4(ctx, "skillId")}))`,
@@ -7016,8 +7342,8 @@ var ContentGraphCore = (() => {
           id: "tile.add-markers",
           label: "\u6279\u91CF\u6DFB\u52A0\u5730\u683C\u6807\u8BB0",
           description: "\u4F7F\u7528\u73B0\u6709\u5730\u683C\u6279\u6B21\u5165\u53E3\u63D0\u4EA4\u4E00\u7EC4\u8868\u73B0\u6807\u8BB0\uFF0C\u5E76\u4FDD\u7559\u56FA\u5B9A\u5C55\u5F00\u52A8\u753B\u6765\u6E90\u3002",
-          inputs: [port16("cells", cellListType2), port16("origin", cellType6), port16("sourceId", stringType11), port16("ownerPlayerId", "player", { nullable: true, optional: true })],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("cells", cellListType2), port17("origin", cellType6), port17("sourceId", stringType11), port17("ownerPlayerId", "player", { nullable: true, optional: true })],
+          outputs: [port17("success", booleanType10)],
           parameters: [
             parameter11("effectType", stringType11),
             parameter11("icon", stringType11),
@@ -7040,8 +7366,8 @@ var ContentGraphCore = (() => {
           id: "tile.add-persistent-markers",
           label: "\u6DFB\u52A0\u6C38\u4E45\u5730\u683C\u6807\u8BB0",
           description: "\u6309\u5DF2\u8BA1\u7B97\u5730\u683C\u96C6\u5408\u5199\u5165\u53BB\u91CD\u7684\u6C38\u4E45\u5730\u683C\u6548\u679C\u548C\u6765\u6E90\u8BB0\u5F55\uFF0C\u5E76\u6CBF\u7528\u5730\u683C\u8868\u73B0\u6279\u6B21\u3002",
-          inputs: [port16("source", pieceType10), port16("cells", cellListType2), port16("tileSourceId", stringType11)],
-          outputs: [port16("added", numberType9)],
+          inputs: [port17("source", pieceType10), port17("cells", cellListType2), port17("tileSourceId", stringType11)],
+          outputs: [port17("added", numberType9)],
           parameters: [
             parameter11("effectType", stringType11),
             parameter11("icon", stringType11),
@@ -7061,8 +7387,8 @@ var ContentGraphCore = (() => {
           id: "extension.set-owner-if-empty",
           label: "\u8BBE\u7F6E\u6269\u5C55\u5F52\u5C5E\u73A9\u5BB6",
           description: "\u5F53\u6269\u5C55\u5F52\u5C5E\u5C1A\u672A\u767B\u8BB0\u65F6\u5199\u5165\u6765\u6E90\u73A9\u5BB6\uFF1B\u5DF2\u6709\u5F52\u5C5E\u4FDD\u6301\u4E0D\u53D8\u3002",
-          inputs: [port16("player", "player")],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("player", "player")],
+          outputs: [port17("success", booleanType10)],
           parameters: [parameter11("storageKey", stringType11, { enum: ["amaterasuOwnerPlayerId"], default: "amaterasuOwnerPlayerId" })],
           effects: writes6(["extensions"]),
           lower: (ctx) => {
@@ -7075,8 +7401,8 @@ var ContentGraphCore = (() => {
           id: "attribute.adjust-max-hp",
           label: "\u8C03\u6574\u751F\u547D\u4E0A\u9650",
           description: "\u53D7\u63A7\u8C03\u6574\u68CB\u5B50\u751F\u547D\u4E0A\u9650\uFF0C\u62D2\u7EDD\u4F4E\u4E8E\u5F53\u524D\u751F\u547D\u7684\u7ED3\u679C\u5E76\u8FD4\u56DE\u5B9E\u9645\u751F\u547D\u4E0A\u9650\u3002",
-          inputs: [port16("piece", pieceType10), port16("amount", numberType9)],
-          outputs: [port16("value", numberType9)],
+          inputs: [port17("piece", pieceType10), port17("amount", numberType9)],
+          outputs: [port17("value", numberType9)],
           effects: writes6(["attributes"]),
           lower: (ctx) => {
             const query = flow17(ctx);
@@ -7088,8 +7414,8 @@ var ContentGraphCore = (() => {
           id: "projectile.distance-multiplier",
           label: "\u6309\u8DDD\u79BB\u8BFB\u53D6\u500D\u7387",
           description: "\u4ECE\u4F5C\u8005\u63D0\u4F9B\u7684\u6709\u9650\u8DDD\u79BB\u500D\u7387\u8868\u8BFB\u53D6\u5F53\u524D\u8DDD\u79BB\u503C\uFF1B\u7528\u4E8E\u4FDD\u7559\u4E0D\u540C\u5F39\u9053\u7684\u8DDD\u79BB\u8870\u51CF\u3002",
-          inputs: [port16("distance", numberType9)],
-          outputs: [port16("value", numberType9)],
+          inputs: [port17("distance", numberType9)],
+          outputs: [port17("value", numberType9)],
           parameters: [parameter11("values", numberListType)],
           effects: pure9(),
           lower: (ctx) => {
@@ -7106,8 +7432,8 @@ var ContentGraphCore = (() => {
           id: "effect.heal-captured",
           label: "\u6CBB\u7597\u5DF2\u4FDD\u7559\u6765\u6E90\u68CB\u5B50",
           description: "\u901A\u8FC7\u5DF2\u4FDD\u7559\u6765\u6E90\u53E5\u67C4\u6CBB\u7597\u5355\u4E2A\u5DF2\u4FDD\u7559\u68CB\u5B50\uFF0C\u5141\u8BB8\u6765\u6E90\u5728\u524D\u4E00\u6B65\u79BB\u573A\u540E\u7EE7\u7EED\u5B8C\u6210\u5F53\u524D\u6548\u679C\u3002",
-          inputs: [port16("source", recordType8), port16("target", recordType8), port16("amount", numberType9)],
-          outputs: [port16("result", recordType8)],
+          inputs: [port17("source", recordType9), port17("target", recordType9), port17("amount", numberType9)],
+          outputs: [port17("result", recordType9)],
           parameters: [parameter11("skillId", stringType11)],
           effects: writes6(["heal", "events"], ["beforeHealDealt", "afterHealDealt"]),
           lower: (ctx) => `${flow17(ctx)}.effects.healManyCaptured(${input14(ctx, "source")},[${flow17(ctx)}.effects.capturedIdentifier(${input14(ctx, "target")})],${input14(ctx, "amount")},${literal4(ctx, "skillId")})`,
@@ -7117,8 +7443,8 @@ var ContentGraphCore = (() => {
           id: "effect.displace",
           label: "\u6309\u8DEF\u5F84\u4F4D\u79FB\u68CB\u5B50",
           description: "\u901A\u8FC7\u7EDF\u4E00\u4F4D\u79FB\u5165\u53E3\u63D0\u4EA4\u4E00\u4E2A\u68CB\u5B50\uFF0C\u5E76\u4FDD\u7559\u4F5C\u8005\u6307\u5B9A\u7684\u53EF\u7A7F\u8D8A\u8DEF\u5F84\u7B56\u7565\u3002",
-          inputs: [port16("piece", pieceType10), port16("destination", cellType6)],
-          outputs: [port16("result", recordType8), port16("success", booleanType10)],
+          inputs: [port17("piece", pieceType10), port17("destination", cellType6)],
+          outputs: [port17("result", recordType9), port17("success", booleanType10)],
           parameters: [
             parameter11("kind", stringType11, { enum: ["dash", "teleport"], default: "dash" }),
             parameter11("passAllies", booleanType10, { default: true }),
@@ -7142,8 +7468,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-without-skill-id",
           label: "\u9020\u6210\u65E0\u6280\u80FD\u6807\u8BC6\u4F24\u5BB3",
           description: "\u6CBF\u7528\u65E7\u6280\u80FD\u76F4\u63A5\u8C03\u7528\u4F24\u5BB3\u5165\u53E3\u65F6\u7701\u7565 skillId \u7684\u4E8B\u4EF6\u8BED\u4E49\uFF1B\u4F24\u5BB3\u7C7B\u578B\u4ECD\u7531\u56FE\u663E\u5F0F\u58F0\u660E\u3002",
-          inputs: [port16("source", pieceType10), port16("target", pieceType10), port16("amount", numberType9)],
-          outputs: [port16("result", recordType8), port16("success", booleanType10), port16("damage", numberType9)],
+          inputs: [port17("source", pieceType10), port17("target", pieceType10), port17("amount", numberType9)],
+          outputs: [port17("result", recordType9), port17("success", booleanType10), port17("damage", numberType9)],
           parameters: [parameter11("damageType", stringType11, { enum: ["physical", "magical", "true"], default: "physical" })],
           effects: writes6(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
           lower: (ctx) => {
@@ -7159,8 +7485,8 @@ var ContentGraphCore = (() => {
           id: "card.discard-instance",
           label: "\u5F03\u7F6E\u624B\u724C\u5B9E\u4F8B",
           description: "\u901A\u8FC7\u73B0\u6709\u5361\u724C\u751F\u547D\u5468\u671F\u6309\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\u5F03\u7F6E\u624B\u724C\u5E76\u5199\u5165\u5F03\u724C\u5806\u3002",
-          inputs: [port16("card", stringType11)],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("card", stringType11)],
+          outputs: [port17("success", booleanType10)],
           effects: writes6(["hand", "events"], ["cardDiscarded"]),
           lower: (ctx) => `Boolean(${flow17(ctx)}.cards.discard(${input14(ctx, "card")}))`,
           ui: { category: "card" }
@@ -7169,8 +7495,8 @@ var ContentGraphCore = (() => {
           id: "skill.reset-cooldown",
           label: "\u91CD\u7F6E\u6280\u80FD\u51B7\u5374",
           description: "\u6CBF\u7528\u73B0\u6709\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\uFF0C\u5C06\u6307\u5B9A\u68CB\u5B50\u6280\u80FD\u51B7\u5374\u91CD\u7F6E\u4E3A\u96F6\u3002",
-          inputs: [port16("piece", pieceType10), port16("skillId", stringType11, { nullable: true })],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("piece", pieceType10), port17("skillId", stringType11, { nullable: true })],
+          outputs: [port17("success", booleanType10)],
           effects: writes6(["skills"], ["skillCooldownChanged"]),
           lower: (ctx) => `(function(pieceId,skillId){if(pieceId==null||skillId==null||!${flow17(ctx)}.query.hasPiece(pieceId))return false;${flow17(ctx)}.skills.resetCooldown(pieceId,[skillId]);return true;})(${input14(ctx, "piece")},${input14(ctx, "skillId")})`,
           ui: { category: "skill" }
@@ -7179,8 +7505,8 @@ var ContentGraphCore = (() => {
           id: "effect.destroy-walls",
           label: "\u7834\u574F\u5730\u683C\u5899\u4F53",
           description: "\u7ECF\u73B0\u6709 flow.effects.destroyWalls \u5165\u53E3\u7834\u574F\u7ED9\u5B9A\u5730\u683C\u4E2D\u7684\u5899\u548C\u53EF\u9009\u63A9\u4F53\uFF0C\u5E76\u8FD4\u56DE\u5B9E\u9645\u53D8\u5316\u6570\u91CF\u3002",
-          inputs: [port16("cells", cellListType2)],
-          outputs: [port16("result", recordType8), port16("changed", numberType9)],
+          inputs: [port17("cells", cellListType2)],
+          outputs: [port17("result", recordType9), port17("changed", numberType9)],
           parameters: [parameter11("includeCover", booleanType10, { default: true })],
           effects: writes6(["terrain", "events"], ["terrainChanged"]),
           lower: (ctx) => `(function(value){return {result:value,changed:Array.isArray(value&&value.changedCells)?value.changedCells.length:0};})(${flow17(ctx)}.effects.destroyWalls(${input14(ctx, "cells")},{includeCover:${booleanLiteral3(ctx, "includeCover", true)}}))`,
@@ -7190,8 +7516,8 @@ var ContentGraphCore = (() => {
           id: "projectile.zone-set",
           label: "\u5199\u5165\u5F39\u9053\u533A\u57DF\u8BB0\u5F55",
           description: "\u5199\u5165\u73B0\u6709\u6218\u6597\u6269\u5C55\u4E2D\u7684\u7ED3\u6784\u5316\u5F39\u9053\u533A\u57DF\u8BB0\u5F55\uFF1B\u72B6\u6001\u751F\u547D\u5468\u671F\u4ECD\u7531\u540C\u4E00\u4F5C\u8005\u56FE\u663E\u5F0F\u8C03\u7528\u3002",
-          inputs: [port16("source", pieceType10), port16("dx", numberType9), port16("dy", numberType9)],
-          outputs: [port16("success", booleanType10)],
+          inputs: [port17("source", pieceType10), port17("dx", numberType9), port17("dy", numberType9)],
+          outputs: [port17("success", booleanType10)],
           parameters: [parameter11("storageKey", stringType11, { enum: ["coltZones"], default: "coltZones" }), parameter11("kind", stringType11, { default: "revolver" }), parameter11("turns", numberType9, { default: 2, minimum: 0, maximum: 32 })],
           effects: writes6(["extensions"]),
           lower: (ctx) => {
@@ -7222,9 +7548,9 @@ var ContentGraphCore = (() => {
       var stringType12 = "string";
       var numberType10 = "number";
       var booleanType11 = "boolean";
-      var recordType9 = "record";
+      var recordType10 = "record";
       var pieceListType3 = { kind: "list", element: pieceType11 };
-      var recordListType4 = { kind: "list", element: recordType9 };
+      var recordListType4 = { kind: "list", element: recordType10 };
       var input15 = (ctx, name) => ctx.inputs[name];
       var COUNTER_PASSIVE_GAMEPLAY_MODULES = [
         define16({
@@ -7394,7 +7720,7 @@ var ContentGraphCore = (() => {
         define16({
           id: "event.action-text",
           label: "\u8BFB\u53D6\u52A8\u4F5C\u6587\u672C\u5B57\u6BB5",
-          inputs: [{ name: "action", type: recordType9 }, { name: "fallback", type: stringType12 }],
+          inputs: [{ name: "action", type: recordType10 }, { name: "fallback", type: stringType12 }],
           outputs: [{ name: "value", type: stringType12 }],
           parameters: [{ name: "field", type: stringType12, enum: ["type"] }],
           effects: { pure: true, previewSafe: false, reads: ["actions"] },
@@ -7404,7 +7730,7 @@ var ContentGraphCore = (() => {
         define16({
           id: "event.action-number",
           label: "\u8BFB\u53D6\u52A8\u4F5C\u6570\u503C\u5B57\u6BB5",
-          inputs: [{ name: "action", type: recordType9 }, { name: "fallback", type: numberType10 }],
+          inputs: [{ name: "action", type: recordType10 }, { name: "fallback", type: numberType10 }],
           outputs: [{ name: "value", type: numberType10 }],
           parameters: [{ name: "field", type: stringType12, enum: ["turn", "payload.finalDamage"] }],
           effects: { pure: true, previewSafe: false, reads: ["actions"] },
@@ -7414,7 +7740,7 @@ var ContentGraphCore = (() => {
         define16({
           id: "event.action-piece",
           label: "\u8BFB\u53D6\u52A8\u4F5C\u68CB\u5B50\u5B57\u6BB5",
-          inputs: [{ name: "action", type: recordType9 }, { name: "fallback", type: pieceType11, nullable: true }],
+          inputs: [{ name: "action", type: recordType10 }, { name: "fallback", type: pieceType11, nullable: true }],
           outputs: [{ name: "value", type: pieceType11, nullable: true }],
           parameters: [{ name: "field", type: stringType12, enum: ["payload.targetId"] }],
           effects: { pure: true, previewSafe: false, reads: ["actions"] },
@@ -7716,14 +8042,14 @@ var ContentGraphCore = (() => {
       var stringType13 = "string";
       var numberType11 = "number";
       var booleanType12 = "boolean";
-      var recordType10 = "record";
+      var recordType11 = "record";
       var eventType3 = "event";
       var pieceListType4 = { kind: "list", element: pieceType12 };
       var cellListType3 = { kind: "list", element: cellType7 };
       var stringListType3 = { kind: "list", element: stringType13 };
-      var recordListType5 = { kind: "list", element: recordType10 };
+      var recordListType5 = { kind: "list", element: recordType11 };
       var eventListType3 = { kind: "list", element: eventType3 };
-      var port17 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port18 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter12 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow20 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var input16 = (ctx, name) => {
@@ -7754,8 +8080,8 @@ var ContentGraphCore = (() => {
           id: "choice.target-cell-by-range",
           label: "\u6309\u8BA1\u7B97\u8303\u56F4\u9009\u62E9\u5730\u683C",
           description: "\u590D\u7528\u73B0\u6709\u5730\u683C\u9009\u62E9\u534F\u8BAE\uFF0C\u4F46\u8BA9\u6280\u80FD\u56FE\u5148\u8BA1\u7B97\u5408\u6CD5\u8303\u56F4\uFF1B\u6302\u8D77\u7ED3\u679C\u4FDD\u7559\u5BBF\u4E3B\u7684\u539F\u59CB range\u3002",
-          inputs: [port17("range", numberType11)],
-          outputs: [port17("choice", "choice")],
+          inputs: [port18("range", numberType11)],
+          outputs: [port18("choice", "choice")],
           parameters: [parameter12("filter", stringType13, { enum: ["enemy", "ally", "all"], default: "all" })],
           effects: { pure: false, previewSafe: false, writes: ["pending"], pending: true },
           lower: (ctx) => {
@@ -7769,8 +8095,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cardinal-direction",
           label: "\u8BA1\u7B97\u6B63\u4EA4\u65B9\u5411",
           description: "\u7531\u4E24\u4E2A\u5730\u683C\u8BA1\u7B97\u56FA\u5B9A\u5355\u4F4D\u6B63\u4EA4\u65B9\u5411\u3001\u8DDD\u79BB\u548C\u540C\u683C\u4E8B\u5B9E\uFF1B\u56FE\u8D1F\u8D23\u51B3\u5B9A\u975E\u6CD5\u9009\u62E9\u7684\u7ED3\u679C\u3002",
-          inputs: [port17("from", cellType7), port17("to", cellType7)],
-          outputs: [port17("direction", cellType7), port17("valid", booleanType12), port17("sameCell", booleanType12), port17("distance", numberType11)],
+          inputs: [port18("from", cellType7), port18("to", cellType7)],
+          outputs: [port18("direction", cellType7), port18("valid", booleanType12), port18("sameCell", booleanType12), port18("distance", numberType11)],
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(function(from,to){var dx=to.x-from.x,dy=to.y-from.y,same=dx===0&&dy===0,valid=(dx===0)!==(dy===0);return {direction:{x:dx===0?0:(dx>0?1:-1),y:dy===0?0:(dy>0?1:-1)},valid:valid,sameCell:same,distance:Math.max(Math.abs(dx),Math.abs(dy))};})(${input16(ctx, "from")},${input16(ctx, "to")})`,
           ui: { category: "position" }
@@ -7779,8 +8105,8 @@ var ContentGraphCore = (() => {
           id: "value.select-cell",
           label: "\u6309\u6761\u4EF6\u9009\u62E9\u5730\u683C",
           description: "\u5728\u4E24\u4E2A\u5DF2\u8BA1\u7B97\u5730\u683C\u4E4B\u95F4\u6309\u5E03\u5C14\u6761\u4EF6\u9009\u62E9\u4E00\u4E2A\uFF0C\u4E0D\u6539\u53D8\u5730\u683C\u6216\u68CB\u5B50\u72B6\u6001\u3002",
-          inputs: [port17("condition", booleanType12), port17("whenTrue", cellType7), port17("whenFalse", cellType7)],
-          outputs: [port17("cell", cellType7)],
+          inputs: [port18("condition", booleanType12), port18("whenTrue", cellType7), port18("whenFalse", cellType7)],
+          outputs: [port18("cell", cellType7)],
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(${input16(ctx, "condition")}?${input16(ctx, "whenTrue")}:${input16(ctx, "whenFalse")})`,
           ui: { category: "value" }
@@ -7789,8 +8115,8 @@ var ContentGraphCore = (() => {
           id: "spatial.random-cardinal-landing",
           label: "\u968F\u673A\u6B63\u4EA4\u76F8\u90BB\u843D\u70B9",
           description: "\u6309\u65E7\u8FFD\u8E2A\u653B\u51FB\u7684\u4E0A\u3001\u53F3\u3001\u4E0B\u3001\u5DE6\u987A\u5E8F\u8BFB\u53D6\u53EF\u884C\u8D70\u4E14\u65E0\u5B58\u6D3B\u5360\u4F4D\u7684\u76F8\u90BB\u5730\u683C\uFF0C\u5E76\u4EA4\u7ED9\u6743\u5A01\u968F\u673A\u6E90\uFF1B\u6240\u6709\u5B58\u6D3B\u68CB\u5B50\u90FD\u5360\u636E\u5730\u683C\u3002",
-          inputs: [port17("target", pieceType12)],
-          outputs: [port17("cell", cellType7, { nullable: true })],
+          inputs: [port18("target", pieceType12)],
+          outputs: [port18("cell", cellType7, { nullable: true })],
           effects: { pure: true, previewSafe: false, reads: ["position", "pieces", "random"], random: true },
           lower: (ctx) => {
             const state2 = ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -7803,8 +8129,8 @@ var ContentGraphCore = (() => {
           id: "spatial.square-cells",
           label: "\u751F\u6210\u65B9\u5F62\u8303\u56F4\u5730\u683C",
           description: "\u6309\u56FA\u5B9A y \u5916\u5C42\u3001x \u5185\u5C42\u987A\u5E8F\u751F\u6210\u4EE5\u4E2D\u5FC3\u4E3A\u57FA\u51C6\u7684\u6709\u754C\u65B9\u5F62\u5730\u683C\u96C6\u5408\u3002",
-          inputs: [port17("center", cellType7)],
-          outputs: [port17("cells", cellListType3)],
+          inputs: [port18("center", cellType7)],
+          outputs: [port18("cells", cellListType3)],
           parameters: [parameter12("radius", numberType11, { default: 1, minimum: 0, maximum: 32 })],
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => {
@@ -7819,8 +8145,8 @@ var ContentGraphCore = (() => {
           id: "spatial.perpendicular-cells",
           label: "\u8BA1\u7B97\u6B63\u4EA4\u4E24\u4FA7\u5730\u683C",
           description: "\u7531\u51B2\u523A\u7EC8\u70B9\u548C\u5355\u4F4D\u65B9\u5411\u8BA1\u7B97\u5DE6\u3001\u53F3\u4E24\u4FA7\u7684\u5730\u683C\u8BB0\u5F55\u3002",
-          inputs: [port17("center", cellType7), port17("direction", cellType7)],
-          outputs: [port17("left", cellType7), port17("right", cellType7)],
+          inputs: [port18("center", cellType7), port18("direction", cellType7)],
+          outputs: [port18("left", cellType7), port18("right", cellType7)],
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(function(center,direction){return {left:{x:center.x+direction.y,y:center.y-direction.x},right:{x:center.x-direction.y,y:center.y+direction.x}};})(${input16(ctx, "center")},${input16(ctx, "direction")})`,
           ui: { category: "position" }
@@ -7829,8 +8155,8 @@ var ContentGraphCore = (() => {
           id: "context.primary-target-rewritten",
           label: "\u8BFB\u53D6\u89C4\u5219\u6539\u5199\u76EE\u6807\u4E8B\u5B9E",
           description: "\u53EA\u5224\u65AD\u5F53\u524D\u6280\u80FD\u4E0A\u4E0B\u6587\u662F\u5426\u628A\u6307\u5B9A\u68CB\u5B50\u4F5C\u4E3A\u89C4\u5219\u6539\u5199\u7684\u4E3B\u76EE\u6807\uFF0C\u4E0D\u66B4\u9732\u4EFB\u610F\u4E0A\u4E0B\u6587\u5B57\u6BB5\u3002",
-          inputs: [port17("target", pieceType12)],
-          outputs: [port17("value", booleanType12)],
+          inputs: [port18("target", pieceType12)],
+          outputs: [port18("value", booleanType12)],
           effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
           lower: (ctx) => {
             const current = ctx.surface === "pending" ? "ctx" : "context";
@@ -7843,21 +8169,21 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6B63\u4EA4\u4F4D\u79FB\u8DEF\u5F84\u4E8B\u5B9E",
           description: "\u901A\u8FC7\u7EDF\u4E00\u79FB\u52A8\u8DEF\u5F84\u89C2\u5BDF\u5668\u8BFB\u53D6\u9010\u683C\u843D\u70B9\u3001\u963B\u6321\u3001\u9996\u4E2A\u654C\u4EBA\u548C\u53EF\u843D\u811A\u5730\u683C\uFF1B\u53EA\u8FD4\u56DE\u4E0D\u900F\u660E\u96C6\u5408\u53CA\u6807\u91CF\u4E8B\u5B9E\uFF0C\u4F4D\u79FB\u63D0\u4EA4\u4ECD\u7531 effect.displace-policy \u5B8C\u6210\u3002",
           inputs: [
-            port17("source", pieceType12),
-            port17("direction", cellType7),
-            port17("maxDistance", numberType11)
+            port18("source", pieceType12),
+            port18("direction", cellType7),
+            port18("maxDistance", numberType11)
           ],
           outputs: [
-            port17("cells", cellListType3),
-            port17("encounters", recordListType5),
-            port17("lastLandable", cellType7, { nullable: true }),
-            port17("hasNewLandable", booleanType12),
-            port17("blocked", booleanType12),
-            port17("reachedTarget", booleanType12),
-            port17("firstEnemy", pieceType12, { nullable: true }),
-            port17("enemyPieces", pieceListType4),
-            port17("beforeFirstEnemy", cellType7),
-            port17("firstEnemyDistance", numberType11)
+            port18("cells", cellListType3),
+            port18("encounters", recordListType5),
+            port18("lastLandable", cellType7, { nullable: true }),
+            port18("hasNewLandable", booleanType12),
+            port18("blocked", booleanType12),
+            port18("reachedTarget", booleanType12),
+            port18("firstEnemy", pieceType12, { nullable: true }),
+            port18("enemyPieces", pieceListType4),
+            port18("beforeFirstEnemy", cellType7),
+            port18("firstEnemyDistance", numberType11)
           ],
           parameters: [
             parameter12("passAllies", booleanType12, { default: true }),
@@ -7892,8 +8218,8 @@ var ContentGraphCore = (() => {
           id: "movement.actual-path-enemies",
           label: "\u6309\u5B9E\u9645\u4F4D\u79FB\u8DEF\u5F84\u67E5\u8BE2\u654C\u4EBA",
           description: "\u4ECE\u6743\u5A01\u4F4D\u79FB\u7ED3\u679C\u7684\u5B9E\u9645\u8DEF\u5F84\u9010\u683C\u8BFB\u53D6\u654C\u65B9\u68CB\u5B50\u5E76\u6309\u9996\u6B21\u63A5\u89E6\u53BB\u91CD\uFF1B\u76EE\u6807\u96C6\u5408\u53EA\u8BFB\uFF0C\u540E\u7EED\u4F24\u5BB3\u4ECD\u7531\u56FE\u9010\u9879\u63D0\u4EA4\u3002",
-          inputs: [port17("source", recordType10), port17("movement", recordType10)],
-          outputs: [port17("pieces", pieceListType4)],
+          inputs: [port18("source", recordType11), port18("movement", recordType11)],
+          outputs: [port18("pieces", pieceListType4)],
           effects: { pure: true, previewSafe: false, reads: ["execution-context", "pieces", "players", "position"] },
           lower: (ctx) => {
             const runtime8 = flow20(ctx);
@@ -7905,8 +8231,8 @@ var ContentGraphCore = (() => {
           id: "effect.displace-policy",
           label: "\u6309\u8DEF\u5F84\u7B56\u7565\u63D0\u4EA4\u4F4D\u79FB",
           description: "\u8C03\u7528\u7EDF\u4E00 flow.effects.displace/flow.effects.move \u8DEF\u5F84\u63D0\u4EA4\u5668\uFF0C\u5E76\u5F00\u653E\u6709\u9650\u53EF\u7A7F\u8D8A\u548C\u5730\u5F62\u7B56\u7565\uFF1B\u4E0D\u76F4\u63A5\u5199\u5165\u5750\u6807\u3002",
-          inputs: [port17("piece", pieceType12, { label: "\u68CB\u5B50" }), port17("destination", cellType7, { label: "\u76EE\u6807\u5730\u683C" })],
-          outputs: [port17("result", recordType10), port17("success", booleanType12), port17("changed", booleanType12), port17("steps", numberType11)],
+          inputs: [port18("piece", pieceType12, { label: "\u68CB\u5B50" }), port18("destination", cellType7, { label: "\u76EE\u6807\u5730\u683C" })],
+          outputs: [port18("result", recordType11), port18("success", booleanType12), port18("changed", booleanType12), port18("steps", numberType11)],
           parameters: [
             parameter12("kind", stringType13, { label: "\u4F4D\u79FB\u65B9\u5F0F", description: "\u4F20\u9001\uFF08teleport\uFF09\u3001\u51B2\u523A\uFF08dash\uFF09\u6216\u62C9\u62FD\uFF08pull\uFF09\uFF1B\u56FE\u4E2D\u4FDD\u7559\u7A33\u5B9A\u82F1\u6587\u6807\u8BC6\u3002", enum: ["dash", "teleport", "pull"], default: "dash" }),
             parameter12("passAllies", booleanType12, { label: "\u53EF\u7A7F\u8D8A\u53CB\u65B9", default: true }),
@@ -7934,8 +8260,8 @@ var ContentGraphCore = (() => {
           id: "effect.swap-pieces",
           label: "\u539F\u5B50\u4EA4\u6362\u68CB\u5B50\u4F4D\u7F6E",
           description: "\u5728\u63D0\u4EA4\u524D\u8BFB\u53D6\u53CC\u65B9\u5F53\u524D\u4F4D\u7F6E\u5FEB\u7167\uFF0C\u518D\u4EE5\u4E00\u6B21\u7EDF\u4E00 swap \u4F4D\u79FB\u6279\u6B21\u4EA4\u6362\u4F4D\u7F6E\uFF1B\u89E6\u53D1\u5668\u3001\u963B\u6321\u548C\u56DE\u6EDA\u5168\u90E8\u7531\u6743\u5A01\u4F4D\u79FB\u751F\u547D\u5468\u671F\u5904\u7406\u3002",
-          inputs: [port17("first", pieceType12, { label: "\u7B2C\u4E00\u679A\u68CB\u5B50" }), port17("second", pieceType12, { label: "\u7B2C\u4E8C\u679A\u68CB\u5B50" })],
-          outputs: [port17("result", recordType10), port17("success", booleanType12), port17("changed", booleanType12)],
+          inputs: [port18("first", pieceType12, { label: "\u7B2C\u4E00\u679A\u68CB\u5B50" }), port18("second", pieceType12, { label: "\u7B2C\u4E8C\u679A\u68CB\u5B50" })],
+          outputs: [port18("result", recordType11), port18("success", booleanType12), port18("changed", booleanType12)],
           effects: writes7(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => {
             const first = input16(ctx, "first");
@@ -7949,8 +8275,8 @@ var ContentGraphCore = (() => {
           id: "projectile.trace-strict",
           label: "\u4E25\u683C\u6B63\u4EA4\u5F39\u9053\u89C2\u5BDF",
           description: "\u590D\u7528\u5BBF\u4E3B traceProjectile \u7684\u4E25\u683C\u65B9\u5411\u6821\u9A8C\uFF1B\u975E\u6CD5\u659C\u5411\u8F93\u5165\u4FDD\u7559\u65E7\u5185\u5BB9\u7684 RangeError\uFF0C\u800C\u4E8B\u4EF6\u8BFB\u53D6\u4ECD\u7531\u540E\u7EED\u539F\u5B50\u5B8C\u6210\u3002",
-          inputs: [port17("source", pieceType12), port17("target", cellType7)],
-          outputs: [port17("events", eventListType3), port17("dx", numberType11), port17("dy", numberType11), port17("valid", booleanType12), port17("sameCell", booleanType12), port17("distance", numberType11)],
+          inputs: [port18("source", pieceType12), port18("target", cellType7)],
+          outputs: [port18("events", eventListType3), port18("dx", numberType11), port18("dy", numberType11), port18("valid", booleanType12), port18("sameCell", booleanType12), port18("distance", numberType11)],
           parameters: [parameter12("maxDistance", numberType11, { default: 99, minimum: 0, maximum: 128 })],
           effects: pure10(["pieces", "position"]),
           lower: (ctx) => {
@@ -7966,13 +8292,13 @@ var ContentGraphCore = (() => {
           id: "movement.first-piece-on-trace",
           label: "\u8BFB\u53D6\u5C04\u7EBF\u9996\u4E2A\u68CB\u5B50",
           description: "\u4ECE\u65E2\u6709\u9010\u683C\u8DEF\u5F84\u4E8B\u4EF6\u8BFB\u53D6\u9996\u4E2A\u68CB\u5B50\u53CA\u654C\u6211\u4E8B\u5B9E\uFF1B\u969C\u788D\u6216\u8FB9\u754C\u5728\u9996\u4E2A\u68CB\u5B50\u524D\u7EC8\u6B62\u89C2\u5BDF\uFF0C\u4E0D\u6539\u53D8\u68CB\u76D8\u72B6\u6001\u3002",
-          inputs: [port17("source", pieceType12), port17("events", eventListType3)],
+          inputs: [port18("source", pieceType12), port18("events", eventListType3)],
           outputs: [
-            port17("piece", pieceType12, { nullable: true }),
-            port17("enemy", booleanType12),
-            port17("distance", numberType11),
-            port17("cell", cellType7, { nullable: true }),
-            port17("present", booleanType12)
+            port18("piece", pieceType12, { nullable: true }),
+            port18("enemy", booleanType12),
+            port18("distance", numberType11),
+            port18("cell", cellType7, { nullable: true }),
+            port18("present", booleanType12)
           ],
           effects: { pure: true, previewSafe: false, reads: ["event", "pieces", "players", "position"] },
           lower: (ctx) => {
@@ -7987,15 +8313,15 @@ var ContentGraphCore = (() => {
           id: "movement.first-trace-obstruction",
           label: "\u8BFB\u53D6\u5C04\u7EBF\u9996\u4E2A\u963B\u6321",
           description: "\u6309\u4E8B\u4EF6\u987A\u5E8F\u8BFB\u53D6\u5C04\u7EBF\u4E0A\u7684\u9996\u4E2A\u5730\u5F62\u6216\u68CB\u5B50\u963B\u6321\uFF0C\u5E76\u5728\u547D\u4E2D\u68CB\u5B50\u65F6\u8FD4\u56DE\u654C\u6211\u4E8B\u5B9E\uFF1B\u4E0D\u4FEE\u6539\u68CB\u76D8\u3002",
-          inputs: [port17("source", pieceType12), port17("events", eventListType3)],
+          inputs: [port18("source", pieceType12), port18("events", eventListType3)],
           outputs: [
-            port17("piece", pieceType12, { nullable: true }),
-            port17("enemy", booleanType12),
-            port17("ally", booleanType12),
-            port17("distance", numberType11),
-            port17("cell", cellType7, { nullable: true }),
-            port17("present", booleanType12),
-            port17("terrainBlocked", booleanType12)
+            port18("piece", pieceType12, { nullable: true }),
+            port18("enemy", booleanType12),
+            port18("ally", booleanType12),
+            port18("distance", numberType11),
+            port18("cell", cellType7, { nullable: true }),
+            port18("present", booleanType12),
+            port18("terrainBlocked", booleanType12)
           ],
           effects: pure10(["event", "pieces", "players", "position"]),
           lower: (ctx) => {
@@ -8010,8 +8336,8 @@ var ContentGraphCore = (() => {
           id: "query.has-piece-id",
           label: "\u6309\u6587\u672C\u6807\u8BC6\u5224\u65AD\u68CB\u5B50\u5B58\u5728",
           description: "\u7ED9\u56FE\u5FAA\u73AF\u4F7F\u7528\u7684\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\u63D0\u4F9B\u5B58\u5728\u6027\u68C0\u67E5\uFF1B\u4E0D\u8FD4\u56DE\u6216\u4FEE\u6539\u68CB\u76D8\u5BF9\u8C61\u3002",
-          inputs: [port17("id", stringType13, { nullable: true })],
-          outputs: [port17("exists", booleanType12)],
+          inputs: [port18("id", stringType13, { nullable: true })],
+          outputs: [port18("exists", booleanType12)],
           effects: { pure: true, previewSafe: false, reads: ["pieces"] },
           lower: (ctx) => `(${input16(ctx, "id")} != null && ${flow20(ctx)}.query.hasPiece(${input16(ctx, "id")}))`,
           ui: { category: "query" }
@@ -8020,8 +8346,8 @@ var ContentGraphCore = (() => {
           id: "movement.bounce-candidates",
           label: "\u67E5\u8BE2 bounce \u5019\u9009\u654C\u4EBA",
           description: "\u6309\u6765\u6E90\u5F53\u524D\u4F4D\u7F6E\u3001\u654C\u6211\u5173\u7CFB\u3001\u5B58\u6D3B\u4E8B\u5B9E\u3001\u8303\u56F4\u548C\u5DF2\u547D\u4E2D\u6807\u8BC6\u67E5\u8BE2\u4E0B\u4E00\u7EC4\u5019\u9009\uFF1B\u968F\u673A\u9009\u62E9\u7531\u56FE\u4E2D\u7684 query.random-item \u5B8C\u6210\u3002",
-          inputs: [port17("sourceId", stringType13), port17("excluded", stringListType3), port17("range", numberType11)],
-          outputs: [port17("pieces", pieceListType4)],
+          inputs: [port18("sourceId", stringType13), port18("excluded", stringListType3), port18("range", numberType11)],
+          outputs: [port18("pieces", pieceListType4)],
           effects: { pure: true, previewSafe: false, reads: ["pieces", "players", "position"] },
           lower: (ctx) => {
             const runtime8 = flow20(ctx);
@@ -8033,8 +8359,8 @@ var ContentGraphCore = (() => {
           id: "collection.piece-at",
           label: "\u8BFB\u53D6\u68CB\u5B50\u96C6\u5408\u9879",
           description: "\u6309\u672C\u6B21\u6267\u884C\u7684\u6709\u754C\u7D22\u5F15\u8BFB\u53D6\u68CB\u5B50\u96C6\u5408\u9879\uFF1B\u8D8A\u754C\u8FD4\u56DE\u7A7A\u5F15\u7528\uFF0C\u4E0D\u6539\u53D8\u96C6\u5408\u6216\u68CB\u76D8\u72B6\u6001\u3002",
-          inputs: [port17("items", pieceListType4), port17("index", numberType11)],
-          outputs: [port17("piece", pieceType12, { nullable: true })],
+          inputs: [port18("items", pieceListType4), port18("index", numberType11)],
+          outputs: [port18("piece", pieceType12, { nullable: true })],
           effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
           lower: (ctx) => `(Array.isArray(${input16(ctx, "items")})&&Number.isInteger(${input16(ctx, "index")})&&${input16(ctx, "index")}>=0&&${input16(ctx, "index")}<${input16(ctx, "items")}.length?${input16(ctx, "items")}[${input16(ctx, "index")}]:null)`,
           ui: { category: "collection" }
@@ -8043,8 +8369,8 @@ var ContentGraphCore = (() => {
           id: "local.string-list-create",
           label: "\u521B\u5EFA\u672C\u6B21\u6267\u884C\u6587\u672C\u96C6\u5408",
           description: "\u5728\u5F53\u524D\u6280\u80FD\u56FE\u6267\u884C\u4E2D\u521B\u5EFA\u53EF\u53D8\u7684\u5C40\u90E8\u6587\u672C\u96C6\u5408\uFF1B\u4E0D\u5199\u5165\u68CB\u76D8\u6216\u53EF\u4FDD\u5B58\u72B6\u6001\u3002",
-          inputs: [port17("items", stringListType3)],
-          outputs: [port17("list", recordType10)],
+          inputs: [port18("items", stringListType3)],
+          outputs: [port18("list", recordType11)],
           effects: { pure: false, previewSafe: false, writes: ["execution-context"] },
           lower: (ctx) => `(function(items){return {values:Array.isArray(items)?items.slice():[]};})(${input16(ctx, "items")})`,
           ui: { category: "flow" }
@@ -8053,8 +8379,8 @@ var ContentGraphCore = (() => {
           id: "local.string-list-read",
           label: "\u8BFB\u53D6\u672C\u6B21\u6267\u884C\u6587\u672C\u96C6\u5408",
           description: "\u8BFB\u53D6\u5C40\u90E8\u6587\u672C\u96C6\u5408\u7684\u5F53\u524D\u5FEB\u7167\u4F9B\u67E5\u8BE2\u539F\u5B50\u4F7F\u7528\u3002",
-          inputs: [port17("list", recordType10)],
-          outputs: [port17("items", stringListType3)],
+          inputs: [port18("list", recordType11)],
+          outputs: [port18("items", stringListType3)],
           effects: { pure: true, previewSafe: false, reads: ["execution-context"] },
           lower: (ctx) => `(Array.isArray(${input16(ctx, "list")}&&${input16(ctx, "list")}.values)?${input16(ctx, "list")}.values:[])`,
           ui: { category: "flow" }
@@ -8063,8 +8389,8 @@ var ContentGraphCore = (() => {
           id: "local.string-list-append",
           label: "\u8FFD\u52A0\u672C\u6B21\u6267\u884C\u6587\u672C\u96C6\u5408",
           description: "\u5411\u5C40\u90E8\u6587\u672C\u96C6\u5408\u8FFD\u52A0\u4E00\u4E2A\u7A33\u5B9A\u6807\u8BC6\uFF1B\u4EC5\u6539\u53D8\u672C\u6B21\u56FE\u6267\u884C\u7684\u5C40\u90E8\u503C\u3002",
-          inputs: [port17("list", recordType10), port17("value", stringType13)],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("list", recordType11), port18("value", stringType13)],
+          outputs: [port18("success", booleanType12)],
           effects: { pure: false, previewSafe: false, writes: ["execution-context"] },
           lower: (ctx) => `(function(list,value){if(!list||!Array.isArray(list.values))return false;list.values.push(value);return true;})(${input16(ctx, "list")},${input16(ctx, "value")})`,
           ui: { category: "flow" }
@@ -8073,8 +8399,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-expired-turn-type",
           label: "\u79FB\u9664\u8FC7\u671F\u56DE\u5408\u72B6\u6001",
           description: "\u6309\u5C01\u95ED\u72B6\u6001\u7C7B\u578B\u548C\u56DE\u5408\u7F16\u53F7\u7ECF status lifecycle \u79FB\u9664\u5DF2\u8FC7\u671F\u68CB\u5B50\u72B6\u6001\uFF0C\u4FDD\u7559\u5F53\u524D\u56DE\u5408\u72B6\u6001\u3002",
-          inputs: [port17("target", pieceType12), port17("turn", numberType11)],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("target", pieceType12), port18("turn", numberType11)],
+          outputs: [port18("success", booleanType12)],
           parameters: [parameter12("statusType", stringType13)],
           effects: writes7(["status", "rule", "events"], ["afterStatusRemoved"]),
           lower: (ctx) => {
@@ -8090,8 +8416,8 @@ var ContentGraphCore = (() => {
           id: "source.capture-list",
           label: "\u6309\u8DEF\u5F84\u987A\u5E8F\u4FDD\u7559\u68CB\u5B50\u96C6\u5408",
           description: "\u6309\u65E2\u6709\u6267\u884C\u6765\u6E90\u53E5\u67C4\u9010\u9879\u4FDD\u7559\u6709\u9650\u68CB\u5B50\u96C6\u5408\uFF1B\u4F9B\u4F4D\u79FB\u63D0\u4EA4\u524D\u56FA\u5B9A\u8DEF\u5F84\u76EE\u6807\uFF0C\u4E0D\u80FD\u8DE8\u6267\u884C\u590D\u7528\u3002",
-          inputs: [port17("pieces", pieceListType4)],
-          outputs: [port17("sources", recordListType5)],
+          inputs: [port18("pieces", pieceListType4)],
+          outputs: [port18("sources", recordListType5)],
           effects: writes7(["execution-context"]),
           lower: (ctx) => {
             const runtime8 = flow20(ctx);
@@ -8103,8 +8429,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-captured-list",
           label: "\u4F7F\u7528\u5DF2\u4FDD\u7559\u76EE\u6807\u6279\u91CF\u4F24\u5BB3",
           description: "\u628A\u5DF2\u4FDD\u7559\u7684\u76EE\u6807\u53E5\u67C4\u6309\u56FE\u4E2D\u987A\u5E8F\u8F6C\u6362\u4E3A\u6743\u5A01\u4F24\u5BB3\u6279\u6B21\uFF1B\u6765\u6E90\u6216\u76EE\u6807\u968F\u540E\u79BB\u573A\u65F6\u4ECD\u6CBF\u7528\u672C\u6B21\u7ED3\u7B97\u53E5\u67C4\u3002",
-          inputs: [port17("source", recordType10), port17("targets", recordListType5), port17("amount", numberType11)],
-          outputs: [port17("result", recordType10)],
+          inputs: [port18("source", recordType11), port18("targets", recordListType5), port18("amount", numberType11)],
+          outputs: [port18("result", recordType11)],
           parameters: [parameter12("damageType", stringType13, { enum: ["physical", "magical", "true"], default: "physical" }), parameter12("skillId", stringType13)],
           effects: writes7(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
           lower: (ctx) => {
@@ -8117,8 +8443,8 @@ var ContentGraphCore = (() => {
           id: "damage.batch-total",
           label: "\u8BFB\u53D6\u672C\u6279\u603B\u4F24\u5BB3",
           description: "\u6309\u6743\u5A01\u6279\u91CF\u7ED3\u679C\u7684\u5B9E\u9645\u4F24\u5BB3\u5B57\u6BB5\u6C42\u548C\uFF0C\u4FDD\u7559\u76EE\u6807\u79BB\u573A\u540E\u7684\u6D88\u606F\u6570\u503C\u3002",
-          inputs: [port17("result", recordType10)],
-          outputs: [port17("value", numberType11)],
+          inputs: [port18("result", recordType11)],
+          outputs: [port18("value", numberType11)],
           effects: { pure: true, previewSafe: false },
           lower: (ctx) => `((Array.isArray(${input16(ctx, "result")}.results) ? ${input16(ctx, "result")}.results : []).reduce(function(total,item){return total + Number(item&&item.damage||0);},0))`,
           ui: { category: "effect" }
@@ -8127,8 +8453,8 @@ var ContentGraphCore = (() => {
           id: "status.refresh-position",
           label: "\u5237\u65B0\u4F4D\u7F6E\u72B6\u6001",
           description: "\u901A\u8FC7\u72B6\u6001\u5BBF\u4E3B\u66F4\u65B0\u5DF2\u6709\u4F4D\u7F6E\u8F7D\u8377\u548C\u5269\u4F59\u6301\u7EED\u65F6\u95F4\uFF0C\u4E0D\u521B\u5EFA\u7B2C\u4E8C\u4EFD\u72B6\u6001\u8BB0\u5F55\u3002",
-          inputs: [port17("target", pieceType12), port17("x", numberType11), port17("y", numberType11)],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("target", pieceType12), port18("x", numberType11), port18("y", numberType11)],
+          outputs: [port18("success", booleanType12)],
           parameters: [parameter12("statusType", stringType13), parameter12("duration", numberType11)],
           effects: writes7(["status"]),
           lower: (ctx) => `${flow20(ctx)}.status.refreshPosition(${input16(ctx, "target")}, ${stringLiteral4(ctx, "statusType")}, ${input16(ctx, "x")}, ${input16(ctx, "y")}, ${numberLiteral5(ctx, "duration")})`,
@@ -8138,8 +8464,8 @@ var ContentGraphCore = (() => {
           id: "tile.add-marker",
           label: "\u6DFB\u52A0\u5730\u683C\u6807\u8BB0",
           description: "\u901A\u8FC7\u65E2\u6709 tileBatch \u5165\u53E3\u6DFB\u52A0\u4E0D\u963B\u6321\u8FDB\u5165\u7684\u6765\u6E90\u5730\u683C\u8868\u73B0\uFF0C\u5E76\u4FDD\u7559\u65E7\u8BB0\u5F55\u5B57\u6BB5\u3002",
-          inputs: [port17("cell", cellType7), port17("sourceId", stringType13)],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("cell", cellType7), port18("sourceId", stringType13)],
+          outputs: [port18("success", booleanType12)],
           parameters: [
             parameter12("effectType", stringType13),
             parameter12("icon", stringType13),
@@ -8159,8 +8485,8 @@ var ContentGraphCore = (() => {
           id: "tile.clear-marker",
           label: "\u6E05\u7406\u6765\u6E90\u5730\u683C\u6807\u8BB0",
           description: "\u6309\u5730\u683C\u7C7B\u578B\u548C\u4E0D\u900F\u660E\u6765\u6E90\u6807\u8BC6\u6E05\u7406\u65E2\u6709\u5730\u683C\u8868\u73B0\u3002",
-          inputs: [port17("sourceId", stringType13)],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("sourceId", stringType13)],
+          outputs: [port18("success", booleanType12)],
           parameters: [parameter12("effectType", stringType13)],
           effects: writes7(["tile-effects"]),
           lower: (ctx) => `${flow20(ctx)}.effects.clearTileMarkers(${stringLiteral4(ctx, "effectType")}, ${input16(ctx, "sourceId")})`,
@@ -8170,8 +8496,8 @@ var ContentGraphCore = (() => {
           id: "effect.teleport-with-change",
           label: "\u8BFB\u53D6\u4F20\u9001\u5B9E\u9645\u4F4D\u79FB",
           description: "\u6CBF\u7528\u6743\u5A01\u4F20\u9001\u63D0\u4EA4\u5668\uFF0C\u5E76\u66B4\u9732\u662F\u5426\u63D0\u4EA4\u4E86\u5B9E\u9645\u5750\u6807\u53D8\u5316\u4EE5\u4FDD\u7559\u65E7\u5185\u5BB9\u7684\u65E0\u4F4D\u79FB\u5206\u652F\u3002",
-          inputs: [port17("piece", pieceType12), port17("destination", cellType7)],
-          outputs: [port17("result", recordType10), port17("success", booleanType12), port17("changed", booleanType12)],
+          inputs: [port18("piece", pieceType12), port18("destination", cellType7)],
+          outputs: [port18("result", recordType11), port18("success", booleanType12), port18("changed", booleanType12)],
           parameters: [parameter12("kind", stringType13, { enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
           effects: writes7(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => {
@@ -8186,8 +8512,8 @@ var ContentGraphCore = (() => {
           id: "lifecycle.remove-enemy",
           label: "\u4F7F\u76EE\u6807\u654C\u65B9\u68CB\u5B50\u51FA\u5C40",
           description: "\u901A\u8FC7\u4E3B\u52A8\u6280\u80FD\u751F\u547D\u5468\u671F\u5165\u53E3\u4F7F\u5F53\u524D\u4ECD\u5B58\u5728\u7684\u654C\u65B9\u76EE\u6807\u51FA\u5C40\uFF1B\u5BBF\u4E3B\u6821\u9A8C\u5F53\u524D\u654C\u65B9\u5173\u7CFB\u4E0E\u6280\u80FD\u5165\u53E3\uFF0C\u4E0D\u76F4\u63A5\u7F16\u8F91\u68CB\u5B50\u96C6\u5408\u3002",
-          inputs: [port17("target", pieceType12, { nullable: true })],
-          outputs: [port17("success", booleanType12)],
+          inputs: [port18("target", pieceType12, { nullable: true })],
+          outputs: [port18("success", booleanType12)],
           inspectReferences: ["target"],
           effects: writes7(["pieces", "events"]),
           lower: (ctx) => `(function(targetId) { if (targetId == null || !${flow20(ctx)}.query.hasPiece(targetId)) return false; return Boolean(${flow20(ctx)}.lifecycle.removeEnemy(targetId)); })(${input16(ctx, "target")})`,
@@ -8196,7 +8522,7 @@ var ContentGraphCore = (() => {
       ];
       var MOVEMENT_FAMILY_GAMEPLAY_MODULES = Object.freeze(MOVEMENT_FAMILY_PRIMITIVES);
       var ACTIVE8 = ["skill", "card", "rule", "triggerSkill", "pending"];
-      var port18 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port19 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter13 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var runtime4 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var HOLY_SUPPORT_GAMEPLAY_MODULES = Object.freeze([
@@ -8205,8 +8531,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u66FF\u6362\u72B6\u6001\u5173\u8054\u89C4\u5219",
           description: "\u66FF\u6362\u9996\u4E2A\u5339\u914D\u72B6\u6001\u7684\u5173\u8054\u89C4\u5219\u5217\u8868\uFF1B\u89C4\u5219\u7684\u5B89\u88C5\u548C\u79FB\u9664\u7531\u72EC\u7ACB\u6A21\u5757\u5904\u7406\u3002",
-          inputs: [port18("piece", "piece"), port18("rules", { kind: "list", element: "string" })],
-          outputs: [port18("changed", "boolean")],
+          inputs: [port19("piece", "piece"), port19("rules", { kind: "list", element: "string" })],
+          outputs: [port19("changed", "boolean")],
           parameters: [parameter13("statusId", "string"), parameter13("statusType", "string")],
           allowedSurfaces: ACTIVE8,
           effects: { pure: false, previewSafe: false, reads: ["statuses"], writes: ["statuses"] },
@@ -8217,8 +8543,8 @@ var ContentGraphCore = (() => {
           id: "value.coalesce-record",
           version: "1",
           label: "\u9009\u53D6\u9996\u4E2A\u6709\u6548\u8BB0\u5F55",
-          inputs: [port18("first", "record", { nullable: true }), port18("fallback", "record", { nullable: true })],
-          outputs: [port18("value", "record", { nullable: true })],
+          inputs: [port19("first", "record", { nullable: true }), port19("fallback", "record", { nullable: true })],
+          outputs: [port19("value", "record", { nullable: true })],
           allowedSurfaces: ACTIVE8,
           effects: { pure: true, previewSafe: false },
           lower: (ctx) => `(${ctx.inputs.first} == null ? ${ctx.inputs.fallback} : ${ctx.inputs.first})`,
@@ -8229,8 +8555,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u68CB\u5B50\u6A21\u677F\u5339\u914D",
           description: "\u5224\u65AD\u5DF2\u9A8C\u8BC1\u68CB\u5B50\u5F15\u7528\u662F\u5426\u5C5E\u4E8E\u6307\u5B9A\u5185\u5BB9\u6A21\u677F\u3002",
-          inputs: [port18("piece", "piece", { nullable: true })],
-          outputs: [port18("value", "boolean")],
+          inputs: [port19("piece", "piece", { nullable: true })],
+          outputs: [port19("value", "boolean")],
           parameters: [parameter13("templateId", "string")],
           allowedSurfaces: ACTIVE8,
           effects: { pure: true, previewSafe: false, reads: ["pieces"] },
@@ -8259,12 +8585,12 @@ var ContentGraphCore = (() => {
       var stringType14 = "string";
       var numberType12 = "number";
       var booleanType13 = "boolean";
-      var recordType11 = "record";
+      var recordType12 = "record";
       var eventType4 = "event";
       var pieceListType5 = { kind: "list", element: pieceType13 };
       var cellListType4 = { kind: "list", element: cellType8 };
       var stringListType4 = { kind: "list", element: stringType14 };
-      var recordListType6 = { kind: "list", element: recordType11 };
+      var recordListType6 = { kind: "list", element: recordType12 };
       var eventListType4 = { kind: "list", element: eventType4 };
       var QUERY_MODULES = [
         define18({
@@ -8478,7 +8804,7 @@ var ContentGraphCore = (() => {
           id: "result.blocked",
           label: "\u6784\u9020\u963B\u6321\u7ED3\u679C",
           inputs: [{ name: "message", type: stringType14 }],
-          outputs: [{ name: "result", type: recordType11 }],
+          outputs: [{ name: "result", type: recordType12 }],
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `({success:true,blocked:true,message:${input17(ctx, "message")}})`,
           ui: { category: "result" }
@@ -8600,18 +8926,18 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u79FB\u9664\u8BB0\u5F55\u4E2D\u7684\u89C4\u5219",
           description: "\u6309\u76EE\u6807\u7C7B\u578B\u79FB\u9664\u89C4\u5219\uFF1A\u5B57\u7B26\u4E32\u6CBF\u7528\u8BB0\u5F55\u6807\u8BC6\u6E05\u7406\uFF0C\u6267\u884C\u8BB0\u5F55\u76F4\u63A5\u4F7F\u7528\u672C\u6B21\u6267\u884C\u8BA4\u8BC1\u6765\u6E90\uFF1B\u65E0\u5339\u914D\u89C4\u5219\u4ECD\u8FD4\u56DE\u6210\u529F\uFF0C\u5931\u6548\u6267\u884C\u8BB0\u5F55\u7531\u5BBF\u4E3B\u8BCA\u65AD\u3002",
-          inputs: [{ name: "target", type: recordType11, label: "\u76EE\u6807" }],
+          inputs: [{ name: "target", type: recordType12, label: "\u76EE\u6807" }],
           inputValueTypeBindings: { target: { parameter: "targetType" } },
           outputs: [{ name: "success", type: booleanType13, label: "\u5DF2\u79FB\u9664" }],
           parameters: [
-            { name: "targetType", type: stringType14, label: "\u76EE\u6807\u7C7B\u578B", enum: [stringType14, recordType11], default: stringType14 },
+            { name: "targetType", type: stringType14, label: "\u76EE\u6807\u7C7B\u578B", enum: [stringType14, recordType12], default: stringType14 },
             { name: "ruleId", type: stringType14, label: "\u89C4\u5219" }
           ],
           allowedSurfaces: surfaces10,
           effects: { pure: false, previewSafe: false, reads: ["pieces", "execution-context"], writes: ["rules"] },
           lower: (ctx) => {
             const targetType2 = ctx.parameters.targetType;
-            if (targetType2 === recordType11) return `${flow21(ctx)}.effects.removeCapturedRule(${input17(ctx, "target")}, ${parameter14(ctx, "ruleId")})`;
+            if (targetType2 === recordType12) return `${flow21(ctx)}.effects.removeCapturedRule(${input17(ctx, "target")}, ${parameter14(ctx, "ruleId")})`;
             if (targetType2 !== stringType14) throw new Error(`module ${ctx.moduleId}: targetType must be string or record`);
             return `(function(targetId,ruleId){var all=(${battle10(ctx)}.pieces||[]).concat(${battle10(ctx)}.graveyard||[]),piece=all.find(function(item){return item&&item.instanceId===targetId;});if(!piece||!Array.isArray(piece.rules))return false;var before=piece.rules.length;piece.rules=piece.rules.filter(function(rule){return (rule&&rule.id?rule.id:rule)!==ruleId;});return before!==piece.rules.length;})(${input17(ctx, "target")},${parameter14(ctx, "ruleId")})`;
           },
@@ -8642,7 +8968,7 @@ var ContentGraphCore = (() => {
           id: "extension.read-owner-record",
           label: "\u8BFB\u53D6\u68CB\u5B50\u6269\u5C55\u8BB0\u5F55",
           inputs: [{ name: "owner", type: pieceType13 }],
-          outputs: [{ name: "record", type: recordType11, nullable: true }],
+          outputs: [{ name: "record", type: recordType12, nullable: true }],
           parameters: [{ name: "key", type: stringType14, enum: ["coltZones"] }],
           effects: { pure: true, previewSafe: false, reads: ["extensions"] },
           lower: (ctx) => `(function(ownerId){var ext=${battle10(ctx)}.extensions&&${battle10(ctx)}.extensions[${parameter14(ctx, "key")}];return ext&&ownerId!=null?ext[ownerId]||null:null;})(${input17(ctx, "owner")})`,
@@ -8651,7 +8977,7 @@ var ContentGraphCore = (() => {
         define18({
           id: "extension.record-source",
           label: "\u8BFB\u53D6\u6269\u5C55\u6765\u6E90\u68CB\u5B50",
-          inputs: [{ name: "record", type: recordType11, nullable: true }],
+          inputs: [{ name: "record", type: recordType12, nullable: true }],
           outputs: [{ name: "piece", type: pieceType13, nullable: true }],
           effects: { pure: true, previewSafe: false, reads: ["extensions", "pieces"] },
           lower: (ctx) => `(function(record){var id=record&&record.sourceId;return id!=null&&${flow21(ctx)}.query.hasPiece(id)?id:null;})(${input17(ctx, "record")})`,
@@ -8660,7 +8986,7 @@ var ContentGraphCore = (() => {
         define18({
           id: "extension.read-number",
           label: "\u8BFB\u53D6\u6269\u5C55\u6570\u503C",
-          inputs: [{ name: "record", type: recordType11, nullable: true }, { name: "fallback", type: numberType12 }],
+          inputs: [{ name: "record", type: recordType12, nullable: true }, { name: "fallback", type: numberType12 }],
           outputs: [{ name: "value", type: numberType12 }],
           parameters: [{ name: "field", type: stringType14, enum: ["dx", "dy", "turns"] }],
           effects: { pure: true, previewSafe: false, reads: ["extensions"] },
@@ -8670,7 +8996,7 @@ var ContentGraphCore = (() => {
         define18({
           id: "extension.read-text",
           label: "\u8BFB\u53D6\u6269\u5C55\u6587\u672C",
-          inputs: [{ name: "record", type: recordType11, nullable: true }, { name: "fallback", type: stringType14 }],
+          inputs: [{ name: "record", type: recordType12, nullable: true }, { name: "fallback", type: stringType14 }],
           outputs: [{ name: "value", type: stringType14 }],
           parameters: [{ name: "field", type: stringType14, enum: ["kind", "sourceId"] }],
           effects: { pure: true, previewSafe: false, reads: ["extensions"] },
@@ -8690,7 +9016,7 @@ var ContentGraphCore = (() => {
         define18({
           id: "extension.decrement-turns",
           label: "\u9012\u51CF\u6269\u5C55\u6301\u7EED\u56DE\u5408",
-          inputs: [{ name: "record", type: recordType11, nullable: true }],
+          inputs: [{ name: "record", type: recordType12, nullable: true }],
           outputs: [{ name: "value", type: numberType12 }],
           effects: { pure: false, previewSafe: false, writes: ["extensions"] },
           lower: (ctx) => `(function(record){if(!record)return 0;record.turns=Number(record.turns||0)-1;return record.turns;})(${input17(ctx, "record")})`,
@@ -8713,7 +9039,7 @@ var ContentGraphCore = (() => {
           id: "effect.free-move",
           label: "\u6267\u884C\u514D\u8D39\u79FB\u52A8",
           inputs: [{ name: "piece", type: pieceType13 }, { name: "destination", type: cellType8 }],
-          outputs: [{ name: "result", type: recordType11 }, { name: "success", type: booleanType13 }],
+          outputs: [{ name: "result", type: recordType12 }, { name: "success", type: booleanType13 }],
           effects: { pure: false, previewSafe: false, writes: ["position", "events"], events: ["beforePiecePositionChange", "afterPiecePositionChange"] },
           lower: (ctx) => `(function(value){return {result:value,success:Boolean(value&&value.success)};})(${flow21(ctx)}.effects.freeMove(${input17(ctx, "piece")},${input17(ctx, "destination")}))`,
           ui: { category: "effect" }
@@ -8743,7 +9069,7 @@ var ContentGraphCore = (() => {
           id: "choice.grid-candidates",
           label: "\u6784\u9020\u5730\u683C\u9009\u62E9\u7ED3\u679C",
           inputs: [{ name: "player", type: playerType6 }, { name: "candidates", type: cellListType4 }],
-          outputs: [{ name: "result", type: recordType11 }],
+          outputs: [{ name: "result", type: recordType12 }],
           parameters: [{ name: "title", type: stringType14 }, { name: "canCancel", type: booleanType13, default: true }, { name: "resumeOnCancel", type: booleanType13, default: false }],
           effects: { pure: true, previewSafe: false },
           lower: (ctx) => `({needsTargetSelection:true,playerId:${input17(ctx, "player")},title:${parameter14(ctx, "title")},targetType:'grid',filter:'all',targetCandidates:(${input17(ctx, "candidates")}).map(function(cell){return {type:'cell',x:cell.x,y:cell.y};}),selectionMode:'single',minSelections:1,maxSelections:1,canCancel:${ctx.parameters.canCancel === false ? "false" : "true"},resumeOnCancel:${ctx.parameters.resumeOnCancel === true ? "true" : "false"}})`,
@@ -8753,7 +9079,7 @@ var ContentGraphCore = (() => {
           id: "choice.piece-candidates",
           label: "\u6784\u9020\u68CB\u5B50\u9009\u62E9\u7ED3\u679C",
           inputs: [{ name: "player", type: playerType6 }, { name: "pieces", type: pieceListType5 }],
-          outputs: [{ name: "result", type: recordType11 }],
+          outputs: [{ name: "result", type: recordType12 }],
           parameters: [{ name: "title", type: stringType14 }],
           effects: { pure: true, previewSafe: false },
           lower: (ctx) => `({needsTargetSelection:true,playerId:${input17(ctx, "player")},title:${parameter14(ctx, "title")},targetType:'piece',targetCandidates:(${input17(ctx, "pieces")}).map(function(pieceId){return {type:'piece',pieceId:pieceId};}),selectionMode:'single',minSelections:1,maxSelections:1,canCancel:true})`,
@@ -8878,7 +9204,7 @@ var ContentGraphCore = (() => {
       var numberType13 = "number";
       var pieceType14 = "piece";
       var pieceListType6 = { kind: "list", element: pieceType14 };
-      var port19 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port20 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter15 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow22 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var battle11 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -8898,8 +9224,8 @@ var ContentGraphCore = (() => {
           id: "query.living-template-faction",
           label: "\u6309\u9635\u8425\u67E5\u8BE2\u5B58\u6D3B\u6A21\u677F\u68CB\u5B50",
           description: "\u6309\u6A21\u677F\u3001\u76EE\u6807\u68CB\u5B50\u9635\u8425\u548C\u5B58\u6D3B\u6761\u4EF6\u8FD4\u56DE\u9996\u4E2A\u68CB\u5B50 ID\uFF0C\u4FDD\u6301\u6218\u573A\u987A\u5E8F\u3002",
-          inputs: [port19("target", pieceType14, { nullable: true })],
-          outputs: [port19("piece", pieceType14, { nullable: true })],
+          inputs: [port20("target", pieceType14, { nullable: true })],
+          outputs: [port20("piece", pieceType14, { nullable: true })],
           parameters: [parameter15("templateId", stringType15)],
           effects: read5(["pieces"]),
           lower: (ctx) => {
@@ -8915,12 +9241,12 @@ var ContentGraphCore = (() => {
           id: "query.enemies-on-cardinal-segment",
           label: "\u67E5\u8BE2\u6B63\u4EA4\u7EBF\u6BB5\u654C\u4EBA",
           description: "\u6309\u6765\u6E90\u68CB\u5B50\u5230\u76EE\u6807\u68CB\u5B50\u7684\u6B63\u4EA4\u7EBF\u6BB5\u8BFB\u53D6\u5B58\u6D3B\u654C\u4EBA\uFF0C\u5E76\u6309\u6765\u6E90\u8DDD\u79BB\u7A33\u5B9A\u6392\u5E8F\u3002",
-          inputs: [port19("source", pieceType14), port19("target", pieceType14)],
+          inputs: [port20("source", pieceType14), port20("target", pieceType14)],
           outputs: [
-            port19("pieces", pieceListType6),
-            port19("valid", booleanType14),
-            port19("sameCell", booleanType14),
-            port19("distance", numberType13)
+            port20("pieces", pieceListType6),
+            port20("valid", booleanType14),
+            port20("sameCell", booleanType14),
+            port20("distance", numberType13)
           ],
           effects: read5(["pieces", "players", "position"]),
           lower: (ctx) => {
@@ -8938,10 +9264,10 @@ var ContentGraphCore = (() => {
       var stringType16 = "string";
       var pieceType15 = "piece";
       var playerType7 = "player";
-      var recordType12 = (schema2) => ({ kind: "record", schema: schema2 });
+      var recordType13 = (schema3) => ({ kind: "record", schema: schema3 });
       var stringListType5 = { kind: "list", element: stringType16 };
-      var statusListType = { kind: "list", element: recordType12("followup-status@1") };
-      var port20 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var statusListType = { kind: "list", element: recordType13("followup-status@1") };
+      var port21 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter16 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow23 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var battle12 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -8973,8 +9299,8 @@ var ContentGraphCore = (() => {
           id: "followup.status-records",
           label: "\u6309\u7C7B\u578B\u8BFB\u53D6\u72B6\u6001\u8BB0\u5F55",
           description: "\u8BFB\u53D6\u68CB\u5B50\u5F53\u524D\u62E5\u6709\u7684\u7ED3\u6784\u5316\u72B6\u6001\u8BB0\u5F55\uFF0C\u4FDD\u7559\u5BBF\u4E3B\u987A\u5E8F\uFF1B\u53EF\u6392\u9664\u672C\u56DE\u5408\u521A\u65BD\u52A0\u7684\u8BB0\u5F55\u3002",
-          inputs: [port20("piece", pieceType15), port20("turn", numberType14, { optional: true })],
-          outputs: [port20("records", statusListType)],
+          inputs: [port21("piece", pieceType15), port21("turn", numberType14, { optional: true })],
+          outputs: [port21("records", statusListType)],
           parameters: [parameter16("statusType", stringType16)],
           effects: pure11(["statuses", "pieces"]),
           lower: (ctx) => `(function(pieceId, statusType, currentTurn) { var piece = ${flow23(ctx)}.query.piece(pieceId); return ((piece && piece.statusTags) || []).filter(function(tag) { return tag && tag.type === statusType && (currentTurn === undefined || tag.appliedTurn !== currentTurn); }); })(${input19(ctx, "piece")}, ${literal5(ctx, "statusType")}, ${ctx.inputs.turn ?? "undefined"})`,
@@ -8984,8 +9310,8 @@ var ContentGraphCore = (() => {
           id: "followup.status-player-field",
           label: "\u8BFB\u53D6\u72B6\u6001\u73A9\u5BB6\u5F15\u7528",
           description: "\u4ECE\u5DF2\u627E\u5230\u7684\u72B6\u6001\u8BB0\u5F55\u8BFB\u53D6\u4E00\u4E2A\u58F0\u660E\u8FC7\u7684\u73A9\u5BB6\u5F15\u7528\u5B57\u6BB5\u3002",
-          inputs: [port20("piece", pieceType15), port20("statusId", stringType16, { nullable: true })],
-          outputs: [port20("player", playerType7, { nullable: true })],
+          inputs: [port21("piece", pieceType15), port21("statusId", stringType16, { nullable: true })],
+          outputs: [port21("player", playerType7, { nullable: true })],
           parameters: [parameter16("field", stringType16, { enum: ["opponentPlayerId"] })],
           effects: pure11(["statuses", "pieces"]),
           lower: (ctx) => `(function(pieceId,statusId) { var piece = ${flow23(ctx)}.query.piece(pieceId); var tag = ((piece && piece.statusTags) || []).find(function(item) { return item && item.id === statusId; }); var value = tag && tag[${literal5(ctx, "field")}]; return typeof value === "string" ? value : null; })(${input19(ctx, "piece")}, ${input19(ctx, "statusId")})`,
@@ -8995,8 +9321,8 @@ var ContentGraphCore = (() => {
           id: "followup.remove-status-types",
           label: "\u79FB\u9664\u591A\u79CD\u72B6\u6001\u7C7B\u578B",
           description: "\u6309\u663E\u5F0F\u7C7B\u578B\u5217\u8868\u76F4\u63A5\u79FB\u9664\u72B6\u6001\u8BB0\u5F55\uFF0C\u4E0D\u9690\u5F0F\u5B89\u88C5\u6216\u6E05\u7406\u89C4\u5219\u3002",
-          inputs: [port20("piece", pieceType15), port20("types", stringListType5)],
-          outputs: [port20("success", booleanType15)],
+          inputs: [port21("piece", pieceType15), port21("types", stringListType5)],
+          outputs: [port21("success", booleanType15)],
           effects: writes8(["statuses"]),
           lower: (ctx) => `(function(pieceId,types) { var piece = ${flow23(ctx)}.query.piece(pieceId); piece.statusTags = (piece.statusTags || []).filter(function(tag) { return !tag || types.indexOf(tag.type) < 0; }); return true; })(${input19(ctx, "piece")}, ${input19(ctx, "types")})`,
           ui: { category: "status" }
@@ -9005,8 +9331,8 @@ var ContentGraphCore = (() => {
           id: "followup.damage-status",
           label: "\u7ED3\u7B97\u72B6\u6001\u5EF6\u8FDF\u4F24\u5BB3",
           description: "\u4ECE\u72B6\u6001\u6765\u6E90\u89E3\u6790\u68CB\u5B50\uFF0C\u5E76\u901A\u8FC7\u73B0\u6709 dealDamage \u6743\u5A01\u5165\u53E3\u7ED3\u7B97\u5EF6\u8FDF\u4F24\u5BB3\u3002",
-          inputs: [port20("status", recordType12("followup-status@1")), port20("target", pieceType15)],
-          outputs: [port20("result", "record"), port20("success", booleanType15), port20("damage", numberType14)],
+          inputs: [port21("status", recordType13("followup-status@1")), port21("target", pieceType15)],
+          outputs: [port21("result", "record"), port21("success", booleanType15), port21("damage", numberType14)],
           parameters: [parameter16("damageType", stringType16, { enum: ["physical", "magical", "true"] }), parameter16("skillId", stringType16)],
           effects: writes8(["damage", "statuses"], ["beforeDamageDealt", "afterDamageDealt"]),
           lower: (ctx) => {
@@ -9021,8 +9347,8 @@ var ContentGraphCore = (() => {
           id: "followup.card-has-prefix",
           label: "\u5361\u724C\u6807\u8BC6\u524D\u7F00\u5339\u914D",
           description: "\u5224\u65AD\u5F53\u524D\u5361\u724C\u6807\u8BC6\u662F\u5426\u4EE5\u6307\u5B9A\u524D\u7F00\u5F00\u5934\u3002",
-          inputs: [port20("cardId", stringType16, { nullable: true })],
-          outputs: [port20("value", booleanType15)],
+          inputs: [port21("cardId", stringType16, { nullable: true })],
+          outputs: [port21("value", booleanType15)],
           parameters: [parameter16("prefix", stringType16)],
           effects: pure11(["event"]),
           lower: (ctx) => `Boolean(${input19(ctx, "cardId")} && ${input19(ctx, "cardId")}.startsWith(${literal5(ctx, "prefix")}))`,
@@ -9033,7 +9359,7 @@ var ContentGraphCore = (() => {
           label: "\u5F00\u59CB\u6D88\u606F\u96C6\u5408",
           description: "\u521B\u5EFA\u5F53\u524D\u89C4\u5219\u6267\u884C\u5185\u7684\u4E34\u65F6\u6D88\u606F\u96C6\u5408\u3002",
           inputs: [],
-          outputs: [port20("started", booleanType15)],
+          outputs: [port21("started", booleanType15)],
           effects: writes8(["execution-context"]),
           lower: (ctx) => `(${host2(ctx)}.__rvbFollowupMessages = [], true)`,
           ui: { category: "flow" }
@@ -9042,8 +9368,8 @@ var ContentGraphCore = (() => {
           id: "followup.message-buffer-add",
           label: "\u8FFD\u52A0\u89C4\u5219\u6D88\u606F",
           description: "\u5411\u5F53\u524D\u89C4\u5219\u6267\u884C\u5185\u7684\u4E34\u65F6\u6D88\u606F\u96C6\u5408\u8FFD\u52A0\u4E00\u6761\u6587\u672C\u3002",
-          inputs: [port20("message", stringType16)],
-          outputs: [port20("count", numberType14)],
+          inputs: [port21("message", stringType16)],
+          outputs: [port21("count", numberType14)],
           effects: writes8(["execution-context"]),
           lower: (ctx) => `(${host2(ctx)}.__rvbFollowupMessages || (${host2(ctx)}.__rvbFollowupMessages = [])).push(${input19(ctx, "message")}), ${host2(ctx)}.__rvbFollowupMessages.length`,
           ui: { category: "flow" }
@@ -9053,7 +9379,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u89C4\u5219\u6D88\u606F",
           description: "\u8BFB\u53D6\u5E76\u6E05\u7406\u5F53\u524D\u89C4\u5219\u6267\u884C\u5185\u7684\u6D88\u606F\u96C6\u5408\u3002",
           inputs: [],
-          outputs: [port20("text", stringType16), port20("count", numberType14)],
+          outputs: [port21("text", stringType16), port21("count", numberType14)],
           effects: writes8(["execution-context"]),
           lower: (ctx) => `(function() { var values = Array.isArray(${host2(ctx)}.__rvbFollowupMessages) ? ${host2(ctx)}.__rvbFollowupMessages : []; var text = values.join("\uFF1B"); delete ${host2(ctx)}.__rvbFollowupMessages; return {text:text,count:values.length}; })()`,
           ui: { category: "flow" }
@@ -9062,8 +9388,8 @@ var ContentGraphCore = (() => {
           id: "followup.counter.increment-player",
           label: "\u9012\u589E\u73A9\u5BB6\u5185\u5BB9\u8BA1\u6570",
           description: "\u9012\u589E\u58F0\u660E\u8FC7\u7684\u73A9\u5BB6\u5185\u5BB9\u8BA1\u6570\u5668\uFF0C\u5E76\u8FD4\u56DE\u65B0\u503C\u3002",
-          inputs: [port20("player", playerType7)],
-          outputs: [port20("next", numberType14)],
+          inputs: [port21("player", playerType7)],
+          outputs: [port21("next", numberType14)],
           parameters: [parameter16("counter", stringType16, { enum: ["mangekyoDeaths"] })],
           effects: writes8(["extensions"]),
           lower: (ctx) => `(function(playerId) { battle.extensions = battle.extensions || {}; battle.extensions.contentCounters = battle.extensions.contentCounters || {}; battle.extensions.contentCounters[${literal5(ctx, "counter")}] = battle.extensions.contentCounters[${literal5(ctx, "counter")}] || {}; var values = battle.extensions.contentCounters[${literal5(ctx, "counter")}]; var next = (Number(values[playerId]) || 0) + 1; values[playerId] = next; return next; })(${input19(ctx, "player")})`,
@@ -9073,8 +9399,8 @@ var ContentGraphCore = (() => {
           id: "followup.piece-name-with-template",
           label: "\u8BFB\u53D6\u68CB\u5B50\u540D\u79F0\u5E76\u56DE\u9000\u6A21\u677F",
           description: "\u6309\u68CB\u5B50\u5F15\u7528\u8BFB\u53D6\u5C55\u793A\u540D\u79F0\uFF0C\u7F3A\u5C11\u540D\u79F0\u65F6\u56DE\u9000\u6A21\u677F\u6807\u8BC6\u3002",
-          inputs: [port20("piece", pieceType15)],
-          outputs: [port20("text", stringType16)],
+          inputs: [port21("piece", pieceType15)],
+          outputs: [port21("text", stringType16)],
           effects: pure11(["pieces"]),
           lower: (ctx) => `(function(value) { var id = value && typeof value === "object" ? value.instanceId : value; var piece = ((${battle12(ctx)}.pieces || []).concat(${battle12(ctx)}.graveyard || [])).find(function(item) { return item && item.instanceId === id; }); return String((piece && (piece.name || piece.templateId)) || id || ""); })(${input19(ctx, "piece")})`,
           ui: { category: "text" }
@@ -9083,8 +9409,8 @@ var ContentGraphCore = (() => {
           id: "followup.piece-template-id",
           label: "\u8BFB\u53D6\u68CB\u5B50\u6A21\u677F\u6807\u8BC6",
           description: "\u8BFB\u53D6\u68CB\u5B50\u7684\u7A33\u5B9A\u6A21\u677F\u6807\u8BC6\u3002",
-          inputs: [port20("piece", pieceType15)],
-          outputs: [port20("text", stringType16)],
+          inputs: [port21("piece", pieceType15)],
+          outputs: [port21("text", stringType16)],
           effects: pure11(["pieces"]),
           lower: (ctx) => `(function(value) { var id = value && typeof value === "object" ? value.instanceId : value; var piece = ((${battle12(ctx)}.pieces || []).concat(${battle12(ctx)}.graveyard || [])).find(function(item) { return item && item.instanceId === id; }); return String((piece && piece.templateId) || ""); })(${input19(ctx, "piece")})`,
           ui: { category: "text" }
@@ -9093,8 +9419,8 @@ var ContentGraphCore = (() => {
           id: "followup.primary-mangekyo-witness",
           label: "\u4E07\u82B1\u7B52\u9996\u4F4D\u89C1\u8BC1\u8005",
           description: "\u6309\u5B9E\u4F8B\u6807\u8BC6\u7A33\u5B9A\u6392\u5E8F\u5224\u65AD\u5F53\u524D\u89C1\u8BC1\u8005\u662F\u5426\u4E3A\u8BE5\u73A9\u5BB6\u7684\u9996\u4E2A\u89C1\u8BC1\u8005\u3002",
-          inputs: [port20("witness", pieceType15)],
-          outputs: [port20("value", booleanType15)],
+          inputs: [port21("witness", pieceType15)],
+          outputs: [port21("value", booleanType15)],
           effects: pure11(["pieces", "statuses"]),
           lower: (ctx) => `(function(value) { var id = value && typeof value === "object" ? value.instanceId : value; var pieces = ${battle12(ctx)}.pieces || []; var current = pieces.find(function(item) { return item && item.instanceId === id; }); if (!current) return false; var witnesses = pieces.filter(function(item) { return item && item.ownerPlayerId === current.ownerPlayerId && (item.statusTags || []).some(function(tag) { return tag && tag.type === "mangekyo-witness"; }); }).sort(function(left,right) { return String(left.instanceId).localeCompare(String(right.instanceId)); }); return witnesses.length > 0 && witnesses[0].instanceId === id; })(${input19(ctx, "witness")})`,
           ui: { category: "condition" }
@@ -9104,7 +9430,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u56DE\u5408\u7F16\u53F7",
           description: "\u8BFB\u53D6\u5F53\u524D\u6218\u6597\u56DE\u5408\u7F16\u53F7\uFF0C\u7F3A\u5C11\u56DE\u5408\u65F6\u56DE\u9000\u4E3A\u96F6\u3002",
           inputs: [],
-          outputs: [port20("value", numberType14)],
+          outputs: [port21("value", numberType14)],
           effects: pure11(["turn"]),
           lower: (ctx) => `Number((${battle12(ctx)}.turn && ${battle12(ctx)}.turn.turnNumber) || 0)`,
           ui: { category: "context" }
@@ -9113,8 +9439,8 @@ var ContentGraphCore = (() => {
           id: "followup.action.append",
           label: "\u8FFD\u52A0\u52A8\u4F5C\u8BB0\u5F55",
           description: "\u8FFD\u52A0\u5DF2\u58F0\u660E\u7ED3\u6784\u5316\u52A8\u4F5C\u8BB0\u5F55\uFF0C\u4FDD\u7559\u539F\u6709\u65E5\u5FD7\u5E8F\u5217\u3002",
-          inputs: [port20("action", recordType12("followup-mangekyo-action@1"))],
-          outputs: [port20("success", booleanType15)],
+          inputs: [port21("action", recordType13("followup-mangekyo-action@1"))],
+          outputs: [port21("success", booleanType15)],
           effects: writes8(["actions"]),
           lower: (ctx) => `(${battle12(ctx)}.actions = ${battle12(ctx)}.actions || [], ${battle12(ctx)}.actions.push(${input19(ctx, "action")}), true)`,
           ui: { category: "log" }
@@ -9125,8 +9451,8 @@ var ContentGraphCore = (() => {
       var numberType15 = "number";
       var booleanType16 = "boolean";
       var playerType8 = "player";
-      var recordType13 = "record";
-      var port21 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordType14 = "record";
+      var port22 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter17 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var writes9 = (domains) => ({ pure: false, previewSafe: false, writes: domains });
       var flow24 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
@@ -9138,12 +9464,12 @@ var ContentGraphCore = (() => {
       function schemaFor2(ctx) {
         const reference = ctx.parameters.payloadSchema;
         if (typeof reference !== "string" || reference.length === 0) throw new Error(`module ${ctx.moduleId}: payloadSchema is required`);
-        const schema2 = (ctx.recordSchemas ?? []).find((candidate) => `${candidate.id}@${candidate.version}` === reference || candidate.id === reference);
-        if (!schema2) throw new Error(`module ${ctx.moduleId}: unknown payload schema ${reference}`);
-        return schema2;
+        const schema3 = (ctx.recordSchemas ?? []).find((candidate) => `${candidate.id}@${candidate.version}` === reference || candidate.id === reference);
+        if (!schema3) throw new Error(`module ${ctx.moduleId}: unknown payload schema ${reference}`);
+        return schema3;
       }
-      function schemaLiteral(schema2) {
-        return JSON.parse(JSON.stringify(schema2));
+      function schemaLiteral(schema3) {
+        return JSON.parse(JSON.stringify(schema3));
       }
       var STRUCTURED_ACTION_LOG_GAMEPLAY_MODULES = Object.freeze([{
         id: "followup.action.append",
@@ -9154,14 +9480,14 @@ var ContentGraphCore = (() => {
         label: "\u8FFD\u52A0\u7ED3\u6784\u5316\u65E5\u5FD7",
         description: "\u5728\u4E00\u53E5\u4F5C\u8005\u8BED\u53E5\u4E2D\u586B\u5199\u65E5\u5FD7\u7C7B\u578B\u4E0E\u5DF2\u58F0\u660E\u8BB0\u5F55\u8F7D\u8377\uFF1B\u5BBF\u4E3B\u4E25\u683C\u6821\u9A8C\u5B57\u6BB5\u548C\u7C7B\u578B\uFF0C\u53EA\u80FD\u8FFD\u52A0\uFF0C\u4E0D\u4F1A\u8986\u76D6\u6743\u5A01\u4F24\u5BB3\u52A8\u4F5C\u3002",
         inputs: [
-          port21("type", stringType17, { label: "\u65E5\u5FD7\u7C7B\u578B" }),
-          port21("playerId", playerType8, { label: "\u5F52\u5C5E\u73A9\u5BB6" }),
-          port21("turn", numberType15, { label: "\u56DE\u5408" }),
-          port21("payload", recordType13, { label: "\u7C7B\u578B\u5316\u8F7D\u8377" })
+          port22("type", stringType17, { label: "\u65E5\u5FD7\u7C7B\u578B" }),
+          port22("playerId", playerType8, { label: "\u5F52\u5C5E\u73A9\u5BB6" }),
+          port22("turn", numberType15, { label: "\u56DE\u5408" }),
+          port22("payload", recordType14, { label: "\u7C7B\u578B\u5316\u8F7D\u8377" })
         ],
         inputSchemaBindings: { payload: { parameter: "payloadSchema" } },
         parameters: [parameter17("payloadSchema", stringType17, { label: "\u8F7D\u8377\u8BB0\u5F55\u7C7B\u578B" })],
-        outputs: [port21("success", booleanType16)],
+        outputs: [port22("success", booleanType16)],
         allowedSurfaces: ACTIVE11,
         effects: writes9(["actions"]),
         lower: (ctx) => `${flow24(ctx)}.log.appendStructured({type:${input20(ctx, "type")},playerId:${input20(ctx, "playerId")},turn:${input20(ctx, "turn")},payload:${input20(ctx, "payload")}},${ctx.emitLiteral(schemaLiteral(schemaFor2(ctx)))})`,
@@ -9230,11 +9556,11 @@ var ContentGraphCore = (() => {
       var stringType19 = "string";
       var numberType17 = "number";
       var booleanType17 = "boolean";
-      var recordType14 = "record";
-      var recordListType7 = { kind: "list", element: recordType14 };
+      var recordType15 = "record";
+      var recordListType7 = { kind: "list", element: recordType15 };
       var nullableStringType3 = { kind: "nullable", value: stringType19 };
       var nullableNumberType = { kind: "nullable", value: numberType17 };
-      var port22 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port23 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter18 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure13 = (reads) => ({ pure: true, previewSafe: false, reads });
       var writes11 = (domains, events = []) => ({
@@ -9291,8 +9617,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BFB\u53D6\u5728\u573A\u6216\u5386\u53F2\u68CB\u5B50\u5B57\u6BB5",
           description: "\u6309\u7A33\u5B9A\u68CB\u5B50\u6807\u8BC6\u8BFB\u53D6\u767B\u8BB0\u7684\u6807\u91CF\u5B57\u6BB5\uFF1B\u5F53\u524D\u68CB\u5B50\u548C\u5893\u5730\u5747\u53EF\u8BFB\uFF0C\u7F3A\u5931\u5B57\u6BB5\u8FD4\u56DE\u7A7A\u503C\u3002",
-          inputs: [port22("id", stringType19, { nullable: true })],
-          outputs: [port22("value", "unknown", { nullable: true }), port22("exists", booleanType17)],
+          inputs: [port23("id", stringType19, { nullable: true })],
+          outputs: [port23("value", "unknown", { nullable: true }), port23("exists", booleanType17)],
           parameters: [parameter18("field", stringType19, { enum: Object.keys(storedFieldTypes) })],
           outputParameterTypeBindings: { value: { parameter: "field", types: storedFieldTypes } },
           allowedSurfaces: SURFACES3,
@@ -9305,8 +9631,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u589E\u76CA\u8BB0\u5F55",
           description: "\u8BFB\u53D6\u6307\u5B9A\u73A9\u5BB6\u7684\u5355\u4E2A\u589E\u76CA\u8BB0\u5F55\u5FEB\u7167\uFF1B\u73A9\u5BB6\u6216\u589E\u76CA\u7F3A\u5931\u8FD4\u56DE\u7A7A\u8BB0\u5F55\u503C\u3002",
-          inputs: [port22("player", playerType9)],
-          outputs: [port22("record", recordType14, { nullable: true })],
+          inputs: [port23("player", playerType9)],
+          outputs: [port23("record", recordType15, { nullable: true })],
           parameters: [parameter18("buffId", stringType19)],
           allowedSurfaces: SURFACES3,
           effects: pure13(["players", "player-buffs"]),
@@ -9318,8 +9644,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u5199\u5165\u73A9\u5BB6\u589E\u76CA\u6B21\u6570",
           description: "\u53EA\u66F4\u65B0\u5DF2\u58F0\u660E\u73A9\u5BB6\u589E\u76CA\u7684\u5269\u4F59\u6B21\u6570\uFF1B\u7F3A\u5931\u6216\u5DF2\u8017\u5C3D\u7684\u589E\u76CA\u4E0D\u4F1A\u521B\u5EFA\u65B0\u8BB0\u5F55\u3002",
-          inputs: [port22("player", playerType9), port22("uses", numberType17)],
-          outputs: [port22("success", booleanType17)],
+          inputs: [port23("player", playerType9), port23("uses", numberType17)],
+          outputs: [port23("success", booleanType17)],
           parameters: [parameter18("buffId", stringType19)],
           allowedSurfaces: SURFACES3,
           effects: writes11(["player-buffs"]),
@@ -9331,8 +9657,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u5199\u5165\u68CB\u5B50\u89C4\u5219\u5F15\u7528\u8BB0\u5F55",
           description: "\u66FF\u6362\u68CB\u5B50\u7684\u539F\u59CB\u89C4\u5219\u5F15\u7528\u5143\u7EC4\uFF1B\u4E0D\u5B89\u88C5\u6216\u79FB\u9664\u89C4\u5219\u751F\u547D\u5468\u671F\u3002",
-          inputs: [port22("piece", pieceType17), port22("rules", recordListType7)],
-          outputs: [port22("success", booleanType17)],
+          inputs: [port23("piece", pieceType17), port23("rules", recordListType7)],
+          outputs: [port23("success", booleanType17)],
           allowedSurfaces: SURFACES3,
           effects: writes11(["rules"]),
           lower: writeRulesLowering,
@@ -9349,7 +9675,7 @@ var ContentGraphCore = (() => {
       var choiceType5 = "choice";
       var stringListType6 = { kind: "list", element: stringType20 };
       var prophecyRecordType = { kind: "record", schema: "velen-holy-prophecy@1" };
-      var port23 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port24 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter19 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow27 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var input23 = (ctx, name) => {
@@ -9375,8 +9701,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-instances",
           label: "\u67E5\u8BE2\u73A9\u5BB6\u624B\u724C\u5B9E\u4F8B",
           description: "\u6309\u5F53\u524D\u624B\u724C\u987A\u5E8F\u8FD4\u56DE\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\uFF1B\u4E0D\u628A\u53EF\u53D8\u5361\u724C\u5BF9\u8C61\u66B4\u9732\u7ED9\u4F5C\u8005\u56FE\u3002\u53EF\u9009\u5361\u724C\u5B9A\u4E49\u6807\u8BC6\u7528\u4E8E\u53D7\u9650\u7B5B\u9009\u3002",
-          inputs: [port23("player", playerType10)],
-          outputs: [port23("cards", stringListType6)],
+          inputs: [port24("player", playerType10)],
+          outputs: [port24("cards", stringListType6)],
           parameters: [parameter19("cardId", stringType20, { optional: true })],
           allowedSurfaces: ACTIVE12,
           effects: pure14(["hand", "players"]),
@@ -9390,8 +9716,8 @@ var ContentGraphCore = (() => {
           id: "card.read-definition-name",
           label: "\u8BFB\u53D6\u624B\u724C\u540D\u79F0",
           description: "\u8BFB\u53D6\u624B\u724C\u5B9E\u4F8B\u7684\u663E\u793A\u540D\u79F0\uFF1B\u7F3A\u5C11\u6216\u7A7A\u540D\u79F0\u65F6\u8FD4\u56DE\u7A7A\u503C\uFF0C\u7531\u4F5C\u8005\u56FE\u51B3\u5B9A\u56DE\u9000\u6587\u672C\u3002",
-          inputs: [port23("player", playerType10), port23("card", stringType20)],
-          outputs: [port23("name", stringType20, { nullable: true })],
+          inputs: [port24("player", playerType10), port24("card", stringType20)],
+          outputs: [port24("name", stringType20, { nullable: true })],
           allowedSurfaces: ACTIVE12,
           effects: pure14(["hand", "content"]),
           lower: (ctx) => `(function(playerId,instanceId){var hand=${flow27(ctx)}.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;});return card&&card.name?String(card.name):null;})(${input23(ctx, "player")},${input23(ctx, "card")})`,
@@ -9401,8 +9727,8 @@ var ContentGraphCore = (() => {
           id: "card.read-content-boolean",
           label: "\u8BFB\u53D6\u624B\u724C\u5185\u5BB9\u58F0\u660E",
           description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u624B\u724C contentState \u5E03\u5C14\u58F0\u660E\uFF1B\u5B57\u6BB5\u96C6\u5408\u5C01\u95ED\uFF0C\u4E0D\u80FD\u8BBF\u95EE\u4EFB\u610F\u5BF9\u8C61\u8DEF\u5F84\u3002",
-          inputs: [port23("player", playerType10), port23("card", stringType20)],
-          outputs: [port23("value", booleanType18)],
+          inputs: [port24("player", playerType10), port24("card", stringType20)],
+          outputs: [port24("value", booleanType18)],
           parameters: [parameter19("field", stringType20, { enum: ["velenHolyProphecy", "velenHolyProphecyEnhanced"] })],
           allowedSurfaces: ACTIVE12,
           effects: pure14(["hand", "content"]),
@@ -9413,8 +9739,8 @@ var ContentGraphCore = (() => {
           id: "card.set-content-record",
           label: "\u5199\u5165\u624B\u724C\u5185\u5BB9\u8BB0\u5F55",
           description: "\u5199\u5165\u4E00\u4E2A\u767B\u8BB0\u8FC7\u7684\u7ED3\u6784\u5316\u5185\u5BB9\u58F0\u660E\uFF1B\u53EA\u590D\u5236\u58F0\u660E schema \u4E2D\u7684\u6765\u6E90\u4E0E\u56DE\u5408\u5B57\u6BB5\u3002",
-          inputs: [port23("player", playerType10), port23("card", stringType20), port23("record", prophecyRecordType)],
-          outputs: [port23("success", booleanType18)],
+          inputs: [port24("player", playerType10), port24("card", stringType20), port24("record", prophecyRecordType)],
+          outputs: [port24("success", booleanType18)],
           parameters: [parameter19("field", stringType20, { enum: ["velenHolyProphecy"] })],
           allowedSurfaces: ACTIVE12,
           effects: writes12(["hand", "content"]),
@@ -9425,8 +9751,8 @@ var ContentGraphCore = (() => {
           id: "choice.hand-cards",
           label: "\u9009\u62E9\u624B\u724C\u5B9E\u4F8B",
           description: "\u4F7F\u7528\u73B0\u6709\u624B\u724C\u9009\u9879\u534F\u8BAE\u5448\u73B0\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\u548C\u4F5C\u8005\u56FE\u63D0\u4F9B\u7684\u6807\u7B7E\uFF1B\u9009\u62E9\u6062\u590D\u4E0E\u6821\u9A8C\u4ECD\u7531\u6743\u5A01\u5BBF\u4E3B\u5904\u7406\u3002",
-          inputs: [port23("player", playerType10), port23("cards", stringListType6), port23("labels", stringListType6)],
-          outputs: [port23("choice", choiceType5, { nullable: true, optional: true })],
+          inputs: [port24("player", playerType10), port24("cards", stringListType6), port24("labels", stringListType6)],
+          outputs: [port24("choice", choiceType5, { nullable: true, optional: true })],
           parameters: [
             parameter19("title", stringType20),
             parameter19("selectionMode", stringType20, { enum: ["single", "multi"] }),
@@ -9446,8 +9772,8 @@ var ContentGraphCore = (() => {
           id: "choice.is-strict-string-list",
           label: "\u68C0\u67E5\u4E25\u683C\u6587\u672C\u591A\u9009",
           description: "\u5224\u65AD\u591A\u9009\u7ED3\u679C\u662F\u5426\u4E3A\u5143\u7D20\u5168\u90E8\u662F\u539F\u59CB\u5B57\u7B26\u4E32\u7684\u6570\u7EC4\uFF0C\u4E0D\u63A5\u53D7\u5BF9\u8C61\u5305\u88C5\u3001\u6570\u5B57\u6216\u6DF7\u5408\u5143\u7D20\u3002",
-          inputs: [port23("choice", choiceType5, { nullable: true, optional: true })],
-          outputs: [port23("value", booleanType18)],
+          inputs: [port24("choice", choiceType5, { nullable: true, optional: true })],
+          outputs: [port24("value", booleanType18)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(Array.isArray(${input23(ctx, "choice")})&&${input23(ctx, "choice")}.every(function(item){return typeof item === "string";}))`,
@@ -9457,8 +9783,8 @@ var ContentGraphCore = (() => {
           id: "choice.strict-string",
           label: "\u8BFB\u53D6\u4E25\u683C\u6587\u672C\u9009\u9879",
           description: "\u53EA\u63A5\u53D7\u539F\u59CB\u5B57\u7B26\u4E32\u9009\u9879\uFF1B\u5BF9\u8C61\u3001\u6570\u5B57\u548C\u5176\u4ED6\u5305\u88C5\u503C\u4FDD\u6301\u65E0\u6548\uFF0C\u4E0D\u81EA\u52A8\u89E3\u5305\u6216\u8F6C\u6587\u672C\u3002",
-          inputs: [port23("choice", choiceType5, { nullable: true, optional: true })],
-          outputs: [port23("text", stringType20)],
+          inputs: [port24("choice", choiceType5, { nullable: true, optional: true })],
+          outputs: [port24("text", stringType20)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(typeof ${input23(ctx, "choice")} === "string" ? ${input23(ctx, "choice")} : "")`,
@@ -9468,8 +9794,8 @@ var ContentGraphCore = (() => {
           id: "choice.strict-string-list",
           label: "\u8BFB\u53D6\u4E25\u683C\u6587\u672C\u591A\u9009",
           description: "\u53EA\u63A5\u53D7\u5143\u7D20\u5168\u90E8\u4E3A\u539F\u59CB\u5B57\u7B26\u4E32\u7684\u6570\u7EC4\uFF1B\u5BF9\u8C61\u3001\u6570\u5B57\u3001\u6DF7\u5408\u6570\u7EC4\u548C\u5305\u88C5\u6570\u7EC4\u4FDD\u6301\u65E0\u6548\u3002",
-          inputs: [port23("choice", choiceType5, { nullable: true, optional: true })],
-          outputs: [port23("values", stringListType6)],
+          inputs: [port24("choice", choiceType5, { nullable: true, optional: true })],
+          outputs: [port24("values", stringListType6)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(function(value){return Array.isArray(value)&&value.every(function(item){return typeof item === "string";})?value:[];})(${input23(ctx, "choice")})`,
@@ -9479,8 +9805,8 @@ var ContentGraphCore = (() => {
           id: "choice.is-array",
           label: "\u68C0\u67E5\u591A\u9009\u6570\u7EC4",
           description: "\u4E25\u683C\u5224\u65AD\u9009\u9879\u7ED3\u679C\u662F\u5426\u4E3A\u6570\u7EC4\uFF0C\u4FDD\u7559\u65E7\u591A\u9009\u6280\u80FD\u5BF9\u975E\u6570\u7EC4\u7ED3\u679C\u7684\u5931\u8D25\u5206\u652F\u3002",
-          inputs: [port23("choice", choiceType5, { nullable: true, optional: true })],
-          outputs: [port23("value", booleanType18)],
+          inputs: [port24("choice", choiceType5, { nullable: true, optional: true })],
+          outputs: [port24("value", booleanType18)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `Array.isArray(${input23(ctx, "choice")})`,
@@ -9490,8 +9816,8 @@ var ContentGraphCore = (() => {
           id: "collection.contains-string",
           label: "\u68C0\u67E5\u6587\u672C\u96C6\u5408\u6210\u5458",
           description: "\u6309\u4E25\u683C\u6587\u672C\u6807\u8BC6\u5224\u65AD\u96C6\u5408\u662F\u5426\u5305\u542B\u4E00\u4E2A\u503C\u3002",
-          inputs: [port23("items", stringListType6), port23("value", stringType20)],
-          outputs: [port23("contains", booleanType18)],
+          inputs: [port24("items", stringListType6), port24("value", stringType20)],
+          outputs: [port24("contains", booleanType18)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(Array.isArray(${input23(ctx, "items")})&&${input23(ctx, "items")}.indexOf(${input23(ctx, "value")})!==-1)`,
@@ -9501,8 +9827,8 @@ var ContentGraphCore = (() => {
           id: "collection.all-in-strings",
           label: "\u68C0\u67E5\u6587\u672C\u96C6\u5408\u5747\u5728\u5141\u8BB8\u96C6\u5408\u4E2D",
           description: "\u6309\u4E25\u683C\u6587\u672C\u6807\u8BC6\u5224\u65AD\u6BCF\u4E2A\u9009\u62E9\u662F\u5426\u4ECD\u5C5E\u4E8E\u5F53\u524D\u6709\u6548\u5019\u9009\u96C6\u5408\u3002",
-          inputs: [port23("items", stringListType6), port23("allowed", stringListType6)],
-          outputs: [port23("valid", booleanType18)],
+          inputs: [port24("items", stringListType6), port24("allowed", stringListType6)],
+          outputs: [port24("valid", booleanType18)],
           allowedSurfaces: PURE3,
           effects: { pure: true, previewSafe: true },
           lower: (ctx) => `(Array.isArray(${input23(ctx, "items")})&&Array.isArray(${input23(ctx, "allowed")})&&${input23(ctx, "items")}.every(function(value){return ${input23(ctx, "allowed")}.indexOf(value)!==-1;}))`,
@@ -9513,7 +9839,7 @@ var ContentGraphCore = (() => {
       var pieceType18 = "piece";
       var cellType9 = "cell";
       var cellListType5 = { kind: "list", element: cellType9 };
-      var port24 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port25 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input24 = (ctx, name) => {
         const value = ctx.inputs[name];
         if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -9531,8 +9857,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cardinal-cells",
           label: "\u751F\u6210\u6B63\u4EA4\u76F8\u90BB\u5730\u683C",
           description: "\u6309\u4E0A\u3001\u53F3\u3001\u4E0B\u3001\u5DE6\u7684\u51BB\u7ED3\u987A\u5E8F\u751F\u6210\u76EE\u6807\u68CB\u5B50\u7684\u56DB\u4E2A\u6B63\u4EA4\u76F8\u90BB\u5730\u683C\uFF1B\u5408\u6CD5\u6027\u7531\u4F5C\u8005\u56FE\u9010\u683C\u5224\u65AD\u3002",
-          inputs: [port24("target", pieceType18)],
-          outputs: [port24("cells", cellListType5)],
+          inputs: [port25("target", pieceType18)],
+          outputs: [port25("cells", cellListType5)],
           effects: pure15(["position"]),
           lower: (ctx) => {
             const target = input24(ctx, "target");
@@ -9544,8 +9870,8 @@ var ContentGraphCore = (() => {
           id: "spatial.shuffle-cardinal-cells",
           label: "\u968F\u673A\u6253\u4E71\u6B63\u4EA4\u76F8\u90BB\u5730\u683C",
           description: "\u5BF9\u76EE\u6807\u7684\u56DB\u4E2A\u6B63\u4EA4\u76F8\u90BB\u5730\u683C\u6267\u884C\u5B8C\u6574 Fisher\u2013Yates \u6D17\u724C\uFF1B\u56FA\u5B9A\u6D88\u8017\u4E09\u6B21\u6743\u5A01\u968F\u673A\u6E90\uFF0C\u5408\u6CD5\u843D\u70B9\u7B5B\u9009\u7531\u4F5C\u8005\u56FE\u5B8C\u6210\u3002",
-          inputs: [port24("target", pieceType18)],
-          outputs: [port24("cells", cellListType5)],
+          inputs: [port25("target", pieceType18)],
+          outputs: [port25("cells", cellListType5)],
           effects: { pure: true, previewSafe: false, reads: ["position", "random"], random: true },
           lower: (ctx) => {
             const target = input24(ctx, "target");
@@ -9558,8 +9884,8 @@ var ContentGraphCore = (() => {
           id: "query.random-cell",
           label: "\u786E\u5B9A\u6027\u968F\u673A\u5730\u683C",
           description: "\u901A\u8FC7\u6743\u5A01\u968F\u673A\u6E90\u4ECE\u4F5C\u8005\u5DF2\u7B5B\u9009\u7684\u5730\u683C\u96C6\u5408\u4E2D\u9009\u62E9\u4E00\u683C\uFF1B\u7A7A\u96C6\u5408\u4E0D\u6D88\u8017\u968F\u673A\u6570\u5E76\u8FD4\u56DE\u7A7A\u5F15\u7528\u3002",
-          inputs: [port24("items", cellListType5)],
-          outputs: [port24("cell", cellType9, { nullable: true })],
+          inputs: [port25("items", cellListType5)],
+          outputs: [port25("cell", cellType9, { nullable: true })],
           effects: { ...pure15(["random"]), random: true },
           lower: (ctx) => `${flow28(ctx)}.query.random(${input24(ctx, "items")})`,
           ui: { category: "query" }
@@ -9571,7 +9897,7 @@ var ContentGraphCore = (() => {
       var booleanType19 = "boolean";
       var pieceType19 = "piece";
       var cellType10 = "cell";
-      var recordType15 = "record";
+      var recordType16 = "record";
       var cellListType6 = { kind: "list", element: cellType10 };
       var CELL_STORAGE_KEYS = ["amaterasuCells"];
       var OWNER_STORAGE_KEYS = ["amaterasuOwnerPlayerId"];
@@ -9579,7 +9905,7 @@ var ContentGraphCore = (() => {
       var MARKER_ICONS = ["\u{1F311}"];
       var MARKER_POSITIONS = ["bottom-right"];
       var PRESENTATIONS = ["expand"];
-      var port25 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port26 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter20 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var input25 = (ctx, name) => {
         const value = ctx.inputs[name];
@@ -9612,8 +9938,8 @@ var ContentGraphCore = (() => {
           id: "spatial.clip-cells",
           label: "\u622A\u53D6\u5730\u56FE\u5185\u5730\u683C",
           description: "\u6309\u5730\u56FE\u5DF2\u6709\u5730\u683C\u987A\u5E8F\u8FC7\u6EE4\u5750\u6807\uFF0C\u4FDD\u7559\u8F93\u5165\u987A\u5E8F\u5E76\u62D2\u7EDD\u5730\u56FE\u5916\u5730\u683C\u3002",
-          inputs: [port25("cells", cellListType6)],
-          outputs: [port25("cells", cellListType6)],
+          inputs: [port26("cells", cellListType6)],
+          outputs: [port26("cells", cellListType6)],
           effects: pure16(["position", "map"]),
           lower: (ctx) => {
             const state2 = battle14(ctx);
@@ -9625,8 +9951,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cells-within-range",
           label: "\u6309\u8DDD\u79BB\u7B5B\u9009\u5730\u683C",
           description: "\u4ECE\u5DF2\u8BA1\u7B97\u5730\u683C\u4E2D\u6309\u66FC\u54C8\u987F\u6216\u5207\u6BD4\u96EA\u592B\u8DDD\u79BB\u7B5B\u9009\u76EE\u6807\u8303\u56F4\u3002",
-          inputs: [port25("origin", cellType10), port25("cells", cellListType6)],
-          outputs: [port25("cells", cellListType6)],
+          inputs: [port26("origin", cellType10), port26("cells", cellListType6)],
+          outputs: [port26("cells", cellListType6)],
           parameters: [parameter20("range", numberType19, { default: 0, minimum: 0, maximum: 64 }), parameter20("metric", stringType21, { enum: ["manhattan", "chebyshev"], default: "manhattan" })],
           effects: pure16(["position"]),
           lower: (ctx) => {
@@ -9643,8 +9969,8 @@ var ContentGraphCore = (() => {
           id: "tile.append-dedup-markers",
           label: "\u53BB\u91CD\u6DFB\u52A0\u5730\u683C\u8868\u73B0",
           description: "\u6309\u56FA\u5B9A tile \u7C7B\u578B\u548C\u8868\u73B0\u5B57\u6BB5\u8FFD\u52A0\u53BB\u91CD\u5730\u683C\u6548\u679C\uFF1B\u8BB0\u5F55\u767B\u8BB0\u7531\u72EC\u7ACB\u6269\u5C55\u539F\u5B50\u5B8C\u6210\u3002",
-          inputs: [port25("cells", cellListType6), port25("origin", cellType10)],
-          outputs: [port25("added", numberType19)],
+          inputs: [port26("cells", cellListType6), port26("origin", cellType10)],
+          outputs: [port26("added", numberType19)],
           parameters: [
             parameter20("tileType", stringType21, { enum: TILE_TYPES }),
             parameter20("icon", stringType21, { enum: MARKER_ICONS }),
@@ -9672,8 +9998,8 @@ var ContentGraphCore = (() => {
           id: "extension.append-cell-records",
           label: "\u767B\u8BB0\u5730\u683C\u6765\u6E90\u8BB0\u5F55",
           description: "\u628A\u6765\u6E90\u68CB\u5B50\u548C\u5F52\u5C5E\u73A9\u5BB6\u767B\u8BB0\u5230\u5C01\u95ED\u6269\u5C55\u5730\u683C\u96C6\u5408\uFF1B\u91CD\u590D\u5750\u6807\u4E0D\u91CD\u590D\u767B\u8BB0\u3002",
-          inputs: [port25("source", pieceType19), port25("cells", cellListType6)],
-          outputs: [port25("added", numberType19)],
+          inputs: [port26("source", pieceType19), port26("cells", cellListType6)],
+          outputs: [port26("added", numberType19)],
           parameters: [parameter20("storageKey", stringType21, { enum: CELL_STORAGE_KEYS, default: "amaterasuCells" })],
           effects: writes13(["extensions"]),
           lower: (ctx) => {
@@ -9687,8 +10013,8 @@ var ContentGraphCore = (() => {
           id: "extension.set-owner",
           label: "\u8BBE\u7F6E\u6269\u5C55\u5F52\u5C5E\u73A9\u5BB6",
           description: "\u4EE5\u5C01\u95ED\u5F52\u5C5E\u5B57\u6BB5\u5199\u5165\u73A9\u5BB6\u6807\u8BC6\uFF1B\u53EF\u9009\u62E9\u4FDD\u7559\u65E2\u6709\u5F52\u5C5E\u6216\u6309\u65E7\u89C4\u5219\u8986\u76D6\u3002",
-          inputs: [port25("player", "player")],
-          outputs: [port25("success", booleanType19)],
+          inputs: [port26("player", "player")],
+          outputs: [port26("success", booleanType19)],
           parameters: [parameter20("storageKey", stringType21, { enum: OWNER_STORAGE_KEYS, default: "amaterasuOwnerPlayerId" }), parameter20("overwrite", booleanType19, { default: false })],
           effects: writes13(["extensions"]),
           lower: (ctx) => {
@@ -9702,7 +10028,7 @@ var ContentGraphCore = (() => {
           id: "extension.read-cell-records",
           label: "\u8BFB\u53D6\u6269\u5C55\u5730\u683C\u8BB0\u5F55",
           inputs: [],
-          outputs: [port25("cells", cellListType6)],
+          outputs: [port26("cells", cellListType6)],
           parameters: [parameter20("storageKey", stringType21, { enum: CELL_STORAGE_KEYS, default: "amaterasuCells" })],
           effects: pure16(["extensions"]),
           lower: (ctx) => {
@@ -9716,8 +10042,8 @@ var ContentGraphCore = (() => {
           id: "extension.remove-cell-records",
           label: "\u79FB\u9664\u6269\u5C55\u5730\u683C\u8BB0\u5F55",
           description: "\u6309\u56FE\u4E2D\u660E\u786E\u4F20\u5165\u7684\u5730\u683C\u96C6\u5408\u5220\u9664\u5C01\u95ED\u6269\u5C55\u8BB0\u5F55\u548C\u5BF9\u5E94 tile \u8868\u73B0\uFF0C\u5E76\u4FDD\u7559\u6279\u6B21\u8868\u73B0\u4E8B\u4EF6\u3002",
-          inputs: [port25("cells", cellListType6)],
-          outputs: [port25("removed", numberType19)],
+          inputs: [port26("cells", cellListType6)],
+          outputs: [port26("removed", numberType19)],
           parameters: [
             parameter20("storageKey", stringType21, { enum: CELL_STORAGE_KEYS, default: "amaterasuCells" }),
             parameter20("tileType", stringType21, { enum: TILE_TYPES, default: "amaterasu" }),
@@ -9738,8 +10064,8 @@ var ContentGraphCore = (() => {
         define24({
           id: "extension.cell-record-source",
           label: "\u8BFB\u53D6\u5730\u683C\u6765\u6E90\u68CB\u5B50",
-          inputs: [port25("piece", pieceType19)],
-          outputs: [port25("sourceId", stringType21, { nullable: true }), port25("ownerPlayerId", "player", { nullable: true })],
+          inputs: [port26("piece", pieceType19)],
+          outputs: [port26("sourceId", stringType21, { nullable: true }), port26("ownerPlayerId", "player", { nullable: true })],
           parameters: [parameter20("storageKey", stringType21, { enum: CELL_STORAGE_KEYS, default: "amaterasuCells" })],
           effects: pure16(["extensions", "position"]),
           lower: (ctx) => {
@@ -9754,7 +10080,7 @@ var ContentGraphCore = (() => {
           label: "\u7EDF\u8BA1\u8DEF\u5F84\u5730\u683C\u547D\u4E2D",
           description: "\u6309\u63A5\u89E6\u8DEF\u5F84\u987A\u5E8F\u7EDF\u8BA1\u5730\u683C\u8BB0\u5F55\u547D\u4E2D\uFF0C\u91CD\u590D\u7ECF\u8FC7\u540C\u4E00\u5730\u683C\u91CD\u590D\u8BA1\u6570\uFF0C\u5E76\u8FD4\u56DE\u9996\u4E2A\u6765\u6E90\u3002",
           inputs: [],
-          outputs: [port25("hits", numberType19), port25("sourceId", stringType21, { nullable: true }), port25("ownerPlayerId", "player", { nullable: true })],
+          outputs: [port26("hits", numberType19), port26("sourceId", stringType21, { nullable: true }), port26("ownerPlayerId", "player", { nullable: true })],
           parameters: [parameter20("storageKey", stringType21, { enum: CELL_STORAGE_KEYS, default: "amaterasuCells" })],
           effects: pure16(["extensions", "event"]),
           lower: (ctx) => {
@@ -9768,7 +10094,7 @@ var ContentGraphCore = (() => {
           id: "rule.authorized-by-owner",
           label: "\u68C0\u67E5\u6269\u5C55\u89C4\u5219\u5F52\u5C5E",
           inputs: [],
-          outputs: [port25("authorized", booleanType19)],
+          outputs: [port26("authorized", booleanType19)],
           parameters: [parameter20("storageKey", stringType21, { enum: OWNER_STORAGE_KEYS, default: "amaterasuOwnerPlayerId" })],
           effects: pure16(["extensions", "event"]),
           lower: (ctx) => {
@@ -9783,7 +10109,7 @@ var ContentGraphCore = (() => {
           id: "rule.source-player-fallback",
           label: "\u8BFB\u53D6\u89C4\u5219\u6765\u6E90\u73A9\u5BB6",
           inputs: [],
-          outputs: [port25("player", "player", { nullable: true })],
+          outputs: [port26("player", "player", { nullable: true })],
           parameters: [parameter20("storageKey", stringType21, { enum: OWNER_STORAGE_KEYS, default: "amaterasuOwnerPlayerId" })],
           effects: pure16(["extensions", "event", "players"]),
           lower: (ctx) => {
@@ -9797,8 +10123,8 @@ var ContentGraphCore = (() => {
         define24({
           id: "status.read-live-source",
           label: "\u8BFB\u53D6\u5B58\u6D3B\u72B6\u6001\u6765\u6E90",
-          inputs: [port25("piece", pieceType19), port25("statusId", stringType21, { nullable: true })],
-          outputs: [port25("source", pieceType19, { nullable: true })],
+          inputs: [port26("piece", pieceType19), port26("statusId", stringType21, { nullable: true })],
+          outputs: [port26("source", pieceType19, { nullable: true })],
           effects: pure16(["statuses", "pieces"]),
           lower: (ctx) => `(function(pieceId,statusId){if(statusId==null||!${flow29(ctx)}.query.hasPiece(pieceId))return null;var piece=${flow29(ctx)}.query.piece(pieceId),tag=((piece&&piece.statusTags)||[]).find(function(item){return item&&item.id===statusId;}),sourceId=tag&&tag.sourcePieceId;if(typeof sourceId!=="string"||!${flow29(ctx)}.query.hasPiece(sourceId))return null;var source=${flow29(ctx)}.query.piece(sourceId);return source&&source.currentHp>0?source.instanceId:null;})(${input25(ctx, "piece")},${input25(ctx, "statusId")})`,
           ui: { category: "status" }
@@ -9806,8 +10132,8 @@ var ContentGraphCore = (() => {
         define24({
           id: "record.read-text",
           label: "\u8BFB\u53D6\u767B\u8BB0\u6587\u672C",
-          inputs: [port25("record", recordType15, { nullable: true }), port25("fallback", stringType21)],
-          outputs: [port25("value", stringType21)],
+          inputs: [port26("record", recordType16, { nullable: true }), port26("fallback", stringType21)],
+          outputs: [port26("value", stringType21)],
           parameters: [parameter20("field", stringType21, { enum: ["message"] })],
           effects: pure16(),
           lower: (ctx) => {
@@ -9822,7 +10148,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u73B0\u5F79\u68CB\u5B50\u6570\u91CF",
           description: "\u8BFB\u53D6\u5F53\u524D\u6743\u5A01\u68CB\u5B50\u6570\u7EC4\u957F\u5EA6\uFF1B\u7528\u4E8E\u4FDD\u7559\u65E7\u7248\u5B9E\u65F6 forEach \u7684\u521D\u59CB\u957F\u5EA6\u8BED\u4E49\u3002",
           inputs: [],
-          outputs: [port25("count", numberType19)],
+          outputs: [port26("count", numberType19)],
           effects: pure16(["pieces"]),
           lower: (ctx) => {
             const state2 = battle14(ctx);
@@ -9834,8 +10160,8 @@ var ContentGraphCore = (() => {
           id: "collection.live-piece-at",
           label: "\u8BFB\u53D6\u73B0\u5F79\u68CB\u5B50\u9879",
           description: "\u6309\u5F53\u524D\u6743\u5A01\u68CB\u5B50\u6570\u7EC4\u7D22\u5F15\u8BFB\u53D6\u4E0D\u900F\u660E\u68CB\u5B50\u6807\u8BC6\uFF1B\u6BCF\u6B21\u8BFB\u53D6\u90FD\u89C2\u5BDF\u5B9E\u65F6\u6570\u7EC4\u3002",
-          inputs: [port25("index", numberType19)],
-          outputs: [port25("piece", pieceType19, { nullable: true })],
+          inputs: [port26("index", numberType19)],
+          outputs: [port26("piece", pieceType19, { nullable: true })],
           effects: pure16(["pieces"]),
           lower: (ctx) => {
             const state2 = battle14(ctx), index = input25(ctx, "index");
@@ -9887,8 +10213,8 @@ var ContentGraphCore = (() => {
       var pieceType20 = "piece";
       var playerType11 = "player";
       var cellType11 = "cell";
-      var recordType16 = "record";
-      var port26 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordType17 = "record";
+      var port27 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter21 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var define26 = (value) => ({
         version: "1",
@@ -9921,8 +10247,8 @@ var ContentGraphCore = (() => {
           id: "status.find-player-id-at",
           label: "\u6309\u5750\u6807\u67E5\u627E\u73A9\u5BB6\u72B6\u6001",
           description: "\u4ECE\u73A9\u5BB6\u72B6\u6001\u4E2D\u6309\u56FA\u5B9A\u5750\u6807\u5B57\u6BB5\u8BFB\u53D6\u9996\u4E2A\u6307\u5B9A\u7C7B\u578B\u7684\u72B6\u6001\u6807\u8BC6\u3002",
-          inputs: [port26("player", playerType11), port26("x", numberType20), port26("y", numberType20)],
-          outputs: [port26("id", stringType22, { nullable: true })],
+          inputs: [port27("player", playerType11), port27("x", numberType20), port27("y", numberType20)],
+          outputs: [port27("id", stringType22, { nullable: true })],
           parameters: [parameter21("statusType", stringType22, { enum: STATUS_TYPES })],
           effects: pure17(["statuses", "players"]),
           lower: (ctx) => {
@@ -9935,8 +10261,8 @@ var ContentGraphCore = (() => {
           id: "status.read-player-number-truthy",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u72B6\u6001\u771F\u503C\u6570\u503C",
           description: "\u8BFB\u53D6\u767B\u8BB0\u73A9\u5BB6\u72B6\u6001\u7684\u6709\u9650\u6570\u503C\u5B57\u6BB5\uFF1B\u65E7\u5185\u5BB9\u7684\u5047\u503C\u5B57\u6BB5\u56DE\u9000\u7531\u5BBF\u4E3B\u9002\u914D\u5668\u4FDD\u7559\u3002",
-          inputs: [port26("player", playerType11), port26("statusId", stringType22, { nullable: true }), port26("fallback", numberType20)],
-          outputs: [port26("value", numberType20)],
+          inputs: [port27("player", playerType11), port27("statusId", stringType22, { nullable: true }), port27("fallback", numberType20)],
+          outputs: [port27("value", numberType20)],
           parameters: [parameter21("field", stringType22, { enum: ["intensity", "value", "extraValue"] })],
           effects: pure17(["statuses", "players"]),
           lower: (ctx) => {
@@ -9949,8 +10275,8 @@ var ContentGraphCore = (() => {
           id: "status.read-player-text-field",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u72B6\u6001\u6587\u672C\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u767B\u8BB0\u73A9\u5BB6\u72B6\u6001\u7684\u6709\u9650\u6765\u6E90\u5B57\u6BB5\uFF0C\u4E0D\u5F00\u653E\u4EFB\u610F\u72B6\u6001\u8DEF\u5F84\u3002",
-          inputs: [port26("player", playerType11), port26("statusId", stringType22, { nullable: true })],
-          outputs: [port26("value", stringType22, { nullable: true })],
+          inputs: [port27("player", playerType11), port27("statusId", stringType22, { nullable: true })],
+          outputs: [port27("value", stringType22, { nullable: true })],
           parameters: [parameter21("field", stringType22, { enum: ["sourceId"] })],
           effects: pure17(["statuses", "players"]),
           lower: (ctx) => {
@@ -9965,8 +10291,8 @@ var ContentGraphCore = (() => {
           id: "query.piece-by-identifier",
           label: "\u6309\u72B6\u6001\u6765\u6E90\u89E3\u6790\u68CB\u5B50",
           description: "\u6309\u53D7\u4FE1\u7684\u5B57\u7B26\u4E32\u5B9E\u4F8B\u6807\u8BC6\u89E3\u6790\u4ECD\u5728\u573A\u7684\u68CB\u5B50\uFF1B\u79BB\u573A\u6765\u6E90\u8FD4\u56DE\u7A7A\u5F15\u7528\u3002",
-          inputs: [port26("pieceId", stringType22, { nullable: true })],
-          outputs: [port26("piece", pieceType20, { nullable: true })],
+          inputs: [port27("pieceId", stringType22, { nullable: true })],
+          outputs: [port27("piece", pieceType20, { nullable: true })],
           effects: pure17(["pieces"]),
           lower: (ctx) => `(function(pieceId){return pieceId!=null&&${flow30(ctx)}.query.hasPiece(pieceId)?${flow30(ctx)}.query.piece(pieceId).instanceId:null;})(${input26(ctx, "pieceId")})`,
           ui: { category: "query" }
@@ -9977,8 +10303,8 @@ var ContentGraphCore = (() => {
           id: "tile.add-source-effect",
           label: "\u6DFB\u52A0\u6765\u6E90\u5730\u683C\u6548\u679C",
           description: "\u5411\u73B0\u6709 tileEffects \u5217\u8868\u8FFD\u52A0\u56FA\u5B9A\u5B57\u6BB5\u7684\u6765\u6E90\u5730\u683C\u6548\u679C\u3002",
-          inputs: [port26("id", stringType22), port26("sourceId", stringType22), port26("owner", playerType11), port26("cell", cellType11)],
-          outputs: [port26("success", booleanType20)],
+          inputs: [port27("id", stringType22), port27("sourceId", stringType22), port27("owner", playerType11), port27("cell", cellType11)],
+          outputs: [port27("success", booleanType20)],
           parameters: [parameter21("tileType", stringType22, { enum: TILE_EFFECT_TYPES })],
           effects: writes14(["tile-effects"]),
           lower: (ctx) => {
@@ -9991,8 +10317,8 @@ var ContentGraphCore = (() => {
           id: "tile.remove-source-effects",
           label: "\u6E05\u7406\u6765\u6E90\u5730\u683C\u6548\u679C",
           description: "\u6309\u56FA\u5B9A\u6548\u679C\u7C7B\u578B\u548C\u6765\u6E90\u6807\u8BC6\u6E05\u7406\u73B0\u6709 tileEffects \u5217\u8868\u3002",
-          inputs: [port26("sourceId", stringType22, { nullable: true })],
-          outputs: [port26("success", booleanType20)],
+          inputs: [port27("sourceId", stringType22, { nullable: true })],
+          outputs: [port27("success", booleanType20)],
           parameters: [parameter21("tileType", stringType22, { enum: TILE_EFFECT_TYPES })],
           effects: writes14(["tile-effects"]),
           lower: (ctx) => {
@@ -10007,8 +10333,8 @@ var ContentGraphCore = (() => {
           id: "effect.displace-one",
           label: "\u7EDF\u4E00\u5355\u68CB\u5B50\u4F4D\u79FB",
           description: "\u901A\u8FC7\u73B0\u6709 displace \u63D0\u4EA4\u5668\u63D0\u4EA4\u4E00\u540D\u68CB\u5B50\u7684\u4F4D\u79FB\u3002",
-          inputs: [port26("piece", pieceType20, { label: "\u68CB\u5B50" }), port26("destination", cellType11, { label: "\u76EE\u6807\u5730\u683C" })],
-          outputs: [port26("result", recordType16), port26("success", booleanType20)],
+          inputs: [port27("piece", pieceType20, { label: "\u68CB\u5B50" }), port27("destination", cellType11, { label: "\u76EE\u6807\u5730\u683C" })],
+          outputs: [port27("result", recordType17), port27("success", booleanType20)],
           parameters: [parameter21("kind", stringType22, { label: "\u4F4D\u79FB\u65B9\u5F0F", description: "\u4F20\u9001\uFF08teleport\uFF09\u3001\u51B2\u523A\uFF08dash\uFF09\u3001\u6B65\u884C\uFF08walk\uFF09\u3001\u63A8\uFF08push\uFF09\u3001\u62C9\u62FD\uFF08pull\uFF09\u6216\u4EA4\u6362\uFF08swap\uFF09\uFF1B\u56FE\u4E2D\u4FDD\u7559\u7A33\u5B9A\u82F1\u6587\u6807\u8BC6\u3002", enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
           effects: writes14(["position", "events"], ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"]),
           lower: (ctx) => {
@@ -10021,8 +10347,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-with-player-fallback",
           label: "\u6309\u68CB\u5B50\u6216\u73A9\u5BB6\u6765\u6E90\u9020\u6210\u4F24\u5BB3",
           description: "\u6765\u6E90\u68CB\u5B50\u5B58\u6D3B\u65F6\u4FDD\u7559\u68CB\u5B50\u5F52\u56E0\uFF0C\u5426\u5219\u6784\u9020\u53D7\u63A7\u73A9\u5BB6\u6765\u6E90\u5E76\u8D70\u7EDF\u4E00\u4F24\u5BB3\u5165\u53E3\u3002",
-          inputs: [port26("pieceSource", pieceType20, { nullable: true }), port26("playerSource", playerType11), port26("target", pieceType20), port26("amount", numberType20)],
-          outputs: [port26("result", recordType16), port26("success", booleanType20), port26("damage", numberType20)],
+          inputs: [port27("pieceSource", pieceType20, { nullable: true }), port27("playerSource", playerType11), port27("target", pieceType20), port27("amount", numberType20)],
+          outputs: [port27("result", recordType17), port27("success", booleanType20), port27("damage", numberType20)],
           parameters: [parameter21("damageType", stringType22, { enum: ["true", "physical", "magical", "toxin"], default: "true" }), parameter21("skillId", stringType22), parameter21("inputPolicy", stringType22, { enum: ["floor", "host"], default: "floor" })],
           effects: writes14(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
           lower: (ctx) => {
@@ -10047,7 +10373,7 @@ var ContentGraphCore = (() => {
       var recordValueListType = { kind: "list", element: "record" };
       var recallRecordType = { kind: "record", schema: "recall-record@1" };
       var recallRecordListType = { kind: "list", element: recallRecordType };
-      var port27 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port28 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure18 = (reads = []) => ({ pure: true, previewSafe: false, reads });
       var writes15 = (domains) => ({ pure: false, previewSafe: false, writes: domains });
       var define27 = (value) => ({ version: "1", allowedSurfaces: surfaces11, ...value });
@@ -10067,7 +10393,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u56DE\u6EAF\u6B21\u6570",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u786E\u8BA4\u7684\u56DE\u6EAF\u64CD\u4F5C\u6570\u5E76\u8F6C\u4E3A\u6570\u503C\uFF1B\u672A\u786E\u8BA4\u6216\u975E\u6CD5\u9009\u9879\u7531\u56FE\u4E0A\u7684\u8303\u56F4\u6761\u4EF6\u62D2\u7EDD\u3002",
           inputs: [],
-          outputs: [port27("value", numberType21)],
+          outputs: [port28("value", numberType21)],
           effects: pure18(["context", "choice"]),
           lower: (ctx) => `Number(${context8(ctx)}.selectedOption)`,
           ui: { category: "choice" }
@@ -10076,8 +10402,8 @@ var ContentGraphCore = (() => {
           id: "recall.piece-reference",
           label: "\u4FDD\u5B58\u68CB\u5B50\u5F15\u7528",
           description: "\u628A\u5DF2\u67E5\u8BE2\u68CB\u5B50\u7684\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\u4FDD\u5B58\u5230\u56DE\u6EAF\u8BB0\u5F55\uFF1B\u4E0D\u4F1A\u590D\u5236\u53EF\u53D8\u68CB\u5B50\u5BF9\u8C61\u3002",
-          inputs: [port27("piece", pieceType21)],
-          outputs: [port27("piece", pieceType21)],
+          inputs: [port28("piece", pieceType21)],
+          outputs: [port28("piece", pieceType21)],
           effects: pure18(["pieces"]),
           lower: (ctx) => `(${flow31(ctx)}.query.piece(${input27(ctx, "piece")}).instanceId)`,
           ui: { category: "record" }
@@ -10086,8 +10412,8 @@ var ContentGraphCore = (() => {
           id: "recall.read-shield",
           label: "\u8BFB\u53D6\u62A4\u76FE",
           description: "\u8BFB\u53D6\u8BB0\u5F55\u5141\u8BB8\u4FDD\u5B58\u7684\u62A4\u76FE\u5B57\u6BB5\uFF1B\u7F3A\u5C11\u62A4\u76FE\u65F6\u4FDD\u7559\u7A7A\u503C\u3002",
-          inputs: [port27("piece", pieceType21)],
-          outputs: [port27("value", numberType21, { nullable: true })],
+          inputs: [port28("piece", pieceType21)],
+          outputs: [port28("value", numberType21, { nullable: true })],
           effects: pure18(["pieces"]),
           lower: (ctx) => `${flow31(ctx)}.query.piece(${input27(ctx, "piece")}).shield`,
           ui: { category: "record" }
@@ -10096,8 +10422,8 @@ var ContentGraphCore = (() => {
           id: "recall.read-status-tags",
           label: "\u8BFB\u53D6\u72B6\u6001\u6807\u7B7E",
           description: "\u8BFB\u53D6\u5E76\u590D\u5236\u767B\u8BB0\u7684\u72B6\u6001\u6807\u7B7E\u5217\u8868\uFF1B\u5B57\u6BB5\u96C6\u5408\u7531\u56DE\u6EAF\u8BB0\u5F55 schema \u56FA\u5B9A\u3002",
-          inputs: [port27("piece", pieceType21)],
-          outputs: [port27("value", recordValueListType)],
+          inputs: [port28("piece", pieceType21)],
+          outputs: [port28("value", recordValueListType)],
           effects: pure18(["pieces", "statuses"]),
           lower: (ctx) => `(function(piece){return Array.isArray(piece&&piece.statusTags)?JSON.parse(JSON.stringify(piece.statusTags)):[];})(${flow31(ctx)}.query.piece(${input27(ctx, "piece")}))`,
           ui: { category: "record" }
@@ -10106,8 +10432,8 @@ var ContentGraphCore = (() => {
           id: "recall.read-buffs",
           label: "\u8BFB\u53D6\u589E\u76CA",
           description: "\u8BFB\u53D6\u5E76\u590D\u5236\u767B\u8BB0\u7684\u589E\u76CA\u5217\u8868\uFF1B\u5B57\u6BB5\u96C6\u5408\u7531\u56DE\u6EAF\u8BB0\u5F55 schema \u56FA\u5B9A\u3002",
-          inputs: [port27("piece", pieceType21)],
-          outputs: [port27("value", recordValueListType)],
+          inputs: [port28("piece", pieceType21)],
+          outputs: [port28("value", recordValueListType)],
           effects: pure18(["pieces", "statuses"]),
           lower: (ctx) => `(function(piece){return Array.isArray(piece&&piece.buffs)?JSON.parse(JSON.stringify(piece.buffs)):[];})(${flow31(ctx)}.query.piece(${input27(ctx, "piece")}))`,
           ui: { category: "record" }
@@ -10116,8 +10442,8 @@ var ContentGraphCore = (() => {
           id: "recall.read-debuffs",
           label: "\u8BFB\u53D6\u51CF\u76CA",
           description: "\u8BFB\u53D6\u5E76\u590D\u5236\u767B\u8BB0\u7684\u51CF\u76CA\u5217\u8868\uFF1B\u5B57\u6BB5\u96C6\u5408\u7531\u56DE\u6EAF\u8BB0\u5F55 schema \u56FA\u5B9A\u3002",
-          inputs: [port27("piece", pieceType21)],
-          outputs: [port27("value", recordValueListType)],
+          inputs: [port28("piece", pieceType21)],
+          outputs: [port28("value", recordValueListType)],
           effects: pure18(["pieces", "statuses"]),
           lower: (ctx) => `(function(piece){return Array.isArray(piece&&piece.debuffs)?JSON.parse(JSON.stringify(piece.debuffs)):[];})(${flow31(ctx)}.query.piece(${input27(ctx, "piece")}))`,
           ui: { category: "record" }
@@ -10126,8 +10452,8 @@ var ContentGraphCore = (() => {
           id: "recall.store-record",
           label: "\u4FDD\u5B58\u56DE\u6EAF\u8BB0\u5F55",
           description: "\u628A\u56FE\u4E2D\u5DF2\u6784\u9020\u7684\u56FA\u5B9A\u5B57\u6BB5\u8BB0\u5F55\u5199\u5165\u65E7 recallData \u9002\u914D\u5668\uFF1B\u53EA\u5E8F\u5217\u5316\u767B\u8BB0\u5B57\u6BB5\uFF0C\u4E0D\u63A5\u53D7\u4EFB\u610F\u5BF9\u8C61\u8DEF\u5F84\u3002",
-          inputs: [port27("record", recallRecordType)],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("record", recallRecordType)],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["extensions"]),
           lower: (ctx) => `(function(record){if(!record||record.pieceId==null||!Number.isInteger(record.targetCount)||record.targetCount<1||record.targetCount>10)return false;${battle17(ctx)}.extensions=${battle17(ctx)}.extensions||{};var data=Array.isArray(${battle17(ctx)}.extensions.recallData)?${battle17(ctx)}.extensions.recallData:[];data=data.filter(function(item){return !item||item.pieceId!==record.pieceId;});data.push({pieceId:record.pieceId,ownerPlayerId:record.ownerPlayerId,projectionVisibility:record.projectionVisibility,targetCount:record.targetCount,actionCount:record.actionCount,snapshot:{x:record.x,y:record.y,hp:record.hp,shield:record.shield,statusTags:record.statusTags?JSON.parse(JSON.stringify(record.statusTags)):[],buffs:record.buffs?JSON.parse(JSON.stringify(record.buffs)):[],debuffs:record.debuffs?JSON.parse(JSON.stringify(record.debuffs)):[]}});${battle17(ctx)}.extensions.recallData=data;return true;})(${input27(ctx, "record")})`,
           ui: { category: "record" }
@@ -10137,7 +10463,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u56DE\u6EAF\u8BB0\u5F55",
           description: "\u6309\u65E7\u89E6\u53D1\u5668\u7684\u9006\u5E8F\u8BFB\u53D6\u56FA\u5B9A\u56DE\u6EAF\u8BB0\u5F55\uFF0C\u5E76\u5C06\u65E7\u5D4C\u5957\u5FEB\u7167\u8F6C\u6362\u4E3A\u56FE\u53EF\u7F16\u8F91\u7684\u6241\u5E73\u8BB0\u5F55\u3002",
           inputs: [],
-          outputs: [port27("records", recallRecordListType)],
+          outputs: [port28("records", recallRecordListType)],
           effects: pure18(["extensions"]),
           lower: (ctx) => normalizedRecords(ctx),
           ui: { category: "record" }
@@ -10146,8 +10472,8 @@ var ContentGraphCore = (() => {
           id: "recall.record-for-holder",
           label: "\u68C0\u67E5\u8BB0\u5F55\u6240\u5C5E\u68CB\u5B50",
           description: "\u6309\u56FA\u5B9A pieceId \u5B57\u6BB5\u8FC7\u6EE4\u5F53\u524D\u89E6\u53D1\u89C4\u5219\u6301\u6709\u7684\u8BB0\u5F55\u3002",
-          inputs: [port27("record", recallRecordType), port27("holder", pieceType21)],
-          outputs: [port27("value", booleanType21)],
+          inputs: [port28("record", recallRecordType), port28("holder", pieceType21)],
+          outputs: [port28("value", booleanType21)],
           effects: pure18(["extensions", "pieces"]),
           lower: (ctx) => `(function(record,holderId){return Boolean(record&&holderId!=null&&record.pieceId===holderId);})(${input27(ctx, "record")},${input27(ctx, "holder")})`,
           ui: { category: "condition" }
@@ -10156,8 +10482,8 @@ var ContentGraphCore = (() => {
           id: "recall.record-opposed",
           label: "\u68C0\u67E5\u89E6\u53D1\u8005\u654C\u5BF9",
           description: "\u6309\u767B\u8BB0\u7684\u8BB0\u5F55\u5F52\u5C5E\u548C\u5F53\u524D\u4E8B\u4EF6\u73A9\u5BB6\u5224\u65AD\u654C\u5BF9\u5173\u7CFB\uFF0C\u4F7F\u7528\u961F\u4F0D\u6620\u5C04\u800C\u975E\u5B57\u7B26\u4E32\u6BD4\u8F83\u3002",
-          inputs: [port27("record", recallRecordType), port27("actor", playerType12, { nullable: true, optional: true })],
-          outputs: [port27("value", booleanType21)],
+          inputs: [port28("record", recallRecordType), port28("actor", playerType12, { nullable: true, optional: true })],
+          outputs: [port28("value", booleanType21)],
           effects: pure18(["extensions", "players"]),
           lower: (ctx) => `(function(record,actor){if(!record||actor==null||record.ownerPlayerId==null)return false;return !${flow31(ctx)}.query.alliedPlayers(actor,record.ownerPlayerId);})(${input27(ctx, "record")},${input27(ctx, "actor")})`,
           ui: { category: "condition" }
@@ -10167,7 +10493,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E8B\u4EF6\u6765\u6E90\u5F52\u5C5E",
           description: "\u8BFB\u53D6\u4E8B\u4EF6\u4E0A\u4E0B\u6587\u6765\u6E90\u68CB\u5B50\u7684\u5F52\u5C5E\uFF1B\u6765\u6E90\u79BB\u573A\u540E\u4ECD\u4FDD\u7559\u4E8B\u4EF6\u53E5\u67C4\uFF0C\u7F3A\u5C11\u6765\u6E90\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
           inputs: [],
-          outputs: [port27("player", playerType12, { nullable: true })],
+          outputs: [port28("player", playerType12, { nullable: true })],
           effects: pure18(["context"]),
           lower: (ctx) => `(${context8(ctx)}.sourcePiece?${context8(ctx)}.sourcePiece.ownerPlayerId:null)`,
           ui: { category: "context" }
@@ -10177,7 +10503,7 @@ var ContentGraphCore = (() => {
           label: "\u68C0\u67E5\u4E8B\u4EF6\u6765\u6E90\u5B58\u5728",
           description: "\u68C0\u67E5\u5F53\u524D\u4E8B\u4EF6\u662F\u5426\u5E26\u6709\u6765\u6E90\u68CB\u5B50\u53E5\u67C4\uFF1B\u6765\u6E90\u53EF\u80FD\u5DF2\u6B7B\u4EA1\u4F46\u4ECD\u7531\u4E8B\u4EF6\u4E0A\u4E0B\u6587\u4FDD\u7559\u3002",
           inputs: [],
-          outputs: [port27("value", booleanType21)],
+          outputs: [port28("value", booleanType21)],
           effects: pure18(["context"]),
           lower: (ctx) => `Boolean(${context8(ctx)}.sourcePiece)`,
           ui: { category: "condition" }
@@ -10186,8 +10512,8 @@ var ContentGraphCore = (() => {
           id: "recall.opposed-players",
           label: "\u68C0\u67E5\u4E24\u4E2A\u5F52\u5C5E\u654C\u5BF9",
           description: "\u7528\u6743\u5A01\u961F\u4F0D\u5173\u7CFB\u5224\u65AD\u4E24\u4E2A\u73A9\u5BB6\u5F52\u5C5E\u662F\u5426\u654C\u5BF9\uFF0C\u5141\u8BB8\u4E8B\u4EF6\u6765\u6E90\u5DF2\u79BB\u573A\u3002",
-          inputs: [port27("actor", playerType12, { nullable: true }), port27("owner", playerType12, { nullable: true })],
-          outputs: [port27("value", booleanType21)],
+          inputs: [port28("actor", playerType12, { nullable: true }), port28("owner", playerType12, { nullable: true })],
+          outputs: [port28("value", booleanType21)],
           effects: pure18(["players"]),
           lower: (ctx) => `(function(actor,owner){return Boolean(actor!=null&&owner!=null&&!${flow31(ctx)}.query.alliedPlayers(actor,owner));})(${input27(ctx, "actor")},${input27(ctx, "owner")})`,
           ui: { category: "condition" }
@@ -10196,8 +10522,8 @@ var ContentGraphCore = (() => {
           id: "recall.record-piece-present",
           label: "\u68C0\u67E5\u56DE\u6EAF\u68CB\u5B50\u5B58\u5728",
           description: "\u5224\u65AD\u8BB0\u5F55\u4E2D\u7684\u68CB\u5B50\u4ECD\u5728\u6743\u5A01\u6218\u6597\u68CB\u5B50\u96C6\u5408\u4E2D\uFF1B\u6B63\u5F0F\u79BB\u573A\u7684\u68CB\u5B50\u4E0D\u4F1A\u88AB\u91CD\u65B0\u521B\u5EFA\u3002",
-          inputs: [port27("record", recallRecordType)],
-          outputs: [port27("value", booleanType21)],
+          inputs: [port28("record", recallRecordType)],
+          outputs: [port28("value", booleanType21)],
           effects: pure18(["extensions", "pieces"]),
           lower: (ctx) => `(function(record){return Boolean(record&&record.pieceId!=null&&${flow31(ctx)}.query.hasPiece(record.pieceId));})(${input27(ctx, "record")})`,
           ui: { category: "condition" }
@@ -10206,8 +10532,8 @@ var ContentGraphCore = (() => {
           id: "recall.replace-count",
           label: "\u66F4\u65B0\u56DE\u6EAF\u52A8\u4F5C\u8BA1\u6570",
           description: "\u53EA\u66F4\u65B0\u65E7\u9002\u914D\u5668\u4E2D\u7684 actionCount \u5B57\u6BB5\uFF1B\u5176\u4ED6\u8BB0\u5F55\u5B57\u6BB5\u7531 graph record.with \u4FDD\u7559\u3002",
-          inputs: [port27("record", recallRecordType)],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("record", recallRecordType)],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["extensions"]),
           lower: (ctx) => `(function(record){var data=${recallData(ctx)};if(!Array.isArray(data)||!record||record.pieceId==null)return false;for(var index=0;index<data.length;index+=1){if(data[index]&&data[index].pieceId===record.pieceId){data[index].actionCount=record.actionCount;return true;}}return false;})(${input27(ctx, "record")})`,
           ui: { category: "record" }
@@ -10216,8 +10542,8 @@ var ContentGraphCore = (() => {
           id: "recall.restore-hp",
           label: "\u6062\u590D\u751F\u547D",
           description: "\u5728\u6743\u5A01\u4F4D\u79FB\u6210\u529F\u540E\u53EA\u6062\u590D\u8BB0\u5F55\u4E2D\u7684\u751F\u547D\u5B57\u6BB5\uFF0C\u5E76\u6309\u68CB\u5B50\u6700\u5927\u751F\u547D\u4E0A\u9650\u88C1\u526A\u3002",
-          inputs: [port27("piece", pieceType21), port27("value", numberType21)],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("piece", pieceType21), port28("value", numberType21)],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["pieces"]),
           lower: (ctx) => `(function(pieceId,value){var piece=pieceId!=null&&${flow31(ctx)}.query.hasPiece(pieceId)?${flow31(ctx)}.query.piece(pieceId):null;if(!piece||typeof value!=='number'||!Number.isFinite(value))return false;piece.currentHp=Math.min(value,piece.maxHp);return true;})(${input27(ctx, "piece")},${input27(ctx, "value")})`,
           ui: { category: "effect" }
@@ -10226,8 +10552,8 @@ var ContentGraphCore = (() => {
           id: "recall.restore-shield",
           label: "\u6062\u590D\u62A4\u76FE",
           description: "\u5728\u6743\u5A01\u4F4D\u79FB\u6210\u529F\u540E\u53EA\u6062\u590D\u8BB0\u5F55\u4E2D\u7684\u62A4\u76FE\u5B57\u6BB5\uFF1B\u7F3A\u5C11\u8BE5\u5B57\u6BB5\u65F6\u4E0D\u5199\u5165\u3002",
-          inputs: [port27("piece", pieceType21), port27("value", numberType21, { nullable: true, optional: true })],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("piece", pieceType21), port28("value", numberType21, { nullable: true, optional: true })],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["pieces"]),
           lower: (ctx) => `(function(pieceId,value){var piece=pieceId!=null&&${flow31(ctx)}.query.hasPiece(pieceId)?${flow31(ctx)}.query.piece(pieceId):null;if(!piece||value===undefined)return false;piece.shield=value;return true;})(${input27(ctx, "piece")},${input27(ctx, "value")})`,
           ui: { category: "effect" }
@@ -10236,8 +10562,8 @@ var ContentGraphCore = (() => {
           id: "recall.restore-status-tags",
           label: "\u6062\u590D\u72B6\u6001\u6807\u7B7E",
           description: "\u5728\u6743\u5A01\u4F4D\u79FB\u6210\u529F\u540E\u53EA\u66FF\u6362\u8BB0\u5F55\u4E2D\u7684\u72B6\u6001\u6807\u7B7E\u5217\u8868\u3002",
-          inputs: [port27("piece", pieceType21), port27("value", recordValueListType, { nullable: true, optional: true })],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("piece", pieceType21), port28("value", recordValueListType, { nullable: true, optional: true })],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["statuses"]),
           lower: (ctx) => `(function(pieceId,value){var piece=pieceId!=null&&${flow31(ctx)}.query.hasPiece(pieceId)?${flow31(ctx)}.query.piece(pieceId):null;if(!piece||!Array.isArray(value))return false;piece.statusTags=JSON.parse(JSON.stringify(value));return true;})(${input27(ctx, "piece")},${input27(ctx, "value")})`,
           ui: { category: "effect" }
@@ -10246,8 +10572,8 @@ var ContentGraphCore = (() => {
           id: "recall.restore-buffs",
           label: "\u6062\u590D\u589E\u76CA",
           description: "\u5728\u6743\u5A01\u4F4D\u79FB\u6210\u529F\u540E\u53EA\u66FF\u6362\u8BB0\u5F55\u4E2D\u7684\u589E\u76CA\u5217\u8868\u3002",
-          inputs: [port27("piece", pieceType21), port27("value", recordValueListType, { nullable: true, optional: true })],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("piece", pieceType21), port28("value", recordValueListType, { nullable: true, optional: true })],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["statuses"]),
           lower: (ctx) => `(function(pieceId,value){var piece=pieceId!=null&&${flow31(ctx)}.query.hasPiece(pieceId)?${flow31(ctx)}.query.piece(pieceId):null;if(!piece||!Array.isArray(value))return false;piece.buffs=JSON.parse(JSON.stringify(value));return true;})(${input27(ctx, "piece")},${input27(ctx, "value")})`,
           ui: { category: "effect" }
@@ -10256,8 +10582,8 @@ var ContentGraphCore = (() => {
           id: "recall.restore-debuffs",
           label: "\u6062\u590D\u51CF\u76CA",
           description: "\u5728\u6743\u5A01\u4F4D\u79FB\u6210\u529F\u540E\u53EA\u66FF\u6362\u8BB0\u5F55\u4E2D\u7684\u51CF\u76CA\u5217\u8868\u3002",
-          inputs: [port27("piece", pieceType21), port27("value", recordValueListType, { nullable: true, optional: true })],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("piece", pieceType21), port28("value", recordValueListType, { nullable: true, optional: true })],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["statuses"]),
           lower: (ctx) => `(function(pieceId,value){var piece=pieceId!=null&&${flow31(ctx)}.query.hasPiece(pieceId)?${flow31(ctx)}.query.piece(pieceId):null;if(!piece||!Array.isArray(value))return false;piece.debuffs=JSON.parse(JSON.stringify(value));return true;})(${input27(ctx, "piece")},${input27(ctx, "value")})`,
           ui: { category: "effect" }
@@ -10266,8 +10592,8 @@ var ContentGraphCore = (() => {
           id: "recall.remove",
           label: "\u79FB\u9664\u56DE\u6EAF\u8BB0\u5F55",
           description: "\u6309\u56FA\u5B9A pieceId \u4ECE recallData \u96C6\u5408\u79FB\u9664\u5F53\u524D\u8BB0\u5F55\uFF0C\u4E0D\u6539\u53D8\u5176\u4ED6\u68CB\u5B50\u7684\u8BB0\u5F55\u3002",
-          inputs: [port27("record", recallRecordType)],
-          outputs: [port27("success", booleanType21)],
+          inputs: [port28("record", recallRecordType)],
+          outputs: [port28("success", booleanType21)],
           effects: writes15(["extensions"]),
           lower: (ctx) => `(function(record){var data=${recallData(ctx)};if(!Array.isArray(data)||!record||record.pieceId==null)return false;var index=data.findIndex(function(item){return item&&item.pieceId===record.pieceId;});if(index<0)return false;data.splice(index,1);return true;})(${input27(ctx, "record")})`,
           ui: { category: "record" }
@@ -10284,7 +10610,7 @@ var ContentGraphCore = (() => {
       var stringType23 = "string";
       var stringListType7 = { kind: "list", element: stringType23 };
       var pieceListType7 = { kind: "list", element: pieceType22 };
-      var port28 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port29 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter22 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var define28 = (value) => ({
         version: "1",
@@ -10309,8 +10635,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-instances-by-definition-ids",
           label: "\u6309\u5B9A\u4E49\u96C6\u5408\u67E5\u8BE2\u624B\u724C\u5B9E\u4F8B",
           description: "\u6309\u5F53\u524D\u624B\u724C\u987A\u5E8F\u8FD4\u56DE\u5C5E\u4E8E\u767B\u8BB0\u5B9A\u4E49\u96C6\u5408\u7684\u7A33\u5B9A\u5B9E\u4F8B\u6807\u8BC6\uFF1B\u5361\u724C\u5B9A\u4E49\u96C6\u5408\u7531\u4F5C\u8005\u56FE\u663E\u5F0F\u63D0\u4F9B\u3002",
-          inputs: [port28("player", playerType13)],
-          outputs: [port28("cards", stringListType7)],
+          inputs: [port29("player", playerType13)],
+          outputs: [port29("cards", stringListType7)],
           parameters: [parameter22("cardIds", stringListType7)],
           effects: pure19(["hand", "players"]),
           allowedSurfaces: ACTIVE16,
@@ -10321,8 +10647,8 @@ var ContentGraphCore = (() => {
           id: "choice.hand-cards-bounded",
           label: "\u6309\u52A8\u6001\u4E0A\u9650\u9009\u62E9\u624B\u724C",
           description: "\u5C06\u7A33\u5B9A\u624B\u724C\u5B9E\u4F8B\u548C\u6807\u7B7E\u4EA4\u7ED9\u73B0\u6709\u591A\u9009\u534F\u8BAE\uFF0C\u6700\u5927\u9009\u62E9\u6570\u7531\u56FE\u8BA1\u7B97\u5E76\u7531\u5BBF\u4E3B\u6062\u590D\u3002",
-          inputs: [port28("player", playerType13), port28("cards", stringListType7), port28("labels", stringListType7), port28("maxSelections", numberType22)],
-          outputs: [port28("choice", choiceType6, { nullable: true, optional: true })],
+          inputs: [port29("player", playerType13), port29("cards", stringListType7), port29("labels", stringListType7), port29("maxSelections", numberType22)],
+          outputs: [port29("choice", choiceType6, { nullable: true, optional: true })],
           parameters: [
             parameter22("title", stringType23),
             parameter22("selectionMode", stringType23, { enum: ["single", "multi"] }),
@@ -10338,8 +10664,8 @@ var ContentGraphCore = (() => {
           id: "choice.array-length",
           label: "\u8BFB\u53D6\u9009\u9879\u6570\u7EC4\u957F\u5EA6",
           description: "\u8BFB\u53D6\u539F\u59CB\u591A\u9009\u6570\u7EC4\u957F\u5EA6\uFF0C\u4E0D\u89E3\u5305\u5BF9\u8C61\u6216\u5C06\u5176\u4ED6\u503C\u8F6C\u6362\u4E3A\u96C6\u5408\u3002",
-          inputs: [port28("choice", choiceType6, { nullable: true, optional: true })],
-          outputs: [port28("count", numberType22)],
+          inputs: [port29("choice", choiceType6, { nullable: true, optional: true })],
+          outputs: [port29("count", numberType22)],
           effects: { pure: true, previewSafe: true, reads: ["choice"] },
           allowedSurfaces: PURE4,
           lower: (ctx) => `Array.isArray(${input28(ctx, "choice")})?${input28(ctx, "choice")}.length:0`,
@@ -10349,8 +10675,8 @@ var ContentGraphCore = (() => {
           id: "choice.array-has-duplicate",
           label: "\u68C0\u67E5\u539F\u59CB\u6570\u7EC4\u91CD\u590D\u9879",
           description: "\u6309\u539F\u59CB JavaScript \u6570\u7EC4\u503C\u68C0\u67E5\u91CD\u590D\u9879\uFF0C\u4FDD\u7559\u5BBF\u4E3B\u5BF9\u975E\u6587\u672C\u9009\u9879\u7684\u91CD\u590D\u6821\u9A8C\u8BED\u4E49\u3002",
-          inputs: [port28("choice", choiceType6, { nullable: true, optional: true })],
-          outputs: [port28("duplicate", booleanType22)],
+          inputs: [port29("choice", choiceType6, { nullable: true, optional: true })],
+          outputs: [port29("duplicate", booleanType22)],
           effects: { pure: true, previewSafe: true, reads: ["choice"] },
           allowedSurfaces: PURE4,
           lower: (ctx) => `(function(value){return Array.isArray(value)&&new Set(value).size!==value.length;})(${input28(ctx, "choice")})`,
@@ -10360,8 +10686,8 @@ var ContentGraphCore = (() => {
           id: "query.affectable-pieces-from-source",
           label: "\u6309\u6765\u6E90\u67E5\u8BE2\u53EF\u5F71\u54CD\u68CB\u5B50",
           description: "\u6309\u73A9\u5BB6\u5173\u7CFB\u3001\u5B58\u6D3B\u6761\u4EF6\u548C\u6765\u6E90\u611F\u77E5\u7684\u5192\u9669\u8FB9\u754C\u8BFB\u53D6\u53EF\u5F71\u54CD\u76EE\u6807\uFF0C\u4FDD\u7559\u5BBF\u4E3B\u987A\u5E8F\u3002",
-          inputs: [port28("owner", playerType13), port28("source", pieceType22)],
-          outputs: [port28("pieces", pieceListType7)],
+          inputs: [port29("owner", playerType13), port29("source", pieceType22)],
+          outputs: [port29("pieces", pieceListType7)],
           parameters: [parameter22("relation", stringType23, { enum: ["ally", "enemy"] })],
           effects: pure19(["pieces", "target-policy", "players"]),
           lower: (ctx) => {
@@ -10378,10 +10704,10 @@ var ContentGraphCore = (() => {
       var cellType12 = "cell";
       var cellListType7 = { kind: "list", element: cellType12 };
       var recordListType8 = { kind: "list", element: "record" };
-      var recordType17 = "record";
+      var recordType18 = "record";
       var numberType23 = "number";
       var stringType24 = "string";
-      var port29 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port30 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter23 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var define29 = (value) => ({ version: "1", allowedSurfaces: value.allowedSurfaces ?? ACTIVE17, ...value });
       var input29 = (ctx, name) => {
@@ -10403,8 +10729,8 @@ var ContentGraphCore = (() => {
           id: "spatial.cardinal-cells-ordered",
           label: "\u6309\u6307\u5B9A\u51BB\u7ED3\u987A\u5E8F\u751F\u6210\u6B63\u4EA4\u5730\u683C",
           description: "\u6309\u4F5C\u8005\u58F0\u660E\u7684\u5C01\u95ED\u6B63\u4EA4\u987A\u5E8F\u751F\u6210\u76EE\u6807\u5468\u56F4\u56DB\u683C\uFF1B\u5730\u56FE\u8FB9\u754C\u548C\u91CD\u590D\u5224\u65AD\u7531\u4F5C\u8005\u56FE\u5904\u7406\u3002",
-          inputs: [port29("target", pieceType23)],
-          outputs: [port29("cells", cellListType7)],
+          inputs: [port30("target", pieceType23)],
+          outputs: [port30("cells", cellListType7)],
           parameters: [parameter23("order", stringType24, { enum: ["up-down-left-right", "up-right-down-left"] })],
           effects: pure20(["position"]),
           lower: (ctx) => {
@@ -10418,8 +10744,8 @@ var ContentGraphCore = (() => {
           id: "extension.records-to-cells",
           label: "\u8BB0\u5F55\u6295\u5F71\u4E3A\u5730\u683C",
           description: "\u5C06\u5DF2\u767B\u8BB0\u7684\u8BB0\u5F55\u6309\u539F\u987A\u5E8F\u6295\u5F71\u4E3A\u5750\u6807\u5730\u683C\uFF0C\u4E0D\u8BFB\u53D6\u6216\u5199\u5165\u5F00\u653E\u5BF9\u8C61\u8DEF\u5F84\u3002",
-          inputs: [port29("records", recordListType8)],
-          outputs: [port29("cells", cellListType7)],
+          inputs: [port30("records", recordListType8)],
+          outputs: [port30("cells", cellListType7)],
           effects: pure20(["extensions"]),
           lower: (ctx) => `(Array.isArray(${input29(ctx, "records")})?${input29(ctx, "records")}.map(function(record){return {x:record.x,y:record.y};}):[])`,
           ui: { category: "state" }
@@ -10428,8 +10754,8 @@ var ContentGraphCore = (() => {
           id: "extension.append-cell-records-ordered",
           label: "\u8FFD\u52A0\u5C01\u95ED\u5730\u683C\u8BB0\u5F55",
           description: "\u5C06\u56FE\u5DF2\u53BB\u91CD\u7684\u5730\u683C\u6309\u8F93\u5165\u987A\u5E8F\u8FFD\u52A0\u5230 shishioBurnTiles\uFF0C\u5E76\u8BB0\u5F55\u6765\u6E90\u68CB\u5B50\u4E0E\u73A9\u5BB6\u3002",
-          inputs: [port29("source", pieceType23), port29("cells", cellListType7)],
-          outputs: [port29("added", numberType23)],
+          inputs: [port30("source", pieceType23), port30("cells", cellListType7)],
+          outputs: [port30("added", numberType23)],
           parameters: [parameter23("key", stringType24, { enum: ["shishioBurnTiles"] })],
           effects: writes17(["extensions"]),
           lower: (ctx) => {
@@ -10446,8 +10772,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-pieces-unattributed",
           label: "\u4EE5\u68CB\u5B50\u5F15\u7528\u9020\u6210\u65E0\u6280\u80FD\u5F52\u5C5E\u4F24\u5BB3",
           description: "\u628A\u5DF2\u7ECF\u89E3\u6790\u7684\u6765\u6E90\u548C\u76EE\u6807\u68CB\u5B50\u4EA4\u7ED9\u65E7 damage facade\uFF1B\u7701\u7565\u53EF\u9009 skillId \u4EE5\u4FDD\u7559\u672A\u5F52\u5C5E\u7684\u65E7\u5185\u5BB9\u4E8B\u4EF6\u5F62\u72B6\u3002",
-          inputs: [port29("source", pieceType23), port29("target", pieceType23), port29("amount", numberType23)],
-          outputs: [port29("result", recordType17)],
+          inputs: [port30("source", pieceType23), port30("target", pieceType23), port30("amount", numberType23)],
+          outputs: [port30("result", recordType18)],
           parameters: [parameter23("damageType", stringType24, { enum: ["true", "physical", "magical"] })],
           allowedSurfaces: ["skill"],
           effects: writes17(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
@@ -10465,8 +10791,8 @@ var ContentGraphCore = (() => {
           id: "tile.batch-effect-markers",
           label: "\u6279\u91CF\u63D0\u4EA4\u71C3\u70E7\u8868\u73B0",
           description: "\u6309\u8F93\u5165\u5730\u683C\u987A\u5E8F\u901A\u8FC7\u6743\u5A01 tileBatch \u63D0\u4EA4\u71C3\u70E7\u8868\u73B0\uFF0C\u4FDD\u7559\u5730\u56FE\u5916\u5730\u683C\u4E0E\u7A7A\u6279\u6B21\u8C03\u7528\u8BED\u4E49\u3002",
-          inputs: [port29("cells", cellListType7)],
-          outputs: [port29("count", numberType23)],
+          inputs: [port30("cells", cellListType7)],
+          outputs: [port30("count", numberType23)],
           parameters: [
             parameter23("sourceId", stringType24, { enum: ["shishio-burn"] }),
             parameter23("tileType", stringType24, { enum: ["shishio-burn"] }),
@@ -10492,10 +10818,10 @@ var ContentGraphCore = (() => {
       var numberType24 = "number";
       var booleanType23 = "boolean";
       var stringType25 = "string";
-      var recordType18 = "record";
+      var recordType19 = "record";
       var pieceListType8 = { kind: "list", element: pieceType24 };
       var cellListType8 = { kind: "list", element: cellType13 };
-      var port30 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port31 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter24 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow34 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var battle19 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -10527,8 +10853,8 @@ var ContentGraphCore = (() => {
           id: "projectile.trace-until-blocker",
           label: "\u8BFB\u53D6\u963B\u6321\u524D\u654C\u4EBA\u5F39\u9053",
           description: "\u6CBF\u6B63\u4EA4\u65B9\u5411\u6309\u987A\u5E8F\u8BFB\u53D6\u654C\u4EBA\uFF0C\u53CB\u519B\u6216\u963B\u6321\u5730\u5F62\u505C\u6B62\uFF1B\u53EA\u8FD4\u56DE\u654C\u4EBA\u96C6\u5408\u548C\u9996\u4E2A\u547D\u4E2D\u5730\u683C\uFF0C\u4F24\u5BB3\u7531\u4F5C\u8005\u56FE\u53E6\u884C\u63D0\u4EA4\u3002",
-          inputs: [port30("source", pieceType24), port30("target", cellType13)],
-          outputs: [port30("enemyPieces", pieceListType8), port30("firstCell", cellType13, { nullable: true }), port30("valid", booleanType23), port30("sameCell", booleanType23), port30("distance", numberType24)],
+          inputs: [port31("source", pieceType24), port31("target", cellType13)],
+          outputs: [port31("enemyPieces", pieceListType8), port31("firstCell", cellType13, { nullable: true }), port31("valid", booleanType23), port31("sameCell", booleanType23), port31("distance", numberType24)],
           parameters: [parameter24("maxDistance", numberType24, { default: 99, minimum: 0, maximum: 128 })],
           effects: pure21(["pieces", "players", "position", "map"]),
           lower: (ctx) => {
@@ -10545,8 +10871,8 @@ var ContentGraphCore = (() => {
           id: "spatial.adjacent-cells-ordered",
           label: "\u751F\u6210\u6B63\u4EA4\u76F8\u90BB\u5730\u683C",
           description: "\u6309\u53F3\u3001\u5DE6\u3001\u4E0B\u3001\u4E0A\u7684\u51BB\u7ED3\u987A\u5E8F\u751F\u6210\u4E00\u4E2A\u5730\u683C\u7684\u56DB\u4E2A\u6B63\u4EA4\u76F8\u90BB\u5730\u683C\uFF1B\u5408\u6CD5\u6027\u7531\u4F5C\u8005\u56FE\u9010\u683C\u5224\u65AD\u3002",
-          inputs: [port30("center", cellType13, { nullable: true })],
-          outputs: [port30("cells", cellListType8)],
+          inputs: [port31("center", cellType13, { nullable: true })],
+          outputs: [port31("cells", cellListType8)],
           effects: pure21(["position"]),
           lower: (ctx) => "(function(center){if(!center||!Number.isInteger(center.x)||!Number.isInteger(center.y))return [];return [{x:center.x+1,y:center.y},{x:center.x-1,y:center.y},{x:center.x,y:center.y+1},{x:center.x,y:center.y-1}];})(" + input30(ctx, "center") + ")",
           ui: { category: "position" }
@@ -10555,8 +10881,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-many-ordered",
           label: "\u6279\u91CF\u9020\u6210\u4F24\u5BB3",
           description: "\u628A\u4F5C\u8005\u56FE\u63D0\u4F9B\u7684\u6709\u5E8F\u76EE\u6807\u96C6\u5408\u4EA4\u7ED9\u7EDF\u4E00\u6279\u91CF\u4F24\u5BB3\u5165\u53E3\uFF0C\u5E76\u8FD4\u56DE\u5B9E\u9645\u603B\u4F24\u5BB3\u3002",
-          inputs: [port30("source", pieceType24), port30("targets", pieceListType8), port30("amount", numberType24)],
-          outputs: [port30("result", recordType18), port30("success", booleanType23), port30("totalDamage", numberType24)],
+          inputs: [port31("source", pieceType24), port31("targets", pieceListType8), port31("amount", numberType24)],
+          outputs: [port31("result", recordType19), port31("success", booleanType23), port31("totalDamage", numberType24)],
           parameters: [parameter24("damageType", stringType25, { enum: ["normal", "true"], default: "normal" }), parameter24("legacyNormalSpelling", stringType25, { enum: ["physical", "magical"], optional: true }), parameter24("skillId", stringType25)],
           effects: { ...writes18(["damage", "events"]), events: ["beforeDamageDealt", "afterDamageDealt"] },
           lower: (ctx) => {
@@ -10572,7 +10898,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E8B\u4EF6\u76EE\u6807\u5730\u683C",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u5DF2\u7ECF\u9A8C\u8BC1\u6216\u6062\u590D\u7684\u76EE\u6807\u5750\u6807\uFF1B\u6CA1\u6709\u76EE\u6807\u65F6\u8FD4\u56DE\u7A7A\u5730\u683C\u3002",
           inputs: [],
-          outputs: [port30("cell", cellType13, { nullable: true })],
+          outputs: [port31("cell", cellType13, { nullable: true })],
           allowedSurfaces: ["rule", "pending"],
           effects: pure21(["event"]),
           lower: (ctx) => {
@@ -10585,8 +10911,8 @@ var ContentGraphCore = (() => {
           id: "extension.read-piece-cells",
           label: "\u8BFB\u53D6\u68CB\u5B50\u6269\u5C55\u5730\u683C",
           description: "\u4ECE\u5C01\u95ED\u7684\u6765\u6E90\u68CB\u5B50\u5730\u683C\u6269\u5C55\u8BB0\u5F55\u4E2D\u8BFB\u53D6\u6709\u5E8F\u5730\u683C\uFF0C\u4E0D\u66B4\u9732\u4EFB\u610F\u5BF9\u8C61\u8DEF\u5F84\u3002",
-          inputs: [port30("owner", pieceType24, { nullable: true })],
-          outputs: [port30("cells", cellListType8)],
+          inputs: [port31("owner", pieceType24, { nullable: true })],
+          outputs: [port31("cells", cellListType8)],
           parameters: [parameter24("key", stringType25, { enum: [EXTENSION_KEY] })],
           effects: pure21(["extensions", "position"]),
           lower: (ctx) => {
@@ -10599,8 +10925,8 @@ var ContentGraphCore = (() => {
           id: "extension.set-piece-cells",
           label: "\u5199\u5165\u68CB\u5B50\u6269\u5C55\u5730\u683C",
           description: "\u6309\u5C01\u95ED\u6269\u5C55\u952E\u4FDD\u5B58\u6765\u6E90\u68CB\u5B50\u7684\u6709\u5E8F\u5730\u683C\u5019\u9009\uFF1B\u5019\u9009\u5185\u5BB9\u53EA\u7531\u4F5C\u8005\u56FE\u63D0\u4F9B\u3002",
-          inputs: [port30("owner", pieceType24, { nullable: true }), port30("cells", cellListType8)],
-          outputs: [port30("success", booleanType23)],
+          inputs: [port31("owner", pieceType24, { nullable: true }), port31("cells", cellListType8)],
+          outputs: [port31("success", booleanType23)],
           parameters: [parameter24("key", stringType25, { enum: [EXTENSION_KEY] })],
           effects: writes18(["extensions"]),
           lower: (ctx) => {
@@ -10613,8 +10939,8 @@ var ContentGraphCore = (() => {
           id: "extension.clear-piece-cells",
           label: "\u6E05\u7406\u68CB\u5B50\u6269\u5C55\u5730\u683C",
           description: "\u5220\u9664\u5C01\u95ED\u6269\u5C55\u952E\u4E0B\u6307\u5B9A\u6765\u6E90\u7684\u5730\u683C\u6761\u76EE\uFF1B\u7A7A\u5BB9\u5668\u6E05\u7406\u7531\u5355\u72EC\u6A21\u5757\u8D1F\u8D23\u3002",
-          inputs: [port30("owner", pieceType24, { nullable: true })],
-          outputs: [port30("success", booleanType23)],
+          inputs: [port31("owner", pieceType24, { nullable: true })],
+          outputs: [port31("success", booleanType23)],
           parameters: [parameter24("key", stringType25, { enum: [EXTENSION_KEY] })],
           effects: writes18(["extensions"]),
           lower: (ctx) => {
@@ -10628,7 +10954,7 @@ var ContentGraphCore = (() => {
           label: "\u6E05\u7406\u7A7A\u68CB\u5B50\u6269\u5C55\u5BB9\u5668",
           description: "\u4EC5\u5728\u5C01\u95ED\u6269\u5C55\u5BB9\u5668\u4E0D\u518D\u6709\u6765\u6E90\u6761\u76EE\u65F6\u5220\u9664\u5BB9\u5668\uFF0C\u4E0E\u6761\u76EE\u6E05\u7406\u4FDD\u6301\u72EC\u7ACB\u3002",
           inputs: [],
-          outputs: [port30("success", booleanType23)],
+          outputs: [port31("success", booleanType23)],
           parameters: [parameter24("key", stringType25, { enum: [EXTENSION_KEY] })],
           effects: writes18(["extensions"]),
           lower: (ctx) => {
@@ -10642,7 +10968,7 @@ var ContentGraphCore = (() => {
       var pieceType25 = "piece";
       var booleanType24 = "boolean";
       var stringType26 = "string";
-      var port31 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port32 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow35 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var context10 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
       var input31 = (ctx, name) => {
@@ -10662,7 +10988,7 @@ var ContentGraphCore = (() => {
           label: "\u5355\u68CB\u5B50\u76EE\u6807\u52A8\u4F5C",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u5BF9\u5F53\u524D\u6280\u80FD\u52A8\u4F5C\u7684\u5355\u68CB\u5B50\u76EE\u6807\u5224\u5B9A\uFF1B\u4E0D\u901A\u8FC7\u5BF9\u8C61\u8DEF\u5F84\u63A8\u65AD\u76EE\u6807\u7C7B\u578B\u3002",
           inputs: [],
-          outputs: [port31("value", booleanType24)],
+          outputs: [port32("value", booleanType24)],
           effects: pure22(["event"]),
           lower: (ctx) => `Boolean(${context10(ctx)}.isSinglePieceTargetAction === true)`,
           ui: { category: "event" }
@@ -10671,8 +10997,8 @@ var ContentGraphCore = (() => {
           id: "status.read-piece-reference",
           label: "\u8BFB\u53D6\u72B6\u6001\u5173\u8054\u68CB\u5B50",
           description: "\u4ECE\u767B\u8BB0\u72B6\u6001\u7684\u5C01\u95ED\u76EE\u6807\u68CB\u5B50\u5B57\u6BB5\u8BFB\u53D6\u4ECD\u5728\u68CB\u76D8\u96C6\u5408\u4E2D\u7684\u5F15\u7528\uFF1B\u751F\u547D\u503C\u7531\u4F7F\u7528\u65B9\u5224\u65AD\u3002",
-          inputs: [port31("piece", pieceType25), port31("statusId", stringType26, { nullable: true })],
-          outputs: [port31("reference", pieceType25, { nullable: true })],
+          inputs: [port32("piece", pieceType25), port32("statusId", stringType26, { nullable: true })],
+          outputs: [port32("reference", pieceType25, { nullable: true })],
           parameters: [{ name: "field", type: stringType26, enum: ["targetPieceId"] }],
           effects: pure22(["statuses", "pieces"]),
           lower: (ctx) => {
@@ -10692,8 +11018,8 @@ var ContentGraphCore = (() => {
       var pieceType26 = "piece";
       var playerType14 = "player";
       var booleanType25 = "boolean";
-      var recordType19 = "record";
-      var port32 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordType20 = "record";
+      var port33 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter25 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var write4 = (writes22, events = []) => ({ pure: false, previewSafe: false, writes: writes22, events });
       var read6 = (reads) => ({ pure: true, previewSafe: false, reads });
@@ -10728,8 +11054,8 @@ var ContentGraphCore = (() => {
           id: "content.card-number",
           label: "\u8BFB\u53D6\u751F\u6210\u5361\u724C\u6570\u503C",
           description: "\u8BFB\u53D6\u53D7\u4FE1\u52A8\u6001\u5361\u724C\u6A21\u677F\u767B\u8BB0\u7684\u6570\u503C\u5B57\u6BB5\uFF1B\u5B57\u6BB5\u540D\u53EA\u80FD\u4F7F\u7528 Rafaam \u6A21\u677F\u767B\u8BB0\u7684 damageAmount\u3002",
-          inputs: [port32("cardId", stringType27)],
-          outputs: [port32("value", numberType25)],
+          inputs: [port33("cardId", stringType27)],
+          outputs: [port33("value", numberType25)],
           parameters: [parameter25("field", stringType27, { enum: ["damageAmount"] }), parameter25("fallback", numberType25, { default: 0 })],
           allowedSurfaces: ruleAndCard,
           effects: read6(["content"]),
@@ -10741,15 +11067,15 @@ var ContentGraphCore = (() => {
           label: "\u5B9E\u4F8B\u5316\u8BC5\u5492\u5361\u6A21\u677F",
           description: "\u4ECE\u5DF2\u9A8C\u8BC1\u7684 Rafaam \u8BC5\u5492\u6837\u672C\u56FE\u521B\u5EFA\u52A8\u6001\u5361\u724C\uFF0C\u5E76\u4EC5\u7ED1\u5B9A\u4F24\u5BB3\u503C\u4E0E\u6765\u6E90\u68CB\u5B50\u3002",
           inputs: [
-            port32("templateId", stringType27),
-            port32("cardId", stringType27),
-            port32("name", stringType27),
-            port32("description", stringType27),
-            port32("owner", playerType14, { nullable: true, optional: true }),
-            port32("damageAmount", numberType25),
-            port32("sourcePieceId", pieceType26, { nullable: true })
+            port33("templateId", stringType27),
+            port33("cardId", stringType27),
+            port33("name", stringType27),
+            port33("description", stringType27),
+            port33("owner", playerType14, { nullable: true, optional: true }),
+            port33("damageAmount", numberType25),
+            port33("sourcePieceId", pieceType26, { nullable: true })
           ],
-          outputs: [port32("cardId", stringType27), port32("success", booleanType25)],
+          outputs: [port33("cardId", stringType27), port33("success", booleanType25)],
           allowedSurfaces: ["rule"],
           effects: write4(["content"], ["contentCardMaterialized"]),
           lower: (ctx) => `${runtime5(ctx)}.content.materializeCurseTemplate({templateId:${input32(ctx, "templateId")},cardId:${input32(ctx, "cardId")},name:${input32(ctx, "name")},description:${input32(ctx, "description")},owner:${ctx.inputs.owner ?? "null"},damageAmount:${input32(ctx, "damageAmount")},sourcePieceId:${input32(ctx, "sourcePieceId")}})`,
@@ -10760,7 +11086,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u5F53\u524D\u52A8\u6001\u5361\u724C\u6807\u8BC6",
           description: "\u8BFB\u53D6\u5F53\u524D\u5361\u724C\u6267\u884C\u4E0A\u4E0B\u6587\u4E2D\u7684\u4E0D\u900F\u660E\u5B9A\u4E49\u6807\u8BC6\u3002",
           inputs: [],
-          outputs: [port32("cardId", stringType27)],
+          outputs: [port33("cardId", stringType27)],
           allowedSurfaces: ["card"],
           effects: read6(["context"]),
           lower: (ctx) => `${runtime5(ctx)}.cards.currentId()`,
@@ -10771,7 +11097,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u5F53\u524D\u5361\u724C\u89E6\u53D1\u7C7B\u578B",
           description: "\u8BFB\u53D6\u5361\u724C\u6267\u884C\u4E0A\u4E0B\u6587\u7684\u89E6\u53D1\u7C7B\u578B\uFF0C\u4F9B\u4F7F\u7528\u65F6\u5F03\u7F6E\u4E0E\u56DE\u5408\u7ED3\u675F\u6548\u679C\u5206\u6D41\u3002",
           inputs: [],
-          outputs: [port32("type", stringType27)],
+          outputs: [port33("type", stringType27)],
           allowedSurfaces: ["card"],
           effects: read6(["context"]),
           lower: (ctx) => `${runtime5(ctx)}.cards.currentType()`,
@@ -10781,8 +11107,8 @@ var ContentGraphCore = (() => {
           id: "effect.card-damage",
           label: "\u7ED3\u7B97\u751F\u6210\u5361\u724C\u4F24\u5BB3",
           description: "\u7528\u52A8\u6001\u5361\u724C\u767B\u8BB0\u7684\u6765\u6E90\uFF1B\u6765\u6E90\u79BB\u573A\u65F6\u7531\u5BBF\u4E3B\u6309\u51BB\u7ED3\u89C4\u5219\u9000\u5316\u4E3A\u76EE\u6807\u68CB\u5B50\uFF0C\u5E76\u4FDD\u7559\u8DF3\u8FC7\u524D\u7F6E\u4E8B\u4EF6\u7684\u65E7\u5361\u724C\u8BED\u4E49\u3002",
-          inputs: [port32("cardId", stringType27), port32("target", pieceType26), port32("amount", numberType25)],
-          outputs: [port32("result", recordType19), port32("success", booleanType25), port32("damage", numberType25)],
+          inputs: [port33("cardId", stringType27), port33("target", pieceType26), port33("amount", numberType25)],
+          outputs: [port33("result", recordType20), port33("success", booleanType25), port33("damage", numberType25)],
           parameters: [parameter25("damageType", stringType27, { enum: ["true"] }), parameter25("skillId", stringType27)],
           allowedSurfaces: ["card"],
           effects: write4(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
@@ -10796,8 +11122,8 @@ var ContentGraphCore = (() => {
           id: "effect.damage-with-killer-typed",
           label: "\u4EE5\u6307\u5B9A\u5F52\u5C5E\u63D0\u4EA4\u7C7B\u578B\u4F24\u5BB3",
           description: "\u4FDD\u7559\u89C4\u5219\u65E7\u5185\u5BB9\u7684\u4F24\u5BB3\u7C7B\u578B\u62FC\u5199\u548C\u51FB\u6740\u5F52\u5C5E\uFF1B\u7C7B\u578B\u548C\u8F93\u5165\u7B56\u7565\u5747\u4E3A\u5C01\u95ED\u53C2\u6570\u3002",
-          inputs: [port32("source", pieceType26), port32("target", pieceType26), port32("amount", numberType25), port32("killerPlayer", playerType14, { nullable: true })],
-          outputs: [port32("result", recordType19), port32("success", booleanType25), port32("damage", numberType25)],
+          inputs: [port33("source", pieceType26), port33("target", pieceType26), port33("amount", numberType25), port33("killerPlayer", playerType14, { nullable: true })],
+          outputs: [port33("result", recordType20), port33("success", booleanType25), port33("damage", numberType25)],
           parameters: [parameter25("damageType", stringType27, { enum: ["physical", "magical", "true", "toxin"], default: "physical" }), parameter25("skillId", stringType27), parameter25("inputPolicy", stringType27, { enum: ["floor", "host"], default: "floor" })],
           allowedSurfaces: ["rule"],
           effects: write4(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
@@ -10811,8 +11137,8 @@ var ContentGraphCore = (() => {
           id: "result.card-action",
           label: "\u6784\u9020\u5361\u724C\u884C\u52A8\u7ED3\u679C",
           description: "\u6784\u9020 success/message\uFF0C\u5E76\u5728\u56DE\u5408\u7ED3\u675F\u89E6\u53D1\u65F6\u663E\u5F0F\u4FDD\u7559\u52A8\u6001\u8BC5\u5492\u5361\u3002",
-          inputs: [port32("success", booleanType25), port32("message", stringType27, { optional: true })],
-          outputs: [port32("result", recordType19)],
+          inputs: [port33("success", booleanType25), port33("message", stringType27, { optional: true })],
+          outputs: [port33("result", recordType20)],
           parameters: [parameter25("keepInHand", booleanType25, { default: false })],
           allowedSurfaces: ["card"],
           effects: { pure: true, previewSafe: true },
@@ -10825,8 +11151,8 @@ var ContentGraphCore = (() => {
       var pieceType27 = "piece";
       var stringType28 = "string";
       var booleanType26 = "boolean";
-      var recordType20 = "record";
-      var port33 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var recordType21 = "record";
+      var port34 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter26 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var flow36 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       var battle20 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -10855,7 +11181,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u539F\u59CB\u73A9\u5BB6\u6807\u8BC6\u6587\u672C",
           description: "\u8BFB\u53D6\u89E6\u53D1\u8FB9\u754C\u63D0\u4F9B\u7684\u73A9\u5BB6\u6807\u8BC6\u6587\u672C\uFF0C\u4E0D\u5728\u8BFB\u53D6\u9636\u6BB5\u505A\u5927\u5C0F\u5199\u6216\u5B58\u5728\u6027\u6821\u9A8C\uFF0C\u4EA4\u7531\u540E\u7EED\u95ED\u5408\u67E5\u8BE2\u5904\u7406\u3002",
           inputs: [],
-          outputs: [port33("text", stringType28, { nullable: true })],
+          outputs: [port34("text", stringType28, { nullable: true })],
           effects: pure23(["context"]),
           lower: (ctx) => `(typeof ${ctx.surface === "pending" ? "ctx" : "context"}.playerId === "undefined" ? null : ${ctx.surface === "pending" ? "ctx" : "context"}.playerId)`,
           ui: { category: "context" }
@@ -10864,8 +11190,8 @@ var ContentGraphCore = (() => {
           id: "query.player-case-insensitive",
           label: "\u4E0D\u533A\u5206\u5927\u5C0F\u5199\u67E5\u8BE2\u73A9\u5BB6",
           description: "\u6309\u89E6\u53D1\u8FB9\u754C\u4FDD\u7559\u7684\u73A9\u5BB6\u6807\u8BC6\u67E5\u8BE2\u5F53\u524D\u5BF9\u5C40\u73A9\u5BB6\uFF0C\u517C\u5BB9\u65E7\u6280\u80FD\u7684\u5927\u5C0F\u5199\u4E0D\u654F\u611F\u5339\u914D\u3002",
-          inputs: [port33("playerId", stringType28, { nullable: true })],
-          outputs: [port33("player", playerType15, { nullable: true }), port33("error", stringType28)],
+          inputs: [port34("playerId", stringType28, { nullable: true })],
+          outputs: [port34("player", playerType15, { nullable: true }), port34("error", stringType28)],
           effects: pure23(["players"]),
           lower: (ctx) => {
             const query = flow36(ctx);
@@ -10877,8 +11203,8 @@ var ContentGraphCore = (() => {
           id: "query.player-by-id-text",
           label: "\u6309\u73A9\u5BB6\u6807\u8BC6\u6587\u672C\u67E5\u8BE2\u73A9\u5BB6",
           description: "\u6309\u539F\u59CB\u73A9\u5BB6\u6807\u8BC6\u6587\u672C\u505A\u7CBE\u786E\u6743\u5A01\u67E5\u8BE2\uFF1B\u6587\u672C\u672A\u5BF9\u5E94\u73B0\u5B58\u73A9\u5BB6\u65F6\u8FD4\u56DE\u7A7A\u5F15\u7528\u3002",
-          inputs: [port33("playerId", stringType28, { nullable: true })],
-          outputs: [port33("player", playerType15, { nullable: true })],
+          inputs: [port34("playerId", stringType28, { nullable: true })],
+          outputs: [port34("player", playerType15, { nullable: true })],
           effects: pure23(["players"]),
           lower: (ctx) => {
             const query = flow36(ctx);
@@ -10890,8 +11216,8 @@ var ContentGraphCore = (() => {
           id: "player.display-name",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u663E\u793A\u540D",
           description: "\u8BFB\u53D6\u5DF2\u9A8C\u8BC1\u73A9\u5BB6\u540D\u79F0\uFF0C\u5E76\u5728\u540D\u79F0\u4E3A\u7A7A\u65F6\u56DE\u9000\u5230\u73A9\u5BB6\u6807\u8BC6\u3002",
-          inputs: [port33("player", playerType15, { nullable: true })],
-          outputs: [port33("text", stringType28)],
+          inputs: [port34("player", playerType15, { nullable: true })],
+          outputs: [port34("text", stringType28)],
           effects: pure23(["players"]),
           lower: (ctx) => {
             const query = flow36(ctx);
@@ -10904,8 +11230,8 @@ var ContentGraphCore = (() => {
           id: "piece.snapshot-serializable",
           label: "\u4FDD\u7559\u68CB\u5B50\u6570\u636E\u5FEB\u7167",
           description: "\u590D\u5236\u5F53\u524D\u68CB\u5B50\u53EF\u6301\u4E45\u5316\u6570\u636E\uFF0C\u5E76\u4ECE\u6BCF\u6761\u89C4\u5219\u4E2D\u53BB\u9664\u53EF\u6267\u884C effect\uFF1B\u4E0D\u4F1A\u628A\u8FD0\u884C\u65F6\u51FD\u6570\u5E26\u5165\u50A8\u5B58\u53EC\u5524\u3002",
-          inputs: [port33("piece", pieceType27)],
-          outputs: [port33("record", recordType20)],
+          inputs: [port34("piece", pieceType27)],
+          outputs: [port34("record", recordType21)],
           parameters: [parameter26("policy", stringType28, { enum: ["strip-rule-effects"], default: "strip-rule-effects" })],
           effects: pure23(["pieces"]),
           lower: (ctx) => {
@@ -10919,8 +11245,8 @@ var ContentGraphCore = (() => {
           id: "piece.owner-id-text",
           label: "\u8BFB\u53D6\u68CB\u5B50\u539F\u59CB\u5F52\u5C5E\u6807\u8BC6",
           description: "\u8BFB\u53D6\u68CB\u5B50\u6240\u5C5E\u73A9\u5BB6\u7684\u539F\u59CB\u6807\u8BC6\u6587\u672C\uFF1B\u7F3A\u5C11\u5F52\u5C5E\u65F6\u4FDD\u7559\u7A7A\u503C\u4F9B\u540E\u7EED\u8FB9\u754C\u62D2\u7EDD\u3002",
-          inputs: [port33("piece", pieceType27)],
-          outputs: [port33("playerId", stringType28, { nullable: true })],
+          inputs: [port34("piece", pieceType27)],
+          outputs: [port34("playerId", stringType28, { nullable: true })],
           effects: pure23(["pieces"]),
           lower: (ctx) => {
             const query = flow36(ctx);
@@ -10932,8 +11258,8 @@ var ContentGraphCore = (() => {
           id: "piece.detach-active",
           label: "\u4ECE\u5F53\u524D\u68CB\u76D8\u79FB\u9664\u68CB\u5B50",
           description: "\u901A\u8FC7\u5BBF\u4E3B\u751F\u547D\u5468\u671F\u6309\u4E0D\u900F\u660E\u5B9E\u4F8B\u6807\u8BC6\u4ECE\u5F53\u524D\u68CB\u76D8\u96C6\u5408\u4E2D\u79FB\u9664\u68CB\u5B50\uFF1B\u4E0D\u4F2A\u9020\u6B7B\u4EA1\u4E8B\u4EF6\u6216\u989D\u5916\u8868\u73B0\u3002\u65E7 data-owned \u5185\u5BB9\u53EF\u663E\u5F0F\u9009\u62E9\u517C\u5BB9\u79BB\u573A\u7B56\u7565\u3002",
-          inputs: [port33("piece", pieceType27)],
-          outputs: [port33("success", booleanType26)],
+          inputs: [port34("piece", pieceType27)],
+          outputs: [port34("success", booleanType26)],
           parameters: [
             parameter26("flowStatePolicy", stringType28, { enum: ["cleanup", "preserve"], default: "cleanup" }),
             // Compatibility-only graphs from the original descriptor version own
@@ -10959,8 +11285,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u5B89\u5168\u79FB\u9664\u5F53\u524D\u68CB\u5B50",
           description: "\u6309\u4F5C\u8005\u751F\u547D\u5468\u671F\u4ECE\u5F53\u524D\u68CB\u76D8\u79FB\u9664\u68CB\u5B50\uFF0C\u5E76\u7531\u5BBF\u4E3B\u4FDD\u7559\u53EF\u9A8C\u8BC1\u7684\u79BB\u573A\u5B9E\u4F8B\uFF1B\u4E0D\u4F2A\u9020\u6B7B\u4EA1\u4E8B\u4EF6\u6216\u989D\u5916\u8868\u73B0\u3002\u53EF\u9009\u62E9\u6E05\u7406\u6216\u4FDD\u7559\u672C\u6B21\u6267\u884C\u7684\u68CB\u5B50\u72B6\u6001\u3002",
-          inputs: [port33("piece", pieceType27)],
-          outputs: [port33("success", booleanType26)],
+          inputs: [port34("piece", pieceType27)],
+          outputs: [port34("success", booleanType26)],
           parameters: [
             parameter26("flowStatePolicy", stringType28, { enum: ["cleanup", "preserve"], default: "cleanup", label: "\u72B6\u6001\u5904\u7406" })
           ],
@@ -10976,8 +11302,8 @@ var ContentGraphCore = (() => {
           id: "extension.store-piece",
           label: "\u767B\u8BB0\u50A8\u5B58\u68CB\u5B50",
           description: "\u5C06\u5DF2\u590D\u5236\u7684\u68CB\u5B50\u767B\u8BB0\u5230\u56FA\u5B9A\u7684\u5168\u5C40\u548C\u6309\u73A9\u5BB6\u5B58\u50A8\u69FD\uFF0C\u4F9B\u58F0\u660E\u5F0F\u552F\u4E00\u53EC\u5524\u8BFB\u53D6\u3002",
-          inputs: [port33("owner", stringType28, { nullable: true }), port33("piece", recordType20)],
-          outputs: [port33("success", booleanType26)],
+          inputs: [port34("owner", stringType28, { nullable: true }), port34("piece", recordType21)],
+          outputs: [port34("success", booleanType26)],
           parameters: [
             parameter26("storageKey", stringType28, { enum: [STORAGE_KEY], default: STORAGE_KEY }),
             parameter26("ownerScopedStorageKey", stringType28, { enum: [OWNER_STORAGE_KEY], default: OWNER_STORAGE_KEY })
@@ -10997,8 +11323,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-add-controlled",
           label: "\u53D7\u63A7\u52A0\u5165\u624B\u724C",
           description: "\u8C03\u7528\u73B0\u6709\u624B\u724C\u751F\u547D\u5468\u671F\uFF0C\u5E76\u628A\u5BBF\u4E3B\u5F02\u5E38\u8F6C\u6362\u4E3A\u5E26\u9519\u8BEF\u6587\u672C\u7684\u53D7\u63A7\u7ED3\u679C\uFF0C\u4F9B\u56FE\u4E2D\u7684\u5206\u652F\u7EE7\u7EED\u8FD4\u56DE\u3002",
-          inputs: [port33("player", playerType15)],
-          outputs: [port33("success", booleanType26), port33("error", stringType28)],
+          inputs: [port34("player", playerType15)],
+          outputs: [port34("success", booleanType26), port34("error", stringType28)],
           parameters: [parameter26("cardId", stringType28)],
           effects: writes19(["hand", "events"]),
           lower: (ctx) => {
@@ -11011,8 +11337,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-add-player-id-text",
           label: "\u6309\u73A9\u5BB6\u6807\u8BC6\u6587\u672C\u52A0\u5165\u624B\u724C",
           description: "\u628A\u539F\u59CB\u73A9\u5BB6\u6807\u8BC6\u6587\u672C\u4EA4\u7ED9\u73B0\u6709\u624B\u724C\u751F\u547D\u5468\u671F\uFF1B\u4E0D\u5B58\u5728\u6216\u4E3A\u7A7A\u65F6\u6CBF\u7528\u52A0\u5165\u5931\u8D25\u7ED3\u679C\u3002",
-          inputs: [port33("playerId", stringType28, { nullable: true })],
-          outputs: [port33("success", booleanType26)],
+          inputs: [port34("playerId", stringType28, { nullable: true })],
+          outputs: [port34("success", booleanType26)],
           parameters: [parameter26("cardId", stringType28)],
           effects: writes19(["hand", "events"]),
           lower: (ctx) => {
@@ -11077,11 +11403,11 @@ var ContentGraphCore = (() => {
       ]);
       var SURFACES5 = ["skill", "card", "rule", "triggerSkill", "pending", "preview"];
       var PURE5 = { pure: true, previewSafe: true };
-      var recordType21 = "record";
+      var recordType22 = "record";
       var booleanType27 = "boolean";
       var stringType29 = "string";
-      var listRecordType = { kind: "list", element: recordType21 };
-      var port34 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var listRecordType = { kind: "list", element: recordType22 };
+      var port35 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter27 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var define34 = (descriptor3) => descriptor3;
       var input34 = (ctx, name) => ctx.inputs[name];
@@ -11098,11 +11424,11 @@ var ContentGraphCore = (() => {
           label: "\u6309\u6761\u4EF6\u9009\u62E9\u503C",
           description: "\u5728\u4E24\u4E2A\u540C\u7C7B\u578B\u503C\u4E4B\u95F4\u6309\u5E03\u5C14\u6761\u4EF6\u9009\u62E9\u4E00\u4E2A\u503C\uFF1B\u503C\u7C7B\u578B\u7531\u5C01\u95ED\u7C7B\u578B\u63CF\u8FF0\u53C2\u6570\u786E\u5B9A\u3002",
           inputs: [
-            port34("condition", booleanType27, { label: "\u6761\u4EF6" }),
-            port34("whenTrue", recordType21, { label: "\u6761\u4EF6\u6210\u7ACB\u503C" }),
-            port34("whenFalse", recordType21, { label: "\u6761\u4EF6\u4E0D\u6210\u7ACB\u503C" })
+            port35("condition", booleanType27, { label: "\u6761\u4EF6" }),
+            port35("whenTrue", recordType22, { label: "\u6761\u4EF6\u6210\u7ACB\u503C" }),
+            port35("whenFalse", recordType22, { label: "\u6761\u4EF6\u4E0D\u6210\u7ACB\u503C" })
           ],
-          outputs: [port34("value", recordType21, { label: "\u9009\u62E9\u503C" })],
+          outputs: [port35("value", recordType22, { label: "\u9009\u62E9\u503C" })],
           inputValueTypeBindings: {
             whenTrue: { parameter: "valueType" },
             whenFalse: { parameter: "valueType" }
@@ -11120,10 +11446,10 @@ var ContentGraphCore = (() => {
           label: "\u7A7A\u503C\u56DE\u9000",
           description: "\u5728\u53EF\u7A7A\u503C\u548C\u540C\u7C7B\u578B\u9ED8\u8BA4\u503C\u4E4B\u95F4\u9009\u62E9\uFF1B\u4EC5\u7A7A\u503C\u89E6\u53D1\u56DE\u9000\uFF0C\u96F6\u548C\u7A7A\u6587\u672C\u4FDD\u6301\u539F\u503C\u3002",
           inputs: [
-            port34("value", recordType21, { nullable: true, label: "\u53EF\u7A7A\u503C" }),
-            port34("defaultValue", recordType21, { label: "\u9ED8\u8BA4\u503C" })
+            port35("value", recordType22, { nullable: true, label: "\u53EF\u7A7A\u503C" }),
+            port35("defaultValue", recordType22, { label: "\u9ED8\u8BA4\u503C" })
           ],
-          outputs: [port34("value", recordType21, { label: "\u7ED3\u679C" })],
+          outputs: [port35("value", recordType22, { label: "\u7ED3\u679C" })],
           inputValueTypeBindings: {
             value: { parameter: "valueType", nullable: true },
             defaultValue: { parameter: "valueType" }
@@ -11142,10 +11468,10 @@ var ContentGraphCore = (() => {
           label: "\u6BD4\u8F83\u503C",
           description: "\u6309\u5C01\u95ED\u503C\u7C7B\u578B\u5BF9\u4E24\u4E2A\u503C\u6267\u884C\u4E25\u683C\u76F8\u7B49\u6216\u4E0D\u76F8\u7B49\u6BD4\u8F83\uFF1B\u4E0D\u5141\u8BB8\u8DE8\u7C7B\u578B\u6BD4\u8F83\u3002",
           inputs: [
-            port34("left", recordType21, { label: "\u5DE6\u503C" }),
-            port34("right", recordType21, { label: "\u53F3\u503C" })
+            port35("left", recordType22, { label: "\u5DE6\u503C" }),
+            port35("right", recordType22, { label: "\u53F3\u503C" })
           ],
-          outputs: [port34("value", booleanType27, { label: "\u6BD4\u8F83\u7ED3\u679C" })],
+          outputs: [port35("value", booleanType27, { label: "\u6BD4\u8F83\u7ED3\u679C" })],
           inspectReferences: ["left", "right"],
           inputValueTypeBindings: {
             left: { parameter: "valueType" },
@@ -11165,8 +11491,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u6587\u672C\u524D\u7F00\u5339\u914D",
           description: "\u5224\u65AD\u53EF\u7A7A\u6587\u672C\u662F\u5426\u4EE5\u7ED9\u5B9A\u6587\u672C\u5F00\u5934\uFF1B\u7A7A\u503C\u8FD4\u56DE false\u3002",
-          inputs: [port34("text", stringType29, { nullable: true, label: "\u6587\u672C" }), port34("value", stringType29, { label: "\u524D\u7F00" })],
-          outputs: [port34("value", booleanType27, { label: "\u5339\u914D\u7ED3\u679C" })],
+          inputs: [port35("text", stringType29, { nullable: true, label: "\u6587\u672C" }), port35("value", stringType29, { label: "\u524D\u7F00" })],
+          outputs: [port35("value", booleanType27, { label: "\u5339\u914D\u7ED3\u679C" })],
           allowedSurfaces: SURFACES5,
           effects: PURE5,
           lower: (ctx) => `(${input34(ctx, "text")} != null && ${input34(ctx, "text")}.startsWith(${input34(ctx, "value")}))`,
@@ -11177,8 +11503,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u6587\u672C\u5305\u542B\u5339\u914D",
           description: "\u5224\u65AD\u53EF\u7A7A\u6587\u672C\u662F\u5426\u5305\u542B\u7ED9\u5B9A\u6587\u672C\uFF1B\u7A7A\u503C\u8FD4\u56DE false\u3002",
-          inputs: [port34("text", stringType29, { nullable: true, label: "\u6587\u672C" }), port34("value", stringType29, { label: "\u67E5\u627E\u6587\u672C" })],
-          outputs: [port34("value", booleanType27, { label: "\u5339\u914D\u7ED3\u679C" })],
+          inputs: [port35("text", stringType29, { nullable: true, label: "\u6587\u672C" }), port35("value", stringType29, { label: "\u67E5\u627E\u6587\u672C" })],
+          outputs: [port35("value", booleanType27, { label: "\u5339\u914D\u7ED3\u679C" })],
           allowedSurfaces: SURFACES5,
           effects: PURE5,
           lower: (ctx) => `(${input34(ctx, "text")} != null && ${input34(ctx, "text")}.includes(${input34(ctx, "value")}))`,
@@ -11189,8 +11515,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u96C6\u5408\u53BB\u91CD",
           description: "\u6309\u7A33\u5B9A\u7684 SameValueZero \u8EAB\u4EFD\u4FDD\u7559\u96C6\u5408\u9996\u6B21\u51FA\u73B0\u7684\u503C\u3002",
-          inputs: [port34("items", listRecordType, { label: "\u96C6\u5408" })],
-          outputs: [port34("value", listRecordType, { label: "\u53BB\u91CD\u96C6\u5408" })],
+          inputs: [port35("items", listRecordType, { label: "\u96C6\u5408" })],
+          outputs: [port35("value", listRecordType, { label: "\u53BB\u91CD\u96C6\u5408" })],
           inputValueTypeBindings: { items: { parameter: "valueType" } },
           outputValueTypeBindings: { value: { parameter: "valueType" } },
           parameters: [parameter27("valueType", stringType29, { label: "\u96C6\u5408\u7C7B\u578B", default: '{"kind":"list","element":"string"}' })],
@@ -11804,8 +12130,8 @@ var ContentGraphCore = (() => {
       var flow37 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
       function declaration(ctx) {
         const reference = String(ctx.parameters.schema);
-        const schema2 = ctx.recordSchemas?.find((item) => item.id === reference || item.id + "@" + item.version === reference);
-        if (!schema2) throw new Error("extension\uFF1A\u8BF7\u9009\u62E9\u5DF2\u58F0\u660E\u7684\u8BB0\u5F55\u7C7B\u578B");
+        const schema3 = ctx.recordSchemas?.find((item) => item.id === reference || item.id + "@" + item.version === reference);
+        if (!schema3) throw new Error("extension\uFF1A\u8BF7\u9009\u62E9\u5DF2\u58F0\u660E\u7684\u8BB0\u5F55\u7C7B\u578B");
         const schemas = [];
         const visitType = (type) => {
           if (typeof type === "string") return;
@@ -11824,9 +12150,9 @@ var ContentGraphCore = (() => {
           schemas.push(item);
           item.fields.forEach((field3) => visitType(field3.type));
         };
-        visit(schema2);
+        visit(schema3);
         schemas.sort((a, b) => (a.id + "@" + a.version).localeCompare(b.id + "@" + b.version));
-        return JSON.stringify({ schema: schema2, schemas, keyField: ctx.parameters.keyField });
+        return JSON.stringify({ schema: schema3, schemas, keyField: ctx.parameters.keyField });
       }
       var parameters2 = [
         { name: "namespace", type: "string", label: "\u6269\u5C55\u5206\u7EC4", default: "content", optional: true },
@@ -11960,6 +12286,9 @@ var ContentGraphCore = (() => {
           description: "\u590D\u5236\u68CB\u5B50\u53EF\u6062\u590D\u4FE1\u606F\uFF0C\u4FDD\u7559\u5916\u90E8\u5B9E\u4F53\u5F15\u7528\u8EAB\u4EFD\uFF1B\u526F\u672C\u53EF\u4EE5\u5B58\u5165 extension\u3002",
           inputs: [{ name: "piece", type: "piece", label: "\u68CB\u5B50" }],
           outputs: [{ name: "snapshot", type: "record", label: "\u5B9E\u4F8B\u526F\u672C" }],
+          recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
+          outputSchemaBindings: { snapshot: { parameter: "snapshotType" } },
+          parameters: [{ name: "snapshotType", type: "string", default: AUTHOR_PIECE_INSTANCE_SCHEMA_ID, label: "\u526F\u672C\u7C7B\u578B" }],
           allowedSurfaces: surfaces12,
           effects: { pure: true, previewSafe: false, reads: ["pieces", "extensions", "rules"] },
           ui: { category: "data", authoring: "standard" },
@@ -12045,10 +12374,10 @@ var ContentGraphCore = (() => {
       var numberType26 = "number";
       var booleanType28 = "boolean";
       var stringType30 = "string";
-      var recordType22 = "record";
+      var recordType23 = "record";
       var pieceType28 = "piece";
       var cellType14 = "cell";
-      var port35 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port36 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter28 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var writes20 = (domains, events = []) => ({
         pure: false,
@@ -12114,9 +12443,9 @@ var ContentGraphCore = (() => {
           id: "author.choice.option",
           label: "\u9009\u62E9\u9009\u9879\u503C",
           description: "\u6309\u201C\u663E\u793A\u6587\u672C\u2192\u503C\u201D\u6620\u5C04\u6253\u5F00\u5355\u9009\u5668\u5E76\u76F4\u63A5\u8FD4\u56DE\u58F0\u660E\u7C7B\u578B\u7684\u9009\u9879\u503C\u3002\u663E\u793A\u6587\u672C\u53EA\u7528\u4E8E\u754C\u9762\uFF0C\u4E1A\u52A1\u5206\u652F\u4F7F\u7528\u8FD4\u56DE\u503C\u3002",
-          inputs: [port35("options", recordType22, { label: "\u9009\u9879\u6620\u5C04" }), port35("cancelValue", recordType22, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
+          inputs: [port36("options", recordType23, { label: "\u9009\u9879\u6620\u5C04" }), port36("cancelValue", recordType23, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
           inputValueTypeBindings: { cancelValue: { parameter: "valueType" } },
-          outputs: [port35("value", recordType22, { label: "\u9009\u4E2D\u503C" })],
+          outputs: [port36("value", recordType23, { label: "\u9009\u4E2D\u503C" })],
           outputValueTypeBindings: { value: { parameter: "valueType" } },
           parameters: [
             parameter28("valueType", stringType30, { label: "\u8FD4\u56DE\u503C\u7C7B\u578B", default: "string" }),
@@ -12143,7 +12472,7 @@ var ContentGraphCore = (() => {
           label: "\u9009\u62E9\u68CB\u5B50\u76EE\u6807",
           description: "\u6309\u4E00\u6B21\u58F0\u660E\u7684\u8303\u56F4\u3001\u9635\u8425\u548C\u53D6\u6D88\u7EA6\u675F\u9009\u62E9\u4E00\u4E2A\u68CB\u5B50\uFF1B\u76EE\u6807\u5931\u6548\u65F6\u7531\u6743\u5A01\u76EE\u6807\u5F15\u64CE\u62D2\u7EDD\u672C\u6B21\u8BED\u53E5\u3002",
           inputs: [],
-          outputs: [port35("piece", pieceType28, { label: "\u68CB\u5B50\u76EE\u6807" })],
+          outputs: [port36("piece", pieceType28, { label: "\u68CB\u5B50\u76EE\u6807" })],
           parameters: [
             parameter28("range", numberType26, { label: "\u8303\u56F4\uFF08\u683C\uFF09", default: 5, minimum: 0 }),
             parameter28("filter", stringType30, { label: "\u9635\u8425\u7B5B\u9009", enum: ["enemy", "ally", "all"], default: "enemy" }),
@@ -12159,7 +12488,7 @@ var ContentGraphCore = (() => {
           label: "\u9009\u62E9\u5730\u683C\u76EE\u6807",
           description: "\u6309\u4E00\u6B21\u58F0\u660E\u7684\u8303\u56F4\u3001\u7B5B\u9009\u548C\u53D6\u6D88\u7EA6\u675F\u9009\u62E9\u4E00\u4E2A\u5730\u683C\uFF1B\u5750\u6807\u548C\u5360\u7528\u5408\u6CD5\u6027\u7531\u6743\u5A01\u76EE\u6807\u5F15\u64CE\u6821\u9A8C\u3002",
           inputs: [],
-          outputs: [port35("cell", cellType14, { label: "\u5730\u683C\u76EE\u6807" })],
+          outputs: [port36("cell", cellType14, { label: "\u5730\u683C\u76EE\u6807" })],
           parameters: [
             parameter28("range", numberType26, { label: "\u8303\u56F4\uFF08\u683C\uFF09", default: 5, minimum: 0 }),
             parameter28("filter", stringType30, { label: "\u5730\u683C\u7B5B\u9009", enum: ["enemy", "ally", "all"], default: "all" }),
@@ -12178,8 +12507,8 @@ var ContentGraphCore = (() => {
           id: "author.effect.damage",
           label: "\u9020\u6210\u4F24\u5BB3",
           description: "\u901A\u8FC7\u6743\u5A01\u4F24\u5BB3\u6D41\u7A0B\u9020\u6210\u666E\u901A\u6216\u771F\u5B9E\u4F24\u5BB3\u5E76\u8FD4\u56DE\u672C\u6B21\u7ED3\u7B97\u7ED3\u679C\uFF1B\u6BD2\u7D20\u53CA\u5176\u4ED6\u5386\u53F2\u5206\u7C7B\u4E0D\u5C5E\u4E8E\u65B0\u7684\u4F5C\u8005\u63A5\u53E3\u3002",
-          inputs: [port35("source", pieceType28), port35("target", pieceType28), port35("amount", numberType26)],
-          outputs: [port35("result", recordType22), port35("success", booleanType28), port35("damage", numberType26)],
+          inputs: [port36("source", pieceType28), port36("target", pieceType28), port36("amount", numberType26)],
+          outputs: [port36("result", recordType23), port36("success", booleanType28), port36("damage", numberType26)],
           parameters: [
             parameter28("damageType", stringType30, { label: "\u4F24\u5BB3\u7C7B\u578B", enum: ["normal", "true"], default: "normal" }),
             parameter28("skillId", stringType30, { label: "\u6280\u80FD\u6807\u8BC6", optional: true })
@@ -12209,16 +12538,16 @@ var ContentGraphCore = (() => {
           label: "\u663E\u793A\u9009\u9879",
           description: "\u5C06\u6709\u5E8F\u9009\u9879\u8BB0\u5F55\u4EA4\u7ED9\u9009\u62E9\u5BBF\u4E3B\uFF1B\u672A\u63D0\u4F9B\u7684\u7EA6\u675F\u4FDD\u6301\u5BBF\u4E3B\u9ED8\u8BA4\u503C\u3002\u9009\u9879\u6570\u91CF\u4E0D\u9650\u4E8E\u4E24\u4E2A\u3002",
           inputs: [
-            port35("options", { kind: "list", element: recordType22 }, { label: "\u9009\u9879" }),
-            port35("title", stringType30, { label: "\u63D0\u793A", optional: true }),
-            port35("playerId", "player", { label: "\u9009\u62E9\u73A9\u5BB6", nullable: true, optional: true }),
-            port35("selectionMode", stringType30, { label: "\u9009\u62E9\u5F62\u5F0F", optional: true }),
-            port35("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }),
-            port35("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }),
-            port35("canCancel", booleanType28, { label: "\u5141\u8BB8\u4E2D\u6B62", optional: true }),
-            port35("cancelValue", stringType30, { label: "\u4E2D\u6B62\u8FD4\u56DE\u503C", optional: true })
+            port36("options", { kind: "list", element: recordType23 }, { label: "\u9009\u9879" }),
+            port36("title", stringType30, { label: "\u63D0\u793A", optional: true }),
+            port36("playerId", "player", { label: "\u9009\u62E9\u73A9\u5BB6", nullable: true, optional: true }),
+            port36("selectionMode", stringType30, { label: "\u9009\u62E9\u5F62\u5F0F", optional: true }),
+            port36("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }),
+            port36("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }),
+            port36("canCancel", booleanType28, { label: "\u5141\u8BB8\u4E2D\u6B62", optional: true }),
+            port36("cancelValue", stringType30, { label: "\u4E2D\u6B62\u8FD4\u56DE\u503C", optional: true })
           ],
-          outputs: [port35("choice", "choice", { label: "\u9009\u62E9\u7ED3\u679C" })],
+          outputs: [port36("choice", "choice", { label: "\u9009\u62E9\u7ED3\u679C" })],
           effects: writes20(["pending"], ["pendingOptionSelection"]),
           lower: (ctx) => `${flow38(ctx)}.choice.option({${Object.entries(ctx.inputs).map(([key, value]) => `${JSON.stringify(key)}:${value}`).join(",")}})`,
           ui: { category: "choice", authoring: "standard" }
@@ -12228,9 +12557,9 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u9009\u62E9\u9009\u9879\u503C",
           description: "\u4ECE\u663E\u793A\u6587\u672C\u4E0E\u503C\u7684\u6620\u5C04\u9009\u62E9\uFF0C\u6570\u91CF\u7EDF\u4E00\u4F7F\u7528\u6700\u5C11\u4E0E\u6700\u591A\uFF1B\u591A\u9009\u6309\u70B9\u51FB\u987A\u5E8F\u8FD4\u56DE\u5143\u7EC4\uFF0C\u5141\u8BB8\u4E0D\u540C\u9009\u9879\u5177\u6709\u76F8\u540C\u503C\u3002",
-          inputs: [port35("options", recordType22, { label: "\u9009\u9879\u6620\u5C04" }), port35("player", "player", { label: "\u9009\u62E9\u73A9\u5BB6", optional: true }), port35("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }), port35("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }), port35("cancelValue", recordType22, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
+          inputs: [port36("options", recordType23, { label: "\u9009\u9879\u6620\u5C04" }), port36("player", "player", { label: "\u9009\u62E9\u73A9\u5BB6", optional: true }), port36("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }), port36("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }), port36("cancelValue", recordType23, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
           inputValueTypeBindings: { cancelValue: { parameter: "valueType" } },
-          outputs: [port35("value", recordType22, { label: "\u9009\u4E2D\u503C" })],
+          outputs: [port36("value", recordType23, { label: "\u9009\u4E2D\u503C" })],
           outputValueTypeBindings: { value: { parameter: "valueType" } },
           parameters: [parameter28("valueType", stringType30, { label: "\u8FD4\u56DE\u503C\u7C7B\u578B", default: "string" }), parameter28("selectionMode", stringType30, { label: "\u8FD4\u56DE\u5F62\u5F0F", enum: ["single", "multi"], default: "single" }), parameter28("title", stringType30, { label: "\u9009\u62E9\u63D0\u793A", default: "\u8BF7\u9009\u62E9" }), parameter28("canCancel", booleanType28, { label: "\u5141\u8BB8\u4E2D\u6B62\u672C\u6B21\u6548\u679C", default: false })],
           allowedSurfaces: ACTIVE_SURFACES6,
@@ -12251,9 +12580,9 @@ var ContentGraphCore = (() => {
           version: "3",
           label: "\u9009\u62E9\u9009\u9879\u503C",
           description: "\u4ECE\u6620\u5C04\u4E2D\u9009\u62E9\uFF1A\u6587\u672C\u952E\u4F5C\u4E3A\u663E\u793A\u6587\u5B57\uFF0C\u503C\u4F5C\u4E3A\u8FD4\u56DE\u7ED3\u679C\u3002\u591A\u9009\u6309\u70B9\u51FB\u987A\u5E8F\u8FD4\u56DE\u5143\u7EC4\uFF0C\u6570\u91CF\u7531\u6700\u5C11\u548C\u6700\u591A\u5171\u540C\u9650\u5236\u3002",
-          inputs: [port35("options", recordType22, { label: "\u9009\u9879\u6620\u5C04" }), port35("player", "player", { label: "\u9009\u62E9\u73A9\u5BB6", optional: true }), port35("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }), port35("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }), port35("cancelValue", recordType22, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
+          inputs: [port36("options", recordType23, { label: "\u9009\u9879\u6620\u5C04" }), port36("player", "player", { label: "\u9009\u62E9\u73A9\u5BB6", optional: true }), port36("minSelections", numberType26, { label: "\u6700\u5C11\u6570\u91CF", optional: true }), port36("maxSelections", numberType26, { label: "\u6700\u591A\u6570\u91CF", optional: true }), port36("cancelValue", recordType23, { label: "\u53D6\u6D88\u540E\u7EE7\u7EED\u5E76\u8FD4\u56DE", optional: true })],
           inputValueTypeBindings: { options: { parameter: "optionsType" }, cancelValue: { parameter: "valueType" } },
-          outputs: [port35("value", recordType22, { label: "\u9009\u4E2D\u503C" })],
+          outputs: [port36("value", recordType23, { label: "\u9009\u4E2D\u503C" })],
           outputValueTypeBindings: { value: { parameter: "valueType" } },
           parameters: [parameter28("optionsType", stringType30, { label: "\u9009\u9879\u6620\u5C04\u7C7B\u578B", default: '{"kind":"map","key":"string","value":"string"}' }), parameter28("valueType", stringType30, { label: "\u8FD4\u56DE\u503C\u7C7B\u578B", default: "string" }), parameter28("selectionMode", stringType30, { label: "\u8FD4\u56DE\u5F62\u5F0F", enum: ["single", "multi"], default: "single" }), parameter28("title", stringType30, { label: "\u9009\u62E9\u63D0\u793A", default: "\u8BF7\u9009\u62E9" }), parameter28("canCancel", booleanType28, { label: "\u5141\u8BB8\u4E2D\u6B62\u672C\u6B21\u6548\u679C", default: false })],
           allowedSurfaces: ACTIVE_SURFACES6,
@@ -12285,13 +12614,13 @@ var ContentGraphCore = (() => {
       var pieceType29 = "piece";
       var playerType16 = "player";
       var statusType2 = "status";
-      var recordType23 = "record";
+      var recordType24 = "record";
       var stringType31 = "string";
       var numberType27 = "number";
       var booleanType29 = "boolean";
       var nullableStringType4 = { kind: "nullable", value: stringType31 };
       var nullablePieceType = { kind: "nullable", value: pieceType29 };
-      var recordListType9 = { kind: "list", element: recordType23 };
+      var recordListType9 = { kind: "list", element: recordType24 };
       var stringListType8 = { kind: "list", element: stringType31 };
       var stringListValueType = JSON.stringify(stringListType8);
       var PIECE_WRITE_FIELD_TYPES = Object.freeze({
@@ -12368,10 +12697,10 @@ var ContentGraphCore = (() => {
         statusTags: recordListType9
       };
       var EVENT_FIELDS = {
-        sourcePiece: { kind: "nullable", value: recordType23 },
-        targetPiece: { kind: "nullable", value: recordType23 },
-        piece: { kind: "nullable", value: recordType23 },
-        rulePiece: { kind: "nullable", value: recordType23 },
+        sourcePiece: { kind: "nullable", value: recordType24 },
+        targetPiece: { kind: "nullable", value: recordType24 },
+        piece: { kind: "nullable", value: recordType24 },
+        rulePiece: { kind: "nullable", value: recordType24 },
         type: { kind: "nullable", value: stringType31 },
         playerId: { kind: "nullable", value: playerType16 },
         skillId: nullableStringType4,
@@ -12587,7 +12916,7 @@ var ContentGraphCore = (() => {
           id: "result.field",
           label: "\u8BFB\u53D6\u6548\u679C\u7ED3\u679C\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u6743\u5A01\u6548\u679C\u7ED3\u679C\u7684\u5C01\u95ED\u5B57\u6BB5\uFF1B\u7ED3\u679C\u6570\u503C\u7F3A\u5931\u6CBF\u7528\u65E7\u7ED3\u679C\u8BFB\u53D6\u7684\u96F6\u503C\u8BED\u4E49\u3002",
-          inputs: [{ name: "record", type: recordType23 }],
+          inputs: [{ name: "record", type: recordType24 }],
           outputs: [{ name: "value", type: "unknown" }],
           parameters: [{ name: "field", type: stringType31, enum: Object.keys(RESULT_FIELDS) }],
           outputParameterTypeBindings: fieldBinding(RESULT_FIELDS),
@@ -12599,7 +12928,7 @@ var ContentGraphCore = (() => {
           id: "piece.write-field",
           label: "\u68CB\u5B50\u5B57\u6BB5\u8D4B\u503C",
           description: "\u7ED9\u68CB\u5B50\u7684\u53EF\u5199\u8BB0\u8D26\u5B57\u6BB5\u8D4B\u503C\uFF1B\u52A8\u80FD\u5199\u5165\u59D4\u6258\u6743\u5A01\u5C5E\u6027\u8FB9\u754C\uFF0C\u5DF2\u7528\u88AB\u52A8\u5217\u8868\u4F7F\u7528\u65B0\u5143\u7EC4\u3002",
-          inputs: [{ name: "piece", type: pieceType29, label: "\u68CB\u5B50" }, { name: "value", type: recordType23, label: "\u503C" }],
+          inputs: [{ name: "piece", type: pieceType29, label: "\u68CB\u5B50" }, { name: "value", type: recordType24, label: "\u503C" }],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
           outputs: [{ name: "success", type: booleanType29 }],
           parameters: [
@@ -12641,7 +12970,7 @@ var ContentGraphCore = (() => {
           inputs: [
             { name: "piece", type: pieceType29, label: "\u5F53\u524D\u68CB\u5B50", optional: true },
             { name: "id", type: stringType31, label: "\u5DF2\u4FDD\u5B58\u68CB\u5B50\u6807\u8BC6", optional: true },
-            { name: "value", type: recordType23, label: "\u503C" }
+            { name: "value", type: recordType24, label: "\u503C" }
           ],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
           outputs: [{ name: "success", type: booleanType29 }],
@@ -12732,7 +13061,7 @@ var ContentGraphCore = (() => {
           id: "data.field",
           label: "\u8BFB\u53D6\u8BB0\u5F55\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u53D7\u4FE1\u8BB0\u5F55\u89C6\u56FE\u7684\u5C01\u95ED\u5B57\u6BB5\uFF1B\u53EA\u8FD4\u56DE\u4E0D\u53EF\u53D8\u5FEB\u7167\u6216\u4E0D\u53EF\u53D8\u6807\u91CF\u3002",
-          inputs: [{ name: "record", type: recordType23 }],
+          inputs: [{ name: "record", type: recordType24 }],
           outputs: [{ name: "value", type: "unknown" }, { name: "exists", type: booleanType29, label: "\u539F\u5B57\u6BB5\u5DF2\u5B9A\u4E49" }],
           parameters: [{ name: "field", type: stringType31, enum: Object.keys(DATA_FIELDS) }],
           outputParameterTypeBindings: fieldBinding(DATA_FIELDS),
@@ -12744,8 +13073,8 @@ var ContentGraphCore = (() => {
           id: "source.fields",
           label: "\u8BFB\u53D6\u5DF2\u4FDD\u7559\u6765\u6E90\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u6267\u884C\u671F\u95F4\u4FDD\u7559\u7684\u6765\u6E90\u5FEB\u7167\uFF1B\u6765\u6E90\u79BB\u573A\u540E\u4ECD\u53EF\u8BFB\u53D6\u5386\u53F2\u8EAB\u4EFD\u4E8B\u5B9E\u3002",
-          inputs: [{ name: "source", type: recordType23 }],
-          outputs: [{ name: "record", type: recordType23 }],
+          inputs: [{ name: "source", type: recordType24 }],
+          outputs: [{ name: "record", type: recordType24 }],
           effects: pure24(["execution-context"]),
           lower: (ctx) => `{record:${flow39(ctx)}.effects.capturedFields(${input36(ctx, "source")})}`,
           ui: { category: "field", authoring: "standard" }
@@ -12754,7 +13083,7 @@ var ContentGraphCore = (() => {
           id: "source.field",
           label: "\u8BFB\u53D6\u6765\u6E90\u6570\u503C\u5B57\u6BB5",
           description: "\u6309\u5C01\u95ED\u5B57\u6BB5\u8BFB\u53D6\u6267\u884C\u671F\u95F4\u4FDD\u7559\u7684\u6765\u6E90\u6570\u503C\uFF1B\u6765\u6E90\u79BB\u573A\u540E\u4ECD\u4F7F\u7528\u540C\u4E00\u8BA4\u8BC1\u6765\u6E90\u53E5\u67C4\u3002",
-          inputs: [{ name: "source", type: { kind: "nullable", value: recordType23 }, label: "\u6765\u6E90" }],
+          inputs: [{ name: "source", type: { kind: "nullable", value: recordType24 }, label: "\u6765\u6E90" }],
           outputs: [{ name: "value", type: numberType27 }],
           parameters: [{ name: "field", type: stringType31, label: "\u5B57\u6BB5", enum: Object.keys(SCOPED_NUMERIC_FIELD_TYPES) }],
           outputParameterTypeBindings: fieldBinding(SCOPED_NUMERIC_FIELD_TYPES),
@@ -12766,7 +13095,7 @@ var ContentGraphCore = (() => {
           id: "source.write-field",
           label: "\u6765\u6E90\u5B57\u6BB5\u8D4B\u503C",
           description: "\u5C06\u5C01\u95ED\u6765\u6E90\u6570\u503C\u5B57\u6BB5\u5199\u56DE\u8BA4\u8BC1\u6765\u6E90\uFF1B\u4E0D\u66B4\u9732\u6765\u6E90\u5BF9\u8C61\u8DEF\u5F84\u6216\u4EFB\u610F\u5B57\u6BB5\u3002",
-          inputs: [{ name: "source", type: { kind: "nullable", value: recordType23 }, label: "\u6765\u6E90" }, { name: "value", type: recordType23, label: "\u503C" }],
+          inputs: [{ name: "source", type: { kind: "nullable", value: recordType24 }, label: "\u6765\u6E90" }, { name: "value", type: recordType24, label: "\u503C" }],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
           outputs: [{ name: "success", type: booleanType29 }, { name: "value", type: numberType27 }],
           parameters: [
@@ -12795,7 +13124,7 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u8BFB\u53D6\u8BB0\u5F55\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u5C01\u95ED\u5B57\u6BB5\uFF1B\u5B9E\u4F8B\u6807\u8BC6\u4FDD\u7559\u6587\u672C\uFF0C\u6240\u5C5E\u73A9\u5BB6\u4FDD\u7559\u73A9\u5BB6\u5F15\u7528\u7C7B\u578B\u3002",
-          inputs: [{ name: "record", type: recordType23 }],
+          inputs: [{ name: "record", type: recordType24 }],
           outputs: [{ name: "value", type: "unknown" }, { name: "exists", type: booleanType29, label: "\u539F\u5B57\u6BB5\u5DF2\u5B9A\u4E49" }],
           parameters: [{ name: "field", type: stringType31, enum: [...Object.keys(DATA_FIELDS), "instanceId"] }],
           outputParameterTypeBindings: fieldBinding({ ...DATA_FIELDS, ownerPlayerId: playerType16, instanceId: stringType31 }),
@@ -12809,7 +13138,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u72B6\u6001\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u5F53\u524D\u6267\u884C\u4FDD\u7559\u7684\u72B6\u6001\u8BB0\u5F55\u5FEB\u7167\uFF1B\u65E0\u6548\u72B6\u6001\u7531\u5BBF\u4E3B\u62A5\u544A\u4E3A\u65E0\u6548\u4F9D\u8D56\u3002",
           inputs: [{ name: "status", type: statusType2, nullable: true }],
-          outputs: [{ name: "record", type: recordType23 }],
+          outputs: [{ name: "record", type: recordType24 }],
           effects: pure24(["execution-context", "statuses"]),
           // A nullable legacy status reader must remain a pure query so it can be
           // used in collection bodies.  Missing handles are represented as a null
@@ -12821,15 +13150,15 @@ var ContentGraphCore = (() => {
       ]);
       var SURFACES6 = ["skill", "card", "rule", "triggerSkill", "pending", "preview"];
       var PURE6 = { pure: true, previewSafe: true };
-      var recordType24 = "record";
+      var recordType25 = "record";
       var stringType32 = "string";
       var numberType28 = "number";
       var playerType17 = "player";
       var cellType15 = "cell";
-      var recordListType10 = { kind: "list", element: recordType24 };
+      var recordListType10 = { kind: "list", element: recordType25 };
       var cellListType9 = { kind: "list", element: cellType15 };
       var stringListType9 = { kind: "list", element: stringType32 };
-      var port36 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port37 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter29 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var nullable = (value) => ({ kind: "nullable", value });
       var OPTIONAL_DATA_FIELD_TYPES = Object.freeze({
@@ -12875,7 +13204,7 @@ var ContentGraphCore = (() => {
         statusTags: recordListType10,
         pathCells: cellListType9,
         skillIds: stringListType9,
-        stats: recordType24
+        stats: recordType25
       });
       var fieldTypes = Object.fromEntries(
         Object.entries(OPTIONAL_DATA_FIELD_TYPES).map(([name, type]) => [name, nullable(type)])
@@ -12906,7 +13235,7 @@ var ContentGraphCore = (() => {
           read7 = 'if (!Array.isArray(value)) return __gameplayInvalid; var strings = []; for (var index = 0; index < value.length; index += 1) { if (typeof value[index] !== "string") return __gameplayInvalid; strings.push(value[index]); } return strings;';
         } else if (type === recordListType10) {
           read7 = 'if (!Array.isArray(value)) return __gameplayInvalid; var records = []; for (var index = 0; index < value.length; index += 1) { var item = value[index]; if (!item || typeof item !== "object" || Array.isArray(item)) return __gameplayInvalid; records.push(JSON.parse(JSON.stringify(item))); } return records;';
-        } else if (type === recordType24) {
+        } else if (type === recordType25) {
           read7 = 'if (typeof value !== "object" || Array.isArray(value)) return __gameplayInvalid; return JSON.parse(JSON.stringify(value));';
         } else {
           throw new Error(`module ${ctx.moduleId}: unsupported field type`);
@@ -12919,8 +13248,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BFB\u53D6\u53EF\u7A7A\u8BB0\u5F55\u5B57\u6BB5",
           description: "\u4ECE\u53EF\u7A7A\u8BB0\u5F55\u8BFB\u53D6\u5C01\u95ED\u5B57\u6BB5\uFF1B\u7F3A\u5931\u6216\u7A7A\u503C\u8FD4\u56DE\u7A7A\uFF0C\u5B57\u6BB5\u7C7B\u578B\u9519\u8BEF\u4FDD\u6301\u65E0\u6548\u4F9D\u8D56\u3002",
-          inputs: [port36("record", recordType24, { nullable: true })],
-          outputs: [port36("value", "unknown", { nullable: true }), port36("defined", "boolean")],
+          inputs: [port37("record", recordType25, { nullable: true })],
+          outputs: [port37("value", "unknown", { nullable: true }), port37("defined", "boolean")],
           outputParameterTypeBindings: { value: { parameter: "field", types: fieldTypes } },
           parameters: [parameter29("field", stringType32, { enum: Object.keys(OPTIONAL_DATA_FIELD_TYPES) })],
           allowedSurfaces: SURFACES6,
@@ -13068,7 +13397,7 @@ var ContentGraphCore = (() => {
         ...Object.fromEntries(SKILL_NUMBER_FIELDS.map((field3) => [field3, numberType29])),
         ...Object.fromEntries(SKILL_STRING_FIELDS.map((field3) => [field3, stringType33]))
       });
-      var port37 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port38 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter30 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure25 = (reads) => ({ pure: true, previewSafe: false, reads });
       var define37 = (value) => ({
@@ -13140,7 +13469,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E0A\u4E0B\u6587\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u4E0A\u4E0B\u6587\u4E2D\u7684\u5C01\u95ED\u6807\u91CF\u5B57\u6BB5\uFF1B\u7A7A\u5B57\u6BB5\u8FD4\u56DE\u53EF\u7A7A\u503C\u5E76\u4FDD\u7559\u5B57\u6BB5\u5B58\u5728\u6027\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType), port37("defined", booleanType30)],
+          outputs: [port38("value", unknownType), port38("defined", booleanType30)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(CONTEXT_FIELD_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: CONTEXT_FIELD_TYPES }
@@ -13154,7 +13483,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6280\u80FD\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u6280\u80FD\u4E0A\u4E0B\u6587\u4E2D\u7684\u5C01\u95ED\u4E0D\u53EF\u53D8\u6807\u91CF\u5B57\u6BB5\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType)],
+          outputs: [port38("value", unknownType)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(SKILL_FIELD_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: SKILL_FIELD_TYPES }
@@ -13169,7 +13498,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E0A\u4E0B\u6587\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u5BBF\u4E3B\u4E0A\u4E0B\u6587\u4E2D\u7684\u5C01\u95ED\u6807\u91CF\u6216\u9009\u62E9\u96C6\u5408\uFF1B\u7F3A\u5931\u96C6\u5408\u6309\u65E7\u9009\u62E9\u8BFB\u53D6\u89C4\u5219\u8FD4\u56DE\u7A7A\u96C6\u5408\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType), port37("defined", booleanType30)],
+          outputs: [port38("value", unknownType), port38("defined", booleanType30)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(CONTEXT_V2_FIELD_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: CONTEXT_V2_FIELD_TYPES }
@@ -13185,7 +13514,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E8B\u4EF6\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u4E8B\u4EF6\u5FEB\u7167\u7684\u5C01\u95ED\u5386\u53F2\u5B57\u6BB5\u5E76\u4FDD\u7559\u65E7\u8BFB\u53D6\u5668\u7684 undefined \u7F3A\u5931\u8BED\u4E49\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType)],
+          outputs: [port38("value", unknownType)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(EVENT_FIELD_V2_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: EVENT_FIELD_V2_TYPES }
@@ -13201,7 +13530,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6218\u6597\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u6218\u6597\u56DE\u5408\u5C01\u95ED\u5B57\u6BB5\u5E76\u4FDD\u7559\u65E7\u56DE\u5408\u8BFB\u53D6\u5668\u7684\u539F\u59CB\u7F3A\u5931\u8BED\u4E49\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType)],
+          outputs: [port38("value", unknownType)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(BATTLE_FIELD_V2_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: BATTLE_FIELD_V2_TYPES }
@@ -13217,7 +13546,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u5F53\u524D\u5361\u724C\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u5F53\u524D\u52A8\u6001\u5361\u724C\u4E0A\u4E0B\u6587\u4E2D\u7684\u6807\u8BC6\u6216\u89E6\u53D1\u7C7B\u578B\uFF0C\u5E76\u4FDD\u7559\u5BBF\u4E3B\u7684\u7A7A\u6587\u672C\u56DE\u9000\u3002",
           inputs: [],
-          outputs: [port37("value", stringType33)],
+          outputs: [port38("value", stringType33)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(CONTEXT_CARD_FIELD_TYPES) })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: CONTEXT_CARD_FIELD_TYPES }
@@ -13233,7 +13562,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u89C4\u5219\u4E0A\u4E0B\u6587\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u89C4\u5219\u6765\u6E90\u73A9\u5BB6\u5B57\u6BB5\u5E76\u4FDD\u7559\u73A9\u5BB6\u5F15\u7528\u7C7B\u578B\uFF1B\u53EF\u4EE5\u4FDD\u7559\u5B57\u6BB5\u7F3A\u5931\u8BED\u4E49\u3002",
           inputs: [],
-          outputs: [port37("value", unknownType), port37("defined", booleanType30)],
+          outputs: [port38("value", unknownType), port38("defined", booleanType30)],
           parameters: [parameter30("field", stringType33, { enum: Object.keys(CONTEXT_RULE_FIELD_TYPES) }), parameter30("preserveMissing", booleanType30, { default: false })],
           outputParameterTypeBindings: {
             value: { parameter: "field", types: CONTEXT_RULE_FIELD_TYPES }
@@ -13254,7 +13583,7 @@ var ContentGraphCore = (() => {
       var nullableRecordType = { kind: "nullable", value: "record" };
       var nullableRecordListType = { kind: "nullable", value: { kind: "list", element: "record" } };
       var unknownType2 = "unknown";
-      var port38 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port39 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter31 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var purePreview = { pure: true, previewSafe: true };
       var pureValue2 = { pure: true, previewSafe: true };
@@ -13344,8 +13673,8 @@ var ContentGraphCore = (() => {
         id,
         version: "1",
         label,
-        inputs: [port38(inputName, inputType)],
-        outputs: [port38("value", unknownType2)],
+        inputs: [port39(inputName, inputType)],
+        outputs: [port39("value", unknownType2)],
         parameters: [
           parameter31("field", stringType34, { enum: Object.keys(fields5) }),
           ...includeMissingMode ? [parameter31("missing", stringType34, { enum: ["undefined", "null"], default: "undefined" })] : []
@@ -13361,7 +13690,7 @@ var ContentGraphCore = (() => {
         fieldDescriptor("preview.skill-field", "\u8BFB\u53D6\u9884\u89C8\u6280\u80FD\u5B57\u6BB5", "skill", "content", PREVIEW_SKILL_FIELD_TYPES, previewSkillFieldLowering, true),
         {
           ...fieldDescriptor("preview.record-field", "\u8BFB\u53D6\u9884\u89C8\u8BB0\u5F55\u5B57\u6BB5", "record", nullableRecordType, PREVIEW_RECORD_FIELD_TYPES, previewRecordFieldLowering),
-          inputs: [port38("record", "record", { nullable: true, optional: true })]
+          inputs: [port39("record", "record", { nullable: true, optional: true })]
         },
         {
           id: "battle.field",
@@ -13369,7 +13698,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6218\u6597\u539F\u59CB\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u6218\u6597\u56DE\u5408\u7684\u5C01\u95ED\u539F\u59CB\u5B57\u6BB5\u5E76\u4FDD\u7559\u5B57\u6BB5\u5B58\u5728\u6027\uFF1B\u8F6C\u6362\u7531\u901A\u7528\u503C\u539F\u5B50\u5B8C\u6210\u3002",
           inputs: [],
-          outputs: [port38("value", unknownType2), port38("defined", "boolean")],
+          outputs: [port39("value", unknownType2), port39("defined", "boolean")],
           parameters: [
             parameter31("field", stringType34, { enum: Object.keys(BATTLE_FIELD_TYPES) }),
             parameter31("missing", stringType34, { enum: ["undefined", "null"], default: "undefined" })
@@ -13385,8 +13714,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8F6C\u6362\u4E3A\u6570\u503C",
           description: "\u4F7F\u7528 JavaScript Number \u8BED\u4E49\u8F6C\u6362\u53EF\u7A7A\u6807\u91CF\u3002",
-          inputs: [port38("value", numberType30, { nullable: true, optional: true })],
-          outputs: [port38("value", numberType30)],
+          inputs: [port39("value", numberType30, { nullable: true, optional: true })],
+          outputs: [port39("value", numberType30)],
           allowedSurfaces: VALUE_SURFACES,
           effects: pureValue2,
           lower: toNumberLowering,
@@ -13397,8 +13726,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8F6C\u6362\u4E3A\u5E03\u5C14\u503C",
           description: "\u5C06\u5C01\u95ED\u7C7B\u578B\u7684\u503C\u8F6C\u6362\u4E3A\u5E03\u5C14\u503C\uFF1B\u7A7A\u503C\u3001\u96F6\u3001\u7A7A\u6587\u672C\u4E3A\u5047\uFF0C\u8BB0\u5F55\u548C\u5143\u7EC4\u4E3A\u771F\u3002\u7C7B\u578B\u7531\u901A\u7528\u7C7B\u578B\u7F16\u8F91\u5668\u786E\u5B9A\u3002",
-          inputs: [port38("value", "record", { nullable: true, optional: true })],
-          outputs: [port38("value", "boolean")],
+          inputs: [port39("value", "record", { nullable: true, optional: true })],
+          outputs: [port39("value", "boolean")],
           inputValueTypeBindings: { value: { parameter: "valueType", nullable: true } },
           parameters: [parameter31("valueType", stringType34, { default: "number" })],
           inspectReferences: ["value"],
@@ -13414,9 +13743,9 @@ var ContentGraphCore = (() => {
       var numberType31 = "number";
       var booleanType31 = "boolean";
       var pieceType30 = "piece";
-      var recordType25 = "record";
+      var recordType26 = "record";
       var choiceType8 = "choice";
-      var port39 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port40 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter32 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure26 = (reads = []) => ({
         pure: true,
@@ -13489,8 +13818,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BFB\u53D6\u53EF\u7A7A\u68CB\u5B50\u5B57\u6BB5",
           description: "\u4ECE\u5F53\u524D\u68CB\u5B50\u8BFB\u53D6\u53EF\u7A7A\u76F4\u63A5\u5B57\u6BB5\uFF1B\u7F3A\u5931\u548C\u7A7A\u503C\u8FD4\u56DE\u7A7A\uFF0C\u6570\u503C\u5185\u5BB9\u4FDD\u7559\u539F\u59CB\u503C\u4F9B\u8C03\u7528\u65B9\u81EA\u884C\u5224\u65AD\u3002",
-          inputs: [port39("piece", pieceType30)],
-          outputs: [port39("value", "unknown", { nullable: true }), port39("defined", booleanType31)],
+          inputs: [port40("piece", pieceType30)],
+          outputs: [port40("value", "unknown", { nullable: true }), port40("defined", booleanType31)],
           parameters: [
             parameter32("field", stringType35),
             parameter32("valueType", stringType35, { default: "number", enum: valueTypeEnum })
@@ -13507,7 +13836,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6218\u6597\u6269\u5C55\u5B57\u6BB5",
           description: "\u4ECE\u6218\u6597\u6269\u5C55\u8BB0\u5F55\u8BFB\u53D6\u4E00\u4E2A\u7C7B\u578B\u5C01\u95ED\u7684\u76F4\u63A5\u5B57\u6BB5\uFF1B\u7F3A\u5931\u548C\u7A7A\u503C\u8FD4\u56DE\u7A7A\uFF0C\u9519\u8BEF\u7C7B\u578B\u4FDD\u6301\u65E0\u6548\u4F9D\u8D56\u3002",
           inputs: [],
-          outputs: [port39("value", "unknown", { nullable: true }), port39("defined", booleanType31)],
+          outputs: [port40("value", "unknown", { nullable: true }), port40("defined", booleanType31)],
           parameters: [
             parameter32("field", stringType35),
             parameter32("valueType", stringType35, { default: "string", enum: valueTypeEnum })
@@ -13534,7 +13863,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u6218\u6597\u6269\u5C55\u8BB0\u5F55",
           description: "\u8BFB\u53D6\u6218\u6597\u72B6\u6001\u4E2D\u7684\u53EA\u8BFB\u6269\u5C55\u8BB0\u5F55\uFF1B\u6269\u5C55\u5BB9\u5668\u7F3A\u5931\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002",
           inputs: [],
-          outputs: [port39("record", recordType25, { nullable: true })],
+          outputs: [port40("record", recordType26, { nullable: true })],
           allowedSurfaces: ACTIVE21,
           effects: pure26(["extensions"]),
           lower: (ctx) => {
@@ -13548,8 +13877,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u6309\u952E\u8BFB\u53D6\u53EF\u7A7A\u8BB0\u5F55\u5B57\u6BB5",
           description: "\u4ECE\u53EF\u7A7A\u8BB0\u5F55\u8BFB\u53D6\u4E00\u4E2A\u7C7B\u578B\u5C01\u95ED\u7684\u76F4\u63A5\u5B57\u6BB5\uFF1B\u7F3A\u5931\u548C\u7A7A\u503C\u8FD4\u56DE\u7A7A\uFF0C\u9519\u8BEF\u7C7B\u578B\u4FDD\u6301\u65E0\u6548\u4F9D\u8D56\u3002",
-          inputs: [port39("record", recordType25, { nullable: true })],
-          outputs: [port39("value", "unknown", { nullable: true }), port39("defined", booleanType31)],
+          inputs: [port40("record", recordType26, { nullable: true })],
+          outputs: [port40("value", "unknown", { nullable: true }), port40("defined", booleanType31)],
           parameters: [
             parameter32("field", stringType35),
             parameter32("valueType", stringType35, { default: "string", enum: valueTypeEnum })
@@ -13565,8 +13894,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u8BFB\u53D6\u539F\u59CB\u9009\u62E9\u6570\u7EC4",
           description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u539F\u59CB\u591A\u9009\u6570\u7EC4\u4EA4\u7ED9\u901A\u7528\u96C6\u5408\u539F\u8BED\uFF1B\u975E\u6570\u7EC4\u503C\u6309\u65E7\u9009\u62E9\u534F\u8BAE\u5F52\u4E00\u4E3A\u7A7A\u96C6\u5408\u3002",
-          inputs: [port39("choice", choiceType8, { nullable: true, optional: true })],
-          outputs: [port39("items", { kind: "list", element: choiceType8 })],
+          inputs: [port40("choice", choiceType8, { nullable: true, optional: true })],
+          outputs: [port40("items", { kind: "list", element: choiceType8 })],
           allowedSurfaces: PURE7,
           effects: pure26(["choice"]),
           lower: (ctx) => `(function(value){return Array.isArray(value)?value:[];})(${input39(ctx, "choice")})`,
@@ -13577,8 +13906,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u6784\u9020\u5355\u9879\u96C6\u5408",
           description: "\u628A\u4E00\u4E2A\u503C\u653E\u5165\u65B0\u7684\u5355\u9879\u5143\u7EC4\uFF0C\u5143\u7D20\u7C7B\u578B\u7531\u8BE5\u503C\u51B3\u5B9A\u3002",
-          inputs: [port39("value", recordType25)],
-          outputs: [port39("items", { kind: "list", element: "any" })],
+          inputs: [port40("value", recordType26)],
+          outputs: [port40("items", { kind: "list", element: "any" })],
           parameters: [parameter32("valueType", stringType35, { default: "piece", label: "\u5143\u7D20\u7C7B\u578B" })],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
           outputTypeBindings: { items: { input: "value", projection: "singleton" } },
@@ -13592,8 +13921,8 @@ var ContentGraphCore = (() => {
           version: "1",
           label: "\u622A\u53D6\u6587\u672C",
           description: "\u6309\u8D77\u70B9\u548C\u53EF\u9009\u7EC8\u70B9\u622A\u53D6\u6587\u672C\uFF1B\u4E0D\u6267\u884C\u989D\u5916\u89C4\u8303\u5316\u3002",
-          inputs: [port39("text", stringType35), port39("start", numberType31), port39("end", numberType31, { optional: true })],
-          outputs: [port39("value", stringType35)],
+          inputs: [port40("text", stringType35), port40("start", numberType31), port40("end", numberType31, { optional: true })],
+          outputs: [port40("value", stringType35)],
           allowedSurfaces: PURE7,
           effects: pure26(),
           lower: (ctx) => `${input39(ctx, "text")}.slice(${input39(ctx, "start")}${ctx.inputs.end === void 0 ? "" : `,${input39(ctx, "end")}`})`,
@@ -13647,7 +13976,7 @@ var ContentGraphCore = (() => {
       }];
       var SURFACES7 = ["skill", "card", "rule", "triggerSkill", "pending", "preview"];
       var PURE8 = { pure: true, previewSafe: true, reads: ["records"] };
-      var recordType26 = "record";
+      var recordType27 = "record";
       var stringType36 = "string";
       var numberType32 = "number";
       var booleanType32 = "boolean";
@@ -13663,7 +13992,7 @@ var ContentGraphCore = (() => {
         playerType19,
         cellType17,
         choiceType9,
-        recordType26
+        recordType27
       ];
       var listTypes = scalarTypes2.map((element) => ({ kind: "list", element }));
       var nullableTypes = [...scalarTypes2, ...listTypes].map((value) => ({ kind: "nullable", value }));
@@ -13672,7 +14001,7 @@ var ContentGraphCore = (() => {
         Object.fromEntries(supportedTypes.map((value) => [typeof value === "string" ? value : JSON.stringify(value), value]))
       );
       var valueTypeEnum2 = Object.keys(valueTypeBindings2);
-      var port40 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port41 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter33 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       function input40(ctx, name) {
         const value = ctx.inputs[name];
@@ -13709,8 +14038,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u6309\u952E\u8BFB\u53D6\u8BB0\u5F55\u5B57\u6BB5",
         description: "\u4ECE\u8BB0\u5F55\u8BFB\u53D6\u4E00\u4E2A\u5B89\u5168\u7684\u76F4\u63A5\u952E\uFF0C\u5E76\u6309\u5C01\u95ED\u503C\u7C7B\u578B\u8FD4\u56DE\u4E0D\u53EF\u53D8\u5FEB\u7167\uFF1B\u7F3A\u5931\u8FD4\u56DE\u53EF\u7A7A\u503C\u3002",
-        inputs: [port40("record", recordType26, { nullable: true }), port40("key", stringType36, { optional: true, label: "\u52A8\u6001\u952E" })],
-        outputs: [port40("value", "unknown", { nullable: true }), port40("defined", booleanType32)],
+        inputs: [port41("record", recordType27, { nullable: true }), port41("key", stringType36, { optional: true, label: "\u52A8\u6001\u952E" })],
+        outputs: [port41("value", "unknown", { nullable: true }), port41("defined", booleanType32)],
         parameters: [
           parameter33("key", stringType36, { optional: true, default: "" }),
           parameter33("valueType", stringType36, { enum: valueTypeEnum2, default: JSON.stringify({ kind: "nullable", value: stringType36 }) })
@@ -13723,18 +14052,18 @@ var ContentGraphCore = (() => {
       }]);
       var ACTIVE22 = ["skill", "card", "rule", "triggerSkill", "pending"];
       var pieceType32 = "piece";
-      var recordType27 = "record";
+      var recordType28 = "record";
       var numberType33 = "number";
       var booleanType33 = "boolean";
       var stringType37 = "string";
       var nullableStringType7 = { kind: "nullable", value: stringType37 };
       var nullableNumberType4 = { kind: "nullable", value: numberType33 };
-      var instanceListType = { kind: "list", element: recordType27 };
+      var instanceListType = { kind: "list", element: recordType28 };
       var statusType3 = "status";
       var statusListType2 = { kind: "list", element: statusType3 };
       var stringListType10 = { kind: "list", element: stringType37 };
       var valueTypeParameter2 = (type) => typeof type === "string" ? type : JSON.stringify(type);
-      var port41 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port42 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter34 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pureRead4 = (reads) => ({ pure: true, previewSafe: false, reads });
       var flow41 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
@@ -13798,8 +14127,8 @@ var ContentGraphCore = (() => {
           id: "skill.instances",
           label: "\u8BFB\u53D6\u6280\u80FD\u5B9E\u4F8B",
           description: "\u6309\u68CB\u5B50\u6280\u80FD\u8FD0\u884C\u65F6\u987A\u5E8F\u8FD4\u56DE\u6267\u884C\u671F\u95F4\u6709\u6548\u7684\u6280\u80FD\u5B9E\u4F8B\u53E5\u67C4\uFF1B\u76F8\u540C\u6280\u80FD\u5B9A\u4E49\u7684\u4E0D\u540C\u5B9E\u4F8B\u4FDD\u6301\u72EC\u7ACB\u3002",
-          inputs: [port41("piece", pieceType32)],
-          outputs: [port41("instances", instanceListType), port41("present", booleanType33)],
+          inputs: [port42("piece", pieceType32)],
+          outputs: [port42("instances", instanceListType), port42("present", booleanType33)],
           livingReferences: ["piece"],
           effects: { pure: false, previewSafe: false, reads: ["skills"], writes: ["execution-context"] },
           lower: (ctx) => `${flow41(ctx)}.skills.instances(${input41(ctx, "piece")})`,
@@ -13809,8 +14138,8 @@ var ContentGraphCore = (() => {
           id: "skill.instance-field",
           label: "\u8BFB\u53D6\u6280\u80FD\u5B9E\u4F8B\u5B57\u6BB5",
           description: "\u4ECE\u540C\u4E00\u6267\u884C\u671F\u95F4\u4FDD\u7559\u7684\u6280\u80FD\u5B9E\u4F8B\u53E5\u67C4\u8BFB\u53D6\u767B\u8BB0\u5B57\u6BB5\uFF1B\u4E0D\u6309\u6280\u80FD\u5B9A\u4E49\u6807\u8BC6\u91CD\u65B0\u5BFB\u627E\u5B9E\u4F8B\u3002",
-          inputs: [port41("instance", recordType27)],
-          outputs: [port41("value", "unknown", { nullable: true }), port41("defined", booleanType33)],
+          inputs: [port42("instance", recordType28)],
+          outputs: [port42("value", "unknown", { nullable: true }), port42("defined", booleanType33)],
           parameters: [parameter34("field", stringType37, { enum: Object.keys(SKILL_INSTANCE_FIELDS) })],
           outputParameterTypeBindings: { value: { parameter: "field", types: SKILL_INSTANCE_FIELDS } },
           effects: pureRead4(["execution-context", "skills"]),
@@ -13821,8 +14150,8 @@ var ContentGraphCore = (() => {
           id: "status.instances",
           label: "\u8BFB\u53D6\u5168\u90E8\u72B6\u6001\u5B9E\u4F8B",
           description: "\u6309\u68CB\u5B50\u72B6\u6001\u6570\u7EC4\u987A\u5E8F\u8FD4\u56DE\u5F53\u524D\u6267\u884C\u671F\u95F4\u6709\u6548\u7684\u72B6\u6001\u5B9E\u4F8B\u53E5\u67C4\uFF1B\u91CD\u590D\u7C7B\u578B\u548C\u65E0\u6807\u8BC6\u8BB0\u5F55\u4FDD\u6301\u72EC\u7ACB\u3002",
-          inputs: [port41("piece", pieceType32)],
-          outputs: [port41("statuses", statusListType2), port41("present", booleanType33)],
+          inputs: [port42("piece", pieceType32)],
+          outputs: [port42("statuses", statusListType2), port42("present", booleanType33)],
           livingReferences: ["piece"],
           effects: { pure: false, previewSafe: false, reads: ["statuses"], writes: ["execution-context"] },
           lower: (ctx) => `${flow41(ctx)}.status.instances(${input41(ctx, "piece")})`,
@@ -13834,10 +14163,10 @@ var ContentGraphCore = (() => {
           allowedSurfaces: ACTIVE22,
           label: "\u8BFB\u53D6\u5168\u90E8\u72B6\u6001\u5B9E\u4F8B",
           description: "\u8BFB\u53D6\u68CB\u5B50\u6216\u73A9\u5BB6\u7684\u72B6\u6001\uFF0C\u4FDD\u7559\u6BCF\u4E2A\u5B9E\u4F8B\u7684\u72EC\u7ACB\u8EAB\u4EFD\u548C\u6392\u5217\u987A\u5E8F\u3002",
-          inputs: [port41("owner", pieceType32, { label: "\u6240\u5C5E\u5BF9\u8C61" })],
+          inputs: [port42("owner", pieceType32, { label: "\u6240\u5C5E\u5BF9\u8C61" })],
           parameters: [parameter34("ownerType", stringType37, { label: "\u6240\u5C5E\u7C7B\u578B", enum: ["piece", "player"], default: "piece" })],
           inputValueTypeBindings: { owner: { parameter: "ownerType" } },
-          outputs: [port41("statuses", statusListType2), port41("present", booleanType33)],
+          outputs: [port42("statuses", statusListType2), port42("present", booleanType33)],
           effects: { pure: false, previewSafe: false, reads: ["statuses"], writes: ["execution-context"] },
           lower: (ctx) => `${flow41(ctx)}.status.instances(${input41(ctx, "owner")}, ${ctx.emitLiteral(ctx.parameters.ownerType ?? "piece")})`,
           ui: { category: "status", authoring: "standard" }
@@ -13846,8 +14175,8 @@ var ContentGraphCore = (() => {
           id: "status.instances-by-id",
           label: "\u6309\u6807\u8BC6\u8BFB\u53D6\u5168\u90E8\u72B6\u6001\u5B9E\u4F8B",
           description: "\u6309\u4E0D\u900F\u660E\u68CB\u5B50\u6807\u8BC6\u8BFB\u53D6\u6218\u573A\u6216\u5893\u5730\u4E2D\u7684\u72B6\u6001\u5B9E\u4F8B\uFF1B\u91CD\u590D\u7C7B\u578B\u3001\u65E0\u6807\u8BC6\u8BB0\u5F55\u548C\u5DF2\u79BB\u573A\u68CB\u5B50\u4FDD\u6301\u72EC\u7ACB\u3002",
-          inputs: [port41("target", stringType37)],
-          outputs: [port41("statuses", statusListType2), port41("present", booleanType33)],
+          inputs: [port42("target", stringType37)],
+          outputs: [port42("statuses", statusListType2), port42("present", booleanType33)],
           effects: { pure: false, previewSafe: false, reads: ["statuses", "pieces"], writes: ["execution-context"] },
           lower: (ctx) => `${flow41(ctx)}.status.instancesById(${input41(ctx, "target")})`,
           ui: { category: "status", authoring: "standard" }
@@ -13856,8 +14185,8 @@ var ContentGraphCore = (() => {
           id: "status.instance-field",
           label: "\u8BFB\u53D6\u72B6\u6001\u5B9E\u4F8B\u5B57\u6BB5",
           description: "\u4ECE\u5F53\u524D\u6267\u884C\u671F\u95F4\u4FDD\u7559\u7684\u72B6\u6001\u5B9E\u4F8B\u53E5\u67C4\u8BFB\u53D6\u767B\u8BB0\u5B57\u6BB5\uFF0C\u4E0D\u6309\u6807\u8BC6\u91CD\u65B0\u5339\u914D\u3002",
-          inputs: [port41("status", statusType3)],
-          outputs: [port41("value", "unknown", { nullable: true }), port41("defined", booleanType33)],
+          inputs: [port42("status", statusType3)],
+          outputs: [port42("value", "unknown", { nullable: true }), port42("defined", booleanType33)],
           parameters: [parameter34("field", stringType37, { enum: Object.keys(STATUS_INSTANCE_FIELDS) })],
           outputParameterTypeBindings: { value: { parameter: "field", types: STATUS_INSTANCE_FIELDS } },
           effects: pureRead4(["execution-context", "statuses"]),
@@ -13868,9 +14197,9 @@ var ContentGraphCore = (() => {
           id: "status.write-field",
           label: "\u72B6\u6001\u5B57\u6BB5\u8D4B\u503C",
           description: "\u4FEE\u6539\u5DF2\u9009\u72B6\u6001\u5B9E\u4F8B\u7684\u5C01\u95ED\u53EF\u5199\u5B57\u6BB5\uFF1B\u5B57\u6BB5\u4E0E\u503C\u7C7B\u578B\u7531\u53D7\u4FE1\u767B\u8BB0\u8868\u7ED1\u5B9A\uFF0C\u89C4\u5219\u7684\u5B89\u88C5\u4E0E\u79FB\u9664\u4F7F\u7528\u89C4\u5219\u8BED\u53E5\u3002",
-          inputs: [port41("status", statusType3, { nullable: true, label: "\u72B6\u6001" }), port41("value", recordType27, { label: "\u503C" })],
+          inputs: [port42("status", statusType3, { nullable: true, label: "\u72B6\u6001" }), port42("value", recordType28, { label: "\u503C" })],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
-          outputs: [port41("success", booleanType33)],
+          outputs: [port42("success", booleanType33)],
           parameters: [
             parameter34("field", stringType37, { enum: Object.keys(STATUS_WRITE_FIELD_TYPES), label: "\u5B57\u6BB5" }),
             parameter34("valueType", stringType37, {
@@ -13899,8 +14228,8 @@ var ContentGraphCore = (() => {
           id: "skill.set-instance-cooldown",
           label: "\u8BBE\u5B9A\u6280\u80FD\u5B9E\u4F8B\u51B7\u5374",
           description: "\u901A\u8FC7\u6280\u80FD\u5BBF\u4E3B\u5199\u5165\u5DF2\u9009\u5B9E\u4F8B\u7684\u51B7\u5374\u503C\uFF1B\u4E0D\u4F1A\u6309\u6280\u80FD\u5B9A\u4E49\u6807\u8BC6\u66F4\u65B0\u5176\u4ED6\u540C\u540D\u5B9E\u4F8B\u3002",
-          inputs: [port41("instance", recordType27), port41("value", numberType33)],
-          outputs: [port41("success", booleanType33)],
+          inputs: [port42("instance", recordType28), port42("value", numberType33)],
+          outputs: [port42("success", booleanType33)],
           effects: { pure: false, previewSafe: false, reads: ["execution-context"], writes: ["skills"] },
           lower: (ctx) => `${flow41(ctx)}.skills.setInstanceCooldown(${input41(ctx, "instance")}, ${input41(ctx, "value")})`,
           ui: { category: "skill", authoring: "standard" }
@@ -13929,10 +14258,10 @@ var ContentGraphCore = (() => {
         }
       }];
       var ACTIVE23 = ["rule", "card"];
-      var recordType28 = "record";
+      var recordType29 = "record";
       var stringType38 = "string";
       var booleanType34 = "boolean";
-      var port42 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port43 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter35 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var effects2 = { pure: true, previewSafe: false, reads: ["content"] };
       function battle25(ctx) {
@@ -13944,7 +14273,7 @@ var ContentGraphCore = (() => {
         label: "\u8BFB\u53D6\u5185\u5BB9\u5B57\u6BB5",
         description: "\u8BFB\u53D6\u53D7\u4FE1\u52A8\u6001\u5185\u5BB9\u5BB9\u5668\u4E2D\u7684\u5C01\u95ED\u8BB0\u5F55\uFF1B\u5F53\u524D\u4EC5\u5F00\u653E\u52A8\u6001\u5361\u724C\u5B9A\u4E49\u8868\u3002",
         inputs: [],
-        outputs: [port42("value", recordType28, { nullable: true }), port42("defined", booleanType34)],
+        outputs: [port43("value", recordType29, { nullable: true }), port43("defined", booleanType34)],
         parameters: [parameter35("field", stringType38, { enum: ["customCards"] })],
         allowedSurfaces: ACTIVE23,
         effects: effects2,
@@ -13960,7 +14289,7 @@ var ContentGraphCore = (() => {
       var stringType39 = "string";
       var nullableStringType8 = { kind: "nullable", value: stringType39 };
       var PURE9 = { pure: true, previewSafe: false, reads: ["skills"] };
-      var port43 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port44 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter36 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       function input42(ctx, name) {
         const value = ctx.inputs[name];
@@ -13975,8 +14304,8 @@ var ContentGraphCore = (() => {
         version: "1",
         label: "\u8BFB\u53D6\u6280\u80FD\u5B9A\u4E49\u5B57\u6BB5",
         description: "\u6309\u6280\u80FD\u6807\u8BC6\u8BFB\u53D6\u767B\u8BB0\u7684\u5C01\u95ED\u6280\u80FD\u5B9A\u4E49\u5B57\u6BB5\uFF1B\u7F3A\u5931\u548C\u7A7A\u503C\u8FD4\u56DE\u53EF\u7A7A\u503C\u3002",
-        inputs: [port43("skillId", nullableStringType8)],
-        outputs: [port43("value", booleanType35, { nullable: true })],
+        inputs: [port44("skillId", nullableStringType8)],
+        outputs: [port44("value", booleanType35, { nullable: true })],
         parameters: [parameter36("field", stringType39, { enum: ["momentumGainOnUse"] })],
         allowedSurfaces: ACTIVE24,
         effects: PURE9,
@@ -13992,16 +14321,16 @@ var ContentGraphCore = (() => {
       var ACTIVE25 = ["skill", "card", "rule", "triggerSkill", "pending"];
       var PURE10 = { pure: true, previewSafe: false };
       var playerType20 = "player";
-      var recordType29 = "record";
+      var recordType30 = "record";
       var stringType40 = "string";
       var booleanType36 = "boolean";
       var pieceType33 = "piece";
       var nullableStringType9 = { kind: "nullable", value: stringType40 };
       var nullablePieceType3 = { kind: "nullable", value: pieceType33 };
-      var nullableRecordType2 = { kind: "nullable", value: recordType29 };
+      var nullableRecordType2 = { kind: "nullable", value: recordType30 };
       var nullableNumberType5 = { kind: "nullable", value: "number" };
-      var handType = { kind: "list", element: recordType29 };
-      var port44 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var handType = { kind: "list", element: recordType30 };
+      var port45 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter37 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var define39 = (value) => ({
         version: "1",
@@ -14088,9 +14417,9 @@ var ContentGraphCore = (() => {
         define39({
           id: "card.remove-field",
           label: "\u79FB\u9664\u624B\u724C\u5B9E\u4F8B\u5B57\u6BB5",
-          inputs: [port44("player", playerType20, { label: "\u73A9\u5BB6" }), port44("card", stringType40, { label: "\u624B\u724C\u5B9E\u4F8B\u6807\u8BC6" })],
+          inputs: [port45("player", playerType20, { label: "\u73A9\u5BB6" }), port45("card", stringType40, { label: "\u624B\u724C\u5B9E\u4F8B\u6807\u8BC6" })],
           parameters: [parameter37("field", stringType40, { label: "\u5B57\u6BB5", enum: ["contentState", "effectModifiers", "presentation", "boundPieceInstanceId"] }), parameter37("subfield", stringType40, { label: "\u8BB0\u5F55\u5B57\u6BB5", optional: true })],
-          outputs: [port44("success", booleanType36)],
+          outputs: [port45("success", booleanType36)],
           effects: { pure: false, previewSafe: false, writes: ["hand", "content", "presentation"] },
           lower: (ctx) => `${ctx.surface === "pending" ? "ctx.flow" : "flow"}.cards.removeField(${input43(ctx, "player")},${input43(ctx, "card")},${ctx.emitLiteral(field2(ctx))}${ctx.parameters.subfield === void 0 ? "" : "," + ctx.emitLiteral(ctx.parameters.subfield)})`,
           ui: { category: "field", authoring: "standard" }
@@ -14099,14 +14428,14 @@ var ContentGraphCore = (() => {
           id: "card.write-field",
           label: "\u624B\u724C\u5B9E\u4F8B\u5B57\u6BB5\u8D4B\u503C",
           description: "\u53EA\u4FEE\u6539\u6307\u5B9A\u73A9\u5BB6\u7684\u4E00\u4E2A\u624B\u724C\u5B9E\u4F8B\uFF0C\u540C\u540D\u7684\u5176\u4ED6\u624B\u724C\u4FDD\u6301\u72EC\u7ACB\u3002",
-          inputs: [port44("player", playerType20, { label: "\u73A9\u5BB6" }), port44("card", stringType40, { label: "\u624B\u724C\u5B9E\u4F8B\u6807\u8BC6" }), port44("value", recordType29, { label: "\u503C" })],
+          inputs: [port45("player", playerType20, { label: "\u73A9\u5BB6" }), port45("card", stringType40, { label: "\u624B\u724C\u5B9E\u4F8B\u6807\u8BC6" }), port45("value", recordType30, { label: "\u503C" })],
           parameters: [
             parameter37("field", stringType40, { label: "\u5B57\u6BB5", enum: ["contentState", "effectModifiers", "presentation", "boundPieceInstanceId"] }),
             parameter37("subfield", stringType40, { label: "\u8BB0\u5F55\u5B57\u6BB5", optional: true }),
             parameter37("valueType", stringType40, { label: "\u503C\u7C7B\u578B", default: "record" })
           ],
           inputValueTypeBindings: { value: { parameter: "valueType" } },
-          outputs: [port44("success", booleanType36)],
+          outputs: [port45("success", booleanType36)],
           effects: { pure: false, previewSafe: false, writes: ["hand", "content", "presentation"] },
           lower: (ctx) => `${ctx.surface === "pending" ? "ctx.flow" : "flow"}.cards.writeField(${input43(ctx, "player")},${input43(ctx, "card")},${ctx.emitLiteral(field2(ctx))},${input43(ctx, "value")}${ctx.parameters.subfield === void 0 ? "" : "," + ctx.emitLiteral(ctx.parameters.subfield)})`,
           ui: { category: "field", authoring: "standard" }
@@ -14115,8 +14444,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-records",
           label: "\u8BFB\u53D6\u624B\u724C\u8BB0\u5F55",
           description: "\u6309\u6743\u5A01\u624B\u724C\u987A\u5E8F\u8BFB\u53D6\u4E0D\u53EF\u53D8\u5361\u724C\u8BB0\u5F55\uFF0C\u5E76\u663E\u5F0F\u62A5\u544A\u624B\u724C\u662F\u5426\u5B58\u5728\u3002",
-          inputs: [port44("player", playerType20, { nullable: true, optional: true })],
-          outputs: [port44("cards", handType), port44("hasHand", booleanType36)],
+          inputs: [port45("player", playerType20, { nullable: true, optional: true })],
+          outputs: [port45("cards", handType), port45("hasHand", booleanType36)],
           effects: { ...PURE10, reads: ["hand", "players"] },
           lower: handLowering,
           ui: { category: "card", authoring: "standard" }
@@ -14125,8 +14454,8 @@ var ContentGraphCore = (() => {
           id: "card.instance-field",
           label: "\u8BFB\u53D6\u5361\u724C\u5B9E\u4F8B\u5B57\u6BB5",
           description: "\u4ECE\u624B\u724C\u5B9E\u4F8B\u8BB0\u5F55\u8BFB\u53D6\u5C01\u95ED\u5B57\u6BB5\uFF1B\u5B57\u6BB5\u7C7B\u578B\u7531\u767B\u8BB0\u8868\u51B3\u5B9A\uFF0C\u7F3A\u5931\u901A\u8FC7 defined \u7AEF\u53E3\u4FDD\u7559\u3002",
-          inputs: [port44("card", recordType29, { nullable: true })],
-          outputs: [port44("value", "unknown", { nullable: true }), port44("defined", booleanType36)],
+          inputs: [port45("card", recordType30, { nullable: true })],
+          outputs: [port45("value", "unknown", { nullable: true }), port45("defined", booleanType36)],
           parameters: [parameter37("field", stringType40, { enum: Object.keys(CARD_INSTANCE_FIELDS) })],
           outputParameterTypeBindings: fieldBinding2(CARD_INSTANCE_FIELDS),
           effects: { ...PURE10, reads: ["hand", "content"] },
@@ -14137,8 +14466,8 @@ var ContentGraphCore = (() => {
           id: "card.definition-field",
           label: "\u8BFB\u53D6\u5361\u724C\u5B9A\u4E49\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u624B\u724C\u5B9E\u4F8B\u5BF9\u5E94\u7684\u5C01\u95ED\u5361\u724C\u5B9A\u4E49\u6807\u8BC6\u6216\u540D\u79F0\uFF1B\u4E0D\u89E3\u6790\u52A8\u6001\u5BF9\u8C61\u8DEF\u5F84\u3002",
-          inputs: [port44("card", recordType29, { nullable: true })],
-          outputs: [port44("value", "unknown", { nullable: true })],
+          inputs: [port45("card", recordType30, { nullable: true })],
+          outputs: [port45("value", "unknown", { nullable: true })],
           parameters: [parameter37("field", stringType40, { enum: Object.keys(CARD_DEFINITION_FIELDS) })],
           outputParameterTypeBindings: fieldBinding2(CARD_DEFINITION_FIELDS),
           effects: { ...PURE10, reads: ["hand", "content"] },
@@ -14149,8 +14478,8 @@ var ContentGraphCore = (() => {
           id: "card.content-field",
           label: "\u8BFB\u53D6\u5361\u724C\u5185\u5BB9\u5B57\u6BB5",
           description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u5361\u724C\u5185\u5BB9\u5B57\u6BB5\uFF1B\u7ED3\u6784\u5316\u9884\u8A00\u8BB0\u5F55\u4E0E\u5E03\u5C14\u58F0\u660E\u4FDD\u6301\u5404\u81EA\u7C7B\u578B\u3002",
-          inputs: [port44("record", recordType29, { nullable: true })],
-          outputs: [port44("value", "unknown", { nullable: true })],
+          inputs: [port45("record", recordType30, { nullable: true })],
+          outputs: [port45("value", "unknown", { nullable: true })],
           parameters: [parameter37("field", stringType40, { enum: Object.keys(CARD_CONTENT_FIELDS) })],
           outputParameterTypeBindings: fieldBinding2(CARD_CONTENT_FIELDS),
           effects: { ...PURE10, reads: ["content"] },
@@ -14169,11 +14498,11 @@ var ContentGraphCore = (() => {
       var numberType34 = "number";
       var booleanType37 = "boolean";
       var stringType41 = "string";
-      var recordType30 = "record";
+      var recordType31 = "record";
       var choiceType10 = "choice";
       var pieceListType9 = { kind: "list", element: pieceType34 };
       var stringListType11 = { kind: "list", element: stringType41 };
-      var port45 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+      var port46 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var parameter38 = (name, type, options2 = {}) => ({ name, type, ...options2 });
       var pure27 = (reads = []) => ({
         pure: true,
@@ -14286,7 +14615,7 @@ var ContentGraphCore = (() => {
           label: "\u6301\u6709\u8005",
           description: "\u8BFB\u53D6\u5F53\u524D\u6280\u80FD\u6216\u89C4\u5219\u7684\u6301\u6709\u68CB\u5B50\u5F15\u7528\u3002",
           inputs: [],
-          outputs: [port45("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+          outputs: [port46("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["context"]),
           lower: (ctx) => expression(`${runtime7(ctx.surface)}.refs.holder()`),
@@ -14297,7 +14626,7 @@ var ContentGraphCore = (() => {
           label: "\u6765\u6E90\u68CB\u5B50",
           description: "\u8BFB\u53D6\u5F53\u524D\u4E8B\u4EF6\u6216\u6548\u679C\u7684\u6765\u6E90\u68CB\u5B50\u5F15\u7528\u3002",
           inputs: [],
-          outputs: [port45("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+          outputs: [port46("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["context"]),
           lower: (ctx) => expression(`${runtime7(ctx.surface)}.refs.source()`),
@@ -14308,7 +14637,7 @@ var ContentGraphCore = (() => {
           label: "\u5F53\u524D\u76EE\u6807",
           description: "\u8BFB\u53D6\u5F53\u524D\u4E8B\u4EF6\u6216\u9009\u62E9\u6D41\u7A0B\u7684\u76EE\u6807\u68CB\u5B50\u5F15\u7528\u3002",
           inputs: [],
-          outputs: [port45("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
+          outputs: [port46("piece", pieceType34, { label: "\u68CB\u5B50\u5F15\u7528", nullable: true })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["context"]),
           lower: (ctx) => expression(`${runtime7(ctx.surface)}.refs.target()`),
@@ -14319,7 +14648,7 @@ var ContentGraphCore = (() => {
           label: "\u6240\u5C5E\u73A9\u5BB6",
           description: "\u8BFB\u53D6\u6301\u6709\u8005\u6216\u5F53\u524D\u5185\u5BB9\u6240\u5C5E\u73A9\u5BB6\u7684\u4E0D\u53EF\u53D8\u73A9\u5BB6 ID\u3002",
           inputs: [],
-          outputs: [port45("player", playerType21, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
+          outputs: [port46("player", playerType21, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["context"]),
           lower: (ctx) => expression(`${runtime7(ctx.surface)}.refs.player()`),
@@ -14330,7 +14659,7 @@ var ContentGraphCore = (() => {
           label: "\u4E8B\u4EF6\u73A9\u5BB6",
           description: "\u8BFB\u53D6\u89E6\u53D1\u5F53\u524D\u4E8B\u4EF6\u7684\u73A9\u5BB6\u5F15\u7528\u3002",
           inputs: [],
-          outputs: [port45("player", playerType21, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
+          outputs: [port46("player", playerType21, { label: "\u73A9\u5BB6\u5F15\u7528", nullable: true })],
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           effects: pure27(["event"]),
           lower: (ctx) => expression(`${runtime7(ctx.surface)}.refs.eventPlayer()`),
@@ -14342,8 +14671,8 @@ var ContentGraphCore = (() => {
           id: "query.piece",
           label: "\u9A8C\u8BC1\u68CB\u5B50\u5F15\u7528",
           description: "\u6309\u4E0D\u900F\u660E\u68CB\u5B50 ID \u9A8C\u8BC1\u5E76\u8FD4\u56DE\u540C\u4E00\u4E2A\u4E0D\u900F\u660E\u5F15\u7528\u3002",
-          inputs: [port45("pieceId", pieceType34, { nullable: true, description: "\u53EF\u7A7A\u68CB\u5B50 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
-          outputs: [port45("piece", pieceType34)],
+          inputs: [port46("pieceId", pieceType34, { nullable: true, description: "\u53EF\u7A7A\u68CB\u5B50 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
+          outputs: [port46("piece", pieceType34)],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["pieces"]),
           lower: (ctx) => {
@@ -14356,8 +14685,8 @@ var ContentGraphCore = (() => {
           id: "query.player",
           label: "\u9A8C\u8BC1\u73A9\u5BB6\u5F15\u7528",
           description: "\u6309\u4E0D\u900F\u660E\u73A9\u5BB6 ID \u9A8C\u8BC1\u5E76\u8FD4\u56DE\u540C\u4E00\u4E2A\u4E0D\u900F\u660E\u5F15\u7528\u3002",
-          inputs: [port45("playerId", playerType21, { nullable: true, description: "\u53EF\u7A7A\u73A9\u5BB6 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
-          outputs: [port45("player", playerType21)],
+          inputs: [port46("playerId", playerType21, { nullable: true, description: "\u53EF\u7A7A\u73A9\u5BB6 ID\uFF1B\u4E3A\u7A7A\u65F6\u7531\u6743\u5A01\u67E5\u8BE2\u62D2\u7EDD" })],
+          outputs: [port46("player", playerType21)],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["players"]),
           lower: (ctx) => {
@@ -14370,8 +14699,8 @@ var ContentGraphCore = (() => {
           id: "query.has-piece",
           label: "\u5224\u65AD\u68CB\u5B50\u662F\u5426\u5B58\u5728",
           description: "\u67E5\u8BE2\u4E0D\u900F\u660E\u68CB\u5B50 ID \u662F\u5426\u4ECD\u7531\u6743\u5A01\u6218\u6597\u72B6\u6001\u6301\u6709\u3002",
-          inputs: [port45("pieceId", pieceType34, { nullable: true })],
-          outputs: [port45("exists", booleanType37)],
+          inputs: [port46("pieceId", pieceType34, { nullable: true })],
+          outputs: [port46("exists", booleanType37)],
           inspectReferences: ["pieceId"],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["pieces"]),
@@ -14382,8 +14711,8 @@ var ContentGraphCore = (() => {
           id: "query.has-player",
           label: "\u5224\u65AD\u73A9\u5BB6\u662F\u5426\u5B58\u5728",
           description: "\u67E5\u8BE2\u4E0D\u900F\u660E\u73A9\u5BB6 ID \u662F\u5426\u4ECD\u7531\u6743\u5A01\u6218\u6597\u72B6\u6001\u6301\u6709\u3002",
-          inputs: [port45("playerId", playerType21, { nullable: true })],
-          outputs: [port45("exists", booleanType37)],
+          inputs: [port46("playerId", playerType21, { nullable: true })],
+          outputs: [port46("exists", booleanType37)],
           inspectReferences: ["playerId"],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["players"]),
@@ -14395,10 +14724,10 @@ var ContentGraphCore = (() => {
           label: "\u67E5\u8BE2\u68CB\u5B50\u96C6\u5408",
           description: "\u6309\u6240\u5C5E\u73A9\u5BB6\u3001\u654C\u6211\u5173\u7CFB\u3001\u6765\u6E90\u8303\u56F4\u548C\u5B58\u6D3B\u6761\u4EF6\u67E5\u8BE2\u6709\u5E8F\u68CB\u5B50 ID \u96C6\u5408\u3002",
           inputs: [
-            port45("originId", pieceType34, { optional: true, nullable: true }),
-            port45("ownerId", playerType21, { optional: true, nullable: true })
+            port46("originId", pieceType34, { optional: true, nullable: true }),
+            port46("ownerId", playerType21, { optional: true, nullable: true })
           ],
-          outputs: [port45("pieces", pieceListType9)],
+          outputs: [port46("pieces", pieceListType9)],
           parameters: [
             parameter38("relation", stringType41, { enum: ["ally", "enemy", "all"], default: "all" }),
             parameter38("range", numberType34, { optional: true, minimum: 0 }),
@@ -14425,8 +14754,8 @@ var ContentGraphCore = (() => {
           id: "query.distance",
           label: "\u68CB\u5B50\u8DDD\u79BB",
           description: "\u8BFB\u53D6\u4E24\u4E2A\u68CB\u5B50\u4E4B\u95F4\u7684\u66FC\u54C8\u987F\u8DDD\u79BB\u3002",
-          inputs: [port45("from", pieceType34), port45("to", pieceType34)],
-          outputs: [port45("distance", numberType34)],
+          inputs: [port46("from", pieceType34), port46("to", pieceType34)],
+          outputs: [port46("distance", numberType34)],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["pieces", "position"]),
           lower: (ctx) => flowCall(ctx, "query.distance", [input44(ctx, "from"), input44(ctx, "to")]),
@@ -14436,8 +14765,8 @@ var ContentGraphCore = (() => {
           id: "attribute.read",
           label: "\u8BFB\u53D6\u68CB\u5B50\u5C5E\u6027",
           description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u68CB\u5B50\u5C5E\u6027\uFF1B\u5C5E\u6027\u540D\u662F\u5C01\u95ED\u679A\u4E3E\u3002",
-          inputs: [port45("piece", pieceType34)],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("piece", pieceType34)],
+          outputs: [port46("value", numberType34)],
           parameters: [parameter38("attribute", stringType41, {
             enum: ["attack", "defense", "moveRange", "currentHp", "maxHp", "x", "y"]
           })],
@@ -14455,8 +14784,8 @@ var ContentGraphCore = (() => {
           id: "attribute.text",
           label: "\u8BFB\u53D6\u68CB\u5B50\u6587\u672C\u5C5E\u6027",
           description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u68CB\u5B50\u6587\u672C\u5C5E\u6027\uFF1B\u5C5E\u6027\u540D\u662F\u5C01\u95ED\u679A\u4E3E\u3002",
-          inputs: [port45("piece", pieceType34)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("piece", pieceType34)],
+          outputs: [port46("text", stringType41)],
           parameters: [parameter38("attribute", stringType41, { enum: ["name"] })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["pieces"]),
@@ -14471,8 +14800,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u8BFB\u53D6\u68CB\u5B50\u6587\u672C\u5C5E\u6027",
           description: "\u8BFB\u53D6\u68CB\u5B50\u7684\u5C01\u95ED\u6587\u672C\u5C5E\u6027\uFF1B\u9635\u8425\u503C\u7531\u6743\u5A01\u961F\u4F0D\u6216\u6240\u5C5E\u73A9\u5BB6\u8EAB\u4EFD\u751F\u6210\u53EF\u6BD4\u8F83\u952E\u3002",
-          inputs: [port45("piece", pieceType34)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("piece", pieceType34)],
+          outputs: [port46("text", stringType41)],
           livingReferences: ["piece"],
           parameters: [parameter38("attribute", stringType41, { enum: ["name", "faction"] })],
           allowedSurfaces: QUERY_SURFACES,
@@ -14487,8 +14816,8 @@ var ContentGraphCore = (() => {
           id: "attribute.player-text",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u6587\u672C\u5C5E\u6027",
           description: "\u8BFB\u53D6\u73A9\u5BB6\u7684\u5C01\u95ED\u6587\u672C\u5C5E\u6027\uFF1B\u9635\u8425\u503C\u4F7F\u7528\u4E0E\u68CB\u5B50\u9635\u8425\u76F8\u540C\u7684\u6743\u5A01\u53EF\u6BD4\u8F83\u952E\u3002",
-          inputs: [port45("player", playerType21)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("player", playerType21)],
+          outputs: [port46("text", stringType41)],
           parameters: [parameter38("attribute", stringType41, { enum: ["name", "faction"] })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["players"]),
@@ -14502,8 +14831,8 @@ var ContentGraphCore = (() => {
           id: "resource.read",
           label: "\u8BFB\u53D6\u73A9\u5BB6\u8D44\u6E90",
           description: "\u8BFB\u53D6\u767B\u8BB0\u8FC7\u7684\u884C\u52A8\u70B9\u6216\u5145\u80FD\u70B9\u3002",
-          inputs: [port45("player", playerType21)],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("player", playerType21)],
+          outputs: [port46("value", numberType34)],
           parameters: [parameter38("resource", stringType41, { enum: ["actionPoints", "chargePoints"] })],
           allowedSurfaces: QUERY_SURFACES,
           effects: pure27(["players", "resources"]),
@@ -14519,8 +14848,8 @@ var ContentGraphCore = (() => {
           id,
           label,
           description: `\u6309\u56FA\u5B9A\u987A\u5E8F\u6267\u884C ${operator} \u8FD0\u7B97\u3002`,
-          inputs: [port45("left", inputType), port45("right", inputType)],
-          outputs: [port45("value", outputType)],
+          inputs: [port46("left", inputType), port46("right", inputType)],
+          outputs: [port46("value", outputType)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`(${input44(ctx, "left")} ${operator} ${input44(ctx, "right")})`),
@@ -14557,8 +14886,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u53EF\u7A7A\u6587\u672C\u76F8\u7B49",
           description: "\u6309\u4E25\u683C\u76F8\u7B49\u89C4\u5219\u6BD4\u8F83\u4E24\u4E2A\u53EF\u7A7A\u6587\u672C\u5B57\u6BB5\uFF1B\u4E0D\u5C06\u7F3A\u5931\u503C\u8F6C\u6362\u4E3A\u6587\u672C\u3002",
-          inputs: [port45("left", stringType41, { nullable: true }), port45("right", stringType41, { nullable: true })],
-          outputs: [port45("value", booleanType37)],
+          inputs: [port46("left", stringType41, { nullable: true }), port46("right", stringType41, { nullable: true })],
+          outputs: [port46("value", booleanType37)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`(${input44(ctx, "left")} === ${input44(ctx, "right")})`),
@@ -14569,8 +14898,8 @@ var ContentGraphCore = (() => {
           version: "2",
           label: "\u6BD4\u8F83\u6587\u672C\u662F\u5426\u76F8\u540C",
           description: "\u6309\u4E25\u683C\u76F8\u7B49\u89C4\u5219\u6BD4\u8F83\u4E24\u4E2A\u53EF\u7A7A\u6587\u672C\u5B57\u6BB5\uFF1B\u65E7\u7248 compare.text@1 \u4FDD\u6301\u517C\u5BB9\u3002",
-          inputs: [port45("left", stringType41, { nullable: true }), port45("right", stringType41, { nullable: true })],
-          outputs: [port45("value", booleanType37)],
+          inputs: [port46("left", stringType41, { nullable: true }), port46("right", stringType41, { nullable: true })],
+          outputs: [port46("value", booleanType37)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`(${input44(ctx, "left")} === ${input44(ctx, "right")})`),
@@ -14582,8 +14911,8 @@ var ContentGraphCore = (() => {
           id: "math.floor",
           label: "\u5411\u4E0B\u53D6\u6574",
           description: "\u5411\u8D1F\u65E0\u7A77\u53D6\u6574\u3002",
-          inputs: [port45("value", numberType34)],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("value", numberType34)],
+          outputs: [port46("value", numberType34)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`Math.floor(${input44(ctx, "value")})`),
@@ -14593,8 +14922,8 @@ var ContentGraphCore = (() => {
           id: "math.abs",
           label: "\u7EDD\u5BF9\u503C",
           description: "\u8BFB\u53D6\u6570\u503C\u7EDD\u5BF9\u503C\u3002",
-          inputs: [port45("value", numberType34)],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("value", numberType34)],
+          outputs: [port46("value", numberType34)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`Math.abs(${input44(ctx, "value")})`),
@@ -14604,8 +14933,8 @@ var ContentGraphCore = (() => {
           id: "logic.not",
           label: "\u975E",
           description: "\u5BF9\u5E03\u5C14\u503C\u53D6\u53CD\u3002",
-          inputs: [port45("value", booleanType37)],
-          outputs: [port45("value", booleanType37)],
+          inputs: [port46("value", booleanType37)],
+          outputs: [port46("value", booleanType37)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`!(${input44(ctx, "value")})`),
@@ -14615,8 +14944,8 @@ var ContentGraphCore = (() => {
           id: "text.concat",
           label: "\u62FC\u63A5\u6587\u672C",
           description: "\u6309\u8F93\u5165\u987A\u5E8F\u62FC\u63A5\u4E24\u4E2A\u6587\u672C\u503C\u3002",
-          inputs: [port45("left", stringType41), port45("right", stringType41)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("left", stringType41), port46("right", stringType41)],
+          outputs: [port46("text", stringType41)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`(${input44(ctx, "left")} + ${input44(ctx, "right")})`),
@@ -14626,8 +14955,8 @@ var ContentGraphCore = (() => {
           id: "text.from-number",
           label: "\u6570\u5B57\u8F6C\u6587\u672C",
           description: "\u6309\u5BBF\u4E3B JavaScript \u6570\u503C\u6587\u672C\u89C4\u5219\u8FD4\u56DE\u5B57\u7B26\u4E32\u3002",
-          inputs: [port45("value", numberType34)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("value", numberType34)],
+          outputs: [port46("text", stringType41)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`String(${input44(ctx, "value")})`),
@@ -14637,8 +14966,8 @@ var ContentGraphCore = (() => {
           id: "value.number-or-zero",
           label: "\u6570\u503C\u4E0B\u9650\u4E3A\u96F6",
           description: "\u5C06\u53EF\u7A7A\u6570\u503C\u7F3A\u7701\u4E3A\u96F6\uFF0C\u5E76\u5F52\u4E00\u4E3A\u4E0D\u5C0F\u4E8E\u96F6\u7684\u6570\u503C\u3002",
-          inputs: [port45("value", numberType34, { nullable: true })],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("value", numberType34, { nullable: true })],
+          outputs: [port46("value", numberType34)],
           allowedSurfaces: PURE_SURFACES2,
           effects: pure27(),
           lower: (ctx) => expression(`Math.max(0, ${input44(ctx, "value")} ?? 0)`),
@@ -14651,7 +14980,7 @@ var ContentGraphCore = (() => {
           label: "\u9009\u62E9\u68CB\u5B50\u76EE\u6807",
           description: "\u4F7F\u7528\u73B0\u6709 selectTarget \u534F\u8BAE\u9009\u62E9\u4E00\u540D\u68CB\u5B50\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u5019\u9009\u6821\u9A8C\u7531\u6743\u5A01\u5BBF\u4E3B\u5904\u7406\u3002",
           inputs: [],
-          outputs: [port45("choice", choiceType10, { label: "\u9009\u62E9\u7ED3\u679C" })],
+          outputs: [port46("choice", choiceType10, { label: "\u9009\u62E9\u7ED3\u679C" })],
           parameters: [
             parameter38("range", numberType34, { label: "\u8303\u56F4\uFF08\u683C\uFF09", default: 5, minimum: 0 }),
             parameter38("filter", stringType41, { label: "\u9635\u8425\u7B5B\u9009", enum: ["enemy", "ally", "all"], default: "enemy" }),
@@ -14675,7 +15004,7 @@ var ContentGraphCore = (() => {
           label: "\u9009\u62E9\u5730\u683C\u76EE\u6807",
           description: "\u4F7F\u7528\u73B0\u6709 grid \u76EE\u6807\u534F\u8BAE\u9009\u62E9\u4E00\u5757\u5730\u683C\uFF1B\u6302\u8D77\u3001\u53D6\u6D88\u548C\u5019\u9009\u6821\u9A8C\u7531\u6743\u5A01\u5BBF\u4E3B\u5904\u7406\u3002",
           inputs: [],
-          outputs: [port45("choice", choiceType10)],
+          outputs: [port46("choice", choiceType10)],
           parameters: [
             parameter38("range", numberType34, { default: 5, minimum: 0 }),
             parameter38("filter", stringType41, { enum: ["enemy", "ally", "all"], default: "all" }),
@@ -14698,8 +15027,8 @@ var ContentGraphCore = (() => {
           id: "choice.is-pending",
           label: "\u68C0\u67E5\u9009\u62E9\u662F\u5426\u6302\u8D77",
           description: "\u8BFB\u53D6\u6743\u5A01\u76EE\u6807\u9009\u62E9\u8FD4\u56DE\u503C\u4E2D\u7684\u6302\u8D77\u6807\u8BB0\uFF0C\u4F9B\u663E\u5F0F\u5206\u652F\u5904\u7406\u7B49\u5F85\u3002",
-          inputs: [port45("choice", choiceType10)],
-          outputs: [port45("pending", booleanType37)],
+          inputs: [port46("choice", choiceType10)],
+          outputs: [port46("pending", booleanType37)],
           allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
           effects: pure27(),
           lower: (ctx) => expression(`Boolean(${input44(ctx, "choice")} && ${input44(ctx, "choice")}.needsTargetSelection)`),
@@ -14709,8 +15038,8 @@ var ContentGraphCore = (() => {
           id: "choice.piece",
           label: "\u8BFB\u53D6\u5DF2\u9009\u68CB\u5B50",
           description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u68CB\u5B50\u9009\u62E9\u89E3\u6790\u4E3A\u4E0D\u900F\u660E\u68CB\u5B50 ID\uFF1B\u6302\u8D77\u503C\u5E94\u5148\u7531 choice.is-pending \u5206\u652F\u62E6\u622A\u3002",
-          inputs: [port45("choice", choiceType10)],
-          outputs: [port45("piece", pieceType34)],
+          inputs: [port46("choice", choiceType10)],
+          outputs: [port46("piece", pieceType34)],
           allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
           effects: pure27(["pieces"]),
           lower: (ctx) => {
@@ -14724,8 +15053,8 @@ var ContentGraphCore = (() => {
           id: "choice.cell",
           label: "\u8BFB\u53D6\u5DF2\u9009\u5730\u683C",
           description: "\u5C06\u5DF2\u5B8C\u6210\u7684\u5730\u683C\u9009\u62E9\u89E3\u6790\u4E3A\u53D7\u4FE1\u5730\u683C\u8BB0\u5F55\uFF1B\u6302\u8D77\u503C\u5E94\u5148\u7531 choice.is-pending \u5206\u652F\u62E6\u622A\u3002",
-          inputs: [port45("choice", choiceType10)],
-          outputs: [port45("cell", cellType18)],
+          inputs: [port46("choice", choiceType10)],
+          outputs: [port46("cell", cellType18)],
           allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
           effects: pure27(),
           lower: (ctx) => expression(`({x: (${input44(ctx, "choice")}).x, y: (${input44(ctx, "choice")}).y})`),
@@ -14737,9 +15066,9 @@ var ContentGraphCore = (() => {
           id: "effect.damage",
           label: "\u9020\u6210\u4F24\u5BB3",
           description: "\u901A\u8FC7\u73B0\u6709 DamageBatch/queue \u5165\u53E3\u9020\u6210\u4F24\u5BB3\u5E76\u8FD4\u56DE\u6743\u5A01\u7ED3\u679C\u3002",
-          inputs: [port45("source", pieceType34), port45("target", pieceType34), port45("amount", numberType34)],
+          inputs: [port46("source", pieceType34), port46("target", pieceType34), port46("amount", numberType34)],
           inputValueTypeBindings: { source: { parameter: "sourceType" } },
-          outputs: [port45("result", recordType30), port45("success", booleanType37), port45("damage", numberType34)],
+          outputs: [port46("result", recordType31), port46("success", booleanType37), port46("damage", numberType34)],
           // Author content has one ordinary damage kind.  The legacy host still
           // receives its frozen spelling for event/log compatibility. Both legacy
           // spellings use the same normal-damage defense calculation.
@@ -14768,8 +15097,8 @@ var ContentGraphCore = (() => {
           id: "effect.heal",
           label: "\u6CBB\u7597",
           description: "\u901A\u8FC7\u73B0\u6709 HealBatch/queue \u5165\u53E3\u6CBB\u7597\u5E76\u8FD4\u56DE\u6743\u5A01\u7ED3\u679C\u3002",
-          inputs: [port45("source", pieceType34), port45("target", pieceType34), port45("amount", numberType34)],
-          outputs: [port45("result", recordType30), port45("success", booleanType37), port45("heal", numberType34)],
+          inputs: [port46("source", pieceType34), port46("target", pieceType34), port46("amount", numberType34)],
+          outputs: [port46("result", recordType31), port46("success", booleanType37), port46("heal", numberType34)],
           parameters: [parameter38("skillId", stringType41, { optional: true })],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["heal", "events"], { events: ["beforeHealDealt", "afterHealDealt"] }),
@@ -14783,8 +15112,8 @@ var ContentGraphCore = (() => {
           id: "effect.queue-heal",
           label: "\u6392\u961F\u6CBB\u7597",
           description: "\u5728\u89C4\u5219\u4E8B\u4EF6\u7684\u83B7\u51C6 healQueue \u4E2D\u52A0\u5165\u4E00\u4E2A\u6CBB\u7597\u8BF7\u6C42\uFF1B\u4E0D\u63D0\u524D\u6539\u53D8 HP\u3002",
-          inputs: [port45("healer", pieceType34), port45("target", pieceType34), port45("amount", numberType34)],
-          outputs: [port45("queued", numberType34)],
+          inputs: [port46("healer", pieceType34), port46("target", pieceType34), port46("amount", numberType34)],
+          outputs: [port46("queued", numberType34)],
           parameters: [parameter38("skillId", stringType41, { optional: true })],
           allowedSurfaces: ["rule"],
           effects: writes21(["heal", "queue"], { events: ["afterHealDealt"] }),
@@ -14799,8 +15128,8 @@ var ContentGraphCore = (() => {
           id: "effect.teleport",
           label: "\u6743\u5A01\u4F4D\u79FB",
           description: "\u901A\u8FC7\u7EDF\u4E00\u4F4D\u7F6E\u63D0\u4EA4\u5668\u4F20\u9001\u4E00\u540D\u68CB\u5B50\u5230\u5730\u683C\u3002",
-          inputs: [port45("piece", pieceType34), port45("destination", cellType18)],
-          outputs: [port45("result", recordType30), port45("success", booleanType37)],
+          inputs: [port46("piece", pieceType34), port46("destination", cellType18)],
+          outputs: [port46("result", recordType31), port46("success", booleanType37)],
           parameters: [parameter38("kind", stringType41, { enum: ["teleport", "dash", "walk", "push", "pull", "swap"], default: "teleport" })],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["position", "events"], { events: ["beforePiecePositionChange", "afterPiecePositionChange", "afterPiecePathContact"] }),
@@ -14815,8 +15144,8 @@ var ContentGraphCore = (() => {
           id: "resource.adjust",
           label: "\u8C03\u6574\u8D44\u6E90",
           description: "\u901A\u8FC7\u8D44\u6E90\u8FB9\u754C\u6821\u9A8C\u8C03\u6574\u884C\u52A8\u70B9\u6216\u5145\u80FD\u70B9\u3002",
-          inputs: [port45("player", playerType21), port45("amount", numberType34)],
-          outputs: [port45("value", numberType34)],
+          inputs: [port46("player", playerType21), port46("amount", numberType34)],
+          outputs: [port46("value", numberType34)],
           parameters: [parameter38("resource", stringType41, { enum: ["actionPoints", "chargePoints"] })],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["resources"], { events: ["resourceChanged"] }),
@@ -14827,8 +15156,8 @@ var ContentGraphCore = (() => {
           id: "card.hand-add",
           label: "\u52A0\u5165\u624B\u724C",
           description: "\u6CBF\u7528\u5361\u724C\u5B9E\u4F8B\u5316\u3001\u5BB9\u91CF\u548C\u4E8B\u4EF6\u5904\u7406\u52A0\u5165\u6307\u5B9A\u73A9\u5BB6\u624B\u724C\u3002",
-          inputs: [port45("player", playerType21)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("player", playerType21)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("cardId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["hand", "events"], { events: ["cardAdded"] }),
@@ -14841,8 +15170,8 @@ var ContentGraphCore = (() => {
           id: "status.apply-piece",
           label: "\u9644\u52A0\u68CB\u5B50\u72B6\u6001",
           description: "\u6309\u56FA\u5B9A\u5B57\u6BB5\u6784\u9020\u72B6\u6001\uFF0C\u5E76\u7ECF\u73B0\u6709 status lifecycle \u5B89\u88C5\u5173\u8054\u89C4\u5219\u3002",
-          inputs: [port45("target", pieceType34)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", pieceType34)],
+          outputs: [port46("success", booleanType37)],
           parameters: [
             parameter38("statusId", stringType41),
             parameter38("statusType", stringType41),
@@ -14868,8 +15197,8 @@ var ContentGraphCore = (() => {
           id: "status.apply-player",
           label: "\u9644\u52A0\u73A9\u5BB6\u72B6\u6001",
           description: "\u6309\u56FA\u5B9A\u5B57\u6BB5\u6784\u9020\u73A9\u5BB6\u72B6\u6001\uFF0C\u5E76\u7ECF\u73B0\u6709 status lifecycle \u5B89\u88C5\u5173\u8054\u89C4\u5219\u3002",
-          inputs: [port45("target", playerType21)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", playerType21)],
+          outputs: [port46("success", booleanType37)],
           parameters: [
             parameter38("statusId", stringType41),
             parameter38("statusType", stringType41),
@@ -14895,8 +15224,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-piece",
           label: "\u79FB\u9664\u68CB\u5B50\u72B6\u6001",
           description: "\u901A\u8FC7\u73B0\u6709 status lifecycle \u79FB\u9664\u68CB\u5B50\u72B6\u6001\u3002",
-          inputs: [port45("target", pieceType34)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", pieceType34)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("statusId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
@@ -14907,8 +15236,8 @@ var ContentGraphCore = (() => {
           id: "status.remove-player",
           label: "\u79FB\u9664\u73A9\u5BB6\u72B6\u6001",
           description: "\u901A\u8FC7\u73B0\u6709 status lifecycle \u79FB\u9664\u73A9\u5BB6\u72B6\u6001\u3002",
-          inputs: [port45("target", playerType21)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", playerType21)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("statusId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["status", "rule", "events"], { events: ["afterStatusRemoved"] }),
@@ -14919,8 +15248,8 @@ var ContentGraphCore = (() => {
           id: "rule.apply-piece",
           label: "\u9644\u52A0\u68CB\u5B50\u89C4\u5219",
           description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u5B89\u88C5\u5DF2\u767B\u8BB0\u89C4\u5219\u5B9A\u4E49\u3002",
-          inputs: [port45("target", pieceType34)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", pieceType34)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("ruleId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["rule", "events"], { events: ["ruleAdded"] }),
@@ -14931,8 +15260,8 @@ var ContentGraphCore = (() => {
           id: "rule.apply-player",
           label: "\u9644\u52A0\u73A9\u5BB6\u89C4\u5219",
           description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u5B89\u88C5\u5DF2\u767B\u8BB0\u73A9\u5BB6\u89C4\u5219\u5B9A\u4E49\u3002",
-          inputs: [port45("target", playerType21)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", playerType21)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("ruleId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["rule", "events"], { events: ["ruleAdded"] }),
@@ -14943,8 +15272,8 @@ var ContentGraphCore = (() => {
           id: "rule.remove-piece",
           label: "\u79FB\u9664\u68CB\u5B50\u89C4\u5219",
           description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u79FB\u9664\u5DF2\u767B\u8BB0\u68CB\u5B50\u89C4\u5219\u3002",
-          inputs: [port45("target", pieceType34)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", pieceType34)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("ruleId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["rule", "events"], { events: ["ruleRemoved"] }),
@@ -14955,8 +15284,8 @@ var ContentGraphCore = (() => {
           id: "rule.remove-player",
           label: "\u79FB\u9664\u73A9\u5BB6\u89C4\u5219",
           description: "\u901A\u8FC7\u89C4\u5219\u5BBF\u4E3B\u79FB\u9664\u5DF2\u767B\u8BB0\u73A9\u5BB6\u89C4\u5219\u3002",
-          inputs: [port45("target", playerType21)],
-          outputs: [port45("success", booleanType37)],
+          inputs: [port46("target", playerType21)],
+          outputs: [port46("success", booleanType37)],
           parameters: [parameter38("ruleId", stringType41)],
           allowedSurfaces: EFFECT_SURFACES,
           effects: writes21(["rule", "events"], { events: ["ruleRemoved"] }),
@@ -14970,7 +15299,7 @@ var ContentGraphCore = (() => {
           label: "\u8BFB\u53D6\u4E8B\u4EF6\u4E8B\u5B9E",
           description: "\u8BFB\u53D6\u7531\u5BBF\u4E3B\u767D\u540D\u5355\u5316\u7684\u4E0D\u53EF\u53D8\u4E8B\u4EF6\u4E8B\u5B9E\u8BB0\u5F55\u3002",
           inputs: [],
-          outputs: [port45("event", recordType30)],
+          outputs: [port46("event", recordType31)],
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           effects: pure27(["event"]),
           lower: (ctx) => flowCall(ctx, "event.read", []),
@@ -14994,7 +15323,7 @@ var ContentGraphCore = (() => {
           label,
           description: `\u8BFB\u53D6\u4E8B\u4EF6\u4E8B\u5B9E ${field3}\uFF1B\u4E8B\u4EF6\u4E0D\u5B58\u5728\u8BE5\u5B57\u6BB5\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002`,
           inputs: [],
-          outputs: [port45("value", type, { nullable: true })],
+          outputs: [port46("value", type, { nullable: true })],
           allowedSurfaces: ["rule", "triggerSkill", "pending"],
           effects: pure27(["event"]),
           lower: (ctx) => expression(`(${runtime7(ctx.surface)}.event.read())[${ctx.emitLiteral(field3)}]`),
@@ -15006,8 +15335,8 @@ var ContentGraphCore = (() => {
           id: "result.message",
           label: "\u8FD4\u56DE\u6D88\u606F",
           description: "\u6784\u9020\u539F\u6709 success/message \u7ED3\u679C\uFF0C\u4E0D\u5F15\u5165\u53EF\u6267\u884C\u5B57\u6BB5\u3002",
-          inputs: [port45("message", stringType41)],
-          outputs: [port45("success", booleanType37), port45("message", stringType41)],
+          inputs: [port46("message", stringType41)],
+          outputs: [port46("success", booleanType37), port46("message", stringType41)],
           parameters: [parameter38("success", booleanType37, { default: true })],
           allowedSurfaces: PURE_SURFACES2,
           effects: { ...pure27(), description: "\u8FD4\u56DE\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
@@ -15018,8 +15347,8 @@ var ContentGraphCore = (() => {
           id: "result.text",
           label: "\u8FD4\u56DE\u6587\u672C",
           description: "\u8FD4\u56DE\u4E00\u4E2A\u7C7B\u578B\u660E\u786E\u7684\u6587\u672C\u7ED3\u679C\u3002",
-          inputs: [port45("text", stringType41)],
-          outputs: [port45("text", stringType41)],
+          inputs: [port46("text", stringType41)],
+          outputs: [port46("text", stringType41)],
           allowedSurfaces: PURE_SURFACES2,
           effects: { ...pure27(), description: "\u8FD4\u56DE\u6587\u672C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
           lower: (ctx) => expression(input44(ctx, "text")),
@@ -15029,8 +15358,8 @@ var ContentGraphCore = (() => {
           id: "result.structured",
           label: "\u8FD4\u56DE\u7ED3\u6784\u5316\u7ED3\u679C",
           description: "\u6784\u9020\u56FA\u5B9A success/message/value \u7ED3\u679C\uFF1Bvalue \u5FC5\u987B\u662F\u5DF2\u7C7B\u578B\u5316\u8BB0\u5F55\u3002",
-          inputs: [port45("success", booleanType37), port45("message", stringType41), port45("value", recordType30)],
-          outputs: [port45("success", booleanType37), port45("message", stringType41), port45("value", recordType30)],
+          inputs: [port46("success", booleanType37), port46("message", stringType41), port46("value", recordType31)],
+          outputs: [port46("success", booleanType37), port46("message", stringType41), port46("value", recordType31)],
           allowedSurfaces: PURE_SURFACES2,
           effects: { ...pure27(), description: "\u8FD4\u56DE\u7ED3\u6784\u5316\u7ED3\u679C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
           lower: (ctx) => expression(`{success: ${input44(ctx, "success")}, message: ${input44(ctx, "message")}, value: ${input44(ctx, "value")}}`),
@@ -15040,8 +15369,8 @@ var ContentGraphCore = (() => {
           id: "result.value",
           label: "\u8FD4\u56DE\u7ED3\u6784\u5316\u503C",
           description: "\u5C06\u5DF2\u7C7B\u578B\u5316\u7684\u503C\u4F5C\u4E3A\u7ED3\u679C\u5B57\u6BB5\u8FD4\u56DE\uFF1B\u4E0D\u63A5\u53D7\u4F5C\u8005\u5BF9\u8C61\u6216\u6E90\u7801\u3002",
-          inputs: [port45("value", recordType30)],
-          outputs: [port45("value", recordType30)],
+          inputs: [port46("value", recordType31)],
+          outputs: [port46("value", recordType31)],
           allowedSurfaces: PURE_SURFACES2,
           effects: { ...pure27(), description: "\u8FD4\u56DE\u7C7B\u578B\u5316\u503C\uFF0C\u4E0D\u6539\u53D8\u6218\u6597\u72B6\u6001" },
           lower: (ctx) => expression(`{success: true, value: ${input44(ctx, "value")}}`),
@@ -15186,6 +15515,7 @@ var ContentGraphCore = (() => {
           uiDescription: item.uiDescription,
           inputs: item.inputs,
           outputs: item.outputs,
+          recordSchemas: item.recordSchemas,
           outputTypeBindings: item.outputTypeBindings,
           outputSchemaBindings: item.outputSchemaBindings,
           inputSchemaBindings: item.inputSchemaBindings,
@@ -15244,9 +15574,9 @@ var ContentGraphCore = (() => {
         }
         if (Object.keys(source).some((key) => !["entry", "input"].includes(key)) || typeof source.input !== "string") fail32("invalid source for " + token);
         if (!Array.isArray(graph2.inputs) || !object(graph2.inputBindings) || !own22(graph2.inputBindings, source.input)) fail32("missing bound input for " + token);
-        const port46 = graph2.inputs.find((item) => object(item) && item.name === source.input);
+        const port47 = graph2.inputs.find((item) => object(item) && item.name === source.input);
         const value = graph2.inputBindings[source.input];
-        if (!object(port46) || !primitive(value) || typeof value !== port46.type) fail32("text requires a primitive declared input: " + token);
+        if (!object(port47) || !primitive(value) || typeof value !== port47.type) fail32("text requires a primitive declared input: " + token);
         return value;
       }
       function getGameplayModuleTextSources(entries) {
@@ -15254,17 +15584,17 @@ var ContentGraphCore = (() => {
         for (const [entryName, entry] of Object.entries(entries)) {
           const graph2 = object(entry) ? entry.graph : void 0;
           if (!object(graph2)) continue;
-          for (const port46 of Array.isArray(graph2.inputs) ? graph2.inputs : []) {
-            if (!object(port46) || typeof port46.name !== "string") continue;
-            const value = object(graph2.inputBindings) ? graph2.inputBindings[port46.name] : void 0;
-            if (primitive(value) && typeof value === port46.type) output.push({ source: { entry: entryName, input: port46.name }, label: `${entryName} \xB7 ${String(port46.label || port46.name)}`, value });
+          for (const port47 of Array.isArray(graph2.inputs) ? graph2.inputs : []) {
+            if (!object(port47) || typeof port47.name !== "string") continue;
+            const value = object(graph2.inputBindings) ? graph2.inputBindings[port47.name] : void 0;
+            if (primitive(value) && typeof value === port47.type) output.push({ source: { entry: entryName, input: port47.name }, label: `${entryName} \xB7 ${String(port47.label || port47.name)}`, value });
           }
           for (const call of statements2(graph2.body)) {
             if (call.kind !== "call" || typeof call.id !== "string") continue;
             const descriptor3 = typeof call.module === "string" ? getGameplayModule(call.module, typeof call.version === "string" ? call.version : void 0) : void 0;
             const label = (name, parameter39) => {
-              const port46 = (parameter39 ? descriptor3?.parameters : descriptor3?.inputs)?.find((port47) => port47.name === name);
-              return `${descriptor3?.label || call.id} \xB7 ${port46?.label || name}\uFF08${call.id}\uFF09`;
+              const port47 = (parameter39 ? descriptor3?.parameters : descriptor3?.inputs)?.find((port48) => port48.name === name);
+              return `${descriptor3?.label || call.id} \xB7 ${port47?.label || name}\uFF08${call.id}\uFF09`;
             };
             for (const [name, value] of Object.entries(object(call.parameters) ? call.parameters : {})) {
               if (primitive(value)) output.push({ source: { entry: entryName, node: call.id, parameter: name }, label: label(name, true), value });
@@ -15617,8 +15947,23 @@ var ContentGraphCore = (() => {
       function hasTargetChange(before, after) {
         return before.length !== after.length || before.some((item, index) => !after[index] || item.node !== after[index].node || !targetParametersEqual(item, after[index]));
       }
+      function rootTargetMetadata(document, before, after) {
+        const target = after.find((item) => item.kind === "target");
+        if (!target) {
+          if (!before.some((item) => item.kind === "target")) return void 0;
+          return { ...typeof document.range === "number" ? { range: null } : {}, requiresTarget: false };
+        }
+        const range = numericParameter(target.statement, "range", 5);
+        return {
+          targetType: target.type,
+          filter: enumParameter(target.statement, "filter", target.type === "cell" ? "all" : "enemy"),
+          ...typeof document.range === "number" && range !== void 0 ? { range } : {},
+          requiresTarget: true
+        };
+      }
       function synchronizeGameplayTargetBinding(document, previousGraph, nextGraph, entry) {
         if (!object2(document)) return { warnings: [], diagnostics: ["\u5185\u5BB9\u4E0D\u662F\u53EF\u7ED1\u5B9A\u7684\u8BB0\u5F55\u3002"] };
+        if (!BOUND_ENTRY_FIELDS.has(entry)) return { warnings: [], diagnostics: [] };
         const beforeResult = interactions(previousGraph);
         const afterResult = interactions(nextGraph);
         const declaredResult = staticSteps(document);
@@ -15632,7 +15977,10 @@ var ContentGraphCore = (() => {
         if (declaredResult.diagnostic) diagnostics.push(declaredResult.diagnostic);
         if (diagnostics.length) return { warnings, diagnostics };
         const declaration2 = declaredResult.values;
-        if (!declaration2.length) return { warnings, diagnostics: [] };
+        if (!declaration2.length) {
+          const rootMetadata = rootTargetMetadata(document, before, after);
+          return { warnings, ...rootMetadata ? { rootTargetMetadata: rootMetadata } : {}, diagnostics: [] };
+        }
         const modules = object2(document.gameplayModules) ? document.gameplayModules : void 0;
         if (modules && own32(modules, "targetBindings") && modules.targetBindings !== void 0 && !existingBinding(modules.targetBindings)) {
           return { warnings, diagnostics: ["targetBindings \u5143\u6570\u636E\u65E0\u6548\uFF0C\u672A\u731C\u6D4B\u66FF\u4EE3\u8282\u70B9\u3002"] };
@@ -17161,6 +17509,21 @@ var ContentGraphCore = (() => {
       var sameType = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       var own5 = (object3, key) => Object.prototype.hasOwnProperty.call(object3, key) ? object3[key] : void 0;
       var number2 = "number";
+      function resolveAuthorRecordField(schema3, requested) {
+        if (!schema3) return { ambiguous: false };
+        const exact = schema3.fields.find((field3) => field3.name === requested);
+        if (exact) return { field: exact, ambiguous: false };
+        const labeled = schema3.fields.filter((field3) => field3.label === requested);
+        if (labeled.length === 1) return { field: labeled[0], ambiguous: false };
+        return { ambiguous: labeled.length > 1 };
+      }
+      function authorRecordFieldDisplayName(schema3, field3) {
+        const label = field3.label;
+        if (!label) return field3.name;
+        const labelMatches = schema3.fields.filter((candidate) => candidate.label === label);
+        const exactOtherField = schema3.fields.some((candidate) => candidate !== field3 && candidate.name === label);
+        return labelMatches.length === 1 && !exactOtherField ? label : field3.name;
+      }
       var authorFieldAliases = {
         \u540D\u79F0: "name",
         \u9635\u8425: "faction",
@@ -17215,9 +17578,9 @@ var ContentGraphCore = (() => {
       };
       var operators = { "+": "math.add", "-": "math.subtract", "*": "math.multiply", "/": "math.divide", "%": "math.modulo", "^": "math.power", "<": "compare.less-than", "<=": "compare.less-or-equal", ">": "compare.greater-than", ">=": "compare.greater-or-equal", "&&": "logic.and", "||": "logic.or" };
       var authorFunctionSpecs = {
-        \u7EDD\u5BF9\u503C: { module: "math.abs", args: ["value"] },
-        \u6700\u5C0F\u503C: { module: "math.min", args: ["left", "right"] },
-        \u6700\u5927\u503C: { module: "math.max", args: ["left", "right"] },
+        \u7EDD\u5BF9\u503C: { module: "math.abs", args: ["value"], labels: ["\u6570\u503C"] },
+        \u6700\u5C0F\u503C: { module: "math.min", args: ["left", "right"], labels: ["\u5DE6\u503C", "\u53F3\u503C"] },
+        \u6700\u5927\u503C: { module: "math.max", args: ["left", "right"], labels: ["\u5DE6\u503C", "\u53F3\u503C"] },
         \u96C6\u5408: { module: "set.create", args: ["items"], labels: ["\u5143\u7EC4"] },
         \u6620\u5C04: { module: "map.create", args: ["keys", "values"], labels: ["\u952E\u5143\u7EC4", "\u503C\u5143\u7EC4"] },
         \u6570\u91CF: { module: "collection.length", args: ["items"], labels: ["\u5BB9\u5668"] },
@@ -17240,7 +17603,7 @@ var ContentGraphCore = (() => {
         \u67E5\u8BE2\u68CB\u5B50: { module: "author.query.pieces", args: ["center", "maximum", "minimum"], labels: ["\u4E2D\u5FC3\u5730\u683C", "\u6700\u5927\u8DDD\u79BB", "\u6700\u5C0F\u8DDD\u79BB"], port: "items" },
         \u67E5\u8BE2\u5730\u683C: { module: "author.query.cells", args: ["center", "maximum", "minimum"], labels: ["\u4E2D\u5FC3\u5730\u683C", "\u6700\u5927\u8DDD\u79BB", "\u6700\u5C0F\u8DDD\u79BB"], port: "items" },
         \u72B6\u6001\u5F3A\u5EA6: { module: "status.strength", args: ["piece", "statusType"], labels: ["\u68CB\u5B50", "\u72B6\u6001\u7C7B\u578B"] },
-        \u5750\u6807: { module: "spatial.cell", args: ["x", "y"], port: "cell" },
+        \u5750\u6807: { module: "spatial.cell", args: ["x", "y"], labels: ["\u6A2A\u5750\u6807", "\u7EB5\u5750\u6807"], port: "cell" },
         \u8DDD\u79BB: { module: "spatial.cell-distance", args: ["from", "to"], labels: ["\u8D77\u70B9", "\u7EC8\u70B9"], port: "distance" }
       };
       function lowerAuthorExpression(source, options2) {
@@ -17252,12 +17615,12 @@ var ContentGraphCore = (() => {
           throw new AuthorExpressionError(message, node.start);
         };
         const typeOfLiteral2 = (value2) => value2 === null ? "null" : typeof value2;
-        function call(body, module2, inputs, parameters4 = {}, port46, version) {
+        function call(body, module2, inputs, parameters4 = {}, port47, version) {
           const descriptor3 = getGameplayModule(module2, version);
           if (!descriptor3) throw new Error(`\u672A\u6CE8\u518C\u4F5C\u8005\u6A21\u5757 ${module2}`);
           if (!descriptor3.allowedSurfaces.includes(options2.surface)) throw new Error(`\u5F53\u524D\u5165\u53E3\u4E0D\u652F\u6301 ${descriptor3.label}`);
           if (descriptor3.effects.pure !== true) throw new Error(`\u8868\u8FBE\u5F0F\u4E0D\u80FD\u6267\u884C\u6709\u526F\u4F5C\u7528\u7684\u8BED\u53E5\uFF1A${descriptor3.label}`);
-          const output = descriptor3.outputs.find((output2) => output2.name === (port46 ?? descriptor3.outputs[0]?.name));
+          const output = descriptor3.outputs.find((output2) => output2.name === (port47 ?? descriptor3.outputs[0]?.name));
           if (!output) throw new Error(`\u6A21\u5757 ${module2} \u6CA1\u6709\u8FD4\u56DE\u503C`);
           let type = output.type;
           const fromParameter = descriptor3.outputParameterTypeBindings?.[output.name];
@@ -17291,7 +17654,7 @@ var ContentGraphCore = (() => {
           return { value: { kind: "output", node: nodeId, port: output.name }, type: output.nullable ? { kind: "nullable", value: type } : type, ...domain ? { domain } : {} };
         }
         const unwrapNullable = (type) => typeof type === "object" && type.kind === "nullable" ? type.value : type;
-        const listType = (element) => ({ kind: "list", element });
+        const listType2 = (element) => ({ kind: "list", element });
         const mapType = (key, value2) => ({ kind: "map", key, value: value2 });
         const setType = (element) => ({ kind: "set", element });
         const wildcardType = (type) => type === "any" || type === "unknown";
@@ -17304,12 +17667,12 @@ var ContentGraphCore = (() => {
               containerType: encodedType(selected),
               keyType: encodedType(selected.key),
               valueType: encodedType(selected.value),
-              keysType: encodedType(listType(selected.key)),
-              valuesType: encodedType(listType(selected.value))
+              keysType: encodedType(listType2(selected.key)),
+              valuesType: encodedType(listType2(selected.value))
             };
           }
           if (typeof selected === "object" && selected.kind === "set") {
-            return { containerType: encodedType(selected), valueType: encodedType(selected.element), itemsType: encodedType(listType(selected.element)) };
+            return { containerType: encodedType(selected), valueType: encodedType(selected.element), itemsType: encodedType(listType2(selected.element)) };
           }
           throw new Error("\u6B64\u503C\u4E0D\u662F\u96C6\u5408\u6216\u6620\u5C04");
         };
@@ -17340,7 +17703,7 @@ var ContentGraphCore = (() => {
               const [itemsExpression] = argumentExpressions(args, false, ["items"], [["\u5143\u7EC4", "\u96C6\u5408", "items"]], node);
               const expectedContainer2 = unwrapNullable(expected ?? "unknown");
               const expectedElement = typeof expectedContainer2 === "object" && expectedContainer2.kind === "set" ? expectedContainer2.element : void 0;
-              const items2 = compile(itemsExpression, body, bindings, expectedElement === void 0 ? void 0 : listType(expectedElement));
+              const items2 = compile(itemsExpression, body, bindings, expectedElement === void 0 ? void 0 : listType2(expectedElement));
               const itemsType = unwrapNullable(items2.type);
               if (typeof itemsType !== "object" || itemsType.kind !== "list") return fail5(node, "\u96C6\u5408\u9700\u8981\u5143\u7EC4\u4F5C\u4E3A\u53C2\u6570");
               let element = itemsType.element;
@@ -17356,8 +17719,8 @@ var ContentGraphCore = (() => {
             const expectedContainer = unwrapNullable(expected ?? "unknown");
             const expectedKey = typeof expectedContainer === "object" && expectedContainer.kind === "map" ? expectedContainer.key : void 0;
             const expectedValue = typeof expectedContainer === "object" && expectedContainer.kind === "map" ? expectedContainer.value : void 0;
-            const keys = compile(keysExpression, body, bindings, expectedKey === void 0 ? void 0 : listType(expectedKey));
-            const values = compile(valuesExpression, body, bindings, expectedValue === void 0 ? void 0 : listType(expectedValue));
+            const keys = compile(keysExpression, body, bindings, expectedKey === void 0 ? void 0 : listType2(expectedKey));
+            const values = compile(valuesExpression, body, bindings, expectedValue === void 0 ? void 0 : listType2(expectedValue));
             const keysType = unwrapNullable(keys.type);
             const valuesType = unwrapNullable(values.type);
             if (typeof keysType !== "object" || keysType.kind !== "list" || typeof valuesType !== "object" || valuesType.kind !== "list") return fail5(node, "\u6620\u5C04\u9700\u8981\u4E24\u4E2A\u5143\u7EC4\u4F5C\u4E3A\u53C2\u6570");
@@ -17413,10 +17776,10 @@ var ContentGraphCore = (() => {
           if (name === "\u952E\u5217\u8868" && isRecord) return call(body, "map.keys", { map: receiver }, {}, "items", legacyVersion);
           if (name === "\u952E\u5217\u8868" && isMap) return call(body, "map.keys", { map: receiver }, containerParameters(receiverType), void 0, containerModuleVersion("map.keys"));
           if (name === "\u503C\u5217\u8868" && isRecord) {
-            const schema2 = typeof receiverType === "object" && receiverType.kind === "record" ? schemas.find((item) => item.id === receiverType.schema || `${item.id}@${item.version}` === receiverType.schema) : void 0;
-            const element = schema2?.fields[0]?.type;
-            if (!element || schema2?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
-            return call(body, "map.values", { map: receiver }, { valueType: encodedType(listType(element)) }, "items", legacyVersion);
+            const schema3 = typeof receiverType === "object" && receiverType.kind === "record" ? schemas.find((item) => item.id === receiverType.schema || `${item.id}@${item.version}` === receiverType.schema) : void 0;
+            const element = schema3?.fields[0]?.type;
+            if (!element || schema3?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
+            return call(body, "map.values", { map: receiver }, { valueType: encodedType(listType2(element)) }, "items", legacyVersion);
           }
           if (name === "\u503C\u5217\u8868" && isMap) return call(body, "map.values", { map: receiver }, containerParameters(receiverType), void 0, containerModuleVersion("map.values"));
           if (name === "\u6570\u91CF" && isList) return call(body, "collection.length", { items: receiver });
@@ -17488,14 +17851,20 @@ var ContentGraphCore = (() => {
               if (declarations.some((item) => !sameType(item.type, declarations[0].type) || item.namespace !== declarations[0].namespace)) return fail5(node, "\u6B64\u6269\u5C55\u53D8\u91CF\u5B58\u5728\u4E0D\u540C\u58F0\u660E\uFF0C\u8BF7\u660E\u786E\u5F53\u524D\u5BF9\u8C61\u7684\u7C7B\u578B");
               const declaration2 = declarations[0];
               let type2 = declaration2?.type;
-              for (const field4 of path) {
+              for (const [pathIndex, field4] of path.entries()) {
                 if (!type2) break;
                 const ownerType2 = typeof type2 === "object" && type2.kind === "nullable" ? type2.value : type2;
                 if (ownerType2 !== "record" && !(typeof ownerType2 === "object" && ownerType2.kind === "record")) return fail5(node, "\u6B64\u6269\u5C55\u503C\u6CA1\u6709\u5B57\u6BB5 " + field4);
                 const reference = typeof ownerType2 === "object" && ownerType2.kind === "record" ? ownerType2.schema : void 0;
-                const schema2 = reference ? schemas.find((item) => item.id === reference || `${item.id}@${item.version}` === reference) : void 0;
-                if (schema2 && !schema2.fields.some((item) => item.name === field4)) return fail5(node, "\u6B64\u6269\u5C55\u7ED3\u6784\u4E2D\u6CA1\u6709\u5B57\u6BB5 " + field4);
-                type2 = schema2?.fields.find((item) => item.name === field4)?.type;
+                const schema3 = reference ? schemas.find((item) => item.id === reference || `${item.id}@${item.version}` === reference) : void 0;
+                if (schema3) {
+                  const selected = resolveAuthorRecordField(schema3, field4);
+                  if (!selected.field) return fail5(node, selected.ambiguous ? `\u6B64\u6269\u5C55\u7ED3\u6784\u4E2D\u7684\u5B57\u6BB5\u6807\u7B7E\u300C${field4}\u300D\u6709\u6B67\u4E49\uFF0C\u8BF7\u4F7F\u7528\u5B57\u6BB5\u539F\u540D` : "\u6B64\u6269\u5C55\u7ED3\u6784\u4E2D\u6CA1\u6709\u5B57\u6BB5 " + field4);
+                  path[pathIndex] = selected.field.name;
+                  type2 = selected.field.type;
+                } else {
+                  type2 = void 0;
+                }
               }
               type2 = type2 ?? expected;
               if (!type2 || type2 === "unknown" || type2 === "any") return fail5(node, "\u8BF7\u58F0\u660E\u6B64\u6269\u5C55\u53D8\u91CF\u7684\u7C7B\u578B\uFF0C\u6216\u5728\u660E\u786E\u7C7B\u578B\u7684\u53C2\u6570\u4E2D\u4F7F\u7528");
@@ -17519,12 +17888,12 @@ var ContentGraphCore = (() => {
             if (type === "piece" && node.field === "\u4F4D\u7F6E") return call(body, "spatial.piece-position", { piece: object3 });
             if (type === "piece" || type === "player") return call(body, `${type}.field`, { [type]: object3 }, { field: field3 }, "value", type === "piece" ? "2" : "1");
             if (typeof type === "object" && type.kind === "record") {
-              const schema2 = schemas.find((item) => item.id === type.schema || `${item.id}@${item.version}` === type.schema);
-              const selected = schema2?.fields.find((item) => item.name === node.field);
-              if (!selected) return fail5(node, `\u8BB0\u5F55\u6CA1\u6709\u5B57\u6BB5\u300C${node.field}\u300D`);
+              const schema3 = schemas.find((item) => item.id === type.schema || `${item.id}@${item.version}` === type.schema);
+              const selected = resolveAuthorRecordField(schema3, node.field);
+              if (!selected.field) return fail5(node, selected.ambiguous ? `\u8BB0\u5F55\u5B57\u6BB5\u6807\u7B7E\u300C${node.field}\u300D\u6709\u6B67\u4E49\uFF0C\u8BF7\u4F7F\u7528\u5B57\u6BB5\u539F\u540D` : `\u8BB0\u5F55\u6CA1\u6709\u5B57\u6BB5\u300C${node.field}\u300D`);
               const nodeId = id();
-              body.push({ kind: "record.get", id: nodeId, record: object3.value, field: node.field });
-              return { value: { kind: "output", node: nodeId, port: "value" }, type: selected.type };
+              body.push({ kind: "record.get", id: nodeId, record: object3.value, field: selected.field.name });
+              return { value: { kind: "output", node: nodeId, port: "value" }, type: selected.field.type };
             }
             if (type === "record") return call(body, "data.field", { record: object3 }, { field: field3 }, "value", "2");
             if (type === "cell" && ["x", "y"].includes(field3)) return call(body, "spatial.cell-coordinates", { cell: object3 }, {}, field3);
@@ -17600,9 +17969,9 @@ var ContentGraphCore = (() => {
           if (node.kind === "object") {
             const values = node.fields.map((field3) => ({ name: field3.name, ...compile(field3.value, body, bindings) }));
             const fields5 = values.map((field3) => ({ name: field3.name, type: field3.type }));
-            const equivalent = schemas.find((schema2) => {
-              if (schema2.fields.length !== fields5.length) return false;
-              return schema2.fields.every((field3, index) => {
+            const equivalent = schemas.find((schema3) => {
+              if (schema3.fields.length !== fields5.length) return false;
+              return schema3.fields.every((field3, index) => {
                 const other = fields5[index];
                 return field3.optional !== true && field3.nullable !== true && field3.name === other.name && sameType(field3.type, other.type);
               });
@@ -17673,9 +18042,9 @@ var ContentGraphCore = (() => {
             if (name === "\u53BB\u91CD" || name === "\u62FC\u63A5") parameters4.valueType = encodedType(inputs.items?.type ?? inputs.left.type);
             if (name === "\u503C\u5217\u8868") {
               const type = inputs.map?.type;
-              const schema2 = typeof type === "object" && type.kind === "record" ? schemas.find((schema3) => schema3.id === type.schema || `${schema3.id}@${schema3.version}` === type.schema) : void 0;
-              const element = schema2?.fields[0]?.type;
-              if (!element || schema2?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
+              const schema3 = typeof type === "object" && type.kind === "record" ? schemas.find((schema4) => schema4.id === type.schema || `${schema4.id}@${schema4.version}` === type.schema) : void 0;
+              const element = schema3?.fields[0]?.type;
+              if (!element || schema3?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
               parameters4.valueType = encodedType({ kind: "list", element });
             }
             const result = call(body, spec.module, inputs, parameters4, spec.port);
@@ -17719,8 +18088,8 @@ var ContentGraphCore = (() => {
         const type = typeof value.type === "object" && value.type.kind === "nullable" ? value.type.value : value.type;
         if (type === "cell") return { x: "number", y: "number", \u53EF\u884C\u8D70: "boolean", \u88AB\u5360\u7528: "boolean", \u5730\u683C\u6548\u679C: { kind: "list", element: "record" } };
         if (typeof type === "object" && type.kind === "record") {
-          const schema2 = options2.schemas?.find((schema3) => schema3.id === type.schema || `${schema3.id}@${schema3.version}` === type.schema);
-          return Object.fromEntries((schema2?.fields ?? []).map((field3) => [field3.name, field3.type]));
+          const schema3 = options2.schemas?.find((schema4) => schema4.id === type.schema || `${schema4.id}@${schema4.version}` === type.schema);
+          return schema3 ? Object.fromEntries(schema3.fields.map((field3) => [authorRecordFieldDisplayName(schema3, field3), field3.type])) : {};
         }
         const moduleId = value.domain === "skill-instance" ? "author.skill-instance.field" : value.domain === "card-instance" ? "card.instance-field" : value.domain === "tile-effect" ? "tile.effect-field" : type === "piece" ? "piece.field" : type === "player" ? "player.field" : type === "event" ? "event.field" : void 0;
         const descriptor3 = moduleId && getGameplayModule(moduleId, type === "piece" ? "2" : "1");
@@ -17823,7 +18192,7 @@ var ContentGraphCore = (() => {
         if (["card", "rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u624B\u724C", value: "\u5F53\u524D\u624B\u724C", kind: "\u624B\u724C\u5B9E\u4F8B" });
         for (const [name, spec] of Object.entries(authorFunctionSpecs)) suggestions.push({ label: name, value: `${name}()`, kind: "\u51FD\u6570", signature: `${name}()`, description: (spec.labels ?? spec.args).join("\uFF0C") });
         for (const name of ["\u7B5B\u9009", "\u9010\u9879\u53D8\u6362", "\u67E5\u627E\u9996\u9879", "\u4EFB\u610F\u6EE1\u8DB3", "\u5168\u90E8\u6EE1\u8DB3"]) suggestions.push({ label: name, value: `${name}()`, kind: "\u51FD\u6570", signature: `${name}()`, description: "\u5BB9\u5668\uFF0C\u5173\u4E8E\u6BCF\u9879\u7684\u8868\u8FBE\u5F0F" });
-        for (const name of ["true", "false", "null"]) suggestions.push({ label: name, value: name, kind: "\u53D6\u503C" });
+        for (const [label, value] of [["\u771F", "\u771F"], ["\u5047", "\u5047"], ["\u7A7A", "\u7A7A"]]) suggestions.push({ label, value, kind: "\u53D6\u503C" });
         return suggestions;
       }
       function authorExpressionParameterHint(prefix, options2) {
@@ -17980,6 +18349,15 @@ var ContentGraphCore = (() => {
         const targetPatch = synchronizeGameplayTargetBinding(next, previousGraph, graph2, target);
         if (targetPatch.diagnostics.length) throw new GameplayTargetBindingError(targetPatch.diagnostics.join("\uFF1B"));
         attachGameplayTargetBindingWarnings(next, targetPatch.warnings);
+        if (targetPatch.rootTargetMetadata !== void 0) {
+          if (targetPatch.rootTargetMetadata.targetType === void 0) delete next.targetType;
+          else next.targetType = targetPatch.rootTargetMetadata.targetType;
+          if (targetPatch.rootTargetMetadata.filter === void 0) delete next.filter;
+          else next.filter = targetPatch.rootTargetMetadata.filter;
+          if (targetPatch.rootTargetMetadata.range === null) delete next.range;
+          else if (targetPatch.rootTargetMetadata.range !== void 0) next.range = targetPatch.rootTargetMetadata.range;
+          next.requiresTarget = targetPatch.rootTargetMetadata.requiresTarget;
+        }
         if (targetPatch.targeting !== void 0) next.targeting = targetPatch.targeting;
         if (targetPatch.targetBindings !== void 0) updated.targetBindings = targetPatch.targetBindings;
         if (targetPatch.textBindings !== void 0) updated.textBindings = targetPatch.textBindings;

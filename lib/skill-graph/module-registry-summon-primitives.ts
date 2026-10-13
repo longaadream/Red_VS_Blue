@@ -113,6 +113,17 @@ const SPATIAL_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
 
 const LIFECYCLE_PRIMITIVES: readonly GameplayModuleDescriptor[] = [
   define({
+    id: 'lifecycle.destroy', label: '消灭棋子',
+    description: '直接消灭目标并进行正式死亡结算；不造成伤害，不经过护盾或伤害减免。目标已离场时跳过。',
+    inputs: [port('target', pieceType, { label: '目标' }), port('source', pieceType, { label: '来源', optional: true })],
+    inputValueTypeBindings: { target: { parameter: 'targetType' } },
+    parameters: [{ name: 'targetType', type: stringType, label: '目标类型', default: 'piece', enum: ['piece', '{"kind":"list","element":"piece"}'] }],
+    outputs: [port('success', booleanType, { label: '是否消灭' })],
+    effects: writes(['pieces', 'health', 'graveyard'], ['onPieceDied']),
+    lower: ctx => `${runtime(ctx)}.lifecycle.destroy(${input(ctx, 'target')}${ctx.inputs.source === undefined ? '' : `, ${input(ctx, 'source')}`})`,
+    ui: { category: 'lifecycle', authoring: 'standard' },
+  }),
+  define({
     id: 'lifecycle.queue-summon', label: '排队声明式召唤',
     description: '将一个来源棋子和地格交给当前内容声明的召唤队列；来源镜像能力、数量和变体由宿主声明验证。',
     inputs: [port('source', pieceType), port('destination', cellType), port('variant', stringType)],

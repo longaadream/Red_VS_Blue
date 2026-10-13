@@ -1,0 +1,270 @@
+#developer-training-host {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.training-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #f5f7fb;
+  color: #1d2b45;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.training-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #dce4ef;
+  background: #ffffff;
+}
+
+.training-panel__eyebrow {
+  color: #6b7890;
+  font: 10px/1.4 "Cascadia Code", Consolas, monospace;
+  letter-spacing: .12em;
+}
+
+.training-panel h2 {
+  margin: 4px 0 5px;
+  font-size: 19px;
+  font-weight: 680;
+}
+
+.training-panel p {
+  max-width: 720px;
+  margin: 0;
+  color: #60708b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.training-panel__status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid #d2dce9;
+  border-radius: 999px;
+  color: #687895;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.training-panel__status.is-active {
+  border-color: #8dc0ad;
+  background: #edf8f3;
+  color: #2b7a5f;
+}
+
+.training-panel__status.is-error {
+  border-color: #e2a8b0;
+  background: #fff1f3;
+  color: #b04457;
+}
+
+.training-panel__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 24px 22px;
+  gap: 14px;
+}
+
+.training-panel__controls {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: end;
+  gap: 10px 14px;
+}
+
+.training-panel__controls label {
+  display: grid;
+  gap: 6px;
+  color: #60708b;
+  font-size: 11px;
+}
+
+.training-panel select,
+.training-panel textarea {
+  width: 100%;
+  border: 1px solid #d2dce9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1d2b45;
+  font: inherit;
+}
+
+.training-panel select {
+  height: 33px;
+  padding: 0 9px;
+}
+
+.training-panel textarea {
+  min-height: 64px;
+  padding: 8px 9px;
+  resize: vertical;
+  font: 11px/1.5 "Cascadia Code", Consolas, monospace;
+}
+
+.training-panel select:focus,
+.training-panel textarea:focus {
+  border-color: #6672d9;
+  outline: 2px solid #6672d955;
+  outline-offset: 1px;
+}
+
+.training-panel__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.training-button {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid #cfd9e7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #344564;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.training-button:hover:not(:disabled) {
+  border-color: #6672d9;
+  color: #3541a4;
+}
+
+.training-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.training-button--primary {
+  border-color: #5260c8;
+  background: #6672d9;
+  color: #fff;
+}
+
+.training-panel__draft-label {
+  grid-column: 1 / -1;
+  max-width: 680px;
+}
+
+.training-panel__message {
+  grid-column: 1 / -1;
+  min-height: 18px;
+  color: #6b7890;
+  font-size: 11px;
+}
+
+.training-panel__message.is-error {
+  color: #b04457;
+}
+
+.training-panel__message.is-success {
+  color: #2b7a5f;
+}
+
+.training-panel__stage {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  min-height: 320px;
+  gap: 12px;
+}
+
+.training-panel__canvas {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 260px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #d2dce9;
+  border-radius: 8px;
+  background: #e9eef6;
+  color: #6b7890;
+  font-size: 12px;
+}
+
+.training-panel__trace {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid #d2dce9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.training-panel__trace-title {
+  padding: 12px 14px;
+  border-bottom: 1px solid #dce4ef;
+  color: #1d2b45;
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.training-panel__trace dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.training-panel__trace dl div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.training-panel__trace dt {
+  color: #6b7890;
+  font-size: 12px;
+}
+
+.training-panel__trace dd {
+  max-width: 160px;
+  margin: 0;
+  overflow: hidden;
+  color: #344564;
+  font: 10px "Cascadia Code", Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-panel__trace pre {
+  max-height: 260px;
+  min-height: 120px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-top: 1px solid #e4eaf2;
+  color: #60708b;
+  font: 12px/1.7 system-ui, "Microsoft YaHei", sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.training-panel__trace details { border-top: 1px solid #e4eaf2; }
+.training-panel__trace summary { padding: 12px 14px; font-size: 12px; cursor: pointer; }
+.training-panel__trace summary:focus-visible { outline: 2px solid #6672d9; outline-offset: -3px; }
+.training-button { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+@media (prefers-reduced-motion: reduce) { .training-button { transition: none; } }
+
+@media (max-width: 900px) {
+  .training-panel__stage { grid-template-columns: 1fr; }
+  .training-panel__trace { max-height: 250px; }
+  .training-panel__trace pre { height: 120px; }
+}

@@ -5,6 +5,7 @@ import { afterEach, expect, it } from 'vitest'
 import { clearRuleCache, loadRuleById } from '../../lib/game/skills'
 import { makePiece, makeState } from '../helpers/minimal-state'
 import { prepareDraftTrainingPreview } from '../../electron-editor/training-draft-worker'
+import { profileIdentityFromDraftSnapshot } from '../../electron-editor/training-preview-worker'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }) })
@@ -37,6 +38,7 @@ function fixture() {
 
 it('prepares an in-memory draft snapshot with a cloned trial piece and no workspace writes', () => {
   const { root, skill } = fixture()
+  fs.writeFileSync(path.join(root, 'images', 'unrelated.gif'), Buffer.from('GIF89a unsupported authoring asset'))
   const before = fs.readFileSync(path.join(root, 'data/skills/biotic-grenade.json'))
   const snapshot = prepareDraftTrainingPreview(root, {
     skillId: 'biotic-grenade',
@@ -46,6 +48,7 @@ it('prepares an in-memory draft snapshot with a cloned trial piece and no worksp
   expect(snapshot.draft).toMatchObject({ skillId: 'biotic-grenade', pieceId: 'holder', pieceFaction: 'good' })
   expect(snapshot.files.some(file => file.path === 'data/pages/battle.html')).toBe(false)
   expect(snapshot.files.some(file => file.path.includes('users'))).toBe(false)
+  expect(snapshot.files.some(file => file.path === 'images/unrelated.gif')).toBe(true)
   const trial = JSON.parse(Buffer.from(snapshot.files.find(file => file.path === `data/pieces/${snapshot.draft.pieceId}.json`)!.bytes).toString())
   expect(trial.id).toBe('holder')
   expect(trial.name).toContain('试用 · ')
@@ -55,6 +58,52 @@ it('prepares an in-memory draft snapshot with a cloned trial piece and no worksp
   const bytes = snapshot.files.find(file => file.path === 'data/skills/biotic-grenade.json')!.bytes
   bytes[0] = bytes[0] ^ 0xff
   expect(fs.readFileSync(path.join(root, 'data/skills/biotic-grenade.json'))).toEqual(before)
+})
+
+it('derives a deterministic profile identity from the frozen draft bytes', () => {
+  const { root, skill } = fixture()
+  const request = { skillId: 'biotic-grenade', drafts: [{ collection: 'skills' as const, document: skill }] }
+  const first = prepareDraftTrainingPreview(root, request)
+  const second = prepareDraftTrainingPreview(root, request)
+  const firstIdentity = profileIdentityFromDraftSnapshot(first)
+  const secondIdentity = profileIdentityFromDraftSnapshot(second)
+  expect(firstIdentity).toEqual(secondIdentity)
+  expect(firstIdentity.resolvedProfileHash).toMatch(/^[a-f0-9]{64}$/)
+  expect(firstIdentity.authorityContentHash).toMatch(/^[a-f0-9]{64}$/)
+
+  const changedSkill = { ...skill, powerMultiplier: Number(skill.powerMultiplier ?? 1) + 0.5 }
+  const changed = prepareDraftTrainingPreview(root, {
+    skillId: 'biotic-grenade',
+    drafts: [{ collection: 'skills', document: changedSkill }],
+  })
+  const changedIdentity = profileIdentityFromDraftSnapshot(changed)
+  expect(changed.contentHash).not.toBe(first.contentHash)
+  expect(changedIdentity.resolvedProfileHash).not.toBe(firstIdentity.resolvedProfileHash)
+  expect(changedIdentity.authorityContentHash).not.toBe(firstIdentity.authorityContentHash)
+})
+
+it('keeps GIF presentation bytes in the snapshot while covering them through the base hash', () => {
+  const { root, skill } = fixture()
+  const gif = path.join(root, 'images', 'unrelated.gif')
+  fs.writeFileSync(gif, Buffer.from('GIF89a first'))
+  const first = prepareDraftTrainingPreview(root, {
+    skillId: 'biotic-grenade',
+    drafts: [{ collection: 'skills', document: skill }],
+  })
+  const firstIdentity = profileIdentityFromDraftSnapshot(first)
+  expect(first.files.some(file => file.path === 'images/unrelated.gif')).toBe(true)
+
+  fs.writeFileSync(gif, Buffer.from('GIF89a changed'))
+  const changed = prepareDraftTrainingPreview(root, {
+    skillId: 'biotic-grenade',
+    drafts: [{ collection: 'skills', document: skill }],
+  })
+  const changedIdentity = profileIdentityFromDraftSnapshot(changed)
+  expect(changed.contentHash).not.toBe(first.contentHash)
+  expect(changedIdentity.resolvedProfileHash).not.toBe(firstIdentity.resolvedProfileHash)
+  // GIF is presentation-only and intentionally omitted from the authority
+  // JSON projection; the resolved profile hash still changes via base hash.
+  expect(changedIdentity.authorityContentHash).toBe(firstIdentity.authorityContentHash)
 })
 
 it('keeps the original template id so template-bound rules resolve in the trial', () => {

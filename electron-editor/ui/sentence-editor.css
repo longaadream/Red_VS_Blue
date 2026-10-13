@@ -28,6 +28,55 @@
 }
 .sentence-editor * { box-sizing: border-box; }
 .sentence-editor input, .sentence-editor select, .sentence-editor textarea { font-family: inherit; }
+.author-object-editor {
+  background: #f8fbff;
+  border: 1px solid #dfe7f2;
+  border-radius: 9px;
+  padding: 10px;
+}
+.author-object-editor-header,
+.author-object-editor-field-header,
+.author-object-editor-schema-heading,
+.author-object-editor-structured-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+.author-object-editor-header { color: #263b5d; margin-bottom: 8px; }
+.author-object-editor-header select { max-width: 240px; }
+.author-object-editor-record,
+.author-object-editor-list { display: grid; gap: 8px; }
+.author-object-editor-field {
+  background: #fff;
+  border: 1px solid #e0e8f3;
+  border-radius: 7px;
+  padding: 8px;
+}
+.author-object-editor-field-header { margin-bottom: 6px; }
+.author-object-editor-field-title { display: grid; gap: 2px; min-width: 0; }
+.author-object-editor-field-title strong { color: #243b62; font-size: 12px; }
+.author-object-editor-type,
+.author-object-editor-field-state,
+.author-object-editor-description,
+.author-object-editor-empty,
+.author-object-editor-unavailable { color: #71819a; font-size: 11px; }
+.author-object-editor-field-state { white-space: nowrap; }
+.author-object-editor-field-state[data-object-editor-field-state="null"] { color: #a1515b; }
+.author-object-editor-field-state[data-object-editor-field-state="default"] { color: #267052; }
+.author-object-editor-field-value { margin-top: 7px; }
+.author-object-editor-field-value > input,
+.author-object-editor-field-value > select,
+.author-object-editor-field-value > textarea,
+.author-object-editor-add-field input { width: 100%; }
+.author-object-editor-nested { margin-top: 7px; }
+.author-object-editor-list-row { align-items: flex-start; display: flex; gap: 7px; }
+.author-object-editor-list-value { flex: 1; min-width: 0; }
+.author-object-editor-list-index { color: #71819a; font-size: 11px; padding-top: 8px; white-space: nowrap; }
+.author-object-editor-action,
+.author-object-editor-add-field { margin-top: 7px; }
+.author-object-editor-add-field { display: flex; gap: 7px; }
+.author-object-editor-add-field input { flex: 1; }
 .sentence-editor h2,
 .sentence-editor h3,
 .sentence-editor h4,

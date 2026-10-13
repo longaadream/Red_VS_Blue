@@ -1,4 +1,5 @@
 import type { GameplayModuleDescriptor, GameplayNativeLoweringContext, GameplayRecordSchema, GameplayValueType } from './module-types'
+import { AUTHOR_PIECE_INSTANCE_SCHEMA_ID, AUTHOR_SUMMON_RECORD_SCHEMAS } from '../game/author-summon-schema'
 import { authorValueSchemas } from '../game/author-extension'
 
 const surfaces = ['skill', 'card', 'rule', 'triggerSkill', 'pending'] as const
@@ -134,6 +135,9 @@ export const AUTHOR_STATE_MODULES: readonly GameplayModuleDescriptor[] = [
     id: 'instance.copy-piece', version: '1', label: '复制棋子实例',
     description: '复制棋子可恢复信息，保留外部实体引用身份；副本可以存入 extension。',
     inputs: [{ name: 'piece', type: 'piece', label: '棋子' }], outputs: [{ name: 'snapshot', type: 'record', label: '实例副本' }],
+    recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
+    outputSchemaBindings: { snapshot: { parameter: 'snapshotType' } },
+    parameters: [{ name: 'snapshotType', type: 'string', default: AUTHOR_PIECE_INSTANCE_SCHEMA_ID, label: '副本类型' }],
     allowedSurfaces: surfaces, effects: { pure: true, previewSafe: false, reads: ['pieces', 'extensions', 'rules'] },
     ui: { category: 'data', authoring: 'standard' }, lower: ctx => `${flow(ctx)}.instances.copy(${ctx.inputs.piece})`,
   },

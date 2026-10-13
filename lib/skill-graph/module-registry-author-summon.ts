@@ -1,18 +1,26 @@
 import type { GameplayModuleDescriptor, GameplayValueType } from './module-types'
+import {
+  AUTHOR_PIECE_DISPLAY_SCHEMA_ID,
+  AUTHOR_PIECE_TEMPLATE_SCHEMA_ID,
+  AUTHOR_SUMMON_RECORD_SCHEMAS,
+} from '../game/author-summon-schema'
 const decode = (value: unknown): GameplayValueType => typeof value === 'string' && value.startsWith('{') ? JSON.parse(value) : value as GameplayValueType
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+const templateTypeDefault = JSON.stringify({ kind: 'record', schema: AUTHOR_PIECE_TEMPLATE_SCHEMA_ID })
+const displayTypeDefault = JSON.stringify({ kind: 'record', schema: AUTHOR_PIECE_DISPLAY_SCHEMA_ID })
 export const AUTHOR_SUMMON_MODULES: readonly GameplayModuleDescriptor[] = [{
   id: 'author.effect.summon', version: '1', label: '召唤',
   description: '模板或原实例与落点逐项对应；单个模板应用于所有落点。显示配置在召唤事件前一次完成，省略字段保持原显示。',
   inputs: [{ name: 'source', type: 'piece', label: '来源' }, { name: 'template', type: 'record', label: '棋子' }, { name: 'destination', type: 'cell', label: '落点' }, { name: 'display', type: 'record', label: '显示选项', optional: true }],
   inputValueTypeBindings: { source: { parameter: 'sourceType' }, template: { parameter: 'templateType' }, destination: { parameter: 'destinationType' }, display: { parameter: 'displayType' } },
   outputs: [{ name: 'result', type: 'record', label: '召唤结果' }],
+  recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
   parameters: [
     { name: 'mode', type: 'string', label: '召唤方式', enum: ['new-instance', 'return-instance'], default: 'new-instance' },
     { name: 'sourceType', type: 'string', label: '来源类型', enum: ['piece', 'record'], default: 'piece' },
-    { name: 'templateType', type: 'string', default: 'record', label: '棋子类型' },
+    { name: 'templateType', type: 'string', default: templateTypeDefault, label: '棋子类型' },
     { name: 'destinationType', type: 'string', default: 'cell', label: '落点类型' },
-    { name: 'displayType', type: 'string', default: 'record', label: '显示类型' },
+    { name: 'displayType', type: 'string', default: displayTypeDefault, label: '显示类型' },
     { name: 'currentHp', type: 'number', optional: true, label: '回场生命值' },
   ],
   allowedSurfaces: ['skill', 'card', 'rule', 'triggerSkill', 'pending'],
@@ -40,12 +48,13 @@ export const AUTHOR_SUMMON_MODULES: readonly GameplayModuleDescriptor[] = [{
   ],
   inputValueTypeBindings: { source: { parameter: 'sourceType' }, template: { parameter: 'templateType' }, destination: { parameter: 'destinationType' }, display: { parameter: 'displayType' } },
   outputs: [{ name: 'result', type: 'record', label: '召唤结果' }],
+  recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
   parameters: [
     { name: 'mode', type: 'string', label: '召唤方式', enum: ['new-instance', 'return-instance', 'declaration'], default: 'new-instance' },
     { name: 'sourceType', type: 'string', label: '来源类型', enum: ['piece', 'record'], default: 'piece' },
-    { name: 'templateType', type: 'string', default: 'record', label: '棋子类型' },
+    { name: 'templateType', type: 'string', default: templateTypeDefault, label: '棋子类型' },
     { name: 'destinationType', type: 'string', default: 'cell', label: '落点类型' },
-    { name: 'displayType', type: 'string', default: 'record', label: '显示类型' },
+    { name: 'displayType', type: 'string', default: displayTypeDefault, label: '显示类型' },
     { name: 'currentHp', type: 'number', optional: true, label: '回场生命值' },
   ],
   allowedSurfaces: ['skill', 'card', 'rule', 'triggerSkill', 'pending'],
@@ -73,10 +82,11 @@ export const AUTHOR_SUMMON_MODULES: readonly GameplayModuleDescriptor[] = [{
   },
 }, {
   id: 'author.piece.display', version: '1', label: '设置棋子显示', description: '按同名字段更新显示快照；不改变真实规则或数值。',
+  recordSchemas: AUTHOR_SUMMON_RECORD_SCHEMAS,
   inputs: [{ name: 'target', type: 'piece', label: '棋子' }, { name: 'display', type: 'record', label: '显示选项' }],
   inputValueTypeBindings: { display: { parameter: 'displayType' } },
   outputs: [{ name: 'reference', type: 'string', label: '显示引用' }],
-  parameters: [{ name: 'displayType', type: 'string', default: 'record', label: '显示类型' }, { name: 'audience', type: 'string', label: '可见对象', default: 'public', enum: ['public', 'owner', 'allies', 'enemies', 'spectators'] }],
+  parameters: [{ name: 'displayType', type: 'string', default: displayTypeDefault, label: '显示类型' }, { name: 'audience', type: 'string', label: '可见对象', default: 'public', enum: ['public', 'owner', 'allies', 'enemies', 'spectators'] }],
   allowedSurfaces: ['skill', 'card', 'rule', 'triggerSkill', 'pending'],
   effects: { pure: false, previewSafe: false, writes: ['presentation'] }, ui: { category: 'presentation', authoring: 'standard' },
   lower: ctx => `${ctx.surface === 'pending' ? 'ctx.flow' : 'flow'}.presentation.setDisplay(${ctx.inputs.target},${ctx.inputs.display},${ctx.emitLiteral(ctx.parameters.audience)})`,

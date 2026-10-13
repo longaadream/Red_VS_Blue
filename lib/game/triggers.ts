@@ -187,6 +187,10 @@ export interface TriggerRule {
   instanceId?: string
   name: string
   description: string
+  /** Optional author-selected image shown in player-rule/status presentation. */
+  iconPath?: string
+  /** Whether this rule is shown in the in-battle player HUD. */
+  visible?: boolean
   trigger: TriggerCondition
   effect: EffectFunction
   /** Per-instance author extension values; persisted with the mounted rule. */

@@ -233,6 +233,7 @@ export function authorValueSchemas(type: GameplayValueType, schemas: readonly Ga
     if (selected.some(item => item.id === schema.id && item.version === schema.version)) return
     selected.push(schema)
     schema.fields.forEach(field => visit(field.type))
+    if (schema.additionalFields) visit(schema.additionalFields)
   }
   visit(type)
   return selected.sort((a, b) => (a.id + '@' + a.version).localeCompare(b.id + '@' + b.version))
@@ -275,6 +276,7 @@ function validateValue(value: unknown, type: GameplayValueType, schemas: readonl
   }
   if (type === 'number') return typeof value === 'number' && Number.isFinite(value)
   if (type === 'boolean' || type === 'string') return typeof value === type
+  if (type === 'json') return strictAuthorJson(value)
   if (type === 'null') return value === null
   if (['piece', 'player', 'card', 'content'].includes(type)) return typeof value === 'string' && value.length > 0
   if (type === 'cell') {
@@ -291,7 +293,14 @@ function validateRecord(value: unknown, schema: GameplayRecordSchema, schemas: r
   if (!object(value)) return false
   const descriptors = ownDescriptors(value)
   if (Reflect.ownKeys(value).some(key => typeof key !== 'string')) return false
-  if (!Object.keys(descriptors).every(key => schema.fields.some(field => field.name === key))) return false
+  const declared = new Set(schema.fields.map(field => field.name))
+  const extraType = schema.additionalFields
+  if (Object.keys(descriptors).some(key => !declared.has(key) && !extraType)) return false
+  if (extraType && Object.keys(descriptors).some(key => {
+    if (declared.has(key)) return false
+    const descriptor = descriptors[key]
+    return !dataDescriptor(descriptor) || !descriptor.enumerable || !validateValue(descriptor.value, extraType, schemas, depth + 1)
+  })) return false
   return schema.fields.every(field => {
     const descriptor = descriptors[field.name]
     if (!descriptor) return !!field.optional

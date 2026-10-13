@@ -112,6 +112,8 @@ export interface DeathCandidate {
 export interface DeathRequest {
   readonly kind: 'death'
   readonly candidates: readonly DeathCandidate[]
+  /** Trusted engine entry: commit direct destruction after the batch is accepted. */
+  readonly cause?: 'destroy'
 }
 
 export type EffectRequest = DamageRequest | HealRequest | SummonRequest | DeathRequest
@@ -673,6 +675,11 @@ export class EffectChain {
     ))
   }
 
+  deathBatchFor(battle: object, piece: PieceInstance): string | undefined {
+    return this.deathProvenance.find(entry => entry.battle === battle
+      && entry.piece === piece && entry.targetId === piece.instanceId)?.deathBatchId
+  }
+
   captureWriterBinding(): EffectWriterBinding {
     this.assertHealthy()
     const current = this.currentBatch
@@ -814,7 +821,7 @@ export class EffectChain {
 
   runEndogenousDeath<TResult>(
     unsafeRequest: DeathRequest,
-    originStage: 'damage:death',
+    originStage: 'damage:death' | 'lifecycle:destroy',
     handler: (request: DeathRequest, context: EffectBatchContext<'death'>, chain: EffectChain) => TResult,
   ): TResult {
     this.assertHealthy()

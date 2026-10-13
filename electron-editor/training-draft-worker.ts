@@ -187,9 +187,11 @@ export function prepareDraftTrainingPreview(workspace: string, rawRequest: unkno
   const entries = [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
   const hash = createHash('sha256')
   for (const [relative, bytes] of entries) hash.update(relative).update('\0').update(String(bytes.length)).update('\0').update(bytes)
+  const contentHash = hash.digest('hex')
+  const snapshotFiles = entries.map(([relative, bytes]) => ({ path: relative, bytes }))
   return {
-    contentHash: hash.digest('hex'),
-    files: entries.map(([relative, bytes]) => ({ path: relative, bytes })),
+    contentHash,
+    files: snapshotFiles,
     draft: { skillId: request.skillId, pieceId, skillName, pieceFaction },
   }
 }

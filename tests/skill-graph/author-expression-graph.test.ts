@@ -26,6 +26,51 @@ describe('author text lowers to the authoritative graph compiler', () => {
     expect(execute('false && (1 / 0 > 0)')).toEqual({ value: false })
     expect(execute('true || (1 / 0 > 0)')).toEqual({ value: true })
   })
+  it('accepts Chinese built-in argument labels while retaining English compatibility', () => {
+    expect(execute('绝对值(数值: -2)')).toEqual({ value: 2 })
+    expect(execute('最小值(左值: 7, 右值: 3)')).toEqual({ value: 3 })
+    expect(execute('最大值(left: 7, right: 3)')).toEqual({ value: 7 })
+    expect(execute('真 && !假')).toEqual({ value: true })
+    expect(execute('true || false')).toEqual({ value: true })
+  })
+  it('resolves nested typed-record labels while preserving canonical graph fields', () => {
+    const schemas = [
+      { id: 'piece-identity', version: '1', fields: [{ name: 'templateId', label: '模板引用', type: 'string' as const }] },
+      { id: 'piece-snapshot', version: '1', fields: [{ name: 'identity', label: '身份', type: { kind: 'record' as const, schema: 'piece-identity@1' } }] },
+    ] as const
+    const lowered = lowerAuthorExpression('实例副本.身份.模板引用', {
+      surface: 'skill',
+      bindings: { 实例副本: { value: { kind: 'input', name: 'snapshot' }, type: { kind: 'record', schema: 'piece-snapshot@1' } } },
+      schemas,
+    })
+    expect(lowered.type).toBe('string')
+    expect(lowered.statements.filter(statement => statement.kind === 'record.get')).toEqual([
+      expect.objectContaining({ field: 'identity' }),
+      expect.objectContaining({ field: 'templateId' }),
+    ])
+  })
+  it('prefers an exact record name and rejects an ambiguous label', () => {
+    const exactSchema = { id: 'exact-record', version: '1', fields: [
+      { name: 'first', label: '重复标签', type: 'string' as const },
+      { name: 'second', label: '重复标签', type: 'number' as const },
+      { name: '重复标签', label: '唯一标签', type: 'boolean' as const },
+    ] } as const
+    const context = {
+      surface: 'skill' as const,
+      bindings: { record: { value: { kind: 'input' as const, name: 'record' }, type: { kind: 'record' as const, schema: 'exact-record@1' } } },
+      schemas: [exactSchema],
+    }
+    expect(lowerAuthorExpression('record.重复标签', context).type).toBe('boolean')
+    expect(lowerAuthorExpression('record.唯一标签', context).type).toBe('boolean')
+    expect(() => lowerAuthorExpression('record.重复标签', {
+      ...context,
+      schemas: [{ id: 'ambiguous-record', version: '1', fields: [
+        { name: 'first', label: '重复标签', type: 'string' as const },
+        { name: 'second', label: '重复标签', type: 'number' as const },
+      ] }],
+      bindings: { record: { value: { kind: 'input' as const, name: 'record' }, type: { kind: 'record' as const, schema: 'ambiguous-record@1' } } },
+    })).toThrow('有歧义')
+  })
   it('lowers current-hand field access through the typed instance reader', () => {
     expect(lowerAuthorExpression('当前手牌', { surface: 'card' }).domain).toBe('card-instance')
     const lowered = lowerAuthorExpression('当前手牌.实例标识', { surface: 'card' })

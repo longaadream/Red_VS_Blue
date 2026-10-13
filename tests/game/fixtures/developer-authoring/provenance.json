@@ -1,0 +1,27 @@
+{
+  "consoleErrors": [],
+  "artifacts": [
+    {
+      "collection": "rules",
+      "sha256": "ab8b205ed9e5d05a841024f617f19a1a5a9e53a1d02f71cd453b07fa170b108c",
+      "id": "content-2a453948-9687-4cfd-bd1f-ba320e60ab65",
+      "file": "dissolve.json"
+    },
+    {
+      "collection": "skills",
+      "sha256": "5f388855d3f4907a8de2d7befd131fdfd327fc2c11fe78696a63e89831d03f69",
+      "id": "content-262f4d99-b1a1-4e02-b5e9-938d970d19b9",
+      "file": "fireball.json"
+    },
+    {
+      "collection": "skills",
+      "sha256": "c13050f5650103886fb21de81fa9cb7cc4d9313a3c72bceeaab61d3069c273f1",
+      "id": "content-5e153fb4-5ab8-4d56-b685-d22f4343b2a9",
+      "file": "shadowclone.json"
+    }
+  ],
+  "fromEmpty": true,
+  "runtimeExceptions": [],
+  "method": "通过真实编辑控件从空白编写、保存和重开；未注入完整图。固定种子594的正式引擎验证见developer-authoring-fixtures.test.ts。",
+  "generatedBy": "tests/electron/developer-authoring-smoke.mjs"
+}

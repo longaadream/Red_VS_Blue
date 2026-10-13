@@ -147,6 +147,15 @@ export function applyGameplayModuleGraph(input: Document, graph: unknown, field?
   const targetPatch = synchronizeGameplayTargetBinding(next, previousGraph, graph, target)
   if (targetPatch.diagnostics.length) throw new GameplayTargetBindingError(targetPatch.diagnostics.join('；'))
   attachGameplayTargetBindingWarnings(next, targetPatch.warnings)
+  if (targetPatch.rootTargetMetadata !== undefined) {
+    if (targetPatch.rootTargetMetadata.targetType === undefined) delete next.targetType
+    else next.targetType = targetPatch.rootTargetMetadata.targetType
+    if (targetPatch.rootTargetMetadata.filter === undefined) delete next.filter
+    else next.filter = targetPatch.rootTargetMetadata.filter
+    if (targetPatch.rootTargetMetadata.range === null) delete next.range
+    else if (targetPatch.rootTargetMetadata.range !== undefined) next.range = targetPatch.rootTargetMetadata.range
+    next.requiresTarget = targetPatch.rootTargetMetadata.requiresTarget
+  }
   if (targetPatch.targeting !== undefined) next.targeting = targetPatch.targeting
   if (targetPatch.targetBindings !== undefined) updated.targetBindings = targetPatch.targetBindings
   if (targetPatch.textBindings !== undefined) updated.textBindings = targetPatch.textBindings

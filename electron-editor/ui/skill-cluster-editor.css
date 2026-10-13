@@ -71,6 +71,8 @@
 .skill-cluster-inline-editor { border-top: 1px solid var(--cluster-border); margin-top: 15px; padding-top: 14px; }
 .skill-cluster-inline-editor-title { font-size: 12px; }
 .skill-cluster-inline-field { display: grid; gap: 5px; margin-top: 10px; }
+.skill-cluster-system-field { align-items: center; grid-template-columns: minmax(0,1fr) auto; }
+.skill-cluster-system-value { color: var(--cluster-muted); font-size: 11px; }
 .skill-cluster-inline-field > span { color: var(--cluster-muted); font-size: 10px; }
 .skill-cluster-inline-field input, .skill-cluster-inline-field textarea { background: #fbfcfd; border: 1px solid var(--cluster-border-strong); border-radius: 6px; color: var(--cluster-text); font-size: 12px; min-width: 0; padding: 7px 8px; width: 100%; }
 .skill-cluster-inline-field textarea { min-height: 56px; resize: vertical; }
@@ -149,9 +151,11 @@
 .skill-cluster-asset-note { color: var(--cluster-muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; padding: 10px; text-align: center; }
 .skill-cluster-asset-note.is-error { color: var(--cluster-red); }
 .skill-cluster-status-icon-field { gap: 8px; }
+.skill-cluster-status-icon-field input[type="text"] { background: #fbfcfd; border: 1px solid var(--cluster-border-strong); border-radius: 6px; color: var(--cluster-text); font-size: 11px; min-width: 0; padding: 7px 8px; width: 100%; }
 .skill-cluster-status-icon-field select { background: #fbfcfd; border: 1px solid var(--cluster-border-strong); border-radius: 6px; color: var(--cluster-text); font-size: 11px; min-width: 0; padding: 7px 8px; width: 100%; }
-.skill-cluster-status-icon-preview { background: #fbfcfd; border: 1px solid var(--cluster-border); border-radius: 7px; margin-top: 10px; min-height: 44px; overflow: hidden; }
-.skill-cluster-status-icon-preview .skill-cluster-asset-image { max-height: 96px; }
+.skill-cluster-status-icon-preview { align-items: center; background: #fbfcfd; border: 1px solid var(--cluster-border); border-radius: 9px; display: flex; height: 72px; justify-content: center; margin-top: 10px; overflow: hidden; width: 72px; }
+.skill-cluster-status-icon-preview .skill-cluster-asset-preview { height: 72px; min-height: 72px; padding: 4px; width: 72px; }
+.skill-cluster-status-icon-preview .skill-cluster-asset-image { height: 64px; max-height: 64px; max-width: 64px; width: 64px; }
 
 /* Unified Cluster authoring workspace. Tabs keep all member kinds in one
    surface so a Skill body editor can be injected below the compact member

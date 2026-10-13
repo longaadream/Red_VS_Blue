@@ -246,7 +246,8 @@
     }
     const definition = definitionFor(descriptor, kind, name)
     if (!definition) return false
-    if (definition.optional && !options.allowUnsetOptional && !configured(statement, kind, name)) return false
+    const needsSummonTemplate = id === 'author.effect.summon' && kind === 'input' && name === 'template' && !summonDeclaration
+    if (definition.optional && !needsSummonTemplate && !options.allowUnsetOptional && !configured(statement, kind, name)) return false
     const stack = new Set([keyOf(kind, name)])
     return dependencyNames(descriptor, statement, name).every(dependency => valueForDependency(descriptor, statement, dependency, stack))
   }
@@ -349,10 +350,11 @@
 
   define(['author.choice.option'], ctx => ctx.parts(
     '从', ctx.input('options'), '中选择一个', ctx.parameter('valueType'), '类型的选项',
+    ...(ctx.isVisible('parameter', 'selectionMode') ? ['，选择方式为', ctx.parameter('selectionMode')] : []),
     ...(ctx.isVisible('parameter', 'title') ? ['，提示为', ctx.parameter('title')] : []),
     ...(ctx.isVisible('parameter', 'canCancel') ? ['，允许取消为', ctx.parameter('canCancel')] : []),
     ...(ctx.isVisible('input', 'cancelValue') ? ['，取消后继续并返回', ctx.input('cancelValue')] : []),
-  ), { slotOrder: ['options', 'valueType', 'title', 'canCancel', 'cancelValue'], category: 'selection' })
+  ), { slotOrder: ['options', 'valueType', 'title', 'canCancel', 'cancelValue', 'selectionMode'], derivedParameters: ['optionsType'], category: 'selection' })
   define(['author.choice.target-piece'], ctx => ctx.parts(
     '在', ctx.parameter('range'), '格内选择', ctx.parameter('filter'), '的棋子目标',
     ...(ctx.isVisible('parameter', 'title') ? ['，提示为', ctx.parameter('title')] : []),
@@ -404,8 +406,13 @@
       return ctx.parts('在', ctx.input('destination'), '使用当前内容声明召唤，来源为', ctx.input('source'))
     }
     return ctx.parts('在', ctx.input('destination'), '召唤', ctx.input('template'),
-      ...(ctx.isVisible('input', 'display') ? ['，显示为', ctx.input('display')] : []), '，来源为', ctx.input('source'))
+      ...(ctx.isVisible('input', 'display') ? ['，显示为', ctx.input('display')] : []), '，来源为', ctx.input('source'),
+      ...(String(ctx.statement?.version) === '2' ? ['，召唤方式为', ctx.parameter('mode')] : []))
   }, { slotOrder: ['template', 'destination', 'display', 'source'], category: 'effect' })
+  define('lifecycle.destroy', ctx => ctx.parts(
+    '消灭', ctx.input('target'),
+    ...(ctx.isVisible('input', 'source') ? ['，来源为', ctx.input('source')] : []),
+  ), { slotOrder: ['target', 'source'], derivedParameters: ['targetType'], category: 'board' })
   define('lifecycle.remove-enemy', ctx => ctx.parts('使', ctx.input('target'), '出局'), { slotOrder: ['target'], category: 'board' })
   define('piece.detach-active', ctx => ctx.parts('将', ctx.input('piece'), '安全移除，状态处理为', ctx.parameter('flowStatePolicy')), { slotOrder: ['piece', 'flowStatePolicy'], category: 'board' })
   define('author.piece.display', ctx => ctx.parts('将', ctx.input('target'), '的显示设置为', ctx.input('display')), { slotOrder: ['target', 'display'], category: 'effect' })
@@ -637,14 +644,41 @@
   define('preview.result', ctx => ctx.parts('返回预览说明', ctx.input('description'), ...(ctx.isVisible('input', 'damage') ? ['，伤害为', ctx.input('damage')] : []), ...(ctx.isVisible('input', 'heal') ? ['，治疗为', ctx.input('heal')] : []), ...(ctx.isVisible('input', 'attackBonus') ? ['，攻击加成为', ctx.input('attackBonus')] : []), ...(ctx.isVisible('input', 'selfDamage') ? ['，自伤为', ctx.input('selfDamage')] : [])), { slotOrder: ['description', 'damage', 'heal', 'attackBonus', 'selfDamage'], category: 'data' })
   define('result.action', ctx => ctx.parts('构造行动结果：成功为', ctx.input('success'), ...(ctx.isVisible('input', 'message') ? ['，消息为', ctx.input('message')] : [])), { slotOrder: ['success', 'message'], category: 'control' })
   define('log.trigger-effect', ctx => ctx.parts('为', ctx.input('player'), '记录触发消息：', ctx.input('message')), { slotOrder: ['player', 'message'], category: 'control' })
-  define('instance.copy-piece', ctx => ctx.parts('复制', ctx.input('piece'), '的棋子实例信息'), { slotOrder: ['piece'], category: 'data' })
+  define('instance.copy-piece', ctx => ctx.parts('复制', ctx.input('piece'), '的棋子实例信息'), { slotOrder: ['piece'], derivedParameters: ['snapshotType'], category: 'data' })
   define('instance.apply-piece', ctx => ctx.parts('将实例副本', ctx.input('snapshot'), '应用到', ctx.input('piece')), { slotOrder: ['piece', 'snapshot'], category: 'data' })
 
   define('status.count-piece', ctx => ctx.parts('统计', ctx.input('piece'), '上的', ctx.parameter('statusType'), '状态数量'), { slotOrder: ['piece', 'statusType'], category: 'status-rule' })
 
+  const genericModuleLabels = Object.freeze({
+    'author.effect.summon': '召唤棋子', 'author.piece.display': '设置棋子显示',
+    'author.effect.damage': '造成伤害', 'author.effect.heal': '进行治疗',
+    'record.create': '创建记录', 'record.get': '读取记录字段', 'record.with': '更新记录',
+    'record.empty': '创建空记录', 'collection.map': '映射集合', 'collection.filter': '筛选集合',
+    'collection.reduce': '汇总集合', 'collection.find': '查找集合', 'code-block.invoke': '执行代码块',
+  })
+  const genericSlotLabels = Object.freeze({
+    source: '来源', target: '目标', template: '棋子模板', display: '显示内容', destination: '目标地格',
+    record: '记录', field: '字段', value: '值', amount: '数量', condition: '条件', items: '集合',
+    item: '当前项目', index: '当前索引', accumulator: '累计值', schema: '记录结构', keyField: '键字段',
+    mode: '模式', audience: '可见对象', message: '提示文字', title: '标题', filter: '筛选条件',
+    selectionMode: '选择方式', min: '最少数量', max: '最多数量', canCancel: '允许中止',
+    resumeOnCancel: '中止后继续', description: '说明', success: '是否成功', player: '玩家', piece: '棋子',
+  })
+  function isInternalLabel(value, id = '') {
+    const text = String(value || '').trim()
+    return !text || text === id || /^[a-z][a-z0-9]*(?:[.-][a-z0-9_-]+)+$/i.test(text)
+  }
+  function moduleDisplayLabel(id, label) {
+    if (!isInternalLabel(label, id)) return String(label)
+    return genericModuleLabels[id] || (id ? `未注册模块（${id}）` : '未注册模块')
+  }
+  function slotDisplayLabel(definition) {
+    return definition?.label || genericSlotLabels[definition?.name] || '字段'
+  }
+
   function genericBuild(ctx) {
     const id = ctx.id
-    const label = ctx.label || id || '未命名模块'
+    const label = moduleDisplayLabel(id, ctx.label)
     if (!ctx.registered) ctx.parts('暂不支持结构化句式，保留模块“', label, '”供兼容查看')
     else if (ctx.authoring === 'compatibility') ctx.parts(label)
     else if (ctx.category === 'calculation') ctx.parts('计算“', label, '”')
@@ -654,8 +688,8 @@
     else if (ctx.category === 'status-rule') ctx.parts('处理状态或规则“', label, '”')
     else if (ctx.category === 'card-ability') ctx.parts('处理卡牌或能力“', label, '”')
     else ctx.parts('执行“', label, '”')
-    for (const definition of ctx.inputs) if (ctx.isVisible('input', definition.name)) ctx.parts('，输入为', ctx.input(definition.name))
-    for (const definition of ctx.parameters) if (ctx.isVisible('parameter', definition.name)) ctx.parts('，参数为', ctx.parameter(definition.name))
+    for (const definition of ctx.inputs) if (ctx.isVisible('input', definition.name)) ctx.parts('，', slotDisplayLabel(definition), '为', ctx.input(definition.name))
+    for (const definition of ctx.parameters) if (ctx.isVisible('parameter', definition.name)) ctx.parts('，', slotDisplayLabel(definition), '为', ctx.parameter(definition.name))
   }
 
   function createCallContext(descriptor, statement, fragments) {
@@ -664,7 +698,7 @@
     const used = new Set()
     const context = {
       id: descriptorId(descriptor, statement),
-      label: descriptor?.label || descriptor?.uiDescription || descriptor?.description || statement?.module || '',
+      label: moduleDisplayLabel(descriptorId(descriptor, statement), descriptor?.label || descriptor?.uiDescription || descriptor?.description || statement?.module || ''),
       category: descriptor?.ui?.category || '',
       authoring: descriptor?.ui?.authoring || '',
       registered: Boolean(descriptor?.id),
@@ -747,7 +781,7 @@
       // custom phrase cannot suppress a required declaration field.
       const fallbackFragments = []
       const fallback = createCallContext(descriptor, statement, fallbackFragments)
-      fallback.parts('暂不支持结构化句式，保留模块“', fallback.label || id || '未知', '”')
+      fallback.parts('暂不支持结构化句式，保留模块“', moduleDisplayLabel(id, fallback.label || id), '”')
       fallback.finalize()
       return addArrayMetadata(fallbackFragments, descriptor, statement, id)
     }
@@ -812,7 +846,7 @@
         if (ctx.hasValue(name)) ctx.parts('，', parameter(name))
       }
     } else {
-      ctx.parts('保留未知结构语句“', kind || '未知', '”，请在高级视图中检查。')
+      ctx.parts('保留未注册结构语句，请在高级视图中检查。')
     }
     const optional = []
     for (const name of ['item', 'index', 'accumulator', 'presentation', 'title', 'targetType', 'range', 'filter', 'candidates', 'selectionMode', 'min', 'max', 'minSelections', 'maxSelections', 'canCancel', 'resumeOnCancel', 'message']) {

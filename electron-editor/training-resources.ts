@@ -7,9 +7,23 @@ export interface DraftTrainingMetadata {
   skillName: string
   pieceFaction: 'good' | 'evil'
 }
+export interface TrainingProfileIdentity {
+  readonly schemaVersion: 'rvb-game-profile-identity/v1'
+  readonly engineAbi: string
+  readonly runnerRevision: string
+  readonly resolvedProfileHash: string
+  readonly authorityContentHash: string
+}
 export interface TrainingSnapshot {
   contentHash: string
   files: { path: string; bytes: Uint8Array }[]
+  /**
+   * The canonical identity of the frozen training content.  It is supplied
+   * by the content worker and exposed only through the same isolated protocol
+   * as the candidate files; the browser must never ask the server profile
+   * runtime to reconstruct it from its virtual filesystem.
+   */
+  profileIdentity?: TrainingProfileIdentity
   draft?: DraftTrainingMetadata
 }
 const contentTypes: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.ttf': 'font/ttf', '.woff': 'font/woff', '.woff2': 'font/woff2', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg' }
@@ -51,6 +65,11 @@ export function createTrainingResources(appRoot: string, snapshot: TrainingSnaps
         : { contentHash: snapshot.contentHash, mode: 'training', acceptedOnly: true }
       return { bytes: Buffer.from(JSON.stringify(marker)), contentType: contentTypes['.json'] }
     }
+    if (relative === '__training-profile.json') {
+      return snapshot.profileIdentity
+        ? { bytes: Buffer.from(JSON.stringify(snapshot.profileIdentity)), contentType: contentTypes['.json'] }
+        : null
+    }
     const extension = path.extname(relative).toLowerCase(), contentType = contentTypes[extension]
     if (!contentType) return null
     let bytes: Buffer | null = null
@@ -58,7 +77,7 @@ export function createTrainingResources(appRoot: string, snapshot: TrainingSnaps
       if (extension !== '.json') return null
       bytes = files.get(relative) ?? null
     } else if (relative.startsWith('images/') && files.has(relative)) {
-      if (!['.png', '.jpg', '.jpeg', '.webp', '.svg'].includes(extension)) return null
+      if (!['.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif'].includes(extension)) return null
       bytes = files.get(relative)!
     } else {
       if (extension === '.html' && !['battle.html', 'training.html'].includes(relative)) return null

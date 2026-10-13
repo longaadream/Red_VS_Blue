@@ -14,6 +14,18 @@ contextBridge.exposeInMainWorld('editorAPI', {
   workbenchExport: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-export', id, hash, notes),
   workbenchTraining: (id: string, hash: string) => ipcRenderer.invoke('workbench-training', id, hash),
   skillTrial: (input: unknown) => ipcRenderer.invoke('skill-trial', input),
+  workbenchTrainingEmbedded: (id: string, hash: string, options: unknown = {}) => ipcRenderer.invoke('workbench-training-embedded', id, hash, options),
+  skillTrialEmbedded: (input: unknown, options: unknown = {}) => ipcRenderer.invoke('skill-trial-embedded', input, options),
+  trainingPreviewRetry: (previewId: string, input: unknown = null) => ipcRenderer.invoke('training-preview-retry', previewId, input),
+  trainingPreviewSetBounds: (previewId: string, bounds: unknown) => ipcRenderer.invoke('training-preview-set-bounds', previewId, bounds),
+  trainingPreviewSetVisible: (previewId: string, visible: boolean) => ipcRenderer.invoke('training-preview-set-visible', previewId, visible),
+  trainingPreviewInspect: (previewId: string) => ipcRenderer.invoke('training-preview-inspect', previewId),
+  trainingPreviewClose: (previewId: string) => ipcRenderer.invoke('training-preview-close', previewId),
+  onTrainingPreviewUpdated: (callback: (value: { previewId?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, value: { previewId?: string }) => callback(value)
+    ipcRenderer.on('training-preview-updated', listener)
+    return () => ipcRenderer.removeListener('training-preview-updated', listener)
+  },
   workbenchPublish: (id: string, hash: string, notes: string) => ipcRenderer.invoke('workbench-publish', id, hash, notes),
   publicationSettings: () => ipcRenderer.invoke('publication-settings'),
   publicationSaveSettings: (input: unknown) => ipcRenderer.invoke('publication-save-settings', input),
@@ -34,6 +46,9 @@ contextBridge.exposeInMainWorld('editorAPI', {
   importProject: () => ipcRenderer.invoke('project-import'),
   selectProject: (mode: 'open' | 'official' | 'blank') => ipcRenderer.invoke('project-select', mode),
   readDocument: (subdir: string, filename: string) => ipcRenderer.invoke('read-document', subdir, filename),
+  listAuthorDrafts: (collection: string) => ipcRenderer.invoke('list-author-drafts', collection),
+  saveAuthorDraft: (collection: string, id: string, value: unknown, revision: string | null) => ipcRenderer.invoke('save-author-draft', collection, id, value, revision),
+  removeAuthorDraft: (collection: string, id: string, revision: string) => ipcRenderer.invoke('remove-author-draft', collection, id, revision),
   writeDocument: (subdir: string, filename: string, data: unknown, revision: string) => ipcRenderer.invoke('write-document', subdir, filename, data, revision),
   readPveDocument: (relativePath: string) => ipcRenderer.invoke('read-pve-document', relativePath),
   writePveDocument: (relativePath: string, data: unknown, revision: string) => ipcRenderer.invoke('write-pve-document', relativePath, data, revision),

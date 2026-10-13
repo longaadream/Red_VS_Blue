@@ -1,0 +1,14 @@
+{
+  "shadowclone": {
+    "file": "shadowclone.json",
+    "collection": "skills"
+  },
+  "dissolve": {
+    "file": "dissolve.json",
+    "collection": "rules"
+  },
+  "fireball": {
+    "file": "fireball.json",
+    "collection": "skills"
+  }
+}

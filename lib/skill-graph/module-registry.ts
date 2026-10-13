@@ -1017,6 +1017,7 @@ export function getGameplayModuleCatalog(): readonly GameplayModuleCatalogEntry[
     uiDescription: item.uiDescription,
     inputs: item.inputs,
     outputs: item.outputs,
+    recordSchemas: item.recordSchemas,
     outputTypeBindings: item.outputTypeBindings,
     outputSchemaBindings: item.outputSchemaBindings,
     inputSchemaBindings: item.inputSchemaBindings,

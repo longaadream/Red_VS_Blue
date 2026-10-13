@@ -4,9 +4,12 @@ type ProfileDirectoryRenameWaitV1 = (milliseconds: number) => void
 
 const PROFILE_DIRECTORY_RENAME_RETRIES_V1 = 3
 const PROFILE_DIRECTORY_RENAME_DELAY_MS_V1 = 100
-const profileDirectoryRenameWaitBufferV1 = new Int32Array(new SharedArrayBuffer(4))
+let profileDirectoryRenameWaitBufferV1: Int32Array | undefined
 
 function nativeProfileDirectoryRenameWaitV1(milliseconds: number): void {
+  // This server-only capability may be present in a browser engine bundle.
+  // Allocate only on an actual filesystem retry, never during module import.
+  profileDirectoryRenameWaitBufferV1 ??= new Int32Array(new SharedArrayBuffer(4))
   Atomics.wait(profileDirectoryRenameWaitBufferV1, 0, 0, milliseconds)
 }
 

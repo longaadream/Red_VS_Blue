@@ -1,6 +1,5 @@
 /* Status library is a projection of source definitions, never a second store. */
 window.renderStudioStatuses = function renderStudioStatuses() {
-  const collections = window.__editorCollections || {}
   const catalog = window.__editorGetContentCatalog?.() || { skills:{}, pieces:{}, rules:{}, cards:{} }
   if (!Object.keys(catalog.skills || {}).length && !Object.keys(catalog.pieces || {}).length) {
     const list = document.getElementById('statuses-list')
@@ -28,13 +27,13 @@ window.renderStudioStatuses = function renderStudioStatuses() {
     const { member,root } = entry
     const definition = member.definition || {}
     detail.replaceChildren()
-    const title = document.createElement('h2');title.textContent = definition.name || member.id;detail.append(title)
+    const title = document.createElement('h2');title.textContent = definition.name || '未命名状态';detail.append(title)
     const description = document.createElement('p');description.className='studio-status-description';description.textContent=definition.description || '这个状态尚未填写说明。';detail.append(description)
     if (definition.iconPath) {
       const image=document.createElement('img');image.className='studio-status-icon';image.alt=title.textContent;detail.append(image)
       api.readAsset(String(definition.iconPath).replace(/^images\//,'')).then(src=>{if(image.isConnected)image.src=src}).catch(error=>{image.remove();const text=document.createElement('p');text.textContent=`图标不可用：${error.message}`;detail.append(text)})
     }
-    const source=document.createElement('p');source.className='studio-status-description';source.textContent=`定义来源：${member.source?.collection || root.collection} / ${member.source?.id || root.id}`;detail.append(source)
+    const source=document.createElement('p');source.className='studio-status-description';source.textContent=`定义来源：${catalog[member.source?.collection || root.collection]?.[member.source?.id || root.id]?.name || '关联能力组'}`;detail.append(source)
     const edit=document.createElement('button');edit.className='btn btn-primary';edit.textContent='编辑状态与图标';edit.disabled=member.editable===false
     edit.onclick=()=>{
       const collection = member.source?.collection === 'statuses' ? root.collection : (member.source?.collection || root.collection)
@@ -51,14 +50,14 @@ window.renderStudioStatuses = function renderStudioStatuses() {
     list.replaceChildren()
     const query=document.getElementById('statuses-search').value.toLowerCase()
     for (const entry of entries.values()) {
-      const name=entry.member.definition?.name || entry.member.id
+      const name=entry.member.definition?.name || '未命名状态'
       if(!`${name} ${entry.member.definition?.description || ''}`.toLowerCase().includes(query))continue
       const button=document.createElement('button');button.type='button';button.className='entity-item studio-status-row'
       const title=document.createElement('span');title.className='name';title.textContent=name
-      const source=document.createElement('span');source.className='id';source.textContent=entry.member.source?.id || entry.root.id
+      const source=document.createElement('span');source.className='entity-summary';source.textContent=catalog[entry.member.source?.collection || entry.root.collection]?.[entry.member.source?.id || entry.root.id]?.name || '关联能力组'
       button.append(title,source);button.onclick=()=>select(entry,button);list.append(button)
     }
-    if(!list.childElementCount) list.textContent = `没有匹配的状态（集群 ${result.clusters?.length || 0} · 状态 ${entries.size} · 技能 ${Object.keys(catalog.skills || {}).length} · 集合 ${Object.keys(collections).join(',') || '无'}）`
+    if(!list.childElementCount) list.textContent = `没有匹配的状态；当前目录共有 ${entries.size} 项。`
   }
   document.getElementById('statuses-search').oninput=filter
   filter()
@@ -77,7 +76,7 @@ window.renderStudioStatuses = function renderStudioStatuses() {
   const api = window.editorAPI
   const routeLabels = {
     workbench: '创作工作台', pieces: '棋子', skills: '能力组', cards: '卡牌',
-    rules: '规则', assets: '素材', build: '资源包', statuses: '状态目录', pve: 'PVE 内容',
+    rules: '规则', assets: '素材', build: '资源包', statuses: '状态目录', pve: '冒险内容', training:'训练营', guide:'使用说明',
   }
   const collectionLabels = { pieces: '棋子', skills: '能力组', cards: '卡牌', rules: '规则' }
   const clone = value => {
@@ -167,13 +166,17 @@ window.renderStudioStatuses = function renderStudioStatuses() {
     const status = data?.statusTag || data?.initialStatusTags
     const statusCount = Array.isArray(status) ? status.length : status ? 1 : 0
     const editEffect = detail?.querySelector('[data-editor-mode="cluster"]') ? '<button type="button" class="context-action" data-context-open="cluster">编辑效果</button>' : ''
-    const editGraph = detail?.querySelector('[data-editor-mode="graph"]') ? '<button type="button" class="context-action secondary" data-context-open="graph">高级模块视图</button>' : ''
     const editFields = detail?.querySelector('[data-editor-mode="fields"]') ? '<button type="button" class="context-action secondary" data-context-open="fields">编辑基础属性</button>' : ''
     const trial = route === 'skills' && detail?.querySelector('[data-sentence-trial]') ? '<button type="button" class="context-action" data-context-action="trial">试用技能</button>' : ''
-    const referenceRows = refs.length ? refs.map(([kind, value]) => `<div class="context-reference-row"><span>${escape(kind)}</span><strong>${escape(value)}</strong></div>`).join('') : '<p class="context-muted">当前内容没有显式引用。</p>'
+    const catalog = window.__editorGetContentCatalog?.() || {}
+    const referenceKinds = { skills:'主动技能', skill:'主动技能', rules:'规则', rule:'规则', relatedRules:'关联规则', relatedCards:'关联卡牌', card:'卡牌', piece:'棋子', template:'棋子', initialStatusTags:'初始状态', statusTag:'状态', status:'状态', cluster:'能力组' }
+    const referenceRows = refs.length ? refs.map(([kind, value]) => {
+      const definition = Object.values(catalog).filter(record).map(collection => collection[value]).find(Boolean)
+      return `<div class="context-reference-row"><span>${escape(referenceKinds[kind] || '关联内容')}</span><strong>${escape(definition?.name || '未命名引用')}</strong></div>`
+    }).join('') : '<p class="context-muted">当前内容没有显式引用。</p>'
     const variableRows = expressionVariables(data)
     const variableCard = variableRows.length ? `<div class="context-card"><div class="context-card-heading"><span>表达式变量</span><span class="context-chip">${variableRows.length}</span></div><div class="context-reference-list context-variable-list">${variableRows.map(([name, value]) => `<div class="context-reference-row"><span>${escape(name)}</span><strong>${escape(value)}</strong></div>`).join('')}</div></div>` : ''
-    const common = `<div class="context-card"><div class="context-card-heading"><span>当前内容</span><span class="context-chip">${escape(collectionLabels[route] || route)}</span></div><h2 data-context-title>${escape(name)}</h2><p class="context-description">${escape(description)}</p><p class="context-id">${escape(id)}</p></div>
+    const common = `<div class="context-card"><div class="context-card-heading"><span>当前内容</span><span class="context-chip">${escape(collectionLabels[route] || '内容')}</span></div><h2 data-context-title>${escape(name)}</h2><p class="context-description">${escape(description)}</p></div>
       <div class="context-card"><div class="context-card-heading"><span>当前可用引用</span><span class="context-help" title="引用来自当前草稿及其能力组" role="img" aria-label="引用说明">?</span></div><div class="context-reference-list" data-context-reference-list>${referenceRows}</div></div>
       ${variableCard}
       <div class="context-card"><div class="context-card-heading"><span>高级信息</span><span class="context-status-dot ${count || route === 'pieces' ? 'is-ok' : 'is-neutral'}"></span></div><div class="context-facts"><span>效果语句<strong>${count || '—'}</strong></span><span>状态定义<strong>${statusCount}</strong></span><span>未知字段<strong>保留</strong></span></div><p class="context-muted">未显示字段会随保存一起保留。校验和引用错误会在编辑器中定位。</p></div>`
@@ -182,9 +185,9 @@ window.renderStudioStatuses = function renderStudioStatuses() {
       const imageNode = image ? `<div class="context-piece-image" data-context-image-host><span>正在读取预览…</span></div>` : '<div class="context-piece-image is-empty" data-context-image-host><span>未选择棋子图片</span></div>'
       const skillCount = Array.isArray(data?.skills) ? data.skills.length : 0
       const ruleCount = Array.isArray(data?.rules) ? data.rules.length : 0
-      return `<div class="context-card context-piece-preview"><div class="context-card-heading"><span>棋子预览</span><span class="context-help" title="预览使用当前内容和素材 IPC" role="img" aria-label="预览说明">↗</span></div>${imageNode}<h2>${escape(name)}</h2><p class="context-muted">阵营：${escape(data?.faction || '未设置')} · 稀有度：${escape(data?.rarity || '未设置')}</p><div class="context-stats">${statCards(data) || '<span class="context-muted">尚未填写基础属性。</span>'}</div><div class="context-counts"><span>能力组成员<strong>${skillCount}</strong></span><span>规则依赖<strong>${ruleCount}</strong></span></div></div>${common}`
+      return `<div class="context-card context-piece-preview"><div class="context-card-heading"><span>棋子预览</span><span class="context-help" title="预览使用当前草稿及其素材" role="img" aria-label="预览说明">↗</span></div>${imageNode}<h2>${escape(name)}</h2><p class="context-muted">阵营：${escape(FIELD_CHOICES.faction[data?.faction] || '未设置')} · 稀有度：${escape(FIELD_CHOICES.rarity[data?.rarity] || '未设置')}</p><div class="context-stats">${statCards(data) || '<span class="context-muted">尚未填写基础属性。</span>'}</div><div class="context-counts"><span>能力组成员<strong>${skillCount}</strong></span><span>规则依赖<strong>${ruleCount}</strong></span></div></div>${common}`
     }
-    return `${common}<div class="context-actions" data-context-actions>${editEffect}${editFields}${editGraph}${trial}</div><div class="context-card context-preview-card"><div class="context-card-heading"><span>效果说明</span></div><p class="context-preview-copy">${escape(description)}</p>${trial ? '<p class="context-muted">试用将在训练营窗口打开。</p>' : ''}</div>`
+    return `${common}<div class="context-actions" data-context-actions>${editEffect}${editFields}${trial}</div><div class="context-card context-preview-card"><div class="context-card-heading"><span>效果说明</span></div><p class="context-preview-copy">${escape(description)}</p>${trial ? '<p class="context-muted">在训练营中验证当前效果。</p>' : ''}</div>`
   }
 
   async function hydratePieceImage(detail, data) {

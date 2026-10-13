@@ -25,6 +25,16 @@ function loadStandardCatalog() {
 
 const standardCatalog = loadStandardCatalog()
 
+test('new summons expose an empty template slot and label the summon mode', () => {
+  const descriptor = standardCatalog.find(item => item.id === 'author.effect.summon' && item.version === '2')
+  const statement = { module: descriptor.id, version: '2', inputs: {}, parameters: { mode: 'new-instance' } }
+  assert.equal(templates.isSlotAvailable(descriptor, statement, 'input', 'template'), true)
+  assert.match(rendered(templates.describeCall(descriptor, statement)), /召唤【input:template】/u)
+  assert.match(rendered(templates.describeCall(descriptor, statement)), /召唤方式为【parameter:mode】/u)
+  statement.parameters.mode = 'declaration'
+  assert.equal(templates.isSlotAvailable(descriptor, statement, 'input', 'template'), false)
+})
+
 test('writable fields derive their value type from registry metadata without another author type choice', () => {
   const piece = standardCatalog.find(item => item.id === 'piece.write-field')
   const status = standardCatalog.find(item => item.id === 'status.write-field')

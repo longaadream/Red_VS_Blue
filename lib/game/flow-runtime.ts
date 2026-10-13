@@ -19,7 +19,7 @@ import { capturePieceInstance, applyPieceInstance, preserveDepartingPiece } from
 import { createAuthorChoiceRuntime } from './author-choice-runtime'
 import { createAuthorEffects } from './author-effects'
 import { getActiveEffectChain } from './effect-batch'
-import { parseAuthoredSummonSpec, type AuthoredPieceTemplate, type AuthoredDisplay } from './author-summon-schema'
+import { parseAuthoredSummonSpec, type AuthoredPieceTemplate, type AuthoredDisplaySpec } from './author-summon-schema'
 import { ENGINE_EXTENSION_FIELDS } from './engine-extension-fields'
 import { createExecutionLocalRuntime } from './execution-local-runtime'
 import { recordDirectSkillAdded, recordDirectSkillRemoved, recordDirectRuleAdded, recordDirectRuleRemoved, type AuthorClusterDefinition } from './author-clusters'
@@ -1867,15 +1867,18 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       },
     },
     lifecycle: {
-      summonAuthored: (sourceRef: string | object, template: AuthoredPieceTemplate | readonly AuthoredPieceTemplate[] | string | readonly string[], destination: GridPosition | readonly GridPosition[], display: AuthoredDisplay = {}, mode: 'new-instance' | 'return-instance' = 'new-instance', currentHp?: number) => {
+      destroy: (target: string | readonly string[], source?: string) => {
+        if (source !== undefined) piece(source)
+        return call('destroyAuthorPieces', Array.isArray(target) ? target : [target], source)
+      },
+      summonAuthored: (sourceRef: string | object, template: AuthoredPieceTemplate | readonly AuthoredPieceTemplate[] | string | readonly string[], destination: GridPosition | readonly GridPosition[], display: AuthoredDisplaySpec = {}, mode: 'new-instance' | 'return-instance' = 'new-instance', currentHp?: number) => {
         // A normal author graph supplies a live piece ID.  A graph that has
         // explicitly captured its source supplies the authenticated
         // execution handle instead.  Both paths pass sourceId to the existing
         // declaration queue; settlement resolves board/graveyard state through
         // the same authoritative resolver used by captured summons.
-        const sourceId = typeof sourceRef === 'string'
-          ? (piece(sourceRef), sourceRef)
-          : capturedSource(sourceRef).instanceId
+        const sourcePiece = typeof sourceRef === 'string' ? piece(sourceRef) : capturedSource(sourceRef)
+        const sourceId = sourcePiece.instanceId
         const cells = Array.isArray(destination) ? destination : [destination]
         const templates = Array.isArray(template) ? template : cells.map(() => template)
         if (!cells.length || cells.length > 64 || cells.length !== templates.length) throw new Error('flow: 召唤棋子与落点须逐项对应')
@@ -1883,6 +1886,19 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
           ? { mode, x: cell.x, y: cell.y, template: templates[index], display }
           : { mode, x: cell.x, y: cell.y, instanceId: templates[index], ...(currentHp === undefined ? {} : { currentHp }) }))
         if (!context.summonQueue) throw new Error('flow: 召唤需由当前内容声明summonCapability')
+        // The authoritative batch validator rejects occupied cells.  When an
+        // author effect can already observe that invariant before enqueueing
+        // (for example after a blocked displacement), expose the same
+        // ordinary blocked-effect result and leave deferred/race validation
+        // to that sealed host.  This applies to every active occupant and
+        // does not depend on a particular skill or source identity.
+        if (cells.some(cell => battle.pieces.some(piece => (
+          piece.currentHp > 0
+          && piece.x === cell.x
+          && piece.y === cell.y
+        )))) {
+          return { success: false, blocked: true, message: '召唤落点已被占用' }
+        }
         const chain = getActiveEffectChain(battle)
         context.summonQueue.push({ sourceId, summons })
         if (chain?.state === 'idle') return call('settleAuthorSummons', sourceId, effectId())

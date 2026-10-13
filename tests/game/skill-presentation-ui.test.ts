@@ -37,6 +37,37 @@ function queuedAudio() {
   return {p,play,model,impact,skip:()=>queue.skip()}
 }
 describe('projected skill display in the actual browser consumers',()=>{
+  it('merges explicit display fields including false and zero without granting ownership',()=>{
+    const state=makeState({pieces:[makePiece({instanceId:'a',currentHp:9}),makePiece({instanceId:'b',currentHp:1,x:1})]})
+    state.pieces[1].isCore=true
+    const api=createSkillPresentation(state,'player-red','demo','a')
+    api.setDisplay('b',{name:'显示名称',shield:0,isCore:false},'public','appearance')
+    api.setDisplay('b',{faction:'blue',ownerPlayerId:'player-blue'},'public','identity')
+    const original=JSON.stringify(state),w=browser()
+    for (const viewerId of ['player-red','player-blue','observer']) {
+      const snapshot=toPublicBattleState(state,viewerId)
+      const model=w.BattleViewModel.create({snapshot,viewerId})
+      expect(model.pieces[1]).toMatchObject({name:'显示名称',ownerPlayerId:'player-red',faction:'blue',
+        displayIdentity:{ownerPlayerId:'player-blue',faction:'blue',isCore:false},displayStats:{shield:0}})
+      expect(snapshot.pieces[1].ownerPlayerId).toBe('player-red')
+      if (viewerId !== 'observer') expect(snapshot.pieces[1].isCore).toBe(true)
+    }
+    expect(JSON.stringify(state)).toBe(original)
+  })
+  it('shows frozen skills and explicit core identity in the real detail helpers',()=>{
+    const page=readFileSync(resolve('data/pages/battle.html'),'utf8')
+    const frozen=[{skillId:'same',currentCooldown:3,usesRemaining:2}]
+    const piece={instanceId:'piece',isCore:true,skills:[{skillId:'same',currentCooldown:0,usesRemaining:7}]}
+    const badge:any={setAttribute:vi.fn()}
+    const context:any=createContext({piece,document:{getElementById:()=>badge},G:{},
+      shouldHidePieceIdentityBadge:()=>false,BattleSkillPresentation:{display:()=>({skills:frozen,isCore:false})}})
+    new Script(page.slice(page.indexOf('function pieceDispSkills('),page.indexOf('function pieceInfoDisplaySkills('))
+      + page.slice(page.indexOf('function renderPieceIdentity('),page.indexOf('function renderPieceInfoRecord('))
+      + ';result=pieceDispSkills(piece);renderPieceIdentity(piece);').runInContext(context)
+    expect(context.result).toEqual(frozen)
+    expect(badge.textContent).toBe('非核心棋子')
+    expect(piece.skills[0].currentCooldown).toBe(0)
+  })
   it('triggers impact only at the live result, once, and cancels on skip/recovery',()=>{
     vi.useFakeTimers()
     const {p,model,impact,skip}=queuedAudio()

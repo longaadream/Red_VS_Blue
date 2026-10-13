@@ -1,4 +1,4 @@
-import { authorFieldAliases, authorFunctionSpecs, lowerAuthorExpression, type AuthorExpressionContext, type AuthorExtensionScope, type AuthorValue } from './author-expression-graph'
+import { authorFieldAliases, authorFunctionSpecs, authorRecordFieldDisplayName, lowerAuthorExpression, type AuthorExpressionContext, type AuthorExtensionScope, type AuthorValue } from './author-expression-graph'
 import { getGameplayModule } from './module-registry'
 import type { GameplayValueType } from './module-types'
 
@@ -26,7 +26,7 @@ function fieldsFor(value: AuthorValue, options: AuthorExpressionContext): Record
   if (type === 'cell') return { x: 'number', y: 'number', 可行走: 'boolean', 被占用: 'boolean', 地格效果: { kind: 'list', element: 'record' } }
   if (typeof type === 'object' && type.kind === 'record') {
     const schema = options.schemas?.find(schema => schema.id === type.schema || `${schema.id}@${schema.version}` === type.schema)
-    return Object.fromEntries((schema?.fields ?? []).map(field => [field.name, field.type]))
+    return schema ? Object.fromEntries(schema.fields.map(field => [authorRecordFieldDisplayName(schema, field), field.type])) : {}
   }
   const moduleId = value.domain === 'skill-instance' ? 'author.skill-instance.field'
     : value.domain === 'card-instance' ? 'card.instance-field'
@@ -122,7 +122,9 @@ export function completeAuthorExpression(prefix: string, options: AuthorExpressi
   if (['card', 'rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前手牌', value: '当前手牌', kind: '手牌实例' })
   for (const [name, spec] of Object.entries(authorFunctionSpecs)) suggestions.push({ label: name, value: `${name}()`, kind: '函数', signature: `${name}()`, description: (spec.labels ?? spec.args).join('，') })
   for (const name of ['筛选', '逐项变换', '查找首项', '任意满足', '全部满足']) suggestions.push({ label: name, value: `${name}()`, kind: '函数', signature: `${name}()`, description: '容器，关于每项的表达式' })
-  for (const name of ['true', 'false', 'null']) suggestions.push({ label: name, value: name, kind: '取值' })
+  // Keep the English spellings accepted by the parser for compatibility,
+  // while inserting the Chinese spellings that authors see in the editor.
+  for (const [label, value] of [['真', '真'], ['假', '假'], ['空', '空']] as const) suggestions.push({ label, value, kind: '取值' })
   return suggestions
 }
 

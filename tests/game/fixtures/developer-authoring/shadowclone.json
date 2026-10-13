@@ -1,0 +1,2130 @@
+{
+  "id": "content-5e153fb4-5ab8-4d56-b685-d22f4343b2a9",
+  "name": "影分身之术 · 从空白",
+  "description": "选择五格内的空地，召唤一个分身；也可以传送至该地格，在原位留下分身。分身不能移动，受到伤害后消散，显示保留召唤时的本体数值。",
+  "keywords": [],
+  "targetText": "",
+  "effectTags": [],
+  "kind": "active",
+  "type": "normal",
+  "form": null,
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "chargeCost": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "areaSize": 0,
+  "requiresTarget": true,
+  "targeting": null,
+  "showInUI": true,
+  "concealTargetInBattleLog": false,
+  "rollbackPendingTargetOnCancel": false,
+  "statusTag": null,
+  "chargeCostModifiers": [],
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = ((function(value){return flow.values.require(value, \"cell\", []);})(flow.choice.authorTarget({type: \"grid\", range: 5, filter: \"all\", canCancel: false, requireWalkable: true, requireUnoccupied: true}, \"sentence-module-1\"))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-1\", __gameplayError, \"author.choice.target-cell\"); _module0 = __gameplayInvalid; } try { if ((JSON.parse(\"{\\\"format\\\":\\\"author-map/v1\\\",\\\"entries\\\":[[\\\"传送并在原地留下分身\\\",true],[\\\"在目标格召唤分身\\\",false]]}\") === __gameplayInvalid) || (JSON.parse(\"{\\\"format\\\":\\\"author-map/v1\\\",\\\"entries\\\":[[\\\"传送并在原地留下分身\\\",true],[\\\"在目标格召唤分身\\\",false]]}\") === undefined) || (JSON.parse(\"{\\\"format\\\":\\\"author-map/v1\\\",\\\"entries\\\":[[\\\"传送并在原地留下分身\\\",true],[\\\"在目标格召唤分身\\\",false]]}\") === null)) { _module1 = __gameplayInvalid; } else { var _module1 = (({value:flow.values.require(flow.choice.authorOption({options:flow.containers.authorMapItems(flow.values.require(JSON.parse(\"{\\\"format\\\":\\\"author-map/v1\\\",\\\"entries\\\":[[\\\"传送并在原地留下分身\\\",true],[\\\"在目标格召唤分身\\\",false]]}\"),{\"kind\":\"map\",\"key\":\"string\",\"value\":\"boolean\"},[{\"id\":\"author.piece-skill\",\"version\":\"1\",\"fields\":[{\"name\":\"skillId\",\"type\":\"string\",\"label\":\"技能引用\"},{\"name\":\"instanceId\",\"type\":\"string\",\"optional\":true,\"label\":\"技能实例\"},{\"name\":\"level\",\"type\":\"number\",\"optional\":true,\"label\":\"等级\"},{\"name\":\"currentCooldown\",\"type\":\"number\",\"optional\":true,\"label\":\"当前冷却\"},{\"name\":\"usesRemaining\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余次数\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"技能扩展\"},{\"name\":\"abilityGroupIds\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"能力组\"},{\"name\":\"authorExtensionDeclarations\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展声明\"}]},{\"id\":\"author.piece-status\",\"version\":\"1\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"label\":\"状态定义引用\"},{\"name\":\"type\",\"type\":\"string\",\"label\":\"状态类型\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"instanceId\",\"type\":\"string\",\"optional\":true,\"label\":\"状态实例\"},{\"name\":\"intensity\",\"type\":\"number\",\"optional\":true,\"label\":\"强度\"},{\"name\":\"stacks\",\"type\":\"number\",\"optional\":true,\"label\":\"层数\"},{\"name\":\"value\",\"type\":\"number\",\"optional\":true,\"label\":\"数值\"},{\"name\":\"currentDuration\",\"type\":\"number\",\"optional\":true,\"label\":\"当前持续\"},{\"name\":\"remainingDuration\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余持续\"},{\"name\":\"currentUses\",\"type\":\"number\",\"optional\":true,\"label\":\"当前次数\"},{\"name\":\"remainingUses\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余次数\"},{\"name\":\"visible\",\"type\":\"boolean\",\"optional\":true,\"label\":\"可见\"},{\"name\":\"stacking\",\"type\":\"string\",\"optional\":true,\"label\":\"叠加方式\"},{\"name\":\"lifetime\",\"type\":\"string\",\"optional\":true,\"label\":\"生命周期\"},{\"name\":\"appliedTurn\",\"type\":\"number\",\"optional\":true,\"label\":\"施加回合\"},{\"name\":\"expiresAfterTurn\",\"type\":\"number\",\"optional\":true,\"nullable\":true,\"label\":\"过期回合\"},{\"name\":\"lastDurationTickTurn\",\"type\":\"number\",\"optional\":true,\"label\":\"上次持续更新回合\"},{\"name\":\"relatedRules\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"关联规则\"},{\"name\":\"statusAliases\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"状态别名\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"状态扩展\"},{\"name\":\"authorExtensionDeclarations\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展声明\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-rule\",\"version\":\"1\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"label\":\"规则引用\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-buff\",\"version\":\"1\",\"fields\":[{\"name\":\"type\",\"type\":\"string\",\"label\":\"增益类型\"},{\"name\":\"value\",\"type\":\"number\",\"label\":\"增益数值\"},{\"name\":\"duration\",\"type\":\"number\",\"label\":\"持续时间\"},{\"name\":\"source\",\"type\":\"string\",\"label\":\"来源\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-debuff\",\"version\":\"1\",\"fields\":[{\"name\":\"type\",\"type\":\"string\",\"label\":\"减益类型\"},{\"name\":\"value\",\"type\":\"number\",\"label\":\"减益数值\"},{\"name\":\"duration\",\"type\":\"number\",\"label\":\"持续时间\"},{\"name\":\"source\",\"type\":\"string\",\"label\":\"来源\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-identity\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"label\":\"名称\"},{\"name\":\"faction\",\"type\":\"string\",\"label\":\"阵营\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"}]},{\"id\":\"author.piece-snapshot-fields\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"技能\"},{\"name\":\"displaySkills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"显示技能\"},{\"name\":\"buffs\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-buff@1\"}},\"optional\":true,\"label\":\"增益\"},{\"name\":\"debuffs\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-debuff@1\"}},\"optional\":true,\"label\":\"减益\"},{\"name\":\"shield\",\"type\":\"number\",\"optional\":true,\"label\":\"护盾\"},{\"name\":\"ruleTags\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"规则标签\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"状态\"},{\"name\":\"rules\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-rule@1\"}},\"optional\":true,\"label\":\"规则\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-flow-state\",\"version\":\"1\",\"fields\":[{\"name\":\"schemaVersion\",\"type\":\"number\",\"label\":\"版本\"},{\"name\":\"scope\",\"type\":\"string\",\"label\":\"所属范围\"},{\"name\":\"entityId\",\"type\":\"string\",\"label\":\"所属实例\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"namespace\",\"type\":\"string\",\"label\":\"变量分组\"},{\"name\":\"name\",\"type\":\"string\",\"label\":\"变量名\"},{\"name\":\"value\",\"type\":\"json\",\"label\":\"存储内容\"},{\"name\":\"lifetime\",\"type\":\"string\",\"label\":\"保留时长\"},{\"name\":\"projectionVisibility\",\"type\":\"string\",\"label\":\"可见范围\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-instance\",\"version\":\"1\",\"fields\":[{\"name\":\"schemaVersion\",\"type\":\"number\",\"label\":\"版本\"},{\"name\":\"kind\",\"type\":\"string\",\"label\":\"类型\"},{\"name\":\"sourcePieceId\",\"type\":\"string\",\"label\":\"来源实例\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"identity\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-identity@1\"},\"label\":\"身份\"},{\"name\":\"fields\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-snapshot-fields@1\"},\"label\":\"字段副本\"},{\"name\":\"flowState\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-flow-state@1\"}},\"label\":\"流程状态\"}]},{\"id\":\"author.piece-display\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"shield\",\"type\":\"number\",\"optional\":true,\"label\":\"护盾\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"技能\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"状态\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"}]},{\"id\":\"author.piece-display-audiences\",\"version\":\"1\",\"fields\":[{\"name\":\"public\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"公开\"},{\"name\":\"owner\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"allies\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"友方\"},{\"name\":\"enemies\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"敌方\"},{\"name\":\"spectators\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"观战者\"}]},{\"id\":\"author.piece-display-plan\",\"version\":\"1\",\"fields\":[{\"name\":\"audiences\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display-audiences@1\"},\"label\":\"可见对象\"}]},{\"id\":\"author.piece-template\",\"version\":\"1\",\"fields\":[{\"name\":\"baseSnapshot\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-instance@1\"},\"optional\":true,\"label\":\"基础副本\"},{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"初始技能\"},{\"name\":\"rules\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"初始规则\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"初始状态\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展\"}]}])).map(function(entry){return {label:entry[0],value:entry[1]};}),indexed:true,selectionMode:\"single\",minSelections:1,maxSelections:1,title:\"是否传送并在原地留下分身\",canCancel:false},\"sentence-module-2\"),\"boolean\",[{\"id\":\"author.piece-skill\",\"version\":\"1\",\"fields\":[{\"name\":\"skillId\",\"type\":\"string\",\"label\":\"技能引用\"},{\"name\":\"instanceId\",\"type\":\"string\",\"optional\":true,\"label\":\"技能实例\"},{\"name\":\"level\",\"type\":\"number\",\"optional\":true,\"label\":\"等级\"},{\"name\":\"currentCooldown\",\"type\":\"number\",\"optional\":true,\"label\":\"当前冷却\"},{\"name\":\"usesRemaining\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余次数\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"技能扩展\"},{\"name\":\"abilityGroupIds\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"能力组\"},{\"name\":\"authorExtensionDeclarations\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展声明\"}]},{\"id\":\"author.piece-status\",\"version\":\"1\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"label\":\"状态定义引用\"},{\"name\":\"type\",\"type\":\"string\",\"label\":\"状态类型\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"instanceId\",\"type\":\"string\",\"optional\":true,\"label\":\"状态实例\"},{\"name\":\"intensity\",\"type\":\"number\",\"optional\":true,\"label\":\"强度\"},{\"name\":\"stacks\",\"type\":\"number\",\"optional\":true,\"label\":\"层数\"},{\"name\":\"value\",\"type\":\"number\",\"optional\":true,\"label\":\"数值\"},{\"name\":\"currentDuration\",\"type\":\"number\",\"optional\":true,\"label\":\"当前持续\"},{\"name\":\"remainingDuration\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余持续\"},{\"name\":\"currentUses\",\"type\":\"number\",\"optional\":true,\"label\":\"当前次数\"},{\"name\":\"remainingUses\",\"type\":\"number\",\"optional\":true,\"label\":\"剩余次数\"},{\"name\":\"visible\",\"type\":\"boolean\",\"optional\":true,\"label\":\"可见\"},{\"name\":\"stacking\",\"type\":\"string\",\"optional\":true,\"label\":\"叠加方式\"},{\"name\":\"lifetime\",\"type\":\"string\",\"optional\":true,\"label\":\"生命周期\"},{\"name\":\"appliedTurn\",\"type\":\"number\",\"optional\":true,\"label\":\"施加回合\"},{\"name\":\"expiresAfterTurn\",\"type\":\"number\",\"optional\":true,\"nullable\":true,\"label\":\"过期回合\"},{\"name\":\"lastDurationTickTurn\",\"type\":\"number\",\"optional\":true,\"label\":\"上次持续更新回合\"},{\"name\":\"relatedRules\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"关联规则\"},{\"name\":\"statusAliases\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"状态别名\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"状态扩展\"},{\"name\":\"authorExtensionDeclarations\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展声明\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-rule\",\"version\":\"1\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"label\":\"规则引用\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-buff\",\"version\":\"1\",\"fields\":[{\"name\":\"type\",\"type\":\"string\",\"label\":\"增益类型\"},{\"name\":\"value\",\"type\":\"number\",\"label\":\"增益数值\"},{\"name\":\"duration\",\"type\":\"number\",\"label\":\"持续时间\"},{\"name\":\"source\",\"type\":\"string\",\"label\":\"来源\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-debuff\",\"version\":\"1\",\"fields\":[{\"name\":\"type\",\"type\":\"string\",\"label\":\"减益类型\"},{\"name\":\"value\",\"type\":\"number\",\"label\":\"减益数值\"},{\"name\":\"duration\",\"type\":\"number\",\"label\":\"持续时间\"},{\"name\":\"source\",\"type\":\"string\",\"label\":\"来源\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-identity\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"label\":\"名称\"},{\"name\":\"faction\",\"type\":\"string\",\"label\":\"阵营\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"}]},{\"id\":\"author.piece-snapshot-fields\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"技能\"},{\"name\":\"displaySkills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"显示技能\"},{\"name\":\"buffs\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-buff@1\"}},\"optional\":true,\"label\":\"增益\"},{\"name\":\"debuffs\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-debuff@1\"}},\"optional\":true,\"label\":\"减益\"},{\"name\":\"shield\",\"type\":\"number\",\"optional\":true,\"label\":\"护盾\"},{\"name\":\"ruleTags\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"规则标签\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"状态\"},{\"name\":\"rules\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-rule@1\"}},\"optional\":true,\"label\":\"规则\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-flow-state\",\"version\":\"1\",\"fields\":[{\"name\":\"schemaVersion\",\"type\":\"number\",\"label\":\"版本\"},{\"name\":\"scope\",\"type\":\"string\",\"label\":\"所属范围\"},{\"name\":\"entityId\",\"type\":\"string\",\"label\":\"所属实例\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"namespace\",\"type\":\"string\",\"label\":\"变量分组\"},{\"name\":\"name\",\"type\":\"string\",\"label\":\"变量名\"},{\"name\":\"value\",\"type\":\"json\",\"label\":\"存储内容\"},{\"name\":\"lifetime\",\"type\":\"string\",\"label\":\"保留时长\"},{\"name\":\"projectionVisibility\",\"type\":\"string\",\"label\":\"可见范围\"}],\"additionalFields\":\"json\"},{\"id\":\"author.piece-instance\",\"version\":\"1\",\"fields\":[{\"name\":\"schemaVersion\",\"type\":\"number\",\"label\":\"版本\"},{\"name\":\"kind\",\"type\":\"string\",\"label\":\"类型\"},{\"name\":\"sourcePieceId\",\"type\":\"string\",\"label\":\"来源实例\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"label\":\"所属玩家\"},{\"name\":\"identity\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-identity@1\"},\"label\":\"身份\"},{\"name\":\"fields\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-snapshot-fields@1\"},\"label\":\"字段副本\"},{\"name\":\"flowState\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-flow-state@1\"}},\"label\":\"流程状态\"}]},{\"id\":\"author.piece-display\",\"version\":\"1\",\"fields\":[{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"shield\",\"type\":\"number\",\"optional\":true,\"label\":\"护盾\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"技能\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"状态\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"}]},{\"id\":\"author.piece-display-audiences\",\"version\":\"1\",\"fields\":[{\"name\":\"public\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"公开\"},{\"name\":\"owner\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"allies\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"友方\"},{\"name\":\"enemies\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"敌方\"},{\"name\":\"spectators\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display@1\"},\"optional\":true,\"label\":\"观战者\"}]},{\"id\":\"author.piece-display-plan\",\"version\":\"1\",\"fields\":[{\"name\":\"audiences\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-display-audiences@1\"},\"label\":\"可见对象\"}]},{\"id\":\"author.piece-template\",\"version\":\"1\",\"fields\":[{\"name\":\"baseSnapshot\",\"type\":{\"kind\":\"record\",\"schema\":\"author.piece-instance@1\"},\"optional\":true,\"label\":\"基础副本\"},{\"name\":\"templateId\",\"type\":\"string\",\"optional\":true,\"label\":\"模板引用\"},{\"name\":\"name\",\"type\":\"string\",\"optional\":true,\"label\":\"名称\"},{\"name\":\"maxHp\",\"type\":\"number\",\"optional\":true,\"label\":\"最大生命\"},{\"name\":\"currentHp\",\"type\":\"number\",\"optional\":true,\"label\":\"当前生命\"},{\"name\":\"attack\",\"type\":\"number\",\"optional\":true,\"label\":\"攻击力\"},{\"name\":\"defense\",\"type\":\"number\",\"optional\":true,\"label\":\"防御力\"},{\"name\":\"moveRange\",\"type\":\"number\",\"optional\":true,\"label\":\"移动力\"},{\"name\":\"ownerPlayerId\",\"type\":\"string\",\"optional\":true,\"label\":\"所属玩家\"},{\"name\":\"faction\",\"type\":\"string\",\"optional\":true,\"label\":\"阵营\"},{\"name\":\"isCore\",\"type\":\"boolean\",\"optional\":true,\"label\":\"核心棋子\"},{\"name\":\"skills\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-skill@1\"}},\"optional\":true,\"label\":\"初始技能\"},{\"name\":\"rules\",\"type\":{\"kind\":\"list\",\"element\":\"string\"},\"optional\":true,\"label\":\"初始规则\"},{\"name\":\"statusTags\",\"type\":{\"kind\":\"list\",\"element\":{\"kind\":\"record\",\"schema\":\"author.piece-status@1\"}},\"optional\":true,\"label\":\"初始状态\"},{\"name\":\"extension\",\"type\":\"record\",\"optional\":true,\"label\":\"扩展\"}]}])})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-2\", __gameplayError, \"author.choice.option\"); _module1 = __gameplayInvalid; } try { var _module2 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-1_1\", __gameplayError, \"ref.holder\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)))) { _module3 = __gameplayInvalid; } else { var _module3 = (flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)) && {x: flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).x, y: flow.query.piece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2)).y}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-1_2\", __gameplayError, \"spatial.piece-position\"); _module3 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"cell\")) ? _module3[\"cell\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"cell\")) ? _module3[\"cell\"] : _module3) === null)) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.execution.declare(\"cell\",[],((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"cell\")) ? _module3[\"cell\"] : _module3))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-3\", __gameplayError, \"local.declare\"); _module4 = __gameplayInvalid; } try { var _module5 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-2_1\", __gameplayError, \"ref.holder\"); _module5 = __gameplayInvalid; } try { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) === null) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5)))) { _module6 = __gameplayInvalid; } else { var _module6 = (flow.instances.copy(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"piece\")) ? _module5[\"piece\"] : _module5))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-4\", __gameplayError, \"instance.copy-piece\"); _module6 = __gameplayInvalid; } try { var _record7 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; if (__gameplayRecordValue0 !== undefined) { __gameplayRecord[\"baseSnapshot\"] = __gameplayRecordValue0; } if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"moveRange\"] = __gameplayRecordValue1; } if (__gameplayRecordValue2 !== undefined) { __gameplayRecord[\"skills\"] = __gameplayRecordValue2; } if (__gameplayRecordValue3 !== undefined) { __gameplayRecord[\"rules\"] = __gameplayRecordValue3; } if (__gameplayRecordValue4 !== undefined) { __gameplayRecord[\"statusTags\"] = __gameplayRecordValue4; } if (__gameplayRecordValue5 !== undefined) { __gameplayRecord[\"extension\"] = __gameplayRecordValue5; } return __gameplayRecord; })(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6), 0, JSON.parse(\"[]\"), JSON.parse(\"[\\\"content-2a453948-9687-4cfd-bd1f-ba320e60ab65\\\"]\"), JSON.parse(\"[]\"), JSON.parse(\"{\\\"影分身标记\\\":\\\"shadow-clone\\\"}\"))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-record.create-1\", __gameplayError); _record7 = __gameplayInvalid; } try { var _recordGet8 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"identity\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_1\", __gameplayError); _recordGet8 = __gameplayInvalid; } try { var _recordGet9 = ((_recordGet8 === __gameplayInvalid || _recordGet8 == null) ? __gameplayInvalid : (_recordGet8)[\"templateId\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_2\", __gameplayError); _recordGet9 = __gameplayInvalid; } try { var _recordGet10 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"identity\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-4_1\", __gameplayError); _recordGet10 = __gameplayInvalid; } try { var _recordGet11 = ((_recordGet10 === __gameplayInvalid || _recordGet10 == null) ? __gameplayInvalid : (_recordGet10)[\"name\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-4_2\", __gameplayError); _recordGet11 = __gameplayInvalid; } try { var _recordGet12 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-5_1\", __gameplayError); _recordGet12 = __gameplayInvalid; } try { var _recordGet13 = ((_recordGet12 === __gameplayInvalid || _recordGet12 == null) ? __gameplayInvalid : (_recordGet12)[\"currentHp\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-5_2\", __gameplayError); _recordGet13 = __gameplayInvalid; } try { var _recordGet14 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-6_1\", __gameplayError); _recordGet14 = __gameplayInvalid; } try { var _recordGet15 = ((_recordGet14 === __gameplayInvalid || _recordGet14 == null) ? __gameplayInvalid : (_recordGet14)[\"maxHp\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-6_2\", __gameplayError); _recordGet15 = __gameplayInvalid; } try { var _recordGet16 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-8_1\", __gameplayError); _recordGet16 = __gameplayInvalid; } try { var _recordGet17 = ((_recordGet16 === __gameplayInvalid || _recordGet16 == null) ? __gameplayInvalid : (_recordGet16)[\"defense\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-8_2\", __gameplayError); _recordGet17 = __gameplayInvalid; } try { var _recordGet18 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-9_1\", __gameplayError); _recordGet18 = __gameplayInvalid; } try { var _recordGet19 = ((_recordGet18 === __gameplayInvalid || _recordGet18 == null) ? __gameplayInvalid : (_recordGet18)[\"moveRange\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-9_2\", __gameplayError); _recordGet19 = __gameplayInvalid; } try { var _recordGet20 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-10_1\", __gameplayError); _recordGet20 = __gameplayInvalid; } try { var _recordGet21 = ((_recordGet20 === __gameplayInvalid || _recordGet20 == null) ? __gameplayInvalid : (_recordGet20)[\"shield\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-10_2\", __gameplayError); _recordGet21 = __gameplayInvalid; } try { var _recordGet22 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-11_1\", __gameplayError); _recordGet22 = __gameplayInvalid; } try { var _recordGet23 = ((_recordGet22 === __gameplayInvalid || _recordGet22 == null) ? __gameplayInvalid : (_recordGet22)[\"skills\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-11_2\", __gameplayError); _recordGet23 = __gameplayInvalid; } try { var _recordGet24 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-12_1\", __gameplayError); _recordGet24 = __gameplayInvalid; } try { var _recordGet25 = ((_recordGet24 === __gameplayInvalid || _recordGet24 == null) ? __gameplayInvalid : (_recordGet24)[\"statusTags\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-12_2\", __gameplayError); _recordGet25 = __gameplayInvalid; } try { var _recordGet26 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-13_1\", __gameplayError); _recordGet26 = __gameplayInvalid; } try { var _recordGet27 = ((_recordGet26 === __gameplayInvalid || _recordGet26 == null) ? __gameplayInvalid : (_recordGet26)[\"isCore\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-13_2\", __gameplayError); _recordGet27 = __gameplayInvalid; } try { var _recordGet28 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"identity\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-14_1\", __gameplayError); _recordGet28 = __gameplayInvalid; } try { var _recordGet29 = ((_recordGet28 === __gameplayInvalid || _recordGet28 == null) ? __gameplayInvalid : (_recordGet28)[\"ownerPlayerId\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-14_2\", __gameplayError); _recordGet29 = __gameplayInvalid; } try { var _recordGet30 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"identity\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-15_1\", __gameplayError); _recordGet30 = __gameplayInvalid; } try { var _recordGet31 = ((_recordGet30 === __gameplayInvalid || _recordGet30 == null) ? __gameplayInvalid : (_recordGet30)[\"faction\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-15_2\", __gameplayError); _recordGet31 = __gameplayInvalid; } try { var _recordGet32 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) === __gameplayInvalid || ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6) == null) ? __gameplayInvalid : (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))[\"fields\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-7_1\", __gameplayError); _recordGet32 = __gameplayInvalid; } try { var _recordGet33 = ((_recordGet32 === __gameplayInvalid || _recordGet32 == null) ? __gameplayInvalid : (_recordGet32)[\"attack\"]); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-7_2\", __gameplayError); _recordGet33 = __gameplayInvalid; } try { var _record34 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6, __gameplayRecordValue7, __gameplayRecordValue8, __gameplayRecordValue9, __gameplayRecordValue10, __gameplayRecordValue11, __gameplayRecordValue12){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid) || (__gameplayRecordValue7 === __gameplayInvalid) || (__gameplayRecordValue8 === __gameplayInvalid) || (__gameplayRecordValue9 === __gameplayInvalid) || (__gameplayRecordValue10 === __gameplayInvalid) || (__gameplayRecordValue11 === __gameplayInvalid) || (__gameplayRecordValue12 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; if (__gameplayRecordValue0 !== undefined) { __gameplayRecord[\"templateId\"] = __gameplayRecordValue0; } if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"name\"] = __gameplayRecordValue1; } if (__gameplayRecordValue2 !== undefined) { __gameplayRecord[\"currentHp\"] = __gameplayRecordValue2; } if (__gameplayRecordValue3 !== undefined) { __gameplayRecord[\"maxHp\"] = __gameplayRecordValue3; } if (__gameplayRecordValue4 !== undefined) { __gameplayRecord[\"attack\"] = __gameplayRecordValue4; } if (__gameplayRecordValue5 !== undefined) { __gameplayRecord[\"defense\"] = __gameplayRecordValue5; } if (__gameplayRecordValue6 !== undefined) { __gameplayRecord[\"moveRange\"] = __gameplayRecordValue6; } if (__gameplayRecordValue7 !== undefined) { __gameplayRecord[\"shield\"] = __gameplayRecordValue7; } if (__gameplayRecordValue8 !== undefined) { __gameplayRecord[\"skills\"] = __gameplayRecordValue8; } if (__gameplayRecordValue9 !== undefined) { __gameplayRecord[\"statusTags\"] = __gameplayRecordValue9; } if (__gameplayRecordValue10 !== undefined) { __gameplayRecord[\"isCore\"] = __gameplayRecordValue10; } if (__gameplayRecordValue11 !== undefined) { __gameplayRecord[\"ownerPlayerId\"] = __gameplayRecordValue11; } if (__gameplayRecordValue12 !== undefined) { __gameplayRecord[\"faction\"] = __gameplayRecordValue12; } return __gameplayRecord; })(_recordGet9, _recordGet11, _recordGet13, _recordGet15, _recordGet33, _recordGet17, _recordGet19, _recordGet21, _recordGet23, _recordGet25, _recordGet27, _recordGet29, _recordGet31)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-record.create-2\", __gameplayError); _record34 = __gameplayInvalid; } try { var _record35 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; if (__gameplayRecordValue0 !== undefined) { __gameplayRecord[\"allies\"] = __gameplayRecordValue0; } if (__gameplayRecordValue1 !== undefined) { __gameplayRecord[\"enemies\"] = __gameplayRecordValue1; } if (__gameplayRecordValue2 !== undefined) { __gameplayRecord[\"spectators\"] = __gameplayRecordValue2; } return __gameplayRecord; })(_record34, _record34, _record34)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-record.create-3\", __gameplayError); _record35 = __gameplayInvalid; } try { var _record36 = ((function(__gameplayRecordValue0){ if ((__gameplayRecordValue0 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"audiences\"] = __gameplayRecordValue0; return __gameplayRecord; })(_record35)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-record.create-4\", __gameplayError); _record36 = __gameplayInvalid; } try { var _condition44 = ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1); if (_condition44 !== __gameplayInvalid && _condition44) { try { var _module37 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-16_1\", __gameplayError, \"ref.holder\"); _module37 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37) === null) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37))) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === null)) { _module38 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module38 = ((function(pieceId,cell){var value=flow.effects.displace([{pieceId:pieceId,x:cell.x,y:cell.y}],\"teleport\");return {result:value,success:Boolean(value&&value.success)};})((function(value) { return value && typeof value === \"object\" ? value.instanceId : value; })(((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"piece\")) ? _module37[\"piece\"] : _module37)),((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-5\", __gameplayError, \"effect.displace-one\"); _module38 = { \"result\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { var _module39 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-17_1\", __gameplayError, \"ref.holder\"); _module39 = __gameplayInvalid; } try { if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"handle\")) ? _module4[\"handle\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"handle\")) ? _module4[\"handle\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"handle\")) ? _module4[\"handle\"] : _module4) === null)) { _module40 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module40 = ((flow.execution.read(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"handle\")) ? _module4[\"handle\"] : _module4),\"cell\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-18_1\", __gameplayError, \"local.read\"); _module40 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39) === null) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39))) || (_record7 === __gameplayInvalid) || (_record7 === null) || ((_module40[\"value\"]) === __gameplayInvalid) || ((_module40[\"value\"]) === undefined) || ((_module40[\"value\"]) === null) || (_record36 === __gameplayInvalid) || (_record36 === null)) { _module41 = __gameplayInvalid; } else { var _module41 = (({result:flow.lifecycle.summonAuthored(((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"piece\")) ? _module39[\"piece\"] : _module39),_record7,(_module40[\"value\"]),_record36,\"new-instance\",undefined)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-6\", __gameplayError, \"author.effect.summon\"); _module41 = __gameplayInvalid; } } else if (_condition44 !== __gameplayInvalid) { try { var _module42 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-19_1\", __gameplayError, \"ref.holder\"); _module42 = __gameplayInvalid; } try { if ((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42) === __gameplayInvalid) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42) === undefined) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42) === null) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42))) || (_record7 === __gameplayInvalid) || (_record7 === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0) === null) || (_record36 === __gameplayInvalid) || (_record36 === null)) { _module43 = __gameplayInvalid; } else { var _module43 = (({result:flow.lifecycle.summonAuthored(((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"piece\")) ? _module42[\"piece\"] : _module42),_record7,((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"cell\")) ? _module0[\"cell\"] : _module0),_record36,\"new-instance\",undefined)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-7\", __gameplayError, \"author.effect.summon\"); _module43 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-condition-1\", __gameplayError); _condition44 = __gameplayInvalid; } try { return; } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return-1\", __gameplayError); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "inputs": [],
+          "inputBindings": {},
+          "outputs": [],
+          "body": [
+            {
+              "kind": "call",
+              "id": "sentence-module-1",
+              "module": "author.choice.target-cell",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "range": 5,
+                "filter": "all",
+                "requireWalkable": true,
+                "requireUnoccupied": true,
+                "canCancel": false
+              },
+              "layout": {
+                "resultNames": {
+                  "cell": "落点"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "sentence-module-2",
+              "module": "author.choice.option",
+              "version": "3",
+              "inputs": {
+                "options": {
+                  "kind": "literal",
+                  "value": {
+                    "format": "author-map/v1",
+                    "entries": [
+                      [
+                        "传送并在原地留下分身",
+                        true
+                      ],
+                      [
+                        "在目标格召唤分身",
+                        false
+                      ]
+                    ]
+                  }
+                }
+              },
+              "parameters": {
+                "optionsType": "{\"kind\":\"map\",\"key\":\"string\",\"value\":\"boolean\"}",
+                "valueType": "boolean",
+                "selectionMode": "single",
+                "title": "是否传送并在原地留下分身",
+                "canCancel": false
+              },
+              "layout": {
+                "resultNames": {
+                  "value": "选择传送"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-1_1",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-3",
+                  "input": "initial",
+                  "source": "当前棋子.位置"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-1_2",
+              "module": "spatial.piece-position",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "expr-1_1",
+                  "port": "piece"
+                }
+              },
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-3",
+                  "input": "initial",
+                  "source": "当前棋子.位置"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "sentence-module-3",
+              "module": "local.declare",
+              "version": "2",
+              "inputs": {
+                "initial": {
+                  "kind": "output",
+                  "node": "expr-1_2",
+                  "port": "cell"
+                }
+              },
+              "parameters": {
+                "valueType": "cell",
+                "name": "原位"
+              },
+              "layout": {
+                "authorExpressions": {
+                  "initial": {
+                    "source": "当前棋子.位置",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-1_2",
+                      "port": "cell"
+                    },
+                    "nodes": [
+                      "expr-1_1",
+                      "expr-1_2"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-2_1",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-4",
+                  "input": "piece",
+                  "source": "当前棋子"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "sentence-module-4",
+              "module": "instance.copy-piece",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "expr-2_1",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "snapshotType": "author.piece-instance@1"
+              },
+              "layout": {
+                "authorExpressions": {
+                  "piece": {
+                    "source": "当前棋子",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-2_1",
+                      "port": "piece"
+                    },
+                    "nodes": [
+                      "expr-2_1"
+                    ]
+                  }
+                },
+                "resultNames": {
+                  "snapshot": "实例副本"
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "sentence-record.create-1",
+              "schema": "author.piece-template@1",
+              "fields": {
+                "baseSnapshot": {
+                  "kind": "output",
+                  "node": "sentence-module-4",
+                  "port": "snapshot"
+                },
+                "moveRange": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "skills": {
+                  "kind": "literal",
+                  "value": []
+                },
+                "statusTags": {
+                  "kind": "literal",
+                  "value": []
+                },
+                "rules": {
+                  "kind": "literal",
+                  "value": [
+                    "content-2a453948-9687-4cfd-bd1f-ba320e60ab65"
+                  ]
+                },
+                "extension": {
+                  "kind": "literal",
+                  "value": {
+                    "影分身标记": "shadow-clone"
+                  }
+                }
+              },
+              "layout": {
+                "authorExpressions": {
+                  "moveRange": {
+                    "source": "0",
+                    "value": {
+                      "kind": "literal",
+                      "value": 0
+                    },
+                    "nodes": []
+                  }
+                },
+                "resultNames": {
+                  "value": "分身模板"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-3_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "identity",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "templateId",
+                  "source": "实例副本.身份.模板引用"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-3_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-3_1",
+                "port": "value"
+              },
+              "field": "templateId",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "templateId",
+                  "source": "实例副本.身份.模板引用"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-4_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "identity",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "name",
+                  "source": "实例副本.身份.名称"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-4_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-4_1",
+                "port": "value"
+              },
+              "field": "name",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "name",
+                  "source": "实例副本.身份.名称"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-5_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "currentHp",
+                  "source": "实例副本.字段副本.当前生命"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-5_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-5_1",
+                "port": "value"
+              },
+              "field": "currentHp",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "currentHp",
+                  "source": "实例副本.字段副本.当前生命"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-6_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "maxHp",
+                  "source": "实例副本.字段副本.最大生命"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-6_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-6_1",
+                "port": "value"
+              },
+              "field": "maxHp",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "maxHp",
+                  "source": "实例副本.字段副本.最大生命"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-8_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "defense",
+                  "source": "实例副本.字段副本.防御力"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-8_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-8_1",
+                "port": "value"
+              },
+              "field": "defense",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "defense",
+                  "source": "实例副本.字段副本.防御力"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-9_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "moveRange",
+                  "source": "实例副本.字段副本.移动力"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-9_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-9_1",
+                "port": "value"
+              },
+              "field": "moveRange",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "moveRange",
+                  "source": "实例副本.字段副本.移动力"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-10_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "shield",
+                  "source": "实例副本.字段副本.护盾"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-10_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-10_1",
+                "port": "value"
+              },
+              "field": "shield",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "shield",
+                  "source": "实例副本.字段副本.护盾"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-11_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "skills",
+                  "source": "实例副本.字段副本.技能"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-11_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-11_1",
+                "port": "value"
+              },
+              "field": "skills",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "skills",
+                  "source": "实例副本.字段副本.技能"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-12_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "statusTags",
+                  "source": "实例副本.字段副本.状态"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-12_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-12_1",
+                "port": "value"
+              },
+              "field": "statusTags",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "statusTags",
+                  "source": "实例副本.字段副本.状态"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-13_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "isCore",
+                  "source": "实例副本.字段副本.核心棋子"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-13_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-13_1",
+                "port": "value"
+              },
+              "field": "isCore",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "isCore",
+                  "source": "实例副本.字段副本.核心棋子"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-14_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "identity",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "ownerPlayerId",
+                  "source": "实例副本.身份.所属玩家"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-14_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-14_1",
+                "port": "value"
+              },
+              "field": "ownerPlayerId",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "ownerPlayerId",
+                  "source": "实例副本.身份.所属玩家"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-15_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "identity",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "faction",
+                  "source": "实例副本.身份.阵营"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-15_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-15_1",
+                "port": "value"
+              },
+              "field": "faction",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "faction",
+                  "source": "实例副本.身份.阵营"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-7_1",
+              "record": {
+                "kind": "output",
+                "node": "sentence-module-4",
+                "port": "snapshot"
+              },
+              "field": "fields",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "attack",
+                  "source": "实例副本.字段副本.攻击力"
+                }
+              }
+            },
+            {
+              "kind": "record.get",
+              "id": "expr-7_2",
+              "record": {
+                "kind": "output",
+                "node": "expr-7_1",
+                "port": "value"
+              },
+              "field": "attack",
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-record.create-2",
+                  "input": "attack",
+                  "source": "实例副本.字段副本.攻击力"
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "sentence-record.create-2",
+              "schema": "author.piece-display@1",
+              "fields": {
+                "templateId": {
+                  "kind": "output",
+                  "node": "expr-3_2",
+                  "port": "value"
+                },
+                "name": {
+                  "kind": "output",
+                  "node": "expr-4_2",
+                  "port": "value"
+                },
+                "currentHp": {
+                  "kind": "output",
+                  "node": "expr-5_2",
+                  "port": "value"
+                },
+                "maxHp": {
+                  "kind": "output",
+                  "node": "expr-6_2",
+                  "port": "value"
+                },
+                "attack": {
+                  "kind": "output",
+                  "node": "expr-7_2",
+                  "port": "value"
+                },
+                "defense": {
+                  "kind": "output",
+                  "node": "expr-8_2",
+                  "port": "value"
+                },
+                "moveRange": {
+                  "kind": "output",
+                  "node": "expr-9_2",
+                  "port": "value"
+                },
+                "shield": {
+                  "kind": "output",
+                  "node": "expr-10_2",
+                  "port": "value"
+                },
+                "skills": {
+                  "kind": "output",
+                  "node": "expr-11_2",
+                  "port": "value"
+                },
+                "statusTags": {
+                  "kind": "output",
+                  "node": "expr-12_2",
+                  "port": "value"
+                },
+                "isCore": {
+                  "kind": "output",
+                  "node": "expr-13_2",
+                  "port": "value"
+                },
+                "ownerPlayerId": {
+                  "kind": "output",
+                  "node": "expr-14_2",
+                  "port": "value"
+                },
+                "faction": {
+                  "kind": "output",
+                  "node": "expr-15_2",
+                  "port": "value"
+                }
+              },
+              "layout": {
+                "authorExpressions": {
+                  "templateId": {
+                    "source": "实例副本.身份.模板引用",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-3_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-3_1",
+                      "expr-3_2"
+                    ]
+                  },
+                  "name": {
+                    "source": "实例副本.身份.名称",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-4_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-4_1",
+                      "expr-4_2"
+                    ]
+                  },
+                  "currentHp": {
+                    "source": "实例副本.字段副本.当前生命",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-5_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-5_1",
+                      "expr-5_2"
+                    ]
+                  },
+                  "maxHp": {
+                    "source": "实例副本.字段副本.最大生命",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-6_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-6_1",
+                      "expr-6_2"
+                    ]
+                  },
+                  "attack": {
+                    "source": "实例副本.字段副本.攻击力",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-7_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-7_1",
+                      "expr-7_2"
+                    ]
+                  },
+                  "defense": {
+                    "source": "实例副本.字段副本.防御力",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-8_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-8_1",
+                      "expr-8_2"
+                    ]
+                  },
+                  "moveRange": {
+                    "source": "实例副本.字段副本.移动力",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-9_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-9_1",
+                      "expr-9_2"
+                    ]
+                  },
+                  "shield": {
+                    "source": "实例副本.字段副本.护盾",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-10_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-10_1",
+                      "expr-10_2"
+                    ]
+                  },
+                  "skills": {
+                    "source": "实例副本.字段副本.技能",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-11_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-11_1",
+                      "expr-11_2"
+                    ]
+                  },
+                  "statusTags": {
+                    "source": "实例副本.字段副本.状态",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-12_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-12_1",
+                      "expr-12_2"
+                    ]
+                  },
+                  "isCore": {
+                    "source": "实例副本.字段副本.核心棋子",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-13_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-13_1",
+                      "expr-13_2"
+                    ]
+                  },
+                  "ownerPlayerId": {
+                    "source": "实例副本.身份.所属玩家",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-14_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-14_1",
+                      "expr-14_2"
+                    ]
+                  },
+                  "faction": {
+                    "source": "实例副本.身份.阵营",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-15_2",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-15_1",
+                      "expr-15_2"
+                    ]
+                  }
+                },
+                "resultNames": {
+                  "value": "本体显示"
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "sentence-record.create-3",
+              "schema": "author.piece-display-audiences@1",
+              "fields": {
+                "allies": {
+                  "kind": "output",
+                  "node": "sentence-record.create-2",
+                  "port": "value"
+                },
+                "enemies": {
+                  "kind": "output",
+                  "node": "sentence-record.create-2",
+                  "port": "value"
+                },
+                "spectators": {
+                  "kind": "output",
+                  "node": "sentence-record.create-2",
+                  "port": "value"
+                }
+              },
+              "layout": {
+                "resultNames": {
+                  "value": "各方显示"
+                }
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "sentence-record.create-4",
+              "schema": "author.piece-display-plan@1",
+              "fields": {
+                "audiences": {
+                  "kind": "output",
+                  "node": "sentence-record.create-3",
+                  "port": "value"
+                }
+              },
+              "layout": {
+                "resultNames": {
+                  "value": "分身显示方案"
+                }
+              }
+            },
+            {
+              "kind": "if",
+              "id": "sentence-condition-1",
+              "condition": {
+                "kind": "output",
+                "node": "sentence-module-2",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "expr-16_1",
+                  "module": "ref.holder",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {},
+                  "layout": {
+                    "authorExpression": {
+                      "owner": "sentence-module-5",
+                      "input": "piece",
+                      "source": "当前棋子"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "sentence-module-5",
+                  "module": "effect.displace-one",
+                  "version": "1",
+                  "inputs": {
+                    "piece": {
+                      "kind": "output",
+                      "node": "expr-16_1",
+                      "port": "piece"
+                    },
+                    "destination": {
+                      "kind": "output",
+                      "node": "sentence-module-1",
+                      "port": "cell"
+                    }
+                  },
+                  "parameters": {
+                    "kind": "teleport"
+                  },
+                  "layout": {
+                    "authorExpressions": {
+                      "piece": {
+                        "source": "当前棋子",
+                        "value": {
+                          "kind": "output",
+                          "node": "expr-16_1",
+                          "port": "piece"
+                        },
+                        "nodes": [
+                          "expr-16_1"
+                        ]
+                      },
+                      "destination": {
+                        "source": "落点",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-module-1",
+                          "port": "cell"
+                        },
+                        "nodes": []
+                      }
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "expr-17_1",
+                  "module": "ref.holder",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {},
+                  "layout": {
+                    "authorExpression": {
+                      "owner": "sentence-module-6",
+                      "input": "source",
+                      "source": "当前棋子"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "expr-18_1",
+                  "module": "local.read",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "sentence-module-3",
+                      "port": "handle"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "cell"
+                  },
+                  "layout": {
+                    "authorExpression": {
+                      "owner": "sentence-module-6",
+                      "input": "destination",
+                      "source": "原位"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "sentence-module-6",
+                  "module": "author.effect.summon",
+                  "version": "2",
+                  "inputs": {
+                    "source": {
+                      "kind": "output",
+                      "node": "expr-17_1",
+                      "port": "piece"
+                    },
+                    "template": {
+                      "kind": "output",
+                      "node": "sentence-record.create-1",
+                      "port": "value"
+                    },
+                    "destination": {
+                      "kind": "output",
+                      "node": "expr-18_1",
+                      "port": "value"
+                    },
+                    "display": {
+                      "kind": "output",
+                      "node": "sentence-record.create-4",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "mode": "new-instance",
+                    "sourceType": "piece",
+                    "templateType": "{\"kind\":\"record\",\"schema\":\"author.piece-template@1\"}",
+                    "destinationType": "cell",
+                    "displayType": "{\"kind\":\"record\",\"schema\":\"author.piece-display-plan@1\"}"
+                  },
+                  "layout": {
+                    "authorExpressions": {
+                      "source": {
+                        "source": "当前棋子",
+                        "value": {
+                          "kind": "output",
+                          "node": "expr-17_1",
+                          "port": "piece"
+                        },
+                        "nodes": [
+                          "expr-17_1"
+                        ]
+                      },
+                      "template": {
+                        "source": "分身模板",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-record.create-1",
+                          "port": "value"
+                        },
+                        "nodes": []
+                      },
+                      "destination": {
+                        "source": "原位",
+                        "value": {
+                          "kind": "output",
+                          "node": "expr-18_1",
+                          "port": "value"
+                        },
+                        "nodes": [
+                          "expr-18_1"
+                        ]
+                      },
+                      "display": {
+                        "source": "分身显示方案",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-record.create-4",
+                          "port": "value"
+                        },
+                        "nodes": []
+                      }
+                    }
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "expr-19_1",
+                  "module": "ref.holder",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {},
+                  "layout": {
+                    "authorExpression": {
+                      "owner": "sentence-module-7",
+                      "input": "source",
+                      "source": "当前棋子"
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "sentence-module-7",
+                  "module": "author.effect.summon",
+                  "version": "2",
+                  "inputs": {
+                    "source": {
+                      "kind": "output",
+                      "node": "expr-19_1",
+                      "port": "piece"
+                    },
+                    "template": {
+                      "kind": "output",
+                      "node": "sentence-record.create-1",
+                      "port": "value"
+                    },
+                    "destination": {
+                      "kind": "output",
+                      "node": "sentence-module-1",
+                      "port": "cell"
+                    },
+                    "display": {
+                      "kind": "output",
+                      "node": "sentence-record.create-4",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "mode": "new-instance",
+                    "sourceType": "piece",
+                    "templateType": "{\"kind\":\"record\",\"schema\":\"author.piece-template@1\"}",
+                    "destinationType": "cell",
+                    "displayType": "{\"kind\":\"record\",\"schema\":\"author.piece-display-plan@1\"}"
+                  },
+                  "layout": {
+                    "authorExpressions": {
+                      "source": {
+                        "source": "当前棋子",
+                        "value": {
+                          "kind": "output",
+                          "node": "expr-19_1",
+                          "port": "piece"
+                        },
+                        "nodes": [
+                          "expr-19_1"
+                        ]
+                      },
+                      "template": {
+                        "source": "分身模板",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-record.create-1",
+                          "port": "value"
+                        },
+                        "nodes": []
+                      },
+                      "destination": {
+                        "source": "落点",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-module-1",
+                          "port": "cell"
+                        },
+                        "nodes": []
+                      },
+                      "display": {
+                        "source": "分身显示方案",
+                        "value": {
+                          "kind": "output",
+                          "node": "sentence-record.create-4",
+                          "port": "value"
+                        },
+                        "nodes": []
+                      }
+                    }
+                  }
+                }
+              ],
+              "layout": {
+                "authorExpressions": {
+                  "condition": {
+                    "source": "选择传送",
+                    "value": {
+                      "kind": "output",
+                      "node": "sentence-module-2",
+                      "port": "value"
+                    },
+                    "nodes": []
+                  }
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return-1"
+            }
+          ],
+          "composites": [],
+          "schemas": [
+            {
+              "id": "author.piece-skill",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "skillId",
+                  "type": "string",
+                  "label": "技能引用"
+                },
+                {
+                  "name": "instanceId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "技能实例"
+                },
+                {
+                  "name": "level",
+                  "type": "number",
+                  "optional": true,
+                  "label": "等级"
+                },
+                {
+                  "name": "currentCooldown",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前冷却"
+                },
+                {
+                  "name": "usesRemaining",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余次数"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "技能扩展"
+                },
+                {
+                  "name": "abilityGroupIds",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "能力组"
+                },
+                {
+                  "name": "authorExtensionDeclarations",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展声明"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "label": "状态定义引用"
+                },
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "状态类型"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "instanceId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "状态实例"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number",
+                  "optional": true,
+                  "label": "强度"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number",
+                  "optional": true,
+                  "label": "层数"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "optional": true,
+                  "label": "数值"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前持续"
+                },
+                {
+                  "name": "remainingDuration",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余持续"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前次数"
+                },
+                {
+                  "name": "remainingUses",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余次数"
+                },
+                {
+                  "name": "visible",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "可见"
+                },
+                {
+                  "name": "stacking",
+                  "type": "string",
+                  "optional": true,
+                  "label": "叠加方式"
+                },
+                {
+                  "name": "lifetime",
+                  "type": "string",
+                  "optional": true,
+                  "label": "生命周期"
+                },
+                {
+                  "name": "appliedTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "施加回合"
+                },
+                {
+                  "name": "expiresAfterTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "过期回合",
+                  "nullable": true
+                },
+                {
+                  "name": "lastDurationTickTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "上次持续更新回合"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "关联规则"
+                },
+                {
+                  "name": "statusAliases",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "状态别名"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "状态扩展"
+                },
+                {
+                  "name": "authorExtensionDeclarations",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展声明"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-rule",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "label": "规则引用"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-buff",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "增益类型"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "label": "增益数值"
+                },
+                {
+                  "name": "duration",
+                  "type": "number",
+                  "label": "持续时间"
+                },
+                {
+                  "name": "source",
+                  "type": "string",
+                  "label": "来源"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-debuff",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "减益类型"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "label": "减益数值"
+                },
+                {
+                  "name": "duration",
+                  "type": "number",
+                  "label": "持续时间"
+                },
+                {
+                  "name": "source",
+                  "type": "string",
+                  "label": "来源"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-identity",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "label": "名称"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "label": "阵营"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-snapshot-fields",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "技能"
+                },
+                {
+                  "name": "displaySkills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "显示技能"
+                },
+                {
+                  "name": "buffs",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-buff@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "增益"
+                },
+                {
+                  "name": "debuffs",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-debuff@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "减益"
+                },
+                {
+                  "name": "shield",
+                  "type": "number",
+                  "optional": true,
+                  "label": "护盾"
+                },
+                {
+                  "name": "ruleTags",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "规则标签"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "状态"
+                },
+                {
+                  "name": "rules",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-rule@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "规则"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-flow-state",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "schemaVersion",
+                  "type": "number",
+                  "label": "版本"
+                },
+                {
+                  "name": "scope",
+                  "type": "string",
+                  "label": "所属范围"
+                },
+                {
+                  "name": "entityId",
+                  "type": "string",
+                  "label": "所属实例"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "namespace",
+                  "type": "string",
+                  "label": "变量分组"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "label": "变量名"
+                },
+                {
+                  "name": "value",
+                  "type": "json",
+                  "label": "存储内容"
+                },
+                {
+                  "name": "lifetime",
+                  "type": "string",
+                  "label": "保留时长"
+                },
+                {
+                  "name": "projectionVisibility",
+                  "type": "string",
+                  "label": "可见范围"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-instance",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "schemaVersion",
+                  "type": "number",
+                  "label": "版本"
+                },
+                {
+                  "name": "kind",
+                  "type": "string",
+                  "label": "类型"
+                },
+                {
+                  "name": "sourcePieceId",
+                  "type": "string",
+                  "label": "来源实例"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "identity",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-identity@1"
+                  },
+                  "label": "身份"
+                },
+                {
+                  "name": "fields",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-snapshot-fields@1"
+                  },
+                  "label": "字段副本"
+                },
+                {
+                  "name": "flowState",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-flow-state@1"
+                    }
+                  },
+                  "label": "流程状态"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "shield",
+                  "type": "number",
+                  "optional": true,
+                  "label": "护盾"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "技能"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "状态"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display-audiences",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "public",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "公开"
+                },
+                {
+                  "name": "owner",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "allies",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "友方"
+                },
+                {
+                  "name": "enemies",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "敌方"
+                },
+                {
+                  "name": "spectators",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "观战者"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display-plan",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "audiences",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display-audiences@1"
+                  },
+                  "label": "可见对象"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-template",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "baseSnapshot",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-instance@1"
+                  },
+                  "optional": true,
+                  "label": "基础副本"
+                },
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "初始技能"
+                },
+                {
+                  "name": "rules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "初始规则"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "初始状态"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展"
+                }
+              ]
+            }
+          ],
+          "continuations": []
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:content-5e153fb4-5ab8-4d56-b685-d22f4343b2a9",
+    "links": []
+  },
+  "targetType": "cell",
+  "filter": "all"
+}

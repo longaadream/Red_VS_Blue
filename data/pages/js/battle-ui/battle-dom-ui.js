@@ -8,6 +8,13 @@
     { id: 'soul-fracture', ruleId: 'rule-soul-fracture-player', label: '裂魂', icon: 'images/effect-icons/player-soul-fracture.svg', description: '本局中，每有一个棋子死亡，你获得1张灵魂残片。' },
   ])
 
+  // Existing player rules keep their legacy presentation when a definition
+  // has no authored display metadata. New rules use the same description and
+  // material-library icon that the editor saved on the Rule document.
+  const PLAYER_RULE_FALLBACKS = Object.freeze({
+    'rule-soul-fracture-player': { label: '裂魂', icon: 'images/effect-icons/player-soul-fracture.svg', description: '本局中，每有一个棋子死亡，你获得1张灵魂残片。' },
+  })
+
   const PHASE_LABELS = { start: '开始阶段', action: '行动阶段', end: '结束阶段' }
 
   function escapeHtml(value) {
@@ -31,6 +38,37 @@
   function playerInitial(player) {
     const label = String(player.name || player.id || '?').trim()
     return label ? label.slice(0, 1).toUpperCase() : '?'
+  }
+
+  function playerEffectEntries(player) {
+    const rules = (player && Array.isArray(player.ruleSummary)) ? player.ruleSummary : []
+    const hiddenRuleIds = new Set(player && Array.isArray(player.hiddenRuleIds) ? player.hiddenRuleIds : [])
+    const ruleEntries = rules.flatMap(function (rule) {
+      const id = String(rule && rule.id || '')
+      const fallback = PLAYER_RULE_FALLBACKS[id] || {}
+      const legacy = PLAYER_EFFECTS.find(function (effect) { return effect.ruleId === id })
+      // A rule without an authored visibility flag keeps the old HUD only
+      // when it was already opted into the explicit legacy registry. Newly
+      // authored rules default to hidden and must opt in with visible:true.
+      if (rule.visible !== true && !legacy) return []
+      const source = rule.visible === true ? rule : legacy || fallback
+      return [{
+        id: 'player-rule:' + id,
+        ruleId: id,
+        authoredRule: true,
+        label: String(source && (source.label || source.name) || fallback.label || id || '玩家规则'),
+        icon: String(source && (source.iconPath || source.icon) || fallback.icon || 'images/effect-icons/fallback.svg'),
+        description: String(source && source.description || fallback.description || '玩家规则'),
+      }]
+    })
+    const ruleIds = new Set(ruleEntries.map(function (entry) { return entry.ruleId }))
+    // Keep the public registry stable for status and buff consumers while
+    // replacing its old hard-coded rule entry with the runtime definition.
+    return PLAYER_EFFECTS.filter(function (effect) {
+      if (!effect.ruleId) return true
+      if (hiddenRuleIds.has(effect.ruleId)) return false
+      return !ruleIds.has(effect.ruleId)
+    }).concat(ruleEntries)
   }
 
   function create(options) {
@@ -127,14 +165,17 @@
       players.className = 'player-state-strip'
       const playerEntries = model.players.map(function (player, index) {
         const isLocal = !!(model.viewer && String(model.viewer.id).toLowerCase() === String(player.id).toLowerCase())
-        const sideName = player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手'
+        const sideName = model.training
+          ? (player.faction === 'blue' ? '蓝方' : '红方') + ' · ' + (player.isFirstPlayer ? '先手' : '后手')
+          : (player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手')
         const currentLabel = player.isCurrent ? '，当前行动方' : ''
-        const tags = PLAYER_EFFECTS.filter(function (effect) {
+        const effects = playerEffectEntries(player)
+        const tags = effects.filter(function (effect) {
           return effect.statusType ? (player.statusSummary || []).some(function (status) { return status.type === effect.statusType })
             : effect.buffId ? (player.buffSummary || []).some(function (buff) { return buff.id === effect.buffId && buff.uses > 0 })
-            : (player.ruleSummary || []).some(function (rule) { return rule.id === effect.ruleId })
+            : effect.authoredRule || (player.ruleSummary || []).some(function (rule) { return rule.id === effect.ruleId })
         }).map(function (effect) {
-          return '<span class="player-effect-icon" tabindex="0" aria-label="' + escapeHtml(effect.label + '：' + effect.description) + '"><img src="' + effect.icon + '" alt=""><span class="player-effect-tip" role="tooltip"><b>' + escapeHtml(effect.label) + '</b><span>' + escapeHtml(effect.description) + '</span></span></span>'
+          return '<span class="player-effect-icon" tabindex="0" aria-label="' + escapeHtml(effect.label + '：' + effect.description) + '"><img src="' + escapeHtml(effect.icon) + '" alt=""><span class="player-effect-tip" role="tooltip"><b>' + escapeHtml(effect.label) + '</b><span>' + escapeHtml(effect.description) + '</span></span></span>'
         }).join('')
         const localLabel = isLocal ? '，你' : ''
         return { key: String(player.id || index), html: '<div class="player-state-chip ' + player.faction + (player.isCurrent ? ' active' : '') + (isLocal ? ' is-local-player' : '')

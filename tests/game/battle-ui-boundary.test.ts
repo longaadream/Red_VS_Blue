@@ -95,14 +95,23 @@ describe('battle presentation boundary', () => {
     const snapshot = fixtureSnapshot()
     Object.assign(snapshot.players[0], {
       statusTags: [{ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '全队共用一次，免疫致命伤害并恢复5点生命' }],
-      rules: [{ id: 'rule-elune-protection-player', name: '艾露恩的守护', description: '消耗守护来保护队友', effect: 'private-rule-code' }],
+      rules: [
+        { id: 'rule-elune-protection-player', name: '艾露恩的守护', description: '消耗守护来保护队友', effect: 'private-rule-code' },
+        { id: 'rule-custom-player', name: '火焰誓约', description: '火球伤害提高', iconPath: 'images/custom/player-fire.svg', visible: true, effect: 'private-rule-code' },
+      ],
     })
     const hud = { className: '', innerHTML: '' }
     const ui = domUi.create({ document: { getElementById: (id: string) => id === 'playerResCards' ? hud : null } })
     const model = viewModel.create({ snapshot, viewerId: 'player-red' })
     expect(JSON.stringify(model.players)).not.toContain('private-rule-code')
+    expect(model.players[0].ruleSummary).toContainEqual(expect.objectContaining({
+      id: 'rule-custom-player', iconPath: 'images/custom/player-fire.svg', description: '火球伤害提高',
+    }))
     ui.update(model)
     expect(hud.innerHTML).toContain('player-elune.svg')
+    expect(hud.innerHTML).toContain('images/custom/player-fire.svg')
+    expect(hud.innerHTML).toContain('火焰誓约')
+    expect(hud.innerHTML).toContain('火球伤害提高')
     expect(hud.innerHTML).not.toContain('player-rule-tray')
     expect(hud.innerHTML).toContain('全队共用一次')
     expect(hud.innerHTML).not.toContain('守护已消耗')
@@ -112,6 +121,51 @@ describe('battle presentation boundary', () => {
     expect(hud.innerHTML).not.toContain('全队共用一次')
     expect(hud.innerHTML).toContain('player-soul-fracture.svg')
     expect(hud.innerHTML).not.toContain('天照叠层')
+    expect(hud.innerHTML).not.toContain('images/effect-icons/fallback.svg')
+  })
+
+  it('keeps legacy player HUD opt-ins, hides backend rules, honors explicit visibility, and still executes hidden rules', () => {
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const snapshot = fixtureSnapshot()
+    Object.assign(snapshot.players[0], {
+      rules: [
+        { id: 'rule-soul-fracture-player', name: '裂魂' },
+        { id: 'rule-background-counter', name: '后台计数', description: '后台规则说明' },
+        { id: 'rule-explicit-visible', name: '公开规则', description: '作者选择公开', visible: true, iconPath: 'images/custom/visible.svg' },
+        { id: 'rule-explicit-hidden', name: '隐藏规则', description: '作者选择隐藏', visible: false, iconPath: 'images/custom/hidden.svg' },
+      ],
+    })
+    const hud = { className: '', innerHTML: '' }
+    const ui = domUi.create({ document: { getElementById: (id: string) => id === 'playerResCards' ? hud : null } })
+    const model = viewModel.create({ snapshot, viewerId: 'player-red' })
+
+    expect(model.players[0].hiddenRuleIds).toEqual(['rule-explicit-hidden'])
+    expect(model.players[0].ruleSummary).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'rule-soul-fracture-player' }),
+      expect.objectContaining({ id: 'rule-background-counter' }),
+      expect.objectContaining({ id: 'rule-explicit-visible', visible: true }),
+    ]))
+    expect(model.players[0].ruleSummary).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'rule-explicit-hidden' }),
+    ]))
+
+    ui.update(model)
+    expect(hud.innerHTML).toContain('player-soul-fracture.svg')
+    expect(hud.innerHTML).toContain('公开规则')
+    expect(hud.innerHTML).toContain('作者选择公开')
+    expect(hud.innerHTML).not.toContain('后台计数')
+    expect(hud.innerHTML).not.toContain('隐藏规则')
+    expect(hud.innerHTML).not.toContain('images/custom/hidden.svg')
+
+    Object.assign(snapshot.players[0], {
+      rules: [{ id: 'rule-soul-fracture-player', name: '裂魂', visible: false }],
+    })
+    const hiddenLegacyModel = viewModel.create({ snapshot, viewerId: 'player-red' })
+    expect(hiddenLegacyModel.players[0].hiddenRuleIds).toEqual(['rule-soul-fracture-player'])
+    ui.update(hiddenLegacyModel)
+    expect(hud.innerHTML).not.toContain('player-soul-fracture.svg')
+
   })
 
   it('only displays the selected player blessing while its authoritative uses remain', () => {

@@ -14,7 +14,7 @@ import { createGameplayModuleDiagnosticHost, installGameplayModuleDiagnosticHost
 import { isAuthorChoiceCancelled } from './author-choice-runtime'
 import { cloneAuthorInitialValue, type AuthorInitialValue } from './author-extension'
 import type { AuthorEntityExtensionDeclarations } from './author-entity-extension'
-import { parseAuthoredSummonSpec, type AuthoredSummonSpec, type AuthoredDisplay } from './author-summon-schema'
+import { authoredDisplayEntries, parseAuthoredSummonSpec, resolveAuthoredPieceTemplate, type AuthoredSummonSpec, type AuthoredDisplaySpec } from './author-summon-schema'
 import { authorOutOfPlayStore, prepareReturningPieceInstance } from './author-instance-state'
 import { createSkillPresentation } from './skill-presentation'
 import { createAuthorClusterRuntime, type AuthorClusterDefinition } from './author-clusters'
@@ -379,6 +379,8 @@ interface RuleDefinition {
   id: string
   name: string
   description: string
+  iconPath?: string
+  visible?: boolean
   trigger: {
     type: string
     conditions?: any
@@ -402,6 +404,10 @@ interface TriggerRule {
   instanceId?: string
   name: string
   description: string
+  /** Optional author-selected image shown in player-rule/status presentation. */
+  iconPath?: string
+  /** Whether this rule is shown in the in-battle player HUD. */
+  visible?: boolean
   trigger: {
     type: string
     conditions?: any
@@ -1803,6 +1809,18 @@ export function createSkillCodeFlow(battle: BattleState, context: Parameters<typ
     ...overrides,
     authorDealDamage: dealDamage,
     authorHealDamage: healDamage,
+    destroyAuthorPieces: (ids: string[], sourceId?: string) => {
+      const eventSource = context.damageSource
+      let source: DamageSource | undefined
+      if (sourceId !== undefined) source = battle.pieces.find(piece => piece.instanceId === sourceId && piece.currentHp > 0)
+      else if (eventSource?.kind === 'piece') source = [...battle.pieces, ...(battle.graveyard ?? [])].find(piece => piece.instanceId === eventSource.sourceId)
+      else if (eventSource && ['player', 'card', 'environment'].includes(eventSource.kind)) source = {
+        kind: eventSource.kind, instanceId: eventSource.sourceId, ownerPlayerId: eventSource.playerId, name: eventSource.sourceId,
+      }
+      else source = context.sourcePiece ?? context.piece
+      return destroyPieces(ids.flatMap(id => battle.pieces.filter(piece => piece.instanceId === id)), battle,
+        source, eventSource ? context.skillId : String(context.skill?.id || context.card?.id || context.ruleId || 'flow'))
+    },
     invokeAuthorCodeBlock: (block, argumentsValue, expected) => createAuthorCodeBlockExecutor({
       compileExpression: request => getSkillExecutionCaches().dynamicCodeRuntime.compileExpression(request),
       context,
@@ -2493,6 +2511,8 @@ export function loadRuleById(
           : {}),
         name: ruleData.name,
         description: ruleData.description,
+        ...(typeof ruleData.iconPath === 'string' ? { iconPath: ruleData.iconPath } : {}),
+        ...(typeof ruleData.visible === 'boolean' ? { visible: ruleData.visible } : {}),
         trigger: ruleData.trigger || { type: 'targetValidation' },
         effect: effectFunction,
         ...(ruleData.extension === undefined ? {} : {
@@ -3332,6 +3352,7 @@ export interface HealResult {
   message: string
   depth: number
   enqueueSequence?: number
+  skipped?: 'target-unavailable'
 }
 
 export interface HealBatchResult {
@@ -3823,6 +3844,10 @@ function prepareDamageTarget(
   chain: EffectChain,
   battle: BattleState,
 ): PreparedDamage {
+  const available = () => battle.pieces.includes(target) && target.currentHp > 0
+  const skipped = (): PreparedDamage => ({ target, hpBefore: target.currentHp,
+    result: skippedDamageResult(request, target, context), emitBlocked: false })
+  if (!available()) return skipped()
   const queues = queueContext(chain, context)
   let redirected = false
   let redirectedTo: string | undefined
@@ -3867,10 +3892,12 @@ function prepareDamageTarget(
     })
     appendDamageMessages(battle, request.attacker.ownerPlayerId, redirectResult.messages || [])
   }
+  if (!available()) return skipped()
   const beforeTaken: TriggerResult = sourceBlocked || redirected
     ? { success: false, blocked: true, messages: [] }
     : checkSynchronousTriggers(battle, beforeDamageTakenContext)
   appendDamageMessages(battle, request.attacker.ownerPlayerId, beforeTaken.messages || [])
+  if (!available()) return skipped()
   const modifiedDamage = finiteNonNegativeDamage(
     beforeDamageTakenContext.damage,
     battle,
@@ -3910,6 +3937,7 @@ function prepareDamageTarget(
     }
     const shieldResult = checkSynchronousTriggers(battle, shieldContext)
     appendDamageMessages(battle, request.attacker.ownerPlayerId, shieldResult.messages || [])
+    if (!available()) return skipped()
     const ruleShieldDamage = finiteNonNegativeDamage(
       shieldContext.damage,
       battle,
@@ -3952,6 +3980,7 @@ function prepareDamageTarget(
     }
     const appliedResult = checkSynchronousTriggers(battle, appliedContext)
     appendDamageMessages(battle, request.attacker.ownerPlayerId, appliedResult.messages || [])
+    if (!available()) return skipped()
     damageAfterShield = finiteNonNegativeDamage(
       appliedContext.damage,
       battle,
@@ -4208,7 +4237,9 @@ function resolveDeathBatch(
         rejection('DeathBatch candidate must appear exactly once in battle.pieces')
       }
       const canonical = canonicalMatches[0]
-      if (canonical.currentHp !== 0) rejection('DeathBatch candidate HP must equal zero')
+      if (request.cause === 'destroy') {
+        if (!Number.isFinite(canonical.currentHp) || canonical.currentHp <= 0 || canonical.currentHp > canonical.maxHp) rejection('Direct destruction requires a living target')
+      } else if (canonical.currentHp !== 0) rejection('DeathBatch candidate HP must equal zero')
       if (!Number.isFinite(canonical.maxHp) || canonical.maxHp <= 0) {
         rejection('DeathBatch candidate maxHp must be finite and positive')
       }
@@ -4246,6 +4277,9 @@ function resolveDeathBatch(
     sourceId: frozen[0]?.sourceId,
     skillId: frozen[0]?.skillId,
   }
+  // Validation and chain-budget acceptance precede every mutation. All targets
+  // enter the dying state together, before any death observer can run.
+  if (request.cause === 'destroy') for (const candidate of frozen) candidate.piece.currentHp = 0
   const deathCandidateIds = new Set(frozen.map(candidate => candidate.targetId))
   for (const candidate of frozen) {
     const parasitismSkillId = candidate.piece.skills
@@ -4468,6 +4502,14 @@ function resolveDeathBatch(
     chain.recordDeathProvenance(battle, candidate.piece, context.batchId)
   }
 
+  if (request.cause === 'destroy') {
+    battle.actions ??= []
+    battle.actions.push({ type: 'destroy', playerId: frozen[0]?.sourceOwnerPlayerId ?? 'neutral', turn: battle.turn.turnNumber,
+      payload: { batchId: context.batchId, chainId: context.chainId, targetIds: killedIds,
+        sourceId: frozen[0]?.sourceId, skillId: frozen[0]?.skillId, message: '棋子被消灭' } })
+    checkpointBattlePresentation(battle)
+  }
+
   return {
     batchId: context.batchId,
     chainId: context.chainId,
@@ -4490,6 +4532,7 @@ function resolveDamageBatch(
   chain: EffectChain,
   battle: BattleState,
 ): DamageBatchResult {
+  const priorDeaths = new Map(request.targets.map(target => [target, chain.deathBatchFor(battle, target)]))
   if (queuedAuthorSourceExpired(request.attacker, request.sourceLifetime, request.skillId, battle, context.batchId)) {
     return { success: false, batchId: context.batchId, chainId: context.chainId, damages: [], totalDamage: 0, results: [], message: '效果来源棋子已失效' }
   }
@@ -4581,6 +4624,13 @@ function resolveDamageBatch(
     battle,
   ))
   for (const entry of prepared) {
+    // Earlier targets may have been prepared before a later target's rule
+    // finalized their death. Never commit an old HP value into that corpse.
+    if (!battle.pieces.includes(entry.target) || entry.target.currentHp <= 0) {
+      entry.result = skippedDamageResult(request, entry.target, context)
+      entry.emitBlocked = false
+      continue
+    }
     recordBattlePresentationBlock({ sourcePieceId: request.attacker.instanceId,
       actorPlayerId: request.attacker.ownerPlayerId, skillId: request.skillId },
     entry.target.instanceId, entry.result.shieldAbsorbed, entry.result.blocked)
@@ -4667,10 +4717,13 @@ function resolveDamageBatch(
   const deathCandidateIds = new Set(deathCandidates.map(candidate => candidate.piece.instanceId))
   for (const entry of prepared) {
     entry.result.targetHp = entry.target.currentHp
-    entry.result.isKilled = killedIds.has(entry.target.instanceId)
+    const childDeath = chain.deathBatchFor(battle, entry.target)
+    const destroyedDuringDamage = Boolean(childDeath && childDeath !== priorDeaths.get(entry.target)
+      && entry.target.currentHp === 0 && !battle.pieces.includes(entry.target))
+    entry.result.isKilled = killedIds.has(entry.target.instanceId) || destroyedDuringDamage
     if (deathResolution && deathCandidateIds.has(entry.target.instanceId)) {
       entry.result.deathBatchId = deathResolution.batchId
-    }
+    } else if (destroyedDuringDamage) entry.result.deathBatchId = childDeath
   }
 
   battle.actions ??= []
@@ -4824,7 +4877,8 @@ function resolveHealBatch(
       healSource: { kind: damageSourcePiece(request.healer) ? "piece" : "kind" in request.healer ? request.healer.kind : "piece", sourceId: request.healer.instanceId, playerId: request.healer.ownerPlayerId },
       ...queues,
     }
-    const beforeTaken = checkSynchronousTriggers(battle, beforeHealTakenContext)
+    const beforeTaken: TriggerResult = battle.pieces.includes(target) && target.currentHp > 0
+      ? checkSynchronousTriggers(battle, beforeHealTakenContext) : { success: false, blocked: true, messages: [] }
     const modifiedHeal = finiteNonNegativeHeal(
       beforeHealTakenContext.heal,
       battle,
@@ -4869,12 +4923,22 @@ function resolveHealBatch(
   })
 
   for (const entry of prepared) {
+    if (!battle.pieces.includes(entry.target) || entry.target.currentHp <= 0) {
+      entry.result.success = false
+      entry.result.heal = 0
+      entry.result.blocked = false
+      entry.result.skipped = 'target-unavailable'
+      entry.result.message = '治疗目标已失效，跳过治疗'
+      entry.result.targetHp = entry.target.currentHp
+      continue
+    }
     if (!entry.result.blocked) entry.target.currentHp = entry.nextHp
     entry.result.targetHp = entry.target.currentHp
   }
   checkpointBattlePresentation(battle, { kind: 'heal', id: context.batchId,
     sourcePieceId: request.healer.instanceId, actorPlayerId: request.healer.ownerPlayerId, skillId: request.skillId })
   for (const entry of prepared) {
+    if (entry.result.skipped) continue
     if (entry.result.blocked) {
       appendHealBlockedMessage(
         battle,
@@ -4974,7 +5038,7 @@ interface PreparedDeclaredSummon {
   readonly storageExtensionKey?: string
   readonly storageEntryKey?: string
   readonly legacyStorageExtensionKey?: string
-  readonly display?: AuthoredDisplay
+  readonly display?: AuthoredDisplaySpec
   readonly returnState?: ReturnType<typeof prepareReturningPieceInstance>
   finalX: number
   finalY: number
@@ -4982,13 +5046,82 @@ interface PreparedDeclaredSummon {
 
 interface SummonCapabilityDefinition {
   readonly id: string
-  readonly summonCapability?: SummonCapabilityDeclaration
+  readonly summonCapability?: SummonCapabilityDeclaration | null
+  /** Module-owned executable entries are validated before execution.  A
+   * generic authored summon capability can therefore be derived from their
+   * registered summon calls when older/newly-created documents have not yet
+   * persisted the optional declaration field. */
+  readonly gameplayModules?: unknown
 }
 
 interface SealedContentExecution {
   readonly chain?: EffectChain
   readonly summonQueue?: ReturnType<typeof createDeclaredSummonQueueWriter>
   readonly cleanup?: () => void
+}
+
+const AUTHOR_SUMMON_MODES = ['new-instance', 'return-instance'] as const
+
+function isRuntimeRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+/**
+ * New author graphs can use the generic authored summon module directly.  The
+ * graph compiler already validates that module and its typed template, so the
+ * runtime can bind the corresponding sealed generic queue without requiring a
+ * second hand-maintained declaration in the newly created document.  Explicit
+ * declarations remain authoritative (and are handled by the caller).
+ */
+function inferAuthoredSummonCapability(definition: SummonCapabilityDefinition): SummonCapabilityDeclaration | undefined {
+  const modules = definition.gameplayModules
+  if (!isRuntimeRecord(modules) || !isRuntimeRecord(modules.entries)) return undefined
+
+  const modes = new Set<(typeof AUTHOR_SUMMON_MODES)[number]>()
+  const visitStatements = (value: unknown): void => {
+    if (!Array.isArray(value)) return
+    for (const statement of value) {
+      if (!isRuntimeRecord(statement)) continue
+      if (statement.kind === 'call' && statement.module === 'author.effect.summon') {
+        const parameters = isRuntimeRecord(statement.parameters) ? statement.parameters : undefined
+        const mode = parameters?.mode === undefined ? 'new-instance' : parameters.mode
+        if (AUTHOR_SUMMON_MODES.includes(mode as (typeof AUTHOR_SUMMON_MODES)[number])) {
+          modes.add(mode as (typeof AUTHOR_SUMMON_MODES)[number])
+        }
+      }
+      visitStatements(statement.then)
+      visitStatements(statement.else)
+      visitStatements(statement.body)
+    }
+  }
+  const visitGraph = (value: unknown): void => {
+    if (!isRuntimeRecord(value)) return
+    visitStatements(value.body)
+    if (Array.isArray(value.composites)) {
+      for (const composite of value.composites) {
+        if (isRuntimeRecord(composite)) visitStatements(composite.body)
+      }
+    }
+    if (Array.isArray(value.continuations)) {
+      for (const continuation of value.continuations) {
+        if (isRuntimeRecord(continuation)) visitGraph(continuation.graph)
+      }
+    }
+  }
+
+  // Only executable entries may grant the queue.  A summon-shaped preview
+  // graph must never authorize a live effect host.
+  for (const field of ['code', 'skillCode', 'triggerSkill', 'effectCode']) {
+    const entry = modules.entries[field]
+    if (isRuntimeRecord(entry)) visitGraph(entry.graph)
+  }
+  if (!modes.size) return undefined
+  return {
+    version: 1,
+    recipe: 'authored-piece',
+    maxSummons: 64,
+    modes: AUTHOR_SUMMON_MODES.filter(mode => modes.has(mode)),
+  }
 }
 
 function cloneEffectTransactionValue<T>(
@@ -5530,24 +5663,25 @@ function prepareAuthoredSummon(
     return { inputIndex: entry.inputIndex, recipe: 'authored-piece', piece: returnState.piece,
       ownerPlayerId: returnState.piece.ownerPlayerId, source: entry.source, returnState, finalX: spec.x, finalY: spec.y }
   }
-  const template = spec.template
-  const ownerPlayerId = template.ownerPlayerId ?? entry.source.ownerPlayerId
+  const ownerPlayerId = spec.template.ownerPlayerId ?? spec.template.baseSnapshot?.ownerPlayerId ?? entry.source.ownerPlayerId
   const owner = battle.players.find(player => player.playerId === ownerPlayerId)
   if (!owner) throw new Error('召唤所属玩家已失效')
   const ownerFaction = (owner as unknown as { faction?: PieceInstance['faction'] }).faction
+  const template = resolveAuthoredPieceTemplate(spec.template, entry.source, ownerFaction)
   const faction = template.faction ?? ownerFaction ?? entry.source.faction
   if (ownerFaction && ownerFaction !== faction) throw new Error('召唤阵营与所属玩家不一致')
-  const piece: PieceInstance = {
+  const piece = {
     instanceId: 'summon-' + getRuleDate().now() + '-' + entry.inputIndex,
-    isCore: template.isCore ?? false, templateId: template.templateId, name: template.name,
+    isCore: template.isCore, templateId: template.templateId, name: template.name,
     ownerPlayerId, faction, x: spec.x, y: spec.y, currentHp: template.currentHp ?? template.maxHp,
     maxHp: template.maxHp, attack: template.attack, defense: template.defense, moveRange: template.moveRange,
     skills: cloneEffectTransactionValue(template.skills ?? []),
     rules: (template.rules ?? []).map(id => ({ id })),
     statusTags: cloneEffectTransactionValue(template.statusTags ?? []),
     buffs: [], debuffs: [], ruleTags: [],
+    noKillCharge: template.isCore !== true,
     ...(template.extension ? { extension: cloneEffectTransactionValue(template.extension) } : {}),
-  }
+  } as PieceInstance & { noKillCharge: boolean }
   return { inputIndex: entry.inputIndex, recipe: 'authored-piece', piece, ownerPlayerId, source: entry.source,
     display: spec.display, finalX: spec.x, finalY: spec.y }
 }
@@ -5798,7 +5932,12 @@ export function resolveDeclaredContentSummonBatch(
         ]
         delete authorOutOfPlayStore(battle).pieces[entry.piece.instanceId]
       }
-      if (entry.display) createSkillPresentation(battle, entry.ownerPlayerId, 'summon', entry.piece.instanceId).setDisplay(entry.piece.instanceId, entry.display)
+      if (entry.display) {
+        const presentation = createSkillPresentation(battle, entry.ownerPlayerId, 'summon', entry.piece.instanceId)
+        for (const [audience, display] of authoredDisplayEntries(entry.display)) {
+          presentation.setDisplay(entry.piece.instanceId, display, audience, 'display:' + entry.piece.instanceId + ':' + audience)
+        }
+      }
       if (!battle.extensions || !entry.storageExtensionKey) continue
       if (!entry.storageEntryKey) {
         delete battle.extensions[entry.storageExtensionKey]
@@ -5886,7 +6025,13 @@ function beginSealedContentExecution(
   battle: BattleState,
   definition: SummonCapabilityDefinition,
 ): SealedContentExecution {
-  if (definition.summonCapability === undefined) return {}
+  // A missing field is the legacy/new-editor omission that can be derived
+  // from a validated author graph.  An explicit null is an intentional
+  // capability denial and must remain closed.
+  const capability = definition.summonCapability === undefined
+    ? inferAuthoredSummonCapability(definition)
+    : definition.summonCapability
+  if (capability === undefined || capability === null) return {}
 
   const active = getActiveEffectChain(battle)
   const chain = active ?? createDetachedEffectChain(battle, 'summon')
@@ -5897,7 +6042,7 @@ function beginSealedContentExecution(
       summonQueue: createDeclaredSummonQueueWriter(
         chain,
         definition.id,
-        definition.summonCapability,
+        capability,
       ),
       cleanup,
     }
@@ -5983,7 +6128,7 @@ export function drainBattleEffectChain(
   })
 }
 
-function createDetachedEffectChain(battle: BattleState, rootKind: 'damage' | 'heal' | 'summon'): EffectChain {
+function createDetachedEffectChain(battle: BattleState, rootKind: 'damage' | 'heal' | 'summon' | 'death'): EffectChain {
   const runtime = getActiveRuleRuntime()
   const turn = battle.turn?.turnNumber ?? 0
   const fallbackBase = {
@@ -6016,6 +6161,25 @@ function createDetachedEffectChain(battle: BattleState, rootKind: 'damage' | 'he
       return nextId(input.kind)
     },
   })
+}
+
+/** Direct destruction has no damage amount or damage prevention stage. */
+export function destroyPieces(targets: readonly PieceInstance[], battle: BattleState, source?: DamageSource, skillId?: string): boolean {
+  const unique = [...new Set(targets)].filter(piece => battle.pieces.includes(piece) && piece.currentHp > 0)
+  if (!unique.length) return false
+  const request: DeathRequest = { kind: 'death', cause: 'destroy', candidates: unique.map(piece => ({ piece, attacker: source, skillId })) }
+  const active = getActiveEffectChain(battle)
+  const chain = active ?? createDetachedEffectChain(battle, 'death')
+  const cleanup = active ? undefined : installEffectChain(battle, chain)
+  try {
+    if (chain.state === 'processing') {
+      chain.runEndogenousDeath(request, 'lifecycle:destroy', (current, context, executing) => resolveDeathBatch(current, context, executing, battle))
+    } else {
+      chain.enqueue(request)
+      drainBattleEffectChain(battle, chain)
+    }
+    return unique.some(piece => piece.currentHp === 0 && !battle.pieces.includes(piece))
+  } finally { cleanup?.() }
 }
 
 function findExecutionResult<TResult>(

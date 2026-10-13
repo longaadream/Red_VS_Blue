@@ -28,7 +28,7 @@ function loadEditorInternals() {
   assert.ok(source.includes(marker), 'sentence editor export marker must remain stable')
   const instrumented = source.replace(
     marker,
-    'window.SkillSentenceEditor = { mount, __test: { movementEnumDisplay, enumLiteralDisplay, literalControl } }',
+    'window.SkillSentenceEditor = { mount, __test: { movementEnumDisplay, enumLiteralDisplay, enumValueDisplay, literalControl, literalDisplay, semanticSlotLabel, outputLabel, typeLabel, authorContentReference, authorReferenceCatalog } }',
   )
   const window = {}
   const document = { createElement: tagName => new StubElement(tagName) }
@@ -73,4 +73,45 @@ test('damage attribution labels are Chinese while serialized policy IDs stay sta
   const select = control.children[0]
   assert.equal(JSON.stringify(Array.from(select.children, option => String(option.textContent))), '["沿用当前归属","无技能归属"]')
   assert.equal(JSON.stringify(Array.from(select.children, option => String(option.value))), '["\\"current\\"","\\"unattributed\\""]')
+})
+
+test('standard summon and display enum controls localize values without changing serialized IDs', () => {
+  const mode = { name: 'mode', type: 'string', enum: ['new-instance', 'return-instance', 'declaration'] }
+  const sourceType = { name: 'sourceType', type: 'string', enum: ['piece', 'record'] }
+  const audience = { name: 'audience', type: 'string', enum: ['public', 'owner', 'allies', 'enemies', 'spectators'] }
+
+  assert.deepEqual(
+    Array.from(internals.literalControl('new-instance', mode, () => {}).children[0].children, option => [option.textContent, option.value]),
+    [['新建棋子', '"new-instance"'], ['原实例回场', '"return-instance"'], ['使用当前内容声明', '"declaration"']],
+  )
+  assert.deepEqual(
+    Array.from(internals.literalControl('public', audience, () => {}).children[0].children, option => [option.textContent, option.value]),
+    [['公开', '"public"'], ['所属玩家', '"owner"'], ['友方', '"allies"'], ['敌方', '"enemies"'], ['观战者', '"spectators"']],
+  )
+  assert.equal(internals.enumLiteralDisplay('piece', sourceType), '棋子来源')
+  assert.equal(internals.semanticSlotLabel({ name: 'attackBonus' }, 'attackBonus'), '攻击加成')
+  assert.equal(internals.outputLabel({ outputs: [{ name: 'beforeFirstEnemy' }] }, 'beforeFirstEnemy'), '首个敌人之前')
+  assert.equal(internals.typeLabel({ kind: 'list', element: 'piece' }), '元组<棋子>')
+  assert.equal(internals.literalDisplay('attack'), '攻击力')
+})
+
+test('author content references are limited to shared schemas and status catalog entries', () => {
+  assert.equal(internals.authorContentReference({ name: 'rules' }, 'template.rules', { schema: 'author.piece-template@1' }).collection, 'rules')
+  assert.equal(internals.authorContentReference({ name: 'skillId' }, 'skill.skillId', { schema: 'author.piece-skill@1' }).collection, 'skills')
+  assert.equal(internals.authorContentReference({ name: 'templateId' }, 'display.templateId', { schema: 'author.piece-display@1' }).collection, 'pieces')
+  assert.equal(internals.authorContentReference({ name: 'id' }, 'status.id', { schema: 'author.piece-status@1' }).collection, 'statusTags')
+  assert.equal(internals.authorContentReference({ name: 'id' }, 'custom.id', { schema: 'custom@1' }), null)
+
+  const catalog = internals.authorReferenceCatalog({
+    skills: { skill: { id: 'skill', statusTag: { id: 'status-skill', name: '技能状态' } } },
+    pieces: { piece: { id: 'piece', initialStatusTags: [{ id: 'status-piece', name: '棋子状态' }] } },
+  })
+  assert.equal(JSON.stringify(Array.from(catalog.statusTags, item => item.id)), '["status-skill","status-piece"]')
+})
+
+test('built-in nested structure types have distinct Chinese names', () => {
+  assert.equal(internals.typeLabel({ kind: 'record', schema: 'author.piece-template@1' }), '棋子模板')
+  assert.equal(internals.typeLabel({ kind: 'list', element: { kind: 'record', schema: 'author.piece-skill@1' } }), '元组<技能实例>')
+  assert.equal(internals.typeLabel({ kind: 'record', schema: 'author.piece-display-plan@1' }), '棋子显示方案')
+  assert.equal(internals.typeLabel({ kind: 'record', schema: 'author.piece-instance@1' }), '棋子实例副本')
 })

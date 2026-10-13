@@ -57,6 +57,8 @@ export type GameplayValueTypeName =
   | 'event'
   | 'choice'
   | 'record'
+  /** Arbitrary JSON data explicitly carried by an open record field. */
+  | 'json'
   | 'null'
   /** Internal bottom type used for an empty list literal; author ports reject it. */
   | 'never'
@@ -172,6 +174,10 @@ export type GameplayModuleDescriptor = {
   readonly uiDescription?: string
   readonly inputs: readonly GameplayPort[]
   readonly outputs: readonly GameplayPort[]
+  /** Trusted named record schemas supplied by this descriptor for authoring
+   * inputs/outputs. They are merged into the graph schema table by the
+   * compiler and exposed to editor catalog consumers. */
+  readonly recordSchemas?: readonly GameplayRecordSchema[]
   /** Trusted generic output bindings; author content cannot override them. */
   readonly outputTypeBindings?: Readonly<Record<string, {
     readonly input: string
@@ -314,11 +320,15 @@ export type GameplayReturnStatement = {
   readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
-/** A graph-local typed record schema.  Field names and types are closed. */
+/**
+ * A graph-local typed record schema.  Field names are closed unless
+ * `additionalFields` explicitly declares the type of unknown fields.
+ */
 export type GameplayRecordSchema = {
   readonly id: string
   readonly version: string
   readonly fields: readonly GameplayPort[]
+  readonly additionalFields?: GameplayValueType
 }
 
 export type GameplayStructuredRecordSchema = GameplayRecordSchema
@@ -328,6 +338,8 @@ export type GameplayRecordCreateStatement = {
   readonly id: string
   readonly schema: string
   readonly fields?: Readonly<Record<string, GameplayValue>>
+  /** Editor-only JSON metadata; it has no runtime/code-generation meaning. */
+  readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
 export type GameplayRecordGetStatement = {
@@ -335,6 +347,8 @@ export type GameplayRecordGetStatement = {
   readonly id: string
   readonly record: GameplayValue
   readonly field: string
+  /** Editor-only JSON metadata; it has no runtime/code-generation meaning. */
+  readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
 export type GameplayRecordWithStatement = {
@@ -342,6 +356,8 @@ export type GameplayRecordWithStatement = {
   readonly id: string
   readonly record: GameplayValue
   readonly fields?: Readonly<Record<string, GameplayValue>>
+  /** Editor-only JSON metadata; it has no runtime/code-generation meaning. */
+  readonly layout?: Readonly<Record<string, GameplayJsonValue>>
 }
 
 export type GameplayCollectionMethod = 'map' | 'filter' | 'reduce' | 'find'

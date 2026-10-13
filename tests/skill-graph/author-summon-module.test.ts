@@ -214,6 +214,28 @@ describe('author.effect.summon compiled graph', () => {
     })
   })
 
+  it('returns success and blocked status through the existing result output when occupied', () => {
+    const source = sourcePiece()
+    const state = makeState({ pieces: [source] }) as any
+    const template = {
+      templateId: 'compiled-author-blocked',
+      name: 'Blocked',
+      maxHp: 30,
+      attack: 8,
+      defense: 2,
+      moveRange: 2,
+    }
+    const graph = summonGraph(template, { x: 0, y: 0 })
+
+    const { compiled, result } = executeCompiled(graph, state, source)
+
+    expect(compiled.diagnostics).toEqual([])
+    expect(result).toEqual({
+      result: { success: false, blocked: true, message: '召唤落点已被占用' },
+    })
+    expect(state.pieces).toHaveLength(1)
+  })
+
   it('compiles a template tuple and destination tuple in input order through the same host', () => {
     const source = sourcePiece()
     const state = makeState({ pieces: [source] }) as any
