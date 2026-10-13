@@ -315,7 +315,7 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
           if (schema && !schema.fields.some(item => item.name === field)) return fail(node, '此扩展结构中没有字段 ' + field)
           type = schema?.fields.find(item => item.name === field)?.type
         }
-        type ??= expected
+        type = type ?? expected
         if (!type || type === 'unknown' || type === 'any') return fail(node, '请声明此扩展变量的类型，或在明确类型的参数中使用')
         if (scope === 'piece' || scope === 'player' || scope === 'battle') {
           return call(body, `extension.read-${scope}`, owner ? { owner } : {}, { namespace: declaration?.namespace ?? 'content', name, path: path.join('.'), valueType: encodedType(type) }, 'value', scope === 'battle' ? '2' : '1')

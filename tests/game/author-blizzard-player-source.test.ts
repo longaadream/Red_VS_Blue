@@ -10,6 +10,16 @@ import { globalTriggerSystem } from '@/lib/game/triggers'
 import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
 type BlizzardMode = 'alive' | 'graveyard' | 'removed' | 'changed-owner'
+type TileEffectRecord = { tileType: string; ownerPlayerId?: string }
+
+function blizzardTiles(state: ReturnType<typeof makeState>): TileEffectRecord[] | undefined {
+  const raw = state.extensions?.tileEffects
+  if (raw === undefined || raw === null) return undefined
+  if (!Array.isArray(raw)) throw new TypeError('tileEffects must be an array')
+  // This fixture intentionally keeps the old direct property access semantics:
+  // malformed entries fail the test instead of being silently filtered out.
+  return (raw as TileEffectRecord[]).filter(tile => tile.tileType === 'blizzard')
+}
 
 const previousProfileRoot = process.env.RVB_PROFILE_ROOT
 const profileRoot = mkdtempSync(join(tmpdir(), 'rvb-blizzard-player-'))
@@ -108,9 +118,9 @@ describe('Blizzard author graph captures its creating player', () => {
     expect(state.players[0].statusTags).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'blizzard', ownerPlayerId: 'player-red' }),
     ]))
-    const tiles = state.extensions?.tileEffects?.filter((tile: any) => tile.tileType === 'blizzard') ?? []
+    const tiles = blizzardTiles(state) ?? []
     expect(tiles).toHaveLength(49)
-    expect(tiles.every((tile: any) => tile.ownerPlayerId === 'player-red')).toBe(true)
+    expect(tiles.every(tile => tile.ownerPlayerId === 'player-red')).toBe(true)
   })
 
   it.each(['alive', 'graveyard', 'removed', 'changed-owner'] as const)(
@@ -123,7 +133,7 @@ describe('Blizzard author graph captures its creating player', () => {
         expect.objectContaining({ type: 'freeze', currentDuration: 1 }),
       ]))
       expect(state.players[0].statusTags).toEqual([])
-      expect(state.extensions?.tileEffects?.filter((tile: any) => tile.tileType === 'blizzard')).toEqual([])
+      expect(blizzardTiles(state)).toEqual([])
 
       const damage = state.actions?.filter(action => action.type === 'damage').at(-1)
       expect(damage?.payload).toMatchObject({

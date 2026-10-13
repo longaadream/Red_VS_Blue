@@ -3,8 +3,8 @@ import type { GameplayCallStatement, GameplayValue } from './module-types'
 
 const output = (node: string, port = 'value'): GameplayValue => ({ kind: 'output', node, port })
 const input = (name: string): GameplayValue => ({ kind: 'input', name })
-const listType = JSON.stringify({ kind: 'list', element: 'record' })
-const pieceListType = JSON.stringify({ kind: 'list', element: 'piece' })
+const listType = /* @__PURE__ */ JSON.stringify({ kind: 'list', element: 'record' })
+const pieceListType = /* @__PURE__ */ JSON.stringify({ kind: 'list', element: 'piece' })
 const call = (id: string, module: string, inputs: GameplayCallStatement['inputs'] = {}, parameters: GameplayCallStatement['parameters'] = {}): GameplayCallStatement => ({ kind: 'call', id, module, version: '1', inputs, parameters })
 
 export const ATOMIC_CAPTURED_COLLECTION_MODULES = new Set([

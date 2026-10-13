@@ -21,7 +21,7 @@ const output = (node: string, port = 'value'): GameplayValue => ({ kind: 'output
 const input = (name: string): GameplayValue => ({ kind: 'input', name })
 const literal = (value: GameplayLiteral): GameplayValue => ({ kind: 'literal', value })
 
-const nullableStringType = JSON.stringify({ kind: 'nullable', value: 'string' })
+const nullableStringType = /* @__PURE__ */ JSON.stringify({ kind: 'nullable', value: 'string' })
 
 function call(
   id: string,

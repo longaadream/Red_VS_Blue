@@ -323,13 +323,6 @@ async function dispatchKey(key, code, windowsVirtualKeyCode) {
   await delay(100)
 }
 
-async function setLiteralNumber(fieldSelector, value) {
-  await evaluate(`(()=>{const field=document.querySelector(${selector(fieldSelector)});if(!field)throw new Error('missing literal field '+${selector(fieldSelector)});const source=field.querySelector('[data-sentence-value-source]');if(source){source.value='literal';source.dispatchEvent(new Event('change',{bubbles:true}))}})()`)
-  await delay(120)
-  await evaluate(`(()=>{const field=document.querySelector(${selector(fieldSelector)});const input=field?.querySelector('.sentence-literal-control input[type=number], .sentence-literal-control input[type=text], input[type=number]');if(!input)throw new Error('missing literal number input in '+${selector(fieldSelector)});input.value=${selector(String(value))};input.dispatchEvent(new Event('change',{bubbles:true}))})()`)
-  await delay(120)
-}
-
 async function setParameter(statementId, name, value) {
   const panel = `#skills-detail [data-sentence-inspector] [data-sentence-inline-editor=${selector(statementId)}]`
   await until(`Boolean(document.querySelector(${selector(panel)}))`, `selected editor ${statementId}`)
@@ -692,8 +685,6 @@ try {
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${codeBlockId}:input:block`)}]`)
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}]'))`, 'code block edit definition form')
-    const sourceBeforeRename = selected.layout?.authorExpressions?.block?.source || ''
-    const editedSource = sourceBeforeRename.replace('ui-block', 'ui-block-edited')
     await evaluate(`(()=>{const root=document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}]');const id=root?.querySelector('[data-sentence-code-block-id]');if(!id)throw new Error('missing code block id field');id.value='ui-block-edited';id.dispatchEvent(new Event('change',{bubbles:true}))})()`)
     await click(`#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}] [data-sentence-code-block-create]`)
     draft = await readDraft()

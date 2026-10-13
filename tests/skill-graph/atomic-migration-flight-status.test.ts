@@ -105,6 +105,10 @@ function callsIn(statements: readonly GameplayStatement[]): GameplayCallStatemen
   return result
 }
 
+function omitInstanceId(value: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'instanceId'))
+}
+
 function execute(source: GameplayModuleGraph, battle: any, context: Record<string, unknown>): unknown {
   const compiled = compileGameplayModuleGraph(migrateFlightStatusModules(source), registry())
   const flow = createFlowRuntime(battle, {}, 'skill', {
@@ -209,7 +213,7 @@ describe('atomic flight/status migrations', () => {
     ] })
     const battle = makeState({ pieces: [holder] }) as any
     expect(execute(removeGraph(), battle, { piece: 'holder', flightId: 'flight-a' })).toEqual({ value: true })
-    expect(battle.pieces[0].statusTags.map(({ instanceId, ...tag }: any) => tag)).toEqual([
+    expect(battle.pieces[0].statusTags.map((tag: object) => omitInstanceId(tag))).toEqual([
       { type: 'flight', flightId: 'flight-a' },
       { id: 'b', type: 'other', flightId: 'flight-b' },
     ])
@@ -228,7 +232,7 @@ describe('atomic flight/status migrations', () => {
     expect(battle.pieces[0].statusTags[0]).toMatchObject({ id: 'counter', remainingTurns: 1 })
     expect(execute(consumeGraph(), battle, { piece: 'holder', statusId: 'missing' })).toEqual({ value: 1 })
     expect(execute(refreshGraph(), battle, { piece: 'holder', turn: 5 })).toEqual({ value: true })
-    expect(battle.pieces[0].statusTags.map(({ instanceId, ...tag }: any) => tag)).toEqual([
+    expect(battle.pieces[0].statusTags.map((tag: object) => omitInstanceId(tag))).toEqual([
       { id: 'counter', type: 'counter', remainingTurns: 1 },
       { id: 'temporary-a', type: 'temporary', name: 'old-a', visible: false, grantedTurnNumber: 5, currentDuration: 3, currentUses: 2, remainingUses: 2, createdTurnNumber: 5 },
       { id: 'temporary-b', type: 'temporary', name: 'old-b', visible: true, grantedTurnNumber: 2, currentDuration: 9, currentUses: 9, remainingUses: 9, createdTurnNumber: 2 },

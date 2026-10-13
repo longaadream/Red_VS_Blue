@@ -229,6 +229,6 @@ export const PREVIEW_FIELD_GAMEPLAY_MODULES: readonly GameplayModuleDescriptor[]
   },
 ])
 
-export const PREVIEW_FIELD_MODULE_IDS = Object.freeze(PREVIEW_FIELD_GAMEPLAY_MODULES.map(module => `${module.id}@${module.version}`))
+export const PREVIEW_FIELD_MODULE_IDS = /* @__PURE__ */ (() => Object.freeze(PREVIEW_FIELD_GAMEPLAY_MODULES.map(module => `${module.id}@${module.version}`)))()
 
 export { BATTLE_FIELD_TYPES }

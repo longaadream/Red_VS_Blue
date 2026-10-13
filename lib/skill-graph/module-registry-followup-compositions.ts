@@ -15,11 +15,9 @@ const stringType: GameplayValueType = 'string'
 const numberType: GameplayValueType = 'number'
 const booleanType: GameplayValueType = 'boolean'
 const recordType: GameplayValueType = 'record'
-const pieceListType: GameplayValueType = { kind: 'list', element: pieceType }
 const recordListType: GameplayValueType = { kind: 'list', element: recordType }
 const nullableStringType: GameplayValueType = { kind: 'nullable', value: stringType }
 const nullableNumberType: GameplayValueType = { kind: 'nullable', value: numberType }
-const nullableRecordType: GameplayValueType = { kind: 'nullable', value: recordType }
 
 const port = (
   name: string,

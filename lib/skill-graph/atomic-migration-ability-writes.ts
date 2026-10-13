@@ -23,8 +23,8 @@ export const ATOMIC_ABILITY_WRITE_MODULE_IDS = ATOMIC_ABILITY_WRITE_MODULES
 const output = (node: string, port = 'value'): GameplayValue => ({ kind: 'output', node, port })
 const input = (name: string): GameplayValue => ({ kind: 'input', name })
 const literal = (value: GameplayLiteral): GameplayValue => ({ kind: 'literal', value })
-const nullableStringType = JSON.stringify({ kind: 'nullable', value: 'string' })
-const stringListType = JSON.stringify({ kind: 'list', element: 'string' })
+const nullableStringType = /* @__PURE__ */ JSON.stringify({ kind: 'nullable', value: 'string' })
+const stringListType = /* @__PURE__ */ JSON.stringify({ kind: 'list', element: 'string' })
 
 function call(
   id: string,

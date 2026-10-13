@@ -3,7 +3,7 @@ import type { GameplayCallStatement, GameplayLiteral, GameplayStatement, Gamepla
 
 export const ATOMIC_STORAGE_WRITE_MODULES = new Set(['extension.set-owner', 'extension.set-owner-if-empty', 'extension.read-owner-record', 'extension.remove-owner-record', 'extension.decrement-turns'])
 const out = (node: string, port = 'value'): GameplayValue => ({ kind: 'output', node, port })
-const nullablePlayer = JSON.stringify({ kind: 'nullable', value: 'player' })
+const nullablePlayer = /* @__PURE__ */ JSON.stringify({ kind: 'nullable', value: 'player' })
 const literal = (value: string | number | boolean | null | string[]): GameplayValue => ({ kind: 'literal', value })
 const call = (id: string, module: string, inputs: Record<string, GameplayValue>, parameters?: Record<string, GameplayLiteral>, version = '1'): GameplayCallStatement => ({ kind: 'call', id, module, version, inputs, ...(parameters ? { parameters } : {}) })
 

@@ -6,7 +6,7 @@ import { compileGameplayModuleGraph } from '../../lib/skill-graph/module-compile
 import { GAMEPLAY_MODULE_REGISTRY } from '../../lib/skill-graph/module-registry'
 import { GAMEPLAY_MODULE_GRAPH_VERSION, type GameplayModuleGraph } from '../../lib/skill-graph/module-types'
 import type { CardInstance } from '../../lib/game/battle-types'
-import { makePiece, makeState } from '../helpers/minimal-state'
+import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
 
 describe('concrete author entity extensions', () => {
   it('does not materialize persistent IDs for execution-local instance lists', () => {
@@ -17,7 +17,7 @@ describe('concrete author entity extensions', () => {
       rules: [{ id: 'rule' }],
     })
     const battle = makeState({ pieces: [target] })
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
 
     flow.skills.instances('caster')
     flow.rules.instances('caster')
@@ -32,9 +32,9 @@ describe('concrete author entity extensions', () => {
     const target = makePiece({
       instanceId: 'caster',
       statusTags: [{ id: 'old-mark', type: 'mark' }],
-    }) as any
+    })
     const battle = makeState({ pieces: [target] })
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
     const staleReference = { pieceId: 'caster', instanceId: 'caster:status:0' }
 
     flow.entityExtension.declare('status', staleReference, 'content', 'oldValue', 'number', [], 1)
@@ -55,16 +55,16 @@ describe('concrete author entity extensions', () => {
     const target = makePiece({
       instanceId: 'caster',
       statusTags: [{ id: 'old-mark', type: 'mark' }],
-    }) as any
-    const battle = makeState({ pieces: [target] }) as any
-    const firstFlow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    })
+    const battle = makeState({ pieces: [target] })
+    const firstFlow = createFlowRuntime(battle, { piece: target }, 'skill', {})
     const staleReference = { pieceId: 'caster', instanceId: 'caster:status:0' }
 
     firstFlow.entityExtension.declare('status', staleReference, 'content', 'oldValue', 'number', [], 1)
     target.statusTags = [{ id: 'replacement-mark', type: 'mark' }]
 
     const restored = JSON.parse(JSON.stringify(battle))
-    const restoredFlow = createFlowRuntime(restored, {}, surface, {}) as any
+    const restoredFlow = createFlowRuntime(restored, {}, surface, {})
 
     // A new runtime has no execution-local tombstone map. It must still not
     // infer the deleted identity from the replacement's array index.
@@ -81,7 +81,7 @@ describe('concrete author entity extensions', () => {
       skills: [{ skillId: 'same', instanceId: 'caster:skill:0' }],
     })
     const battle = makeState({ pieces: [target] })
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
     const handle = flow.skills.instances('caster').instances[0]
 
     flow.entityExtension.declare('skill', handle, 'alpha', 'shared', 'number', [], 1)
@@ -100,7 +100,7 @@ describe('concrete author entity extensions', () => {
       skills: [{ skillId: 'same', instanceId: 'caster:skill:0' }],
     })
     const battle = makeState({ pieces: [target] })
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
     const handle = flow.skills.instances('caster').instances[0]
 
     flow.entityExtension.declare('skill', handle, 'a.b', 'c', 'number', [], 1)
@@ -137,12 +137,13 @@ describe('concrete author entity extensions', () => {
   })
 
   it('keeps card, Cluster, status, and tile-effect writes on the authoritative objects', () => {
-    const target = makePiece({ instanceId: 'caster', statusTags: [{ id: 'mark', type: 'mark' }] }) as any
+    const target = asPieceInstance(makePiece({ instanceId: 'caster', statusTags: [{ id: 'mark', type: 'mark' }] }))
     target.abilityGroups = [{ id: 'group', instanceId: 'group:0', skills: [], rules: [] }]
-    const battle = makeState({ pieces: [target] }) as any
+    const battle = makeState({ pieces: [target] })
+    const extensions = battle.extensions ?? (battle.extensions = {})
     battle.players[0].hand.push({ cardId: 'card', instanceId: 'card:0', ownerPlayerId: 'player-red' })
-    battle.extensions.tileEffects = [{ id: 'tile:0', tileType: 'aura', x: 1, y: 1 }]
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    extensions.tileEffects = [{ id: 'tile:0', tileType: 'aura', x: 1, y: 1 }]
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
 
     const status = flow.status.instances('caster').statuses[0]
     // Execution-local status handles preserve the legacy object exactly; a
@@ -165,7 +166,7 @@ describe('concrete author entity extensions', () => {
     expect(target.statusTags[0].instanceId).toBeUndefined()
     expect(target.abilityGroups[0].extension).toEqual({ value: 9 })
     expect(battle.players[0].hand[0].extension).toEqual({ value: 9 })
-    expect(battle.extensions.tileEffects[0].extension).toEqual({ value: 9 })
+    expect(battle.extensions?.tileEffects?.[0]?.extension).toEqual({ value: 9 })
 
     flow.entityExtension.read('status', { pieceId: 'caster', instanceId: 'caster:status:0' }, 'content', 'value', '', 'number', [])
     expect(target.statusTags[0].instanceId).toBe('caster:status:0')
@@ -224,7 +225,7 @@ describe('concrete author entity extensions', () => {
   it('rejects declaration type changes and leaves the entity untouched after invalid writes', () => {
     const target = makePiece({ instanceId: 'caster', skills: [{ skillId: 'one', instanceId: 'caster:skill:0' }] })
     const battle = makeState({ pieces: [target] })
-    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { piece: target }, 'skill', {})
     const handle = flow.skills.instances('caster').instances[0]
     flow.entityExtension.declare('skill', handle, 'content', 'state', 'number', [], 3)
     expect(() => flow.entityExtension.declare('skill', handle, 'content', '__proto__', 'number', [], 1)).toThrow()

@@ -5,10 +5,10 @@ import { makePiece, makeState } from '../helpers/minimal-state'
 
 describe('player status identity persistence', () => {
   it('serializes a player status handle with an exact owner identity for pending flow', () => {
-    const battle = makeState() as any
+    const battle = makeState()
     const player = battle.players[0]
     player.statusTags = [{ id: 'mark', type: 'mark' }]
-    const flow = createFlowRuntime(battle, { playerId: player.playerId }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { playerId: player.playerId }, 'skill', {})
     const handle = flow.status.instances(player.playerId, 'player').statuses[0]
 
     // Enumerating legacy statuses remains mutation-free until the reference is
@@ -23,7 +23,7 @@ describe('player status identity persistence', () => {
     })
 
     const restored = JSON.parse(JSON.stringify(battle))
-    const resumed = createFlowRuntime(restored, {}, 'pending', {}) as any
+    const resumed = createFlowRuntime(restored, {}, 'pending', {})
     resumed.entityExtension.declare('status', serializedReference, 'content', 'uses', 'number', [], 1)
     resumed.entityExtension.write('status', serializedReference, 'content', 'uses', '', 'number', [], 2)
 
@@ -32,10 +32,10 @@ describe('player status identity persistence', () => {
   })
 
   it('does not rebind a retired player status reference after replacement and restore', () => {
-    const battle = makeState() as any
+    const battle = makeState()
     const player = battle.players[0]
     player.statusTags = [{ id: 'old-mark', type: 'mark' }]
-    const flow = createFlowRuntime(battle, { playerId: player.playerId }, 'skill', {}) as any
+    const flow = createFlowRuntime(battle, { playerId: player.playerId }, 'skill', {})
     const handle = flow.status.instances(player.playerId, 'player').statuses[0]
     const serializedReference = JSON.parse(JSON.stringify(handle))
 
@@ -43,7 +43,7 @@ describe('player status identity persistence', () => {
     player.statusTags = [{ id: 'replacement-mark', type: 'mark' }]
 
     const restored = JSON.parse(JSON.stringify(battle))
-    const resumed = createFlowRuntime(restored, {}, 'pending', {}) as any
+    const resumed = createFlowRuntime(restored, {}, 'pending', {})
     expect(() => resumed.entityExtension.declare(
       'status', serializedReference, 'content', 'uses', 'number', [], 1,
     )).toThrow('已经失效')
@@ -52,11 +52,11 @@ describe('player status identity persistence', () => {
   })
 
   it('reads piece status instances by stable id from active pieces and graveyard without minting ids', () => {
-    const active = makeState({ pieces: [makePiece({ instanceId: 'active-piece', ownerPlayerId: 'player-red' })] }) as any
+    const active = makeState({ pieces: [makePiece({ instanceId: 'active-piece', ownerPlayerId: 'player-red' })] })
     const activePiece = active.pieces[0]
     activePiece.statusTags = [{ id: 'active-mark', type: 'mark' }]
     active.graveyard = [{ ...activePiece, instanceId: 'departed', statusTags: [{ id: 'dead-mark', type: 'mark' }] }]
-    const flow = createFlowRuntime(active, {}, 'skill', {}) as any
+    const flow = createFlowRuntime(active, {}, 'skill', {})
 
     const activeResult = flow.status.instancesById(activePiece.instanceId)
     const graveyardResult = flow.status.instancesById('departed')

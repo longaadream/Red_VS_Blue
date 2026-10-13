@@ -978,7 +978,7 @@ function parseGraph(value, context13 = { active: /* @__PURE__ */ new Set() }, ro
   const bindings = hostBindings(record3.hostBindings, surface, rootPath + ".hostBindings");
   const continuationValues = continuationList(record3.continuations, { active: active3 }, rootPath + ".continuations");
   const hostInputPorts = [];
-  if (surface === "pending") for (const [name, type2] of Object.entries(bindings)) hostInputPorts.push({ name, type: type2 });
+  if (surface === "pending") for (const [name, type] of Object.entries(bindings)) hostInputPorts.push({ name, type });
   const normalizedInputs = inputPorts.length ? inputPorts : hostInputPorts;
   const inputNames = /* @__PURE__ */ new Set();
   for (const input45 of normalizedInputs) {
@@ -1334,15 +1334,15 @@ function parameterValues(value, declarations, path) {
 function valueType(value, environment, path) {
   if (value.kind === "literal") return typeOfLiteral(value.value);
   if (value.kind === "input") {
-    const type3 = environment.inputs.get(value.name);
-    if (!type3) fail2('unknown input "' + value.name + '"', path, "GAMEPLAY_MODULE_UNKNOWN_INPUT");
-    return type3;
+    const type2 = environment.inputs.get(value.name);
+    if (!type2) fail2('unknown input "' + value.name + '"', path, "GAMEPLAY_MODULE_UNKNOWN_INPUT");
+    return type2;
   }
   const binding = environment.bindings.get(value.node);
   if (!binding) fail2("output is not in scope or does not dominate this statement", path, "GAMEPLAY_MODULE_OUTPUT_SCOPE");
-  const type2 = binding.get(value.port);
-  if (!type2) fail2('unknown output port "' + value.node + "." + value.port + '"', path, "GAMEPLAY_MODULE_UNKNOWN_OUTPUT");
-  return type2;
+  const type = binding.get(value.port);
+  if (!type) fail2('unknown output port "' + value.node + "." + value.port + '"', path, "GAMEPLAY_MODULE_UNKNOWN_OUTPUT");
+  return type;
 }
 function previewSafe(effects4) {
   if (effects4.previewSafe === false) return false;
@@ -1381,9 +1381,9 @@ function parameterValueType(value, resolver, path) {
       fail2("invalid value type descriptor", path, "GAMEPLAY_MODULE_INVALID_TYPE");
     }
   }
-  const type2 = typeValue(parsed, path);
-  validateTypeSchemas(type2, resolver.schemas, path);
-  return type2;
+  const type = typeValue(parsed, path);
+  validateTypeSchemas(type, resolver.schemas, path);
+  return type;
 }
 function resolveRecordSchema(resolver, reference, path) {
   return schemaFor(resolver.schemas, reference, path);
@@ -1458,8 +1458,8 @@ function collectCollectionReturns(list2, resolver, environment, path, validateCo
       for (const key of Object.keys(fields5)) {
         const field3 = declared.get(key);
         if (!field3) fail2('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
-        const type2 = valueType(fields5[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
-        if (!assignable(type2, effective(field3))) fail2('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type2), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+        const type = valueType(fields5[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
+        if (!assignable(type, effective(field3))) fail2('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
       }
       bindings.set(node.id, /* @__PURE__ */ new Map([["value", recordType(actual.schema)]]));
     } else if (node.kind === "collection") {
@@ -1605,8 +1605,8 @@ function validateBody(list2, resolver, environment, outputs, path, active3, dept
         resolveRecordSchema(resolver, String(params[binding.parameter]), nodePath + ".parameters." + binding.parameter);
         const value = node.inputs?.[name];
         if (value !== void 0) {
-          const type2 = { kind: "record", schema: String(params[binding.parameter]) };
-          const expected = binding.list ? { kind: "list", element: type2 } : type2;
+          const type = { kind: "record", schema: String(params[binding.parameter]) };
+          const expected = binding.list ? { kind: "list", element: type } : type;
           if (!assignable(valueType(value, { inputs: environment.inputs, bindings }, nodePath + ".inputs." + name), expected)) fail2("input must use declared record schema", nodePath + ".inputs." + name, "GAMEPLAY_MODULE_PORT_TYPE");
         }
       }
@@ -1614,23 +1614,23 @@ function validateBody(list2, resolver, environment, outputs, path, active3, dept
       const outputTypes = /* @__PURE__ */ new Map();
       for (const output of outputPorts) {
         const binding = resolved.kind === "native" ? resolved.descriptor.outputTypeBindings?.[output.name] : void 0;
-        let type2 = effective(output);
+        let type = effective(output);
         const valueBinding = resolved.kind === "native" ? resolved.descriptor.outputValueTypeBindings?.[output.name] : void 0;
-        if (valueBinding) type2 = parameterValueType(params[valueBinding.parameter], resolver, nodePath + ".parameters." + valueBinding.parameter);
+        if (valueBinding) type = parameterValueType(params[valueBinding.parameter], resolver, nodePath + ".parameters." + valueBinding.parameter);
         const fieldBinding3 = resolved.kind === "native" ? resolved.descriptor.outputParameterTypeBindings?.[output.name] : void 0;
         if (fieldBinding3) {
           const selected = params[fieldBinding3.parameter];
           if (typeof selected !== "string") fail2("field type binding parameter must select a string field", nodePath + ".parameters." + fieldBinding3.parameter, "GAMEPLAY_MODULE_INVALID_TYPE_BINDING");
           const selectedType2 = fieldBinding3.types[selected];
           if (!selectedType2) fail2('unknown field "' + selected + '"', nodePath + ".parameters." + fieldBinding3.parameter, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
-          type2 = selectedType2;
-          if (output.type !== "any" && output.type !== "unknown" && !assignable(type2, effective(output))) fail2("field type does not match its output declaration", nodePath + ".module.outputs." + output.name, "GAMEPLAY_MODULE_INVALID_TYPE_BINDING");
+          type = selectedType2;
+          if (output.type !== "any" && output.type !== "unknown" && !assignable(type, effective(output))) fail2("field type does not match its output declaration", nodePath + ".module.outputs." + output.name, "GAMEPLAY_MODULE_INVALID_TYPE_BINDING");
         }
         const schemaBinding = resolved.kind === "native" ? resolved.descriptor.outputSchemaBindings?.[output.name] : void 0;
         if (schemaBinding) {
           resolveRecordSchema(resolver, String(params[schemaBinding.parameter]), nodePath + ".parameters." + schemaBinding.parameter);
           const record3 = { kind: "record", schema: String(params[schemaBinding.parameter]) };
-          type2 = schemaBinding.list ? { kind: "list", element: record3 } : record3;
+          type = schemaBinding.list ? { kind: "list", element: record3 } : record3;
         }
         if (binding) {
           const supplied = node.inputs?.[binding.input];
@@ -1638,12 +1638,12 @@ function validateBody(list2, resolver, environment, outputs, path, active3, dept
           const inputType = valueType(supplied, { inputs: environment.inputs, bindings }, nodePath + ".inputs." + binding.input);
           if (binding.projection === "element") {
             if (typeof inputType !== "object" || inputType.kind !== "list") fail2("element type binding requires a collection", nodePath + ".inputs." + binding.input, "GAMEPLAY_MODULE_PORT_TYPE");
-            type2 = inputType.element;
-          } else type2 = binding.projection === "singleton" ? { kind: "list", element: inputTypes.get(binding.input) } : inputType;
-          if (output.nullable && !(typeof type2 === "object" && type2.kind === "nullable")) type2 = { kind: "nullable", value: type2 };
-          if (!assignable(type2, effective(output))) fail2("inferred output type does not match its declaration", nodePath + ".module", "GAMEPLAY_MODULE_REGISTRY_INVALID");
+            type = inputType.element;
+          } else type = binding.projection === "singleton" ? { kind: "list", element: inputTypes.get(binding.input) } : inputType;
+          if (output.nullable && !(typeof type === "object" && type.kind === "nullable")) type = { kind: "nullable", value: type };
+          if (!assignable(type, effective(output))) fail2("inferred output type does not match its declaration", nodePath + ".module", "GAMEPLAY_MODULE_REGISTRY_INVALID");
         }
-        outputTypes.set(output.name, type2);
+        outputTypes.set(output.name, type);
       }
       const metadata = { module: resolved, inputs: node.inputs ?? {}, parameters: params, inputTypes, outputTypes };
       resolver.calls.set(node, metadata);
@@ -1694,8 +1694,8 @@ function validateBody(list2, resolver, environment, outputs, path, active3, dept
       for (const key of Object.keys(node.fields ?? {})) {
         const field3 = declared.get(key);
         if (!field3) fail2('unknown record field "' + key + '"', nodePath + ".fields." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
-        const type2 = valueType(node.fields[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
-        if (!assignable(type2, effective(field3))) fail2('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type2), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
+        const type = valueType(node.fields[key], { inputs: environment.inputs, bindings }, nodePath + ".fields." + key);
+        if (!assignable(type, effective(field3))) fail2('record field "' + key + '" expects ' + typeName(effective(field3)) + ", got " + typeName(type), nodePath + ".fields." + key, "GAMEPLAY_MODULE_PORT_TYPE");
       }
       bindings.set(node.id, /* @__PURE__ */ new Map([["value", actual]]));
     } else if (node.kind === "collection") {
@@ -1788,8 +1788,8 @@ function emit(value, environment) {
 }
 function compileValueType(value, environment, resolver) {
   if (value.kind === "input") {
-    const type2 = environment.inputTypes?.get(value.name);
-    if (type2 !== void 0) return type2;
+    const type = environment.inputTypes?.get(value.name);
+    if (type !== void 0) return type;
     const port46 = resolver.graph.inputs.find((entry) => entry.name === value.name);
     return port46 === void 0 ? void 0 : effective(port46);
   }
@@ -1797,19 +1797,19 @@ function compileValueType(value, environment, resolver) {
 }
 function listElement(value, environment, resolver) {
   if (value.kind === "literal") {
-    const type3 = typeOfLiteral(value.value);
-    return typeof type3 === "object" && type3.kind === "list" ? type3.element : "record";
+    const type2 = typeOfLiteral(value.value);
+    return typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
   }
   if (value.kind === "input") {
-    const type3 = environment.inputTypes?.get(value.name) ?? (() => {
+    const type2 = environment.inputTypes?.get(value.name) ?? (() => {
       const port46 = resolver.graph.inputs.find((entry) => entry.name === value.name);
       return port46 === void 0 ? void 0 : effective(port46);
     })();
-    return type3 && typeof type3 === "object" && type3.kind === "list" ? type3.element : "record";
+    return type2 && typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
   }
   const binding = environment.bindings.get(value.node);
-  const type2 = binding?.ports.get(value.port);
-  return type2 && typeof type2 === "object" && type2.kind === "list" ? type2.element : "record";
+  const type = binding?.ports.get(value.port);
+  return type && typeof type === "object" && type.kind === "list" ? type.element : "record";
 }
 function inputExpressions(node, metadata, environment) {
   const result = /* @__PURE__ */ Object.create(null);
@@ -1998,8 +1998,8 @@ function emitCollection(node, environment, state2, outputs, active3, depth) {
   const itemInputTypes = /* @__PURE__ */ new Map();
   for (const [key, value] of Object.entries(node.inputs ?? {})) itemInputs.set(key, captured(value));
   for (const [key, value] of Object.entries(node.inputs ?? {})) {
-    const type2 = compileValueType(value, environment, state2.resolver);
-    if (type2) itemInputTypes.set(key, type2);
+    const type = compileValueType(value, environment, state2.resolver);
+    if (type) itemInputTypes.set(key, type);
   }
   itemInputs.set(names.item, item);
   itemInputs.set(names.index, index);
@@ -2451,7 +2451,7 @@ var numberType = "number";
 var booleanType = "boolean";
 var stringType = "string";
 var cellType = "cell";
-var port2 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port2 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var read = (domains) => ({ pure: true, previewSafe: false, reads: domains });
 var write = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
 var define2 = (value) => ({ version: "1", allowedSurfaces: ACTIVE_SURFACES, ...value });
@@ -2545,7 +2545,7 @@ var TERRAIN_FACT_MODULES = [{
 
 // lib/skill-graph/module-registry-query.ts
 var active = ["skill", "card", "rule", "triggerSkill", "pending"];
-var port3 = (name, type2) => ({ name, type: type2 });
+var port3 = (name, type) => ({ name, type });
 var flow2 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var context2 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
 var battle2 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -2923,7 +2923,7 @@ function resolveRecordSchema2(reference, schemas) {
   if (matches.length > 1) throw new Error("extension\uFF1A\u8BB0\u5F55\u7C7B\u578B\u7248\u672C\u4E0D\u660E\u786E");
   return matches[0];
 }
-function authorValueSchemas(type2, schemas) {
+function authorValueSchemas(type, schemas) {
   const selected = [];
   const visit = (value) => {
     if (typeof value === "string") return;
@@ -2940,7 +2940,7 @@ function authorValueSchemas(type2, schemas) {
     selected.push(schema2);
     schema2.fields.forEach((field3) => visit(field3.type));
   };
-  visit(type2);
+  visit(type);
   return selected.sort((a, b) => (a.id + "@" + a.version).localeCompare(b.id + "@" + b.version));
 }
 
@@ -3008,8 +3008,8 @@ var AUTHOR_CARD_MODULES = [{
   ui: { category: "card", authoring: "standard" },
   lower: (ctx) => {
     const raw = String(ctx.parameters.extensionType);
-    const type2 = raw.startsWith("{") ? JSON.parse(raw) : raw;
-    const initial = ctx.inputs.extension ? `{value:${ctx.inputs.extension},type:${JSON.stringify(type2)},schemas:${JSON.stringify(authorValueSchemas(type2, ctx.recordSchemas ?? []))}}` : "undefined";
+    const type = raw.startsWith("{") ? JSON.parse(raw) : raw;
+    const initial = ctx.inputs.extension ? `{value:${ctx.inputs.extension},type:${JSON.stringify(type)},schemas:${JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? []))}}` : "undefined";
     return `${ctx.surface === "pending" ? "ctx.flow" : "flow"}.cards.gain(${ctx.inputs.player},${ctx.inputs.card},${initial})`;
   }
 }];
@@ -3202,8 +3202,8 @@ var CURRENT_SKILL_FIELDS = Object.freeze({
   owner: pieceType2
 });
 var WRITABLE_CURRENT_SKILL_FIELDS = ["currentCooldown", "usesRemaining", "level"];
-var port4 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter2 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter2 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow4 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input2 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -3361,7 +3361,7 @@ var AUTHOR_CODE_BLOCK_EFFECTS = Object.freeze({
   pending: true,
   writes: ["execution-context"]
 });
-var port5 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var parameter3 = (name, options2 = {}) => ({ name, type: AUTHOR_CODE_BLOCK_STRING, ...options2 });
 function input3(ctx, name) {
   const value = ctx.inputs[name];
@@ -3371,16 +3371,16 @@ function input3(ctx, name) {
 function resultTypeLiteral(ctx) {
   const raw = ctx.parameters.resultType;
   if (raw === void 0) throw new Error(`module ${ctx.moduleId}: missing result type`);
-  let type2 = raw;
+  let type = raw;
   if (typeof raw === "string" && raw.trimStart().startsWith("{")) {
     try {
-      type2 = JSON.parse(raw);
+      type = JSON.parse(raw);
     } catch {
       throw new Error(`module ${ctx.moduleId}: result type is not valid JSON`);
     }
   }
   return ctx.emitLiteral({
-    type: type2,
+    type,
     schemas: ctx.recordSchemas ?? []
   });
 }
@@ -3462,11 +3462,11 @@ var AUTHOR_CONTAINER_MODULES = operations.map((operation) => {
     version: map && ["map.has-key", "map.keys", "map.values"].includes(operation.id) ? "2" : "1",
     label: operation.label,
     description: "\u8FD4\u56DE\u65B0\u5BB9\u5668\uFF1B\u539F\u53D8\u91CF\u4E0D\u4F1A\u88AB\u9690\u5F0F\u4FEE\u6539\u3002\u6620\u5C04\u4FDD\u7559\u952E\u7684\u7C7B\u578B\uFF0C\u96C6\u5408\u53BB\u91CD\uFF0C\u5143\u7EC4\u4FDD\u7559\u987A\u5E8F\u4E0E\u91CD\u590D\u9879\u3002",
-    inputs: operation.inputs.map(([name, label, type2]) => ({ name, label, type: defaults2[type2] })),
+    inputs: operation.inputs.map(([name, label, type]) => ({ name, label, type: defaults2[type] })),
     inputValueTypeBindings: Object.fromEntries(operation.inputs.map(([name, , parameter39]) => [name, { parameter: parameter39 }])),
     outputs: [{ name: "value", label: "\u7ED3\u679C", type: boundOutput ? defaults2[boundOutput] : operation.output }],
     ...boundOutput ? { outputValueTypeBindings: { value: { parameter: boundOutput } } } : {},
-    parameters: Object.entries(defaults2).map(([name, type2]) => ({ name, type: "string", label: "\u63A8\u5BFC\u7C7B\u578B", default: typeof type2 === "string" ? type2 : JSON.stringify(type2) })),
+    parameters: Object.entries(defaults2).map(([name, type]) => ({ name, type: "string", label: "\u63A8\u5BFC\u7C7B\u578B", default: typeof type === "string" ? type : JSON.stringify(type) })),
     allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
     effects: { pure: true, previewSafe: false },
     ui: { category: "calculation", authoring: "standard" },
@@ -3474,7 +3474,7 @@ var AUTHOR_CONTAINER_MODULES = operations.map((operation) => {
       const container = decode3(ctx.parameters.containerType);
       if (typeof container !== "object" || container.kind !== (map ? "map" : "set")) throw new Error("\u5BB9\u5668\u7C7B\u578B\u4E0D\u6B63\u786E");
       const expected = container.kind === "map" ? { keyType: container.key, valueType: container.value, keysType: list(container.key), valuesType: list(container.value) } : container.kind === "set" ? { valueType: container.element, itemsType: list(container.element) } : {};
-      for (const [name, type2] of Object.entries(expected)) if (!same3(type2, decode3(ctx.parameters[name]))) throw new Error("\u5BB9\u5668\u53C2\u6570\u7C7B\u578B\u4E0D\u4E00\u81F4");
+      for (const [name, type] of Object.entries(expected)) if (!same3(type, decode3(ctx.parameters[name]))) throw new Error("\u5BB9\u5668\u53C2\u6570\u7C7B\u578B\u4E0D\u4E00\u81F4");
       const expression2 = `${ctx.surface === "pending" ? "ctx.flow" : "flow"}.containers.${operation.method}(${operation.inputs.map(([name]) => ctx.inputs[name]).join(",")})`;
       return operation.id === "map.get" ? `(function(result){if(!result.found)throw new Error("\u6620\u5C04\u4E2D\u4E0D\u5B58\u5728\u6B64\u952E");return result.value;})(${expression2})` : expression2;
     }
@@ -3491,8 +3491,8 @@ var pieceType3 = "piece";
 var playerType2 = "player";
 var nullableStringType = { kind: "nullable", value: stringType3 };
 var recordListType2 = { kind: "list", element: recordType4 };
-var port6 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter4 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter4 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input4 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -3594,7 +3594,7 @@ var ACTIVE = ["skill", "card", "rule", "triggerSkill", "pending"];
 var recordListType3 = { kind: "list", element: "record" };
 var statusType = "status";
 var booleanType4 = "boolean";
-var port7 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow7 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input5 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -3666,8 +3666,8 @@ var recordType5 = "record";
 var stringType4 = "string";
 var entityType = "record";
 var kindType = "string";
-var port8 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter5 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow8 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input6 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -3687,8 +3687,8 @@ var commonParameters = [
 var readParameters = [...commonParameters.slice(0, 3), parameter5("path", stringType4, { default: "", optional: true }), commonParameters[3]];
 var pureRead2 = { pure: true, previewSafe: false, reads: ["entity-extensions"] };
 var entityInput = port8("entity", entityType, { label: "\u5B9E\u4F53\u5B9E\u4F8B" });
-function declarationSchemas(ctx, type2) {
-  return JSON.stringify(authorValueSchemas(type2, ctx.recordSchemas ?? []));
+function declarationSchemas(ctx, type) {
+  return JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? []));
 }
 var declare = {
   id: "extension.declare-instance",
@@ -3767,7 +3767,7 @@ var numberType3 = "number";
 var nullableStringType2 = { kind: "nullable", value: stringType5 };
 var eventListType = { kind: "list", element: eventType };
 var anyListType = { kind: "list", element: "any" };
-var port9 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input7 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -3865,9 +3865,6 @@ var PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES = Object.freeze([
     ui: { category: "collection", authoring: "standard" }
   })
 ]);
-var PROJECTILE_QUERY_HOST_GAMEPLAY_MODULE_IDS = new Set(
-  PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES.map((descriptor3) => `${descriptor3.id}@${descriptor3.version}`)
-);
 
 // lib/skill-graph/module-registry-damage-redirect.ts
 var DAMAGE_REDIRECT_GAMEPLAY_MODULES = [
@@ -3954,8 +3951,8 @@ var numberType4 = "number";
 var booleanType5 = "boolean";
 var stringType6 = "string";
 var recordType7 = "record";
-var port10 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter6 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter6 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow11 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle4 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var input8 = (ctx, name) => {
@@ -4142,9 +4139,9 @@ var STATUS_PRIMITIVES = [
     effects: pure4(["statuses", "pieces"]),
     lower: (ctx) => {
       const target = input8(ctx, "target");
-      const type2 = literal(ctx, "statusType");
+      const type = literal(ctx, "statusType");
       const query = flow11(ctx);
-      return `(function(pieceId, statusType) { var piece = ${query}.query.piece(pieceId); var tag = ((piece && piece.statusTags) || []).find(function(item) { return item && item.type === statusType && item.ownerId === pieceId; }); var allyId = tag && typeof tag.allyId === "string" && ${query}.query.hasPiece(tag.allyId) && ${query}.query.piece(tag.allyId).currentHp > 0 ? tag.allyId : null; return {found: Boolean(tag), id: tag && typeof tag.id === "string" ? tag.id : "", flightId: tag && typeof tag.flightId === "string" ? tag.flightId : "", allyId: allyId, x: tag && Number.isFinite(tag.x) ? tag.x : 0, y: tag && Number.isFinite(tag.y) ? tag.y : 0, allyX: tag && Number.isFinite(tag.allyX) ? tag.allyX : 0, allyY: tag && Number.isFinite(tag.allyY) ? tag.allyY : 0, appliedTurn: tag && Number.isFinite(tag.appliedTurn) ? tag.appliedTurn : -1, currentDuration: tag && Number.isFinite(tag.currentDuration) ? tag.currentDuration : 0}; })(${target}, ${type2})`;
+      return `(function(pieceId, statusType) { var piece = ${query}.query.piece(pieceId); var tag = ((piece && piece.statusTags) || []).find(function(item) { return item && item.type === statusType && item.ownerId === pieceId; }); var allyId = tag && typeof tag.allyId === "string" && ${query}.query.hasPiece(tag.allyId) && ${query}.query.piece(tag.allyId).currentHp > 0 ? tag.allyId : null; return {found: Boolean(tag), id: tag && typeof tag.id === "string" ? tag.id : "", flightId: tag && typeof tag.flightId === "string" ? tag.flightId : "", allyId: allyId, x: tag && Number.isFinite(tag.x) ? tag.x : 0, y: tag && Number.isFinite(tag.y) ? tag.y : 0, allyX: tag && Number.isFinite(tag.allyX) ? tag.allyX : 0, allyY: tag && Number.isFinite(tag.allyY) ? tag.allyY : 0, appliedTurn: tag && Number.isFinite(tag.appliedTurn) ? tag.appliedTurn : -1, currentDuration: tag && Number.isFinite(tag.currentDuration) ? tag.currentDuration : 0}; })(${target}, ${type})`;
     },
     ui: { category: "status" }
   }),
@@ -4180,8 +4177,8 @@ var choiceType = "choice";
 var numberType5 = "number";
 var booleanType6 = "boolean";
 var stringType7 = "string";
-var port11 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter7 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter7 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input9 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -4534,9 +4531,9 @@ var STATUS_EVENT_GAMEPLAY_MODULES = [
     parameters: [{ name: "statusType", type: "string" }, { name: "legacyStrings", type: "string", enum: ["ignore", "exact", "contains"], default: "ignore" }],
     effects: { pure: true, previewSafe: false, reads: ["statuses"] },
     lower: (ctx) => {
-      const type2 = ctx.emitLiteral(ctx.parameters.statusType);
-      const stringMatch = ctx.parameters.legacyStrings === "exact" ? `tag === ${type2}` : ctx.parameters.legacyStrings === "contains" ? `tag.includes(${type2})` : "false";
-      return `(${flow13(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).some(function(tag) { return typeof tag === 'string' ? ${stringMatch} : Boolean(tag && tag.type === ${type2}); })`;
+      const type = ctx.emitLiteral(ctx.parameters.statusType);
+      const stringMatch = ctx.parameters.legacyStrings === "exact" ? `tag === ${type}` : ctx.parameters.legacyStrings === "contains" ? `tag.includes(${type})` : "false";
+      return `(${flow13(ctx)}.query.piece(${ctx.inputs.piece}).statusTags || []).some(function(tag) { return typeof tag === 'string' ? ${stringMatch} : Boolean(tag && tag.type === ${type}); })`;
     },
     ui: { category: "status" }
   }),
@@ -4859,8 +4856,8 @@ var stringType8 = "string";
 var numberType6 = "number";
 var booleanType7 = "boolean";
 var choiceType2 = "choice";
-var port12 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter8 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port12 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter8 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure6 = (reads = []) => ({ pure: true, previewSafe: false, reads });
 var pureValue = () => ({ pure: true, previewSafe: true });
 var writes3 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
@@ -5042,8 +5039,8 @@ var descriptors = [
     allowedSurfaces: ACTIVE4,
     effects: writes3(["damage", "events"], ["beforeDamageDealt", "afterDamageDealt"]),
     lower: (ctx) => {
-      const type2 = enumLiteral(ctx, "damageType", ["normal", "true", "toxin"], "normal");
-      const engineType = type2 === '"normal"' ? '"physical"' : type2;
+      const type = enumLiteral(ctx, "damageType", ["normal", "true", "toxin"], "normal");
+      const engineType = type === '"normal"' ? '"physical"' : type;
       const skillId = Object.prototype.hasOwnProperty.call(ctx.parameters, "skillId") ? stringLiteral(ctx, "skillId") : `${ctx.surface === "pending" ? "ctx" : "context"}.skill?.id || ${ctx.surface === "pending" ? "ctx" : "context"}.ruleId || "flow"`;
       const policy = Object.prototype.hasOwnProperty.call(ctx.parameters, "inputPolicy") ? `, ${enumLiteral(ctx, "inputPolicy", ["floor", "host"])}` : "";
       const call = `${flow15(ctx)}.effects.damageWithKiller(${input10(ctx, "source")}, ${input10(ctx, "target")}, ${input10(ctx, "amount")}, ${engineType}, ${skillId}, ${input10(ctx, "killerPlayer")}${policy})`;
@@ -5077,8 +5074,8 @@ var pieceType8 = "piece";
 var stringType9 = "string";
 var choiceType3 = "choice";
 var stringListType = { kind: "list", element: stringType9 };
-var port13 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter9 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port13 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter9 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure7 = (reads = []) => ({
   pure: true,
   previewSafe: true,
@@ -5507,8 +5504,8 @@ var cellListType = { kind: "list", element: cellType5 };
 var choiceListType = { kind: "list", element: choiceType4 };
 var MARKER_STORAGE_KEYS = ["minatoAnchors"];
 var TURN_STORAGE_KEYS = ["turalyonLightforgedTurns"];
-var port14 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter10 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port14 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter10 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input12 = (ctx, name, fallback) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) {
@@ -6126,8 +6123,8 @@ var MARK_PRIMITIVES = [
     effects: writes5(["status", "events"], ["afterStatusApplied"]),
     lower: (ctx) => {
       const query = runtime2(ctx), state2 = battle6(ctx);
-      const type2 = stringLiteral3(ctx, "statusType"), name = stringLiteral3(ctx, "statusName"), prefix = stringLiteral3(ctx, "statusIdPrefix");
-      return `(function(targetId, sourceId) { var target = (${state2}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = Array.isArray(target.statusTags) ? target.statusTags : []; var existing = target.statusTags.find(function(tag) { return tag && tag.type === ${type2} && tag.sourceId === sourceId; }); if (existing) { existing.stacks = (existing.stacks || 1) + 1; existing.currentDuration = -1; return true; } var id = ${prefix} + "-" + sourceId + "-" + targetId + "-" + Date.now(); return Boolean(${query}.status.add(targetId, {id:id, type:${type2}, name:${name}, visible:true, currentDuration:-1, currentUses:-1, intensity:1, stacks:1, sourceId:sourceId}, "piece", "host")); })(${pieceId(ctx, "target")}, ${pieceId(ctx, "source")})`;
+      const type = stringLiteral3(ctx, "statusType"), name = stringLiteral3(ctx, "statusName"), prefix = stringLiteral3(ctx, "statusIdPrefix");
+      return `(function(targetId, sourceId) { var target = (${state2}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = Array.isArray(target.statusTags) ? target.statusTags : []; var existing = target.statusTags.find(function(tag) { return tag && tag.type === ${type} && tag.sourceId === sourceId; }); if (existing) { existing.stacks = (existing.stacks || 1) + 1; existing.currentDuration = -1; return true; } var id = ${prefix} + "-" + sourceId + "-" + targetId + "-" + Date.now(); return Boolean(${query}.status.add(targetId, {id:id, type:${type}, name:${name}, visible:true, currentDuration:-1, currentUses:-1, intensity:1, stacks:1, sourceId:sourceId}, "piece", "host")); })(${pieceId(ctx, "target")}, ${pieceId(ctx, "source")})`;
     },
     ui: { category: "status" }
   }),
@@ -6140,8 +6137,8 @@ var MARK_PRIMITIVES = [
     parameters: [parameter10("statusType", stringType10)],
     effects: writes5(["status"], ["afterStatusRemoved"]),
     lower: (ctx) => {
-      const state2 = battle6(ctx), type2 = stringLiteral3(ctx, "statusType");
-      return `(function(targetId, sourceId) { var target = (${state2}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = (target.statusTags || []).filter(function(tag) { return !(tag && tag.type === ${type2} && tag.sourceId === sourceId); }); return true; })(${pieceId(ctx, "target")}, ${pieceId(ctx, "source")})`;
+      const state2 = battle6(ctx), type = stringLiteral3(ctx, "statusType");
+      return `(function(targetId, sourceId) { var target = (${state2}.pieces || []).find(function(piece) { return piece && piece.instanceId === targetId; }); if (!target || !sourceId) return false; target.statusTags = (target.statusTags || []).filter(function(tag) { return !(tag && tag.type === ${type} && tag.sourceId === sourceId); }); return true; })(${pieceId(ctx, "target")}, ${pieceId(ctx, "source")})`;
     },
     ui: { category: "status" }
   })
@@ -6184,7 +6181,7 @@ var PENDING_SPATIAL_GAMEPLAY_MODULES = Object.freeze([
 
 // lib/skill-graph/module-registry-card-operations.ts
 var input13 = (ctx, name) => ctx.inputs[name];
-var port15 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port15 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var active2 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var read4 = (domains) => ({ pure: true, previewSafe: false, reads: domains });
 var write3 = (domains, events = []) => ({ pure: false, previewSafe: false, writes: domains, events });
@@ -6594,8 +6591,8 @@ var cellListType2 = { kind: "list", element: cellType6 };
 var eventListType2 = { kind: "list", element: eventType2 };
 var numberListType = { kind: "list", element: numberType9 };
 var stringListType2 = { kind: "list", element: stringType11 };
-var port16 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter11 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port16 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter11 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input14 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -7527,9 +7524,9 @@ var flow19 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var valueType2 = (ctx) => {
   const raw = ctx.parameters.valueType;
   if (typeof raw !== "string") throw new Error(`module ${ctx.moduleId}: valueType is required`);
-  const type2 = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
-  const schemas = authorValueSchemas(type2, ctx.recordSchemas ?? []);
-  return { type: JSON.stringify(type2), schemas: JSON.stringify(schemas) };
+  const type = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
+  const schemas = authorValueSchemas(type, ctx.recordSchemas ?? []);
+  return { type: JSON.stringify(type), schemas: JSON.stringify(schemas) };
 };
 var activeSurfaces2 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var localParameters = [{ name: "valueType", type: "string", label: "\u503C\u7C7B\u578B", default: "number" }];
@@ -7770,8 +7767,8 @@ var cellListType3 = { kind: "list", element: cellType7 };
 var stringListType3 = { kind: "list", element: stringType13 };
 var recordListType5 = { kind: "list", element: recordType10 };
 var eventListType3 = { kind: "list", element: eventType3 };
-var port17 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter12 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port17 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter12 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow20 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input16 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -8127,9 +8124,9 @@ var MOVEMENT_FAMILY_PRIMITIVES = [
     lower: (ctx) => {
       const target = input16(ctx, "target");
       const turn = input16(ctx, "turn");
-      const type2 = stringLiteral4(ctx, "statusType");
+      const type = stringLiteral4(ctx, "statusType");
       const runtime8 = flow20(ctx);
-      return `(function(pieceId,currentTurn){if(pieceId==null||!${runtime8}.query.hasPiece(pieceId))return false;var piece=${runtime8}.query.piece(pieceId),tags=Array.isArray(piece&&piece.statusTags)?piece.statusTags.slice():[];tags.forEach(function(tag){if(tag&&tag.type===${type2}&&Number(tag.turnNumber)!==Number(currentTurn)&&typeof tag.id==='string')${runtime8}.status.remove(pieceId,tag.id,"piece");});return true;})(${target},${turn})`;
+      return `(function(pieceId,currentTurn){if(pieceId==null||!${runtime8}.query.hasPiece(pieceId))return false;var piece=${runtime8}.query.piece(pieceId),tags=Array.isArray(piece&&piece.statusTags)?piece.statusTags.slice():[];tags.forEach(function(tag){if(tag&&tag.type===${type}&&Number(tag.turnNumber)!==Number(currentTurn)&&typeof tag.id==='string')${runtime8}.status.remove(pieceId,tag.id,"piece");});return true;})(${target},${turn})`;
     },
     ui: { category: "status" }
   }),
@@ -8245,8 +8242,8 @@ var MOVEMENT_FAMILY_GAMEPLAY_MODULES = Object.freeze(MOVEMENT_FAMILY_PRIMITIVES)
 
 // lib/skill-graph/module-registry-holy-support.ts
 var ACTIVE8 = ["skill", "card", "rule", "triggerSkill", "pending"];
-var port18 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter13 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port18 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter13 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var runtime4 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var HOLY_SUPPORT_GAMEPLAY_MODULES = Object.freeze([
   {
@@ -8931,8 +8928,8 @@ var booleanType14 = "boolean";
 var numberType13 = "number";
 var pieceType14 = "piece";
 var pieceListType6 = { kind: "list", element: pieceType14 };
-var port19 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter15 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port19 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter15 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow22 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle11 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var input18 = (ctx, name) => {
@@ -8996,8 +8993,8 @@ var playerType7 = "player";
 var recordType12 = (schema2) => ({ kind: "record", schema: schema2 });
 var stringListType5 = { kind: "list", element: stringType16 };
 var statusListType = { kind: "list", element: recordType12("followup-status@1") };
-var port20 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter16 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port20 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter16 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow23 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle12 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var host2 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
@@ -9183,8 +9180,8 @@ var numberType15 = "number";
 var booleanType16 = "boolean";
 var playerType8 = "player";
 var recordType13 = "record";
-var port21 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter17 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port21 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter17 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var writes9 = (domains) => ({ pure: false, previewSafe: false, writes: domains });
 var flow24 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input20 = (ctx, name) => {
@@ -9295,8 +9292,8 @@ var recordType14 = "record";
 var recordListType7 = { kind: "list", element: recordType14 };
 var nullableStringType3 = { kind: "nullable", value: stringType19 };
 var nullableNumberType = { kind: "nullable", value: numberType17 };
-var port22 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter18 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port22 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter18 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure13 = (reads) => ({ pure: true, previewSafe: false, reads });
 var writes11 = (domains, events = []) => ({
   pure: false,
@@ -9412,8 +9409,8 @@ var numberType18 = "number";
 var choiceType5 = "choice";
 var stringListType6 = { kind: "list", element: stringType20 };
 var prophecyRecordType = { kind: "record", schema: "velen-holy-prophecy@1" };
-var port23 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter19 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port23 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter19 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow27 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input23 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -9578,7 +9575,7 @@ var ACTIVE13 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var pieceType18 = "piece";
 var cellType9 = "cell";
 var cellListType5 = { kind: "list", element: cellType9 };
-var port24 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port24 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input24 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -9646,8 +9643,8 @@ var TILE_TYPES = ["amaterasu"];
 var MARKER_ICONS = ["\u{1F311}"];
 var MARKER_POSITIONS = ["bottom-right"];
 var PRESENTATIONS = ["expand"];
-var port25 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter20 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port25 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter20 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var input25 = (ctx, name) => {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -9959,8 +9956,8 @@ var pieceType20 = "piece";
 var playerType11 = "player";
 var cellType11 = "cell";
 var recordType16 = "record";
-var port26 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter21 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port26 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter21 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var define26 = (value) => ({
   version: "1",
   allowedSurfaces: value.allowedSurfaces ?? ACTIVE15,
@@ -9997,8 +9994,8 @@ var STATUS_PRIMITIVES2 = [
     parameters: [parameter21("statusType", stringType22, { enum: STATUS_TYPES })],
     effects: pure17(["statuses", "players"]),
     lower: (ctx) => {
-      const type2 = stringLiteral6(ctx, "statusType");
-      return `(function(playerId,x,y){var owner=${flow30(ctx)}.query.player(playerId),tags=owner&&Array.isArray(owner.statusTags)?owner.statusTags:[],tag=tags.find(function(item){return item&&item.type===${type2}&&item.value===x&&item.extraValue===y;});return tag&&typeof tag.id==="string"?tag.id:null;})(${input26(ctx, "player")},${input26(ctx, "x")},${input26(ctx, "y")})`;
+      const type = stringLiteral6(ctx, "statusType");
+      return `(function(playerId,x,y){var owner=${flow30(ctx)}.query.player(playerId),tags=owner&&Array.isArray(owner.statusTags)?owner.statusTags:[],tag=tags.find(function(item){return item&&item.type===${type}&&item.value===x&&item.extraValue===y;});return tag&&typeof tag.id==="string"?tag.id:null;})(${input26(ctx, "player")},${input26(ctx, "x")},${input26(ctx, "y")})`;
     },
     ui: { category: "status" }
   }),
@@ -10053,8 +10050,8 @@ var TILE_PRIMITIVES2 = [
     parameters: [parameter21("tileType", stringType22, { enum: TILE_EFFECT_TYPES })],
     effects: writes14(["tile-effects"]),
     lower: (ctx) => {
-      const state2 = battle16(ctx), type2 = stringLiteral6(ctx, "tileType");
-      return `(function(id,sourceId,ownerId,cell){if(typeof id!=="string"||typeof sourceId!=="string"||typeof ownerId!=="string"||!cell||!Number.isFinite(cell.x)||!Number.isFinite(cell.y))return false;${state2}.extensions=${state2}.extensions||{};${state2}.extensions.tileEffects=Array.isArray(${state2}.extensions.tileEffects)?${state2}.extensions.tileEffects:[];${state2}.extensions.tileEffects.push({id:id,sourceId:sourceId,tileType:${type2},x:cell.x,y:cell.y,ownerPlayerId:ownerId});return true;})(${input26(ctx, "id")},${input26(ctx, "sourceId")},${input26(ctx, "owner")},${input26(ctx, "cell")})`;
+      const state2 = battle16(ctx), type = stringLiteral6(ctx, "tileType");
+      return `(function(id,sourceId,ownerId,cell){if(typeof id!=="string"||typeof sourceId!=="string"||typeof ownerId!=="string"||!cell||!Number.isFinite(cell.x)||!Number.isFinite(cell.y))return false;${state2}.extensions=${state2}.extensions||{};${state2}.extensions.tileEffects=Array.isArray(${state2}.extensions.tileEffects)?${state2}.extensions.tileEffects:[];${state2}.extensions.tileEffects.push({id:id,sourceId:sourceId,tileType:${type},x:cell.x,y:cell.y,ownerPlayerId:ownerId});return true;})(${input26(ctx, "id")},${input26(ctx, "sourceId")},${input26(ctx, "owner")},${input26(ctx, "cell")})`;
     },
     ui: { category: "position" }
   }),
@@ -10067,8 +10064,8 @@ var TILE_PRIMITIVES2 = [
     parameters: [parameter21("tileType", stringType22, { enum: TILE_EFFECT_TYPES })],
     effects: writes14(["tile-effects"]),
     lower: (ctx) => {
-      const state2 = battle16(ctx), type2 = stringLiteral6(ctx, "tileType");
-      return `(function(sourceId){if(typeof sourceId!=="string")return false;if(!${state2}.extensions||!Array.isArray(${state2}.extensions.tileEffects))return true;${state2}.extensions.tileEffects=${state2}.extensions.tileEffects.filter(function(effect){return !(effect&&effect.tileType===${type2}&&effect.sourceId===sourceId);});return true;})(${input26(ctx, "sourceId")})`;
+      const state2 = battle16(ctx), type = stringLiteral6(ctx, "tileType");
+      return `(function(sourceId){if(typeof sourceId!=="string")return false;if(!${state2}.extensions||!Array.isArray(${state2}.extensions.tileEffects))return true;${state2}.extensions.tileEffects=${state2}.extensions.tileEffects.filter(function(effect){return !(effect&&effect.tileType===${type}&&effect.sourceId===sourceId);});return true;})(${input26(ctx, "sourceId")})`;
     },
     ui: { category: "position" }
   })
@@ -10120,7 +10117,7 @@ var booleanType21 = "boolean";
 var recordValueListType = { kind: "list", element: "record" };
 var recallRecordType = { kind: "record", schema: "recall-record@1" };
 var recallRecordListType = { kind: "list", element: recallRecordType };
-var port27 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port27 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure18 = (reads = []) => ({ pure: true, previewSafe: false, reads });
 var writes15 = (domains) => ({ pure: false, previewSafe: false, writes: domains });
 var define27 = (value) => ({ version: "1", allowedSurfaces: surfaces11, ...value });
@@ -10359,8 +10356,8 @@ var booleanType22 = "boolean";
 var stringType23 = "string";
 var stringListType7 = { kind: "list", element: stringType23 };
 var pieceListType7 = { kind: "list", element: pieceType22 };
-var port28 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter22 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port28 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter22 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var define28 = (value) => ({
   version: "1",
   allowedSurfaces: value.allowedSurfaces ?? ACTIVE16,
@@ -10458,8 +10455,8 @@ var recordListType8 = { kind: "list", element: "record" };
 var recordType17 = "record";
 var numberType23 = "number";
 var stringType24 = "string";
-var port29 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter23 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port29 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter23 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var define29 = (value) => ({ version: "1", allowedSurfaces: value.allowedSurfaces ?? ACTIVE17, ...value });
 var input29 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -10532,9 +10529,9 @@ var SHISHIO_FLAME_SPIRIT_GAMEPLAY_MODULES = Object.freeze([
       const source = input29(ctx, "source");
       const target = input29(ctx, "target");
       const amount = input29(ctx, "amount");
-      const type2 = parameterLiteral(ctx, "damageType");
+      const type = parameterLiteral(ctx, "damageType");
       const runtime8 = flow33(ctx);
-      return `(function(sourceId,targetId,amount){var source=${runtime8}.query.piece(sourceId),target=${runtime8}.query.piece(targetId);return dealDamage(source,target,amount,${type2});})(${source},${target},${amount})`;
+      return `(function(sourceId,targetId,amount){var source=${runtime8}.query.piece(sourceId),target=${runtime8}.query.piece(targetId);return dealDamage(source,target,amount,${type});})(${source},${target},${amount})`;
     },
     ui: { category: "effect" }
   }),
@@ -10574,8 +10571,8 @@ var stringType25 = "string";
 var recordType18 = "record";
 var pieceListType8 = { kind: "list", element: pieceType24 };
 var cellListType8 = { kind: "list", element: cellType13 };
-var port30 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter24 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port30 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter24 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow34 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle19 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var context9 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
@@ -10723,7 +10720,7 @@ var ACTIVE19 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var pieceType25 = "piece";
 var booleanType24 = "boolean";
 var stringType26 = "string";
-var port31 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port31 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow35 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var context10 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
 var input31 = (ctx, name) => {
@@ -10776,8 +10773,8 @@ var pieceType26 = "piece";
 var playerType14 = "player";
 var booleanType25 = "boolean";
 var recordType19 = "record";
-var port32 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter25 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port32 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter25 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var write4 = (writes22, events = []) => ({ pure: false, previewSafe: false, writes: writes22, events });
 var read6 = (reads) => ({ pure: true, previewSafe: false, reads });
 var runtime5 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
@@ -10911,8 +10908,8 @@ var pieceType27 = "piece";
 var stringType28 = "string";
 var booleanType26 = "boolean";
 var recordType20 = "record";
-var port33 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter26 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port33 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter26 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var flow36 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle20 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var input33 = (ctx, name) => {
@@ -11178,8 +11175,8 @@ var recordType21 = "record";
 var booleanType27 = "boolean";
 var stringType29 = "string";
 var listRecordType = { kind: "list", element: recordType21 };
-var port34 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter27 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port34 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter27 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var define34 = (descriptor3) => descriptor3;
 var input34 = (ctx, name) => ctx.inputs[name];
 var comparisonOperator = (ctx) => {
@@ -11486,7 +11483,6 @@ var ATOMIC_HAND_QUERY_MODULES = /* @__PURE__ */ new Set([
 
 // lib/skill-graph/atomic-migration-storage-writes.ts
 var ATOMIC_STORAGE_WRITE_MODULES = /* @__PURE__ */ new Set(["extension.set-owner", "extension.set-owner-if-empty", "extension.read-owner-record", "extension.remove-owner-record", "extension.decrement-turns"]);
-var nullablePlayer = JSON.stringify({ kind: "nullable", value: "player" });
 
 // lib/skill-graph/atomic-migration-extension-queries.ts
 var ATOMIC_EXTENSION_QUERY_MODULES = /* @__PURE__ */ new Set([
@@ -11513,8 +11509,6 @@ var ATOMIC_ABILITY_WRITE_MODULES = /* @__PURE__ */ new Set([
   "status.replace-related-rules",
   "status.refresh-position"
 ]);
-var nullableStringType4 = JSON.stringify({ kind: "nullable", value: "string" });
-var stringListType8 = JSON.stringify({ kind: "list", element: "string" });
 
 // lib/skill-graph/atomic-migration-formation.ts
 var ATOMIC_FORMATION_MODULES = /* @__PURE__ */ new Set([
@@ -11568,7 +11562,6 @@ var ATOMIC_RAW_STATUS_REMOVAL_MODULES = /* @__PURE__ */ new Set([
   "status.remove-expired-turn-type",
   "status.remove-player-records"
 ]);
-var nullableStringType5 = JSON.stringify({ kind: "nullable", value: "string" });
 
 // lib/skill-graph/atomic-migration-option-choices.ts
 var ATOMIC_OPTION_CHOICE_MODULES = /* @__PURE__ */ new Set([
@@ -11591,8 +11584,6 @@ var ATOMIC_MARKER_WRITE_MODULES = /* @__PURE__ */ new Set([
 ]);
 
 // lib/skill-graph/atomic-migration-captured-collections.ts
-var listType = JSON.stringify({ kind: "list", element: "record" });
-var pieceListType9 = JSON.stringify({ kind: "list", element: "piece" });
 var ATOMIC_CAPTURED_COLLECTION_MODULES = /* @__PURE__ */ new Set([
   "source.capture-list",
   "effect.damage-captured-list",
@@ -11626,7 +11617,6 @@ var ATOMIC_PROJECTILE_QUERY_MODULES = /* @__PURE__ */ new Set([
 
 // lib/skill-graph/atomic-migration-message-buffer.ts
 var ATOMIC_MESSAGE_BUFFER_MODULES = /* @__PURE__ */ new Set(["followup.message-buffer-start", "followup.message-buffer-add", "followup.message-buffer-read"]);
-var type = JSON.stringify({ kind: "list", element: "string" });
 
 // lib/skill-graph/atomic-migration-delayed-damage.ts
 var ATOMIC_DELAYED_DAMAGE_MODULES = /* @__PURE__ */ new Set(["effect.damage-with-player-fallback", "followup.damage-status", "content.materialize-curse-template", "effect.card-damage"]);
@@ -11706,8 +11696,6 @@ var ATOMIC_LOCAL_ALIAS_MODULES = /* @__PURE__ */ new Set([
   "collection.text-list-create",
   "collection.text-list-add"
 ]);
-var stringListType9 = { kind: "list", element: "string" };
-var stringListTypeParameter = JSON.stringify(stringListType9);
 
 // lib/skill-graph/atomic-migration-skill-owner.ts
 var ATOMIC_SKILL_OWNER_MODULES = /* @__PURE__ */ new Set(["skill.add-player", "skill.remove-player"]);
@@ -11993,16 +11981,16 @@ function declaration(ctx) {
   const schema2 = ctx.recordSchemas?.find((item) => item.id === reference || item.id + "@" + item.version === reference);
   if (!schema2) throw new Error("extension\uFF1A\u8BF7\u9009\u62E9\u5DF2\u58F0\u660E\u7684\u8BB0\u5F55\u7C7B\u578B");
   const schemas = [];
-  const visitType = (type2) => {
-    if (typeof type2 === "string") return;
-    if (type2.kind === "list" || type2.kind === "set") return visitType(type2.element);
-    if (type2.kind === "map") {
-      visitType(type2.key);
-      visitType(type2.value);
+  const visitType = (type) => {
+    if (typeof type === "string") return;
+    if (type.kind === "list" || type.kind === "set") return visitType(type.element);
+    if (type.kind === "map") {
+      visitType(type.key);
+      visitType(type.value);
       return;
     }
-    if (type2.kind === "nullable") return visitType(type2.value);
-    const dependency = ctx.recordSchemas?.find((item) => item.id === type2.schema || item.id + "@" + item.version === type2.schema);
+    if (type.kind === "nullable") return visitType(type.value);
+    const dependency = ctx.recordSchemas?.find((item) => item.id === type.schema || item.id + "@" + item.version === type.schema);
     if (dependency) visit(dependency);
   };
   const visit = (item) => {
@@ -12069,7 +12057,7 @@ var AUTHOR_STATE_MODULES = [
     ui: { category: "data", authoring: "standard" },
     lower: (ctx) => {
       const raw = String(ctx.parameters.valueType);
-      const type2 = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
+      const type = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
       const method = { declare: "declareValue", read: "readValue", write: "writeValue" }[operation];
       const args = [
         JSON.stringify(scope),
@@ -12077,8 +12065,8 @@ var AUTHOR_STATE_MODULES = [
         ctx.emitLiteral(ctx.parameters.namespace),
         ctx.emitLiteral(ctx.parameters.name),
         ...operation === "declare" ? [] : [ctx.emitLiteral(ctx.parameters.path)],
-        JSON.stringify(type2),
-        JSON.stringify(authorValueSchemas(type2, ctx.recordSchemas ?? [])),
+        JSON.stringify(type),
+        JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? [])),
         ...operation === "read" ? [] : [ctx.inputs.value]
       ];
       return `({value:${flow37(ctx)}.extension.${method}(${args.join(",")})})`;
@@ -12105,15 +12093,15 @@ var AUTHOR_STATE_MODULES = [
     ui: { category: "data", authoring: "compatibility" },
     lower: (ctx) => {
       const raw = String(ctx.parameters.valueType);
-      const type2 = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
+      const type = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
       const args = [
         JSON.stringify(scope),
         scope === "battle" ? '"battle"' : ctx.inputs.owner,
         ctx.emitLiteral(ctx.parameters.namespace),
         ctx.emitLiteral(ctx.parameters.name),
         ctx.emitLiteral(ctx.parameters.path),
-        JSON.stringify(type2),
-        JSON.stringify(authorValueSchemas(type2, ctx.recordSchemas ?? []))
+        JSON.stringify(type),
+        JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? []))
       ];
       return `({value:${flow37(ctx)}.extension.readValueOrNull(${args.join(",")})})`;
     }
@@ -12168,7 +12156,7 @@ var ROOT_AUTHOR_STATE_BASE_MODULES = AUTHOR_STATE_MODULES.filter((module2) => ["
 function lowerRootAuthorState(module2, ctx, withSuccess) {
   const operation = module2.id.split(".")[1].replace(/-battle$/, "");
   const raw = String(ctx.parameters.valueType);
-  const type2 = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
+  const type = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
   const method = { declare: "declareValue", read: "readValue", "read-optional": "readValueOrNull", write: "writeValue" }[operation];
   const reading = operation === "read" || operation === "read-optional";
   const args = [
@@ -12177,8 +12165,8 @@ function lowerRootAuthorState(module2, ctx, withSuccess) {
     ctx.emitLiteral(ctx.parameters.namespace),
     ctx.emitLiteral(ctx.parameters.name),
     ...operation === "declare" ? [] : [ctx.inputs.path ?? ctx.emitLiteral(ctx.parameters.path)],
-    JSON.stringify(type2),
-    JSON.stringify(authorValueSchemas(type2, ctx.recordSchemas ?? [])),
+    JSON.stringify(type),
+    JSON.stringify(authorValueSchemas(type, ctx.recordSchemas ?? [])),
     ...!reading ? [ctx.inputs.value] : []
   ];
   const call = `${flow37(ctx)}.${ctx.parameters.namespace === "" ? "extensionRoot" : "extension"}.${method}(${args.join(",")})`;
@@ -12213,10 +12201,10 @@ var ROOT_AUTHOR_STATE_REMOVE_MODULES = Object.freeze([{
   ui: { category: "data", authoring: "standard" },
   lower: (ctx) => {
     const raw = String(ctx.parameters.valueType ?? "record");
-    const type2 = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
-    const schemas = authorValueSchemas(type2, ctx.recordSchemas ?? []);
+    const type = raw.trimStart().startsWith("{") ? JSON.parse(raw) : raw;
+    const schemas = authorValueSchemas(type, ctx.recordSchemas ?? []);
     const target = String(ctx.parameters.namespace ?? "") === "" ? "extensionRoot" : "extension";
-    const args = ['"battle"', '"battle"', ctx.emitLiteral(ctx.parameters.namespace ?? ""), ctx.emitLiteral(ctx.parameters.name), JSON.stringify(type2), JSON.stringify(schemas)];
+    const args = ['"battle"', '"battle"', ctx.emitLiteral(ctx.parameters.namespace ?? ""), ctx.emitLiteral(ctx.parameters.name), JSON.stringify(type), JSON.stringify(schemas)];
     return `({success:${flow37(ctx)}.${target}.removeValue(${args.join(",")})})`;
   }
 }]);
@@ -12236,8 +12224,8 @@ var stringType30 = "string";
 var recordType22 = "record";
 var pieceType28 = "piece";
 var cellType14 = "cell";
-var port35 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter28 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port35 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter28 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var writes20 = (domains, events = []) => ({
   pure: false,
   previewSafe: false,
@@ -12320,9 +12308,9 @@ var AUTHOR_CHOICE_MODULES = [
       const cancelValue = ctx.inputs.cancelValue === void 0 ? "" : `, cancelValue: ${ctx.inputs.cancelValue}`;
       const selected = `${flow38(ctx)}.choice.authorOption({options: ${mapped}${title}${canCancel}${cancelValue}}, ${ctx.emitLiteral(ctx.callId)})`;
       const declaredType = stringLiteral7(ctx, "valueType", "string");
-      const type2 = `(function(raw){return typeof raw === "string" && raw.trim().startsWith("{") ? JSON.parse(raw) : raw;})(${declaredType})`;
+      const type = `(function(raw){return typeof raw === "string" && raw.trim().startsWith("{") ? JSON.parse(raw) : raw;})(${declaredType})`;
       const schemas = JSON.stringify(ctx.recordSchemas ?? []);
-      return `(function(value){return {value: ${flow38(ctx)}.values.require(value, ${type2}, ${schemas})};})(${selected})`;
+      return `(function(value){return {value: ${flow38(ctx)}.values.require(value, ${type}, ${schemas})};})(${selected})`;
     },
     ui: { category: "choice", authoring: "standard" }
   }),
@@ -12426,11 +12414,11 @@ var AUTHOR_CHOICE_GAMEPLAY_MODULES = Object.freeze([
     ui: { category: "selection", authoring: "standard" },
     lower: (ctx) => {
       const raw = ctx.parameters.valueType ?? "string";
-      const type2 = typeof raw === "string" && raw.startsWith("{") ? JSON.parse(raw) : raw;
+      const type = typeof raw === "string" && raw.startsWith("{") ? JSON.parse(raw) : raw;
       const multi = ctx.parameters.selectionMode === "multi";
-      if (multi && (typeof type2 !== "object" || type2.kind !== "list")) throw new Error("\u591A\u9009\u8FD4\u56DE\u503C\u5FC5\u987B\u662F\u5143\u7EC4\u7C7B\u578B");
+      if (multi && (typeof type !== "object" || type.kind !== "list")) throw new Error("\u591A\u9009\u8FD4\u56DE\u503C\u5FC5\u987B\u662F\u5143\u7EC4\u7C7B\u578B");
       const config = `{ options: Object.keys(${ctx.inputs.options}).map(function(label){return {label:label,value:${ctx.inputs.options}[label]};}), indexed:true, selectionMode:${ctx.emitLiteral(multi ? "multi" : "single")}, minSelections:${ctx.inputs.minSelections ?? "1"}, maxSelections:${ctx.inputs.maxSelections ?? "1"}, title:${ctx.emitLiteral(ctx.parameters.title ?? "\u8BF7\u9009\u62E9")}, canCancel:${ctx.emitLiteral(ctx.parameters.canCancel ?? false)}${ctx.inputs.player ? `,playerId:${ctx.inputs.player}` : ""}${ctx.inputs.cancelValue === void 0 ? "" : `,cancelValue:${ctx.inputs.cancelValue}`} }`;
-      return `({value:${flow38(ctx)}.values.require(${flow38(ctx)}.choice.authorOption(${config},${ctx.emitLiteral(ctx.callId)}),${JSON.stringify(type2)},${JSON.stringify(ctx.recordSchemas ?? [])})})`;
+      return `({value:${flow38(ctx)}.values.require(${flow38(ctx)}.choice.authorOption(${config},${ctx.emitLiteral(ctx.callId)}),${JSON.stringify(type)},${JSON.stringify(ctx.recordSchemas ?? [])})})`;
     }
   },
   ...AUTHOR_DAMAGE_MODULES,
@@ -12452,7 +12440,7 @@ var AUTHOR_CHOICE_GAMEPLAY_MODULES = Object.freeze([
       const optionsType = parse(ctx.parameters.optionsType ?? '{"kind":"map","key":"string","value":"string"}');
       if (typeof optionsType !== "object" || optionsType.kind !== "map" || optionsType.key !== "string") throw new Error("\u9009\u9879\u5FC5\u987B\u662F\u4EE5\u6587\u672C\u4E3A\u952E\u7684\u6620\u5C04");
       const multi = ctx.parameters.selectionMode === "multi";
-      const type2 = parse(ctx.parameters.valueType ?? "string");
+      const type = parse(ctx.parameters.valueType ?? "string");
       const expected = multi ? { kind: "list", element: optionsType.value } : optionsType.value;
       const canonical3 = (value) => {
         if (typeof value === "string") return value;
@@ -12461,11 +12449,11 @@ var AUTHOR_CHOICE_GAMEPLAY_MODULES = Object.freeze([
         if (value.kind === "nullable") return "nullable<" + canonical3(value.value) + ">";
         return "record<" + value.schema + ">";
       };
-      if (canonical3(type2) !== canonical3(expected)) throw new Error("\u9009\u62E9\u8FD4\u56DE\u503C\u7C7B\u578B\u5FC5\u987B\u4E0E\u9009\u9879\u6620\u5C04\u548C\u8FD4\u56DE\u5F62\u5F0F\u4E00\u81F4");
+      if (canonical3(type) !== canonical3(expected)) throw new Error("\u9009\u62E9\u8FD4\u56DE\u503C\u7C7B\u578B\u5FC5\u987B\u4E0E\u9009\u9879\u6620\u5C04\u548C\u8FD4\u56DE\u5F62\u5F0F\u4E00\u81F4");
       const checked = `${flow38(ctx)}.values.require(${ctx.inputs.options},${JSON.stringify(optionsType)},${JSON.stringify(ctx.recordSchemas ?? [])})`;
       const options2 = `${flow38(ctx)}.containers.authorMapItems(${checked}).map(function(entry){return {label:entry[0],value:entry[1]};})`;
       const config = `{options:${options2},indexed:true,selectionMode:${ctx.emitLiteral(multi ? "multi" : "single")},minSelections:${ctx.inputs.minSelections ?? "1"},maxSelections:${ctx.inputs.maxSelections ?? "1"},title:${ctx.emitLiteral(ctx.parameters.title ?? "\u8BF7\u9009\u62E9")},canCancel:${ctx.emitLiteral(ctx.parameters.canCancel ?? false)}${ctx.inputs.player ? `,playerId:${ctx.inputs.player}` : ""}${ctx.inputs.cancelValue === void 0 ? "" : `,cancelValue:${ctx.inputs.cancelValue}`}}`;
-      return `({value:${flow38(ctx)}.values.require(${flow38(ctx)}.choice.authorOption(${config},${ctx.emitLiteral(ctx.callId)}),${JSON.stringify(type2)},${JSON.stringify(ctx.recordSchemas ?? [])})})`;
+      return `({value:${flow38(ctx)}.values.require(${flow38(ctx)}.choice.authorOption(${config},${ctx.emitLiteral(ctx.callId)}),${JSON.stringify(type)},${JSON.stringify(ctx.recordSchemas ?? [])})})`;
     }
   }
 ]);
@@ -12479,13 +12467,13 @@ var recordType23 = "record";
 var stringType31 = "string";
 var numberType27 = "number";
 var booleanType29 = "boolean";
-var nullableStringType6 = { kind: "nullable", value: stringType31 };
+var nullableStringType4 = { kind: "nullable", value: stringType31 };
 var nullablePieceType = { kind: "nullable", value: pieceType29 };
 var recordListType9 = { kind: "list", element: recordType23 };
-var stringListType10 = { kind: "list", element: stringType31 };
-var stringListValueType = JSON.stringify(stringListType10);
+var stringListType8 = { kind: "list", element: stringType31 };
+var stringListValueType = JSON.stringify(stringListType8);
 var PIECE_WRITE_FIELD_TYPES = Object.freeze({
-  spentPassives: stringListType10,
+  spentPassives: stringListType8,
   momentum: numberType27,
   currentHp: numberType27,
   maxHp: numberType27
@@ -12503,7 +12491,7 @@ var PIECE_V2_WRITE_FIELD_TYPES = Object.freeze({
   ...PIECE_WRITE_FIELD_TYPES,
   ...STORED_FIELD_TYPES
 });
-var valueTypeParameter = (type2) => typeof type2 === "string" ? type2 : JSON.stringify(type2);
+var valueTypeParameter = (type) => typeof type === "string" ? type : JSON.stringify(type);
 var flow39 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var battle21 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
 var context11 = (ctx) => ctx.surface === "pending" ? "ctx" : "context";
@@ -12547,7 +12535,7 @@ var PIECE_FIELDS = {
   rules: recordListType9,
   /** Immutable snapshots used by generic skill/ability readers. */
   skills: recordListType9,
-  spentPassives: stringListType10
+  spentPassives: stringListType8
 };
 var PLAYER_FIELDS = {
   name: stringType31,
@@ -12564,7 +12552,7 @@ var EVENT_FIELDS = {
   rulePiece: { kind: "nullable", value: recordType23 },
   type: { kind: "nullable", value: stringType31 },
   playerId: { kind: "nullable", value: playerType16 },
-  skillId: nullableStringType6,
+  skillId: nullableStringType4,
   damage: { kind: "nullable", value: numberType27 },
   actualDamage: { kind: "nullable", value: numberType27 },
   heal: { kind: "nullable", value: numberType27 },
@@ -12584,19 +12572,19 @@ var DATA_FIELDS = {
   moveRange: numberType27,
   currentHp: numberType27,
   maxHp: numberType27,
-  id: nullableStringType6,
-  type: nullableStringType6,
-  name: nullableStringType6,
-  sourceId: nullableStringType6,
-  sourcePieceId: nullableStringType6,
-  ownerPlayerId: nullableStringType6,
+  id: nullableStringType4,
+  type: nullableStringType4,
+  name: nullableStringType4,
+  sourceId: nullableStringType4,
+  sourcePieceId: nullableStringType4,
+  ownerPlayerId: nullableStringType4,
   // Status/extension records retain stable identity text; unlike effect
   // results this is not a live piece reference and must remain comparable
   // after the piece has left the board.
-  targetId: nullableStringType6,
-  skillId: nullableStringType6,
-  flightId: nullableStringType6,
-  legacyText: nullableStringType6,
+  targetId: nullableStringType4,
+  skillId: nullableStringType4,
+  flightId: nullableStringType4,
+  legacyText: nullableStringType4,
   lastDamageTurn: numberType27,
   stacks: numberType27,
   intensity: numberType27,
@@ -12626,7 +12614,7 @@ var DATA_FIELDS = {
   statusTags: recordListType9,
   rules: recordListType9,
   results: recordListType9,
-  skillIds: stringListType10
+  skillIds: stringListType8
 };
 function copiedField(source, fieldExpression) {
   return `(function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!=="object")return value;return JSON.parse(JSON.stringify(value));})(${source}[${fieldExpression}])`;
@@ -13020,9 +13008,9 @@ var playerType17 = "player";
 var cellType15 = "cell";
 var recordListType10 = { kind: "list", element: recordType24 };
 var cellListType9 = { kind: "list", element: cellType15 };
-var stringListType11 = { kind: "list", element: stringType32 };
-var port36 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter29 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var stringListType9 = { kind: "list", element: stringType32 };
+var port36 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter29 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var nullable = (value) => ({ kind: "nullable", value });
 var OPTIONAL_DATA_FIELD_TYPES = Object.freeze({
   id: stringType32,
@@ -13066,11 +13054,11 @@ var OPTIONAL_DATA_FIELD_TYPES = Object.freeze({
   right: cellType15,
   statusTags: recordListType10,
   pathCells: cellListType9,
-  skillIds: stringListType11,
+  skillIds: stringListType9,
   stats: recordType24
 });
 var fieldTypes = Object.fromEntries(
-  Object.entries(OPTIONAL_DATA_FIELD_TYPES).map(([name, type2]) => [name, nullable(type2)])
+  Object.entries(OPTIONAL_DATA_FIELD_TYPES).map(([name, type]) => [name, nullable(type)])
 );
 var input37 = (ctx, name) => {
   const value = ctx.inputs[name];
@@ -13084,21 +13072,21 @@ function optionalFieldLowering(ctx) {
   }
   const record3 = input37(ctx, "record");
   const field3 = ctx.emitLiteral(selected);
-  const type2 = OPTIONAL_DATA_FIELD_TYPES[selected];
+  const type = OPTIONAL_DATA_FIELD_TYPES[selected];
   let read7;
-  if (type2 === stringType32 || type2 === playerType17) {
+  if (type === stringType32 || type === playerType17) {
     read7 = 'if (typeof value !== "string") return __gameplayInvalid; return value;';
-  } else if (type2 === numberType28) {
+  } else if (type === numberType28) {
     read7 = 'if (typeof value !== "number" || !Number.isFinite(value)) return __gameplayInvalid; return value;';
-  } else if (type2 === cellType15) {
+  } else if (type === cellType15) {
     read7 = 'if (!value || typeof value !== "object" || Array.isArray(value) || !Number.isInteger(value.x) || !Number.isInteger(value.y)) return __gameplayInvalid; return {x:value.x,y:value.y};';
-  } else if (type2 === cellListType9) {
+  } else if (type === cellListType9) {
     read7 = 'if (!Array.isArray(value)) return __gameplayInvalid; var cells = []; for (var index = 0; index < value.length; index += 1) { var cell = value[index]; if (!cell || typeof cell !== "object" || Array.isArray(cell) || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) return __gameplayInvalid; cells.push({x: cell.x, y: cell.y}); } return cells;';
-  } else if (type2 === stringListType11) {
+  } else if (type === stringListType9) {
     read7 = 'if (!Array.isArray(value)) return __gameplayInvalid; var strings = []; for (var index = 0; index < value.length; index += 1) { if (typeof value[index] !== "string") return __gameplayInvalid; strings.push(value[index]); } return strings;';
-  } else if (type2 === recordListType10) {
+  } else if (type === recordListType10) {
     read7 = 'if (!Array.isArray(value)) return __gameplayInvalid; var records = []; for (var index = 0; index < value.length; index += 1) { var item = value[index]; if (!item || typeof item !== "object" || Array.isArray(item)) return __gameplayInvalid; records.push(JSON.parse(JSON.stringify(item))); } return records;';
-  } else if (type2 === recordType24) {
+  } else if (type === recordType24) {
     read7 = 'if (typeof value !== "object" || Array.isArray(value)) return __gameplayInvalid; return JSON.parse(JSON.stringify(value));';
   } else {
     throw new Error(`module ${ctx.moduleId}: unsupported field type`);
@@ -13202,7 +13190,7 @@ var cellType16 = "cell";
 var choiceType7 = "choice";
 var unknownType = "unknown";
 var nullableNumberType2 = { kind: "nullable", value: numberType29 };
-var nullableStringType7 = { kind: "nullable", value: stringType33 };
+var nullableStringType5 = { kind: "nullable", value: stringType33 };
 var nullablePlayerType = { kind: "nullable", value: playerType18 };
 var nullablePieceType2 = { kind: "nullable", value: "piece" };
 var cellListType10 = { kind: "list", element: cellType16 };
@@ -13228,7 +13216,7 @@ var CONTEXT_STRING_FIELDS = [
 var CONTEXT_BOOLEAN_FIELDS = ["cancelled"];
 var CONTEXT_FIELD_TYPES = Object.freeze({
   ...Object.fromEntries(CONTEXT_NUMBER_FIELDS.map((field3) => [field3, nullableNumberType2])),
-  ...Object.fromEntries(CONTEXT_STRING_FIELDS.map((field3) => [field3, nullableStringType7])),
+  ...Object.fromEntries(CONTEXT_STRING_FIELDS.map((field3) => [field3, nullableStringType5])),
   ...Object.fromEntries(CONTEXT_BOOLEAN_FIELDS.map((field3) => [field3, booleanType30]))
 });
 var CONTEXT_V2_FIELD_TYPES = Object.freeze({
@@ -13236,7 +13224,7 @@ var CONTEXT_V2_FIELD_TYPES = Object.freeze({
   isSinglePieceTargetAction: booleanType30,
   reservedCells: cellListType10,
   selectedTargets: choiceListType2,
-  selectedOption: nullableStringType7
+  selectedOption: nullableStringType5
 });
 var CONTEXT_V2_LIST_FIELDS = /* @__PURE__ */ new Set(["reservedCells", "selectedTargets"]);
 var CONTEXT_V2_STRICT_BOOLEAN_FIELDS = /* @__PURE__ */ new Set(["isSinglePieceTargetAction"]);
@@ -13251,10 +13239,10 @@ var CONTEXT_RULE_FIELD_TYPES = Object.freeze({
   ruleRewrittenPrimaryTargetPieceId: nullablePieceType2
 });
 var EVENT_FIELD_V2_TYPES = Object.freeze({
-  type: nullableStringType7,
+  type: nullableStringType5,
   playerId: nullablePlayerType,
   actualDamage: nullableNumberType2,
-  movementKind: nullableStringType7
+  movementKind: nullableStringType5
 });
 var BATTLE_FIELD_V2_TYPES = Object.freeze({
   turnNumber: numberType29,
@@ -13266,8 +13254,8 @@ var SKILL_FIELD_TYPES = Object.freeze({
   ...Object.fromEntries(SKILL_NUMBER_FIELDS.map((field3) => [field3, numberType29])),
   ...Object.fromEntries(SKILL_STRING_FIELDS.map((field3) => [field3, stringType33]))
 });
-var port37 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter30 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port37 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter30 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure25 = (reads) => ({ pure: true, previewSafe: false, reads });
 var define37 = (value) => ({
   version: "1",
@@ -13442,7 +13430,6 @@ var CONTEXT_FIELD_GAMEPLAY_MODULES = Object.freeze([
     ui: { category: "context", authoring: "standard" }
   }
 ]);
-var CONTEXT_FIELD_MODULE_IDS = Object.freeze([...new Set(CONTEXT_FIELD_GAMEPLAY_MODULES.map((module2) => module2.id))]);
 
 // lib/skill-graph/module-registry-preview-fields.ts
 var PREVIEW_SURFACES = ["preview"];
@@ -13450,13 +13437,13 @@ var ACTIVE_SURFACES9 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var VALUE_SURFACES = [...ACTIVE_SURFACES9, "preview"];
 var numberType30 = "number";
 var stringType34 = "string";
-var nullableStringType8 = { kind: "nullable", value: stringType34 };
+var nullableStringType6 = { kind: "nullable", value: stringType34 };
 var nullableNumberType3 = { kind: "nullable", value: numberType30 };
 var nullableRecordType = { kind: "nullable", value: "record" };
 var nullableRecordListType = { kind: "nullable", value: { kind: "list", element: "record" } };
 var unknownType2 = "unknown";
-var port38 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter31 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port38 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter31 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var purePreview = { pure: true, previewSafe: true };
 var pureValue2 = { pure: true, previewSafe: true };
 var PREVIEW_PIECE_FIELD_TYPES = Object.freeze({
@@ -13476,7 +13463,7 @@ var PREVIEW_SKILL_FIELD_TYPES = Object.freeze({
   description: stringType34
 });
 var PREVIEW_RECORD_FIELD_TYPES = Object.freeze({
-  type: nullableStringType8,
+  type: nullableStringType6,
   intensity: nullableNumberType3,
   maxHp: nullableNumberType3
 });
@@ -13609,7 +13596,6 @@ var PREVIEW_FIELD_GAMEPLAY_MODULES = Object.freeze([
     ui: { category: "value", authoring: "standard" }
   }
 ]);
-var PREVIEW_FIELD_MODULE_IDS = Object.freeze(PREVIEW_FIELD_GAMEPLAY_MODULES.map((module2) => `${module2.id}@${module2.version}`));
 
 // lib/skill-graph/module-registry-generic-reads.ts
 var ACTIVE21 = ["skill", "card", "rule", "triggerSkill", "pending"];
@@ -13620,8 +13606,8 @@ var booleanType31 = "boolean";
 var pieceType30 = "piece";
 var recordType25 = "record";
 var choiceType8 = "choice";
-var port39 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter32 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port39 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter32 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure26 = (reads = []) => ({
   pure: true,
   previewSafe: true,
@@ -13880,8 +13866,8 @@ var valueTypeBindings2 = Object.freeze(
   Object.fromEntries(supportedTypes.map((value) => [typeof value === "string" ? value : JSON.stringify(value), value]))
 );
 var valueTypeEnum2 = Object.keys(valueTypeBindings2);
-var port40 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter33 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port40 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter33 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 function input40(ctx, name) {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -13906,11 +13892,11 @@ function selectedType(ctx) {
 }
 function lowerReadKey(ctx) {
   const record3 = input40(ctx, "record");
-  const type2 = JSON.stringify(selectedType(ctx));
+  const type = JSON.stringify(selectedType(ctx));
   const dynamicKey = hasInput(ctx, "key");
   const key = dynamicKey ? input40(ctx, "key") : keyParameter(ctx);
   const keyGuard = dynamicKey ? 'if(typeof key!=="string"||key.length===0||key==="__proto__"||key==="prototype"||key==="constructor")return __gameplayInvalid;' : "";
-  return `(function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;${keyGuard}if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!=="object")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,"constructor");if(!constructor||!hasOwn.call(constructor,"value")||typeof constructor.value!=="function")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,"name");return !!name&&hasOwn.call(name,"value")&&name.value==="Object";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,"value"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,"value")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind==="string"||kind==="boolean")return true;if(kind==="number")return Number.isFinite(value);if(kind!=="object")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!=="string"){arrayValid=false;break;}if(arrayKey==="length"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name==="__proto__"||name==="prototype"||name==="constructor"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected==="object"){if(expected.kind==="nullable")return value===null||valid(value,expected.value,depth);if(expected.kind==="list"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!=="string"){listValid=false;break;}if(listKey==="length")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind==="record")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected==="string"||expected==="piece"||expected==="player")return typeof value==="string";if(expected==="number")return typeof value==="number"&&Number.isFinite(value);if(expected==="boolean")return typeof value==="boolean";if(expected==="cell"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,"x"),yDescriptor=Object.getOwnPropertyDescriptor(value,"y");return !!xDescriptor&&hasOwn.call(xDescriptor,"value")&&!!yDescriptor&&hasOwn.call(yDescriptor,"value")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected==="choice")return plain(value)&&validRecord(value,depth);if(expected==="record")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!=="object")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,"value"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,"value"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})(${record3},${key},${type2})`;
+  return `(function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;${keyGuard}if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!=="object")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,"constructor");if(!constructor||!hasOwn.call(constructor,"value")||typeof constructor.value!=="function")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,"name");return !!name&&hasOwn.call(name,"value")&&name.value==="Object";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,"value"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,"value")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind==="string"||kind==="boolean")return true;if(kind==="number")return Number.isFinite(value);if(kind!=="object")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!=="string"){arrayValid=false;break;}if(arrayKey==="length"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name==="__proto__"||name==="prototype"||name==="constructor"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected==="object"){if(expected.kind==="nullable")return value===null||valid(value,expected.value,depth);if(expected.kind==="list"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!=="string"){listValid=false;break;}if(listKey==="length")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind==="record")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected==="string"||expected==="piece"||expected==="player")return typeof value==="string";if(expected==="number")return typeof value==="number"&&Number.isFinite(value);if(expected==="boolean")return typeof value==="boolean";if(expected==="cell"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,"x"),yDescriptor=Object.getOwnPropertyDescriptor(value,"y");return !!xDescriptor&&hasOwn.call(xDescriptor,"value")&&!!yDescriptor&&hasOwn.call(yDescriptor,"value")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected==="choice")return plain(value)&&validRecord(value,depth);if(expected==="record")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!=="object")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,"value"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,"value"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})(${record3},${key},${type})`;
 }
 var RECORD_KEY_GAMEPLAY_MODULES = Object.freeze([{
   id: "data.read-key",
@@ -13937,15 +13923,15 @@ var recordType27 = "record";
 var numberType33 = "number";
 var booleanType33 = "boolean";
 var stringType37 = "string";
-var nullableStringType9 = { kind: "nullable", value: stringType37 };
+var nullableStringType7 = { kind: "nullable", value: stringType37 };
 var nullableNumberType4 = { kind: "nullable", value: numberType33 };
 var instanceListType = { kind: "list", element: recordType27 };
 var statusType3 = "status";
 var statusListType2 = { kind: "list", element: statusType3 };
-var stringListType12 = { kind: "list", element: stringType37 };
-var valueTypeParameter2 = (type2) => typeof type2 === "string" ? type2 : JSON.stringify(type2);
-var port41 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter34 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var stringListType10 = { kind: "list", element: stringType37 };
+var valueTypeParameter2 = (type) => typeof type === "string" ? type : JSON.stringify(type);
+var port41 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter34 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pureRead4 = (reads) => ({ pure: true, previewSafe: false, reads });
 var flow41 = (ctx) => ctx.surface === "pending" ? "ctx.flow" : "flow";
 var input41 = (ctx, name) => {
@@ -13964,24 +13950,24 @@ var define38 = (value) => ({
   ...value
 });
 var SKILL_INSTANCE_FIELDS = Object.freeze({
-  skillId: nullableStringType9,
-  kind: nullableStringType9,
+  skillId: nullableStringType7,
+  kind: nullableStringType7,
   currentCooldown: nullableNumberType4,
   definitionExists: booleanType33
 });
 var STATUS_INSTANCE_FIELDS = Object.freeze({
-  name: nullableStringType9,
-  id: nullableStringType9,
-  type: nullableStringType9,
-  sourceId: nullableStringType9,
-  flightId: nullableStringType9,
+  name: nullableStringType7,
+  id: nullableStringType7,
+  type: nullableStringType7,
+  sourceId: nullableStringType7,
+  flightId: nullableStringType7,
   remainingTurns: nullableNumberType4,
   grantedTurnNumber: nullableNumberType4,
   createdTurnNumber: nullableNumberType4,
   turnNumber: nullableNumberType4
 });
 var STATUS_WRITE_FIELD_TYPES = Object.freeze({
-  relatedRules: stringListType12,
+  relatedRules: stringListType10,
   type: stringType37,
   sourceId: stringType37,
   name: stringType37,
@@ -14085,7 +14071,7 @@ var GENERIC_ABILITY_WRITE_GAMEPLAY_MODULES = Object.freeze([
       parameter34("field", stringType37, { enum: Object.keys(STATUS_WRITE_FIELD_TYPES), label: "\u5B57\u6BB5" }),
       parameter34("valueType", stringType37, {
         enum: [...new Set(Object.values(STATUS_WRITE_FIELD_TYPES).map(valueTypeParameter2))],
-        default: valueTypeParameter2(stringListType12),
+        default: valueTypeParameter2(stringListType10),
         label: "\u503C\u7C7B\u578B"
       })
     ],
@@ -14146,8 +14132,8 @@ var ACTIVE23 = ["rule", "card"];
 var recordType28 = "record";
 var stringType38 = "string";
 var booleanType34 = "boolean";
-var port42 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter35 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port42 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter35 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var effects2 = { pure: true, previewSafe: false, reads: ["content"] };
 function battle25(ctx) {
   return ctx.surface === "pending" ? "ctx.battle" : "battle";
@@ -14174,10 +14160,10 @@ var CONTENT_FIELD_GAMEPLAY_MODULES = Object.freeze([{
 var ACTIVE24 = ["skill", "card", "rule", "triggerSkill", "pending"];
 var booleanType35 = "boolean";
 var stringType39 = "string";
-var nullableStringType10 = { kind: "nullable", value: stringType39 };
+var nullableStringType8 = { kind: "nullable", value: stringType39 };
 var PURE9 = { pure: true, previewSafe: false, reads: ["skills"] };
-var port43 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter36 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port43 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter36 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 function input42(ctx, name) {
   const value = ctx.inputs[name];
   if (typeof value !== "string" || value.length === 0) throw new Error(`module ${ctx.moduleId}: missing input ${name}`);
@@ -14191,7 +14177,7 @@ var SKILL_DEFINITION_FIELD_GAMEPLAY_MODULES = Object.freeze([{
   version: "1",
   label: "\u8BFB\u53D6\u6280\u80FD\u5B9A\u4E49\u5B57\u6BB5",
   description: "\u6309\u6280\u80FD\u6807\u8BC6\u8BFB\u53D6\u767B\u8BB0\u7684\u5C01\u95ED\u6280\u80FD\u5B9A\u4E49\u5B57\u6BB5\uFF1B\u7F3A\u5931\u548C\u7A7A\u503C\u8FD4\u56DE\u53EF\u7A7A\u503C\u3002",
-  inputs: [port43("skillId", nullableStringType10)],
+  inputs: [port43("skillId", nullableStringType8)],
   outputs: [port43("value", booleanType35, { nullable: true })],
   parameters: [parameter36("field", stringType39, { enum: ["momentumGainOnUse"] })],
   allowedSurfaces: ACTIVE24,
@@ -14214,13 +14200,13 @@ var recordType29 = "record";
 var stringType40 = "string";
 var booleanType36 = "boolean";
 var pieceType33 = "piece";
-var nullableStringType11 = { kind: "nullable", value: stringType40 };
+var nullableStringType9 = { kind: "nullable", value: stringType40 };
 var nullablePieceType3 = { kind: "nullable", value: pieceType33 };
 var nullableRecordType2 = { kind: "nullable", value: recordType29 };
 var nullableNumberType5 = { kind: "nullable", value: "number" };
 var handType = { kind: "list", element: recordType29 };
-var port44 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter37 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var port44 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter37 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var define39 = (value) => ({
   version: "1",
   allowedSurfaces: ACTIVE25,
@@ -14287,19 +14273,19 @@ function contentFieldLowering(ctx) {
 var CARD_INSTANCE_FIELDS = Object.freeze({
   cardId: stringType40,
   instanceId: stringType40,
-  name: nullableStringType11,
+  name: nullableStringType9,
   boundPieceInstanceId: nullablePieceType3,
   contentState: nullableRecordType2,
   extension: nullableRecordType2
 });
 var CARD_DEFINITION_FIELDS = Object.freeze({
   id: stringType40,
-  name: nullableStringType11
+  name: nullableStringType9
 });
 var CARD_CONTENT_FIELDS = Object.freeze({
   velenHolyProphecy: nullableRecordType2,
   velenHolyProphecyEnhanced: booleanType36,
-  sourcePieceId: nullableStringType11,
+  sourcePieceId: nullableStringType9,
   createdTurnNumber: nullableNumberType5
 });
 var GENERIC_CARD_FIELD_GAMEPLAY_MODULES = Object.freeze([
@@ -14391,10 +14377,10 @@ var booleanType37 = "boolean";
 var stringType41 = "string";
 var recordType30 = "record";
 var choiceType10 = "choice";
-var pieceListType10 = { kind: "list", element: pieceType34 };
-var stringListType13 = { kind: "list", element: stringType41 };
-var port45 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
-var parameter38 = (name, type2, options2 = {}) => ({ name, type: type2, ...options2 });
+var pieceListType9 = { kind: "list", element: pieceType34 };
+var stringListType11 = { kind: "list", element: stringType41 };
+var port45 = (name, type, options2 = {}) => ({ name, type, ...options2 });
+var parameter38 = (name, type, options2 = {}) => ({ name, type, ...options2 });
 var pure27 = (reads = []) => ({
   pure: true,
   previewSafe: true,
@@ -14472,7 +14458,7 @@ function freezeOutputParameterTypeBindings(value) {
   const result = /* @__PURE__ */ Object.create(null);
   for (const [output, binding] of Object.entries(value)) {
     const types = /* @__PURE__ */ Object.create(null);
-    for (const [field3, type2] of Object.entries(binding.types)) types[field3] = freezeValueType(type2);
+    for (const [field3, type] of Object.entries(binding.types)) types[field3] = freezeValueType(type);
     result[output] = Object.freeze({ parameter: binding.parameter, types: Object.freeze(types) });
   }
   return Object.freeze(result);
@@ -14618,7 +14604,7 @@ var queries = [
       port45("originId", pieceType34, { optional: true, nullable: true }),
       port45("ownerId", playerType21, { optional: true, nullable: true })
     ],
-    outputs: [port45("pieces", pieceListType10)],
+    outputs: [port45("pieces", pieceListType9)],
     parameters: [
       parameter38("relation", stringType41, { enum: ["ally", "enemy", "all"], default: "all" }),
       parameter38("range", numberType34, { optional: true, minimum: 0 }),
@@ -15072,7 +15058,7 @@ var statusAndRules = [
       parameter38("stacks", numberType34, { default: 1 }),
       parameter38("maxStacks", numberType34, { optional: true }),
       parameter38("visible", booleanType37, { default: true }),
-      parameter38("relatedRules", stringListType13, { default: [] })
+      parameter38("relatedRules", stringListType11, { default: [] })
     ],
     allowedSurfaces: EFFECT_SURFACES,
     effects: writes21(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
@@ -15099,7 +15085,7 @@ var statusAndRules = [
       parameter38("stacks", numberType34, { default: 1 }),
       parameter38("maxStacks", numberType34, { optional: true }),
       parameter38("visible", booleanType37, { default: true }),
-      parameter38("relatedRules", stringListType13, { default: [] })
+      parameter38("relatedRules", stringListType11, { default: [] })
     ],
     allowedSurfaces: EFFECT_SURFACES,
     effects: writes21(["status", "rule", "events"], { events: ["afterStatusApplied"] }),
@@ -15209,12 +15195,12 @@ var eventFacts = [
     ["event.movement-kind", "\u4F4D\u79FB\u7C7B\u578B", "movementKind", stringType41],
     ["event.from-x", "\u8D77\u70B9 X", "fromX", numberType34],
     ["event.from-y", "\u8D77\u70B9 Y", "fromY", numberType34]
-  ].map(([id, label, field3, type2]) => descriptor2({
+  ].map(([id, label, field3, type]) => descriptor2({
     id,
     label,
     description: `\u8BFB\u53D6\u4E8B\u4EF6\u4E8B\u5B9E ${field3}\uFF1B\u4E8B\u4EF6\u4E0D\u5B58\u5728\u8BE5\u5B57\u6BB5\u65F6\u8FD4\u56DE\u7A7A\u503C\u3002`,
     inputs: [],
-    outputs: [port45("value", type2, { nullable: true })],
+    outputs: [port45("value", type, { nullable: true })],
     allowedSurfaces: ["rule", "triggerSkill", "pending"],
     effects: pure27(["event"]),
     lower: (ctx) => expression(`(${runtime7(ctx.surface)}.event.read())[${ctx.emitLiteral(field3)}]`),
@@ -15607,9 +15593,9 @@ function staticSteps(document) {
       continue;
     }
     if (raw.kind !== "target") return { values, diagnostic: "targeting.steps \u542B\u6709\u56FE\u7ED1\u5B9A\u65E0\u6CD5\u5B89\u5168\u63D0\u5347\u7684\u6B65\u9AA4\u3002" };
-    const type2 = targetType(raw.type);
-    if (!type2) return { values, diagnostic: "targeting.steps \u542B\u6709\u672A\u77E5\u76EE\u6807\u7C7B\u578B\uFF0C\u65E0\u6CD5\u5EFA\u7ACB\u56FE\u7ED1\u5B9A\u3002" };
-    values.push({ kind: "target", type: type2, raw, index });
+    const type = targetType(raw.type);
+    if (!type) return { values, diagnostic: "targeting.steps \u542B\u6709\u672A\u77E5\u76EE\u6807\u7C7B\u578B\uFF0C\u65E0\u6CD5\u5EFA\u7ACB\u56FE\u7ED1\u5B9A\u3002" };
+    values.push({ kind: "target", type, raw, index });
   }
   return { values };
 }
@@ -15636,13 +15622,13 @@ function booleanParameterWithDefault(statement2, name, fallback) {
 function targetSignature(interaction) {
   if (interaction.kind !== "target") return { kind: interaction.kind };
   const statement2 = interaction.statement;
-  const type2 = interaction.type;
+  const type = interaction.type;
   return {
     kind: interaction.kind,
-    type: type2,
+    type,
     range: numericParameter(statement2, "range", 5),
-    filter: enumParameter(statement2, "filter", type2 === "cell" ? "all" : "enemy"),
-    ...type2 === "cell" ? {
+    filter: enumParameter(statement2, "filter", type === "cell" ? "all" : "enemy"),
+    ...type === "cell" ? {
       requireWalkable: booleanParameterWithDefault(statement2, "requireWalkable", true),
       requireUnoccupied: booleanParameterWithDefault(statement2, "requireUnoccupied", true)
     } : {}
@@ -16432,12 +16418,12 @@ function collectLegacyGraphEvidence(value, path = "contentGraph") {
         const parameters4 = record(node.parameters) ? node.parameters : void 0;
         const definition = object3 ?? (parameters4 ? cloneRecord(parameters4) : {});
         const id = asString(definition.id) ?? asString(definition.type) ?? (parameters4 ? asString(parameters4.statusId) : void 0);
-        const type2 = asString(definition.type) ?? (parameters4 ? asString(parameters4.statusType) : void 0);
-        if (id || type2) {
+        const type = asString(definition.type) ?? (parameters4 ? asString(parameters4.statusType) : void 0);
+        if (id || type) {
           const relatedRules = asStringList(definition.relatedRules);
           statuses.push({
-            id: id ?? type2,
-            definition: { ...definition, ...type2 && !definition.type ? { type: type2 } : {} },
+            id: id ?? type,
+            definition: { ...definition, ...type && !definition.type ? { type } : {} },
             path: nodePath,
             relatedRules
           });
@@ -17389,7 +17375,7 @@ function parseAuthorExpression(source) {
 
 // lib/skill-graph/author-expression-graph.ts
 var literal12 = (value) => ({ kind: "literal", value });
-var encodedType = (type2) => typeof type2 === "string" ? type2 : JSON.stringify(type2);
+var encodedType = (type) => typeof type === "string" ? type : JSON.stringify(type);
 var sameType = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 var own5 = (object3, key) => Object.prototype.hasOwnProperty.call(object3, key) ? object3[key] : void 0;
 var number2 = "number";
@@ -17491,21 +17477,21 @@ function lowerAuthorExpression(source, options2) {
     if (descriptor3.effects.pure !== true) throw new Error(`\u8868\u8FBE\u5F0F\u4E0D\u80FD\u6267\u884C\u6709\u526F\u4F5C\u7528\u7684\u8BED\u53E5\uFF1A${descriptor3.label}`);
     const output = descriptor3.outputs.find((output2) => output2.name === (port46 ?? descriptor3.outputs[0]?.name));
     if (!output) throw new Error(`\u6A21\u5757 ${module2} \u6CA1\u6709\u8FD4\u56DE\u503C`);
-    let type2 = output.type;
+    let type = output.type;
     const fromParameter = descriptor3.outputParameterTypeBindings?.[output.name];
-    if (fromParameter) type2 = fromParameter.types[String(parameters4[fromParameter.parameter])];
+    if (fromParameter) type = fromParameter.types[String(parameters4[fromParameter.parameter])];
     const fromType = descriptor3.outputValueTypeBindings?.[output.name];
     if (fromType) {
       const selected = parameters4[fromType.parameter];
-      type2 = typeof selected === "string" && selected.startsWith("{") ? JSON.parse(selected) : selected;
+      type = typeof selected === "string" && selected.startsWith("{") ? JSON.parse(selected) : selected;
     }
     const binding = descriptor3.outputTypeBindings?.[output.name];
     if (binding) {
       const inputType = inputs[binding.input]?.type;
       if (!inputType) throw new Error(`\u7F3A\u5C11\u6CDB\u578B\u8F93\u5165 ${binding.input}`);
-      type2 = binding.projection === "same" ? inputType : binding.projection === "singleton" ? { kind: "list", element: inputType } : typeof inputType === "object" && inputType.kind === "list" ? inputType.element : "unknown";
+      type = binding.projection === "same" ? inputType : binding.projection === "singleton" ? { kind: "list", element: inputType } : typeof inputType === "object" && inputType.kind === "list" ? inputType.element : "unknown";
     }
-    if (!type2) throw new Error(`\u5B57\u6BB5\u672A\u6CE8\u518C\uFF1A${String(parameters4.field)}`);
+    if (!type) throw new Error(`\u5B57\u6BB5\u672A\u6CE8\u518C\uFF1A${String(parameters4.field)}`);
     const nodeId = id();
     body.push({ kind: "call", id: nodeId, module: module2, version: descriptor3.version, inputs: Object.fromEntries(Object.entries(inputs).map(([key, value2]) => [key, value2.value])), parameters: parameters4 });
     const domainByModule = {
@@ -17520,28 +17506,28 @@ function lowerAuthorExpression(source, options2) {
       "author.cluster.list": "cluster-instances"
     };
     const domain = output.name === "value" || output.name === "instance" || output.name === "card" || output.name === "status" || output.name === "statuses" || output.name === "instances" || output.name === "groups" ? domainByModule[module2] : void 0;
-    return { value: { kind: "output", node: nodeId, port: output.name }, type: output.nullable ? { kind: "nullable", value: type2 } : type2, ...domain ? { domain } : {} };
+    return { value: { kind: "output", node: nodeId, port: output.name }, type: output.nullable ? { kind: "nullable", value: type } : type, ...domain ? { domain } : {} };
   }
-  const unwrapNullable = (type2) => typeof type2 === "object" && type2.kind === "nullable" ? type2.value : type2;
-  const listType2 = (element) => ({ kind: "list", element });
+  const unwrapNullable = (type) => typeof type === "object" && type.kind === "nullable" ? type.value : type;
+  const listType = (element) => ({ kind: "list", element });
   const mapType = (key, value2) => ({ kind: "map", key, value: value2 });
   const setType = (element) => ({ kind: "set", element });
-  const wildcardType = (type2) => type2 === "any" || type2 === "unknown";
+  const wildcardType = (type) => type === "any" || type === "unknown";
   const matchesExpected = (actual, expected) => expected === void 0 || wildcardType(expected) || sameType(actual, expected);
   const containerModuleVersion = (module2) => getGameplayModule(module2, "2") ? "2" : void 0;
-  const containerParameters = (type2) => {
-    const selected = unwrapNullable(type2);
+  const containerParameters = (type) => {
+    const selected = unwrapNullable(type);
     if (typeof selected === "object" && selected.kind === "map") {
       return {
         containerType: encodedType(selected),
         keyType: encodedType(selected.key),
         valueType: encodedType(selected.value),
-        keysType: encodedType(listType2(selected.key)),
-        valuesType: encodedType(listType2(selected.value))
+        keysType: encodedType(listType(selected.key)),
+        valuesType: encodedType(listType(selected.value))
       };
     }
     if (typeof selected === "object" && selected.kind === "set") {
-      return { containerType: encodedType(selected), valueType: encodedType(selected.element), itemsType: encodedType(listType2(selected.element)) };
+      return { containerType: encodedType(selected), valueType: encodedType(selected.element), itemsType: encodedType(listType(selected.element)) };
     }
     throw new Error("\u6B64\u503C\u4E0D\u662F\u96C6\u5408\u6216\u6620\u5C04");
   };
@@ -17572,7 +17558,7 @@ function lowerAuthorExpression(source, options2) {
         const [itemsExpression] = argumentExpressions(args, false, ["items"], [["\u5143\u7EC4", "\u96C6\u5408", "items"]], node);
         const expectedContainer2 = unwrapNullable(expected ?? "unknown");
         const expectedElement = typeof expectedContainer2 === "object" && expectedContainer2.kind === "set" ? expectedContainer2.element : void 0;
-        const items2 = compile(itemsExpression, body, bindings, expectedElement === void 0 ? void 0 : listType2(expectedElement));
+        const items2 = compile(itemsExpression, body, bindings, expectedElement === void 0 ? void 0 : listType(expectedElement));
         const itemsType = unwrapNullable(items2.type);
         if (typeof itemsType !== "object" || itemsType.kind !== "list") return fail5(node, "\u96C6\u5408\u9700\u8981\u5143\u7EC4\u4F5C\u4E3A\u53C2\u6570");
         let element = itemsType.element;
@@ -17581,15 +17567,15 @@ function lowerAuthorExpression(source, options2) {
           element = expectedElement;
         }
         if (!matchesExpected(element, expectedElement)) return fail5(node, "\u96C6\u5408\u5143\u7D20\u7C7B\u578B\u4E0E\u4E0A\u4E0B\u6587\u4E0D\u4E00\u81F4");
-        const type3 = setType(element);
-        return call(body, "set.create", { items: items2 }, containerParameters(type3), void 0, containerModuleVersion("set.create"));
+        const type2 = setType(element);
+        return call(body, "set.create", { items: items2 }, containerParameters(type2), void 0, containerModuleVersion("set.create"));
       }
       const [keysExpression, valuesExpression] = argumentExpressions(args, false, ["keys", "values"], [["\u952E\u5143\u7EC4", "\u952E", "keys"], ["\u503C\u5143\u7EC4", "\u503C", "values"]], node);
       const expectedContainer = unwrapNullable(expected ?? "unknown");
       const expectedKey = typeof expectedContainer === "object" && expectedContainer.kind === "map" ? expectedContainer.key : void 0;
       const expectedValue = typeof expectedContainer === "object" && expectedContainer.kind === "map" ? expectedContainer.value : void 0;
-      const keys = compile(keysExpression, body, bindings, expectedKey === void 0 ? void 0 : listType2(expectedKey));
-      const values = compile(valuesExpression, body, bindings, expectedValue === void 0 ? void 0 : listType2(expectedValue));
+      const keys = compile(keysExpression, body, bindings, expectedKey === void 0 ? void 0 : listType(expectedKey));
+      const values = compile(valuesExpression, body, bindings, expectedValue === void 0 ? void 0 : listType(expectedValue));
       const keysType = unwrapNullable(keys.type);
       const valuesType = unwrapNullable(values.type);
       if (typeof keysType !== "object" || keysType.kind !== "list" || typeof valuesType !== "object" || valuesType.kind !== "list") return fail5(node, "\u6620\u5C04\u9700\u8981\u4E24\u4E2A\u5143\u7EC4\u4F5C\u4E3A\u53C2\u6570");
@@ -17604,8 +17590,8 @@ function lowerAuthorExpression(source, options2) {
         value2 = expectedValue;
       }
       if (!matchesExpected(key, expectedKey) || !matchesExpected(value2, expectedValue)) return fail5(node, "\u6620\u5C04\u952E\u6216\u503C\u7C7B\u578B\u4E0E\u4E0A\u4E0B\u6587\u4E0D\u4E00\u81F4");
-      const type2 = mapType(key, value2);
-      return call(body, "map.create", { keys, values }, containerParameters(type2), void 0, containerModuleVersion("map.create"));
+      const type = mapType(key, value2);
+      return call(body, "map.create", { keys, values }, containerParameters(type), void 0, containerModuleVersion("map.create"));
     }
     const operationNames = /* @__PURE__ */ new Set(["\u5305\u542B", "\u5305\u542B\u952E", "\u952E\u5217\u8868", "\u503C\u5217\u8868", "\u6570\u91CF", "\u8BFB\u53D6", "\u5199\u5165", "\u79FB\u9664", "\u52A0\u5165", "\u8F6C\u5143\u7EC4"]);
     if (!operationNames.has(name)) return void 0;
@@ -17648,7 +17634,7 @@ function lowerAuthorExpression(source, options2) {
       const schema2 = typeof receiverType === "object" && receiverType.kind === "record" ? schemas.find((item) => item.id === receiverType.schema || `${item.id}@${item.version}` === receiverType.schema) : void 0;
       const element = schema2?.fields[0]?.type;
       if (!element || schema2?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
-      return call(body, "map.values", { map: receiver }, { valueType: encodedType(listType2(element)) }, "items", legacyVersion);
+      return call(body, "map.values", { map: receiver }, { valueType: encodedType(listType(element)) }, "items", legacyVersion);
     }
     if (name === "\u503C\u5217\u8868" && isMap) return call(body, "map.values", { map: receiver }, containerParameters(receiverType), void 0, containerModuleVersion("map.values"));
     if (name === "\u6570\u91CF" && isList) return call(body, "collection.length", { items: receiver });
@@ -17719,22 +17705,22 @@ function lowerAuthorExpression(source, options2) {
         const declarations = (options2.extensions ?? []).filter((item) => item.scope === scope && item.name === name);
         if (declarations.some((item) => !sameType(item.type, declarations[0].type) || item.namespace !== declarations[0].namespace)) return fail5(node, "\u6B64\u6269\u5C55\u53D8\u91CF\u5B58\u5728\u4E0D\u540C\u58F0\u660E\uFF0C\u8BF7\u660E\u786E\u5F53\u524D\u5BF9\u8C61\u7684\u7C7B\u578B");
         const declaration2 = declarations[0];
-        let type3 = declaration2?.type;
+        let type2 = declaration2?.type;
         for (const field4 of path) {
-          if (!type3) break;
-          const ownerType2 = typeof type3 === "object" && type3.kind === "nullable" ? type3.value : type3;
+          if (!type2) break;
+          const ownerType2 = typeof type2 === "object" && type2.kind === "nullable" ? type2.value : type2;
           if (ownerType2 !== "record" && !(typeof ownerType2 === "object" && ownerType2.kind === "record")) return fail5(node, "\u6B64\u6269\u5C55\u503C\u6CA1\u6709\u5B57\u6BB5 " + field4);
           const reference = typeof ownerType2 === "object" && ownerType2.kind === "record" ? ownerType2.schema : void 0;
           const schema2 = reference ? schemas.find((item) => item.id === reference || `${item.id}@${item.version}` === reference) : void 0;
           if (schema2 && !schema2.fields.some((item) => item.name === field4)) return fail5(node, "\u6B64\u6269\u5C55\u7ED3\u6784\u4E2D\u6CA1\u6709\u5B57\u6BB5 " + field4);
-          type3 = schema2?.fields.find((item) => item.name === field4)?.type;
+          type2 = schema2?.fields.find((item) => item.name === field4)?.type;
         }
-        type3 ?? (type3 = expected);
-        if (!type3 || type3 === "unknown" || type3 === "any") return fail5(node, "\u8BF7\u58F0\u660E\u6B64\u6269\u5C55\u53D8\u91CF\u7684\u7C7B\u578B\uFF0C\u6216\u5728\u660E\u786E\u7C7B\u578B\u7684\u53C2\u6570\u4E2D\u4F7F\u7528");
+        type2 = type2 ?? expected;
+        if (!type2 || type2 === "unknown" || type2 === "any") return fail5(node, "\u8BF7\u58F0\u660E\u6B64\u6269\u5C55\u53D8\u91CF\u7684\u7C7B\u578B\uFF0C\u6216\u5728\u660E\u786E\u7C7B\u578B\u7684\u53C2\u6570\u4E2D\u4F7F\u7528");
         if (scope === "piece" || scope === "player" || scope === "battle") {
-          return call(body, `extension.read-${scope}`, owner ? { owner } : {}, { namespace: declaration2?.namespace ?? "content", name, path: path.join("."), valueType: encodedType(type3) }, "value", scope === "battle" ? "2" : "1");
+          return call(body, `extension.read-${scope}`, owner ? { owner } : {}, { namespace: declaration2?.namespace ?? "content", name, path: path.join("."), valueType: encodedType(type2) }, "value", scope === "battle" ? "2" : "1");
         }
-        return call(body, "extension.read-instance", { entity: owner }, { entityKind: scope, namespace: declaration2?.namespace ?? "content", name, path: path.join("."), valueType: encodedType(type3) }, "value");
+        return call(body, "extension.read-instance", { entity: owner }, { entityKind: scope, namespace: declaration2?.namespace ?? "content", name, path: path.join("."), valueType: encodedType(type2) }, "value");
       }
       const field3 = own5(authorFieldAliases, node.field) ?? node.field;
       if (node.object.kind === "identifier" && ["\u5168\u5C40", "\u5F53\u524D\u5BF9\u5C40"].includes(node.object.name)) {
@@ -17743,24 +17729,24 @@ function lowerAuthorExpression(source, options2) {
       }
       if (node.object.kind === "identifier" && node.object.name === "\u5F53\u524D\u4E8B\u4EF6") return call(body, "event.field", {}, { field: field3 });
       const object3 = compile(node.object, body, bindings);
-      const type2 = typeof object3.type === "object" && object3.type.kind === "nullable" ? object3.type.value : object3.type;
+      const type = typeof object3.type === "object" && object3.type.kind === "nullable" ? object3.type.value : object3.type;
       if (object3.domain === "tile-effect") return call(body, "tile.effect-field", { effect: object3 }, { field: node.field === "\u7C7B\u578B" || node.field === "type" ? "tileType" : field3 });
       if (object3.domain === "skill-instance") return call(body, "author.skill-instance.field", { instance: object3 }, { field: field3 });
       if (object3.domain === "card-instance") return call(body, "card.instance-field", { card: object3 }, { field: field3 }, "value");
-      if (type2 === "piece" && field3 === "abilityGroups") return call(body, "author.cluster.list", { piece: object3 }, {}, "groups");
-      if (type2 === "piece" && node.field === "\u4F4D\u7F6E") return call(body, "spatial.piece-position", { piece: object3 });
-      if (type2 === "piece" || type2 === "player") return call(body, `${type2}.field`, { [type2]: object3 }, { field: field3 }, "value", type2 === "piece" ? "2" : "1");
-      if (typeof type2 === "object" && type2.kind === "record") {
-        const schema2 = schemas.find((item) => item.id === type2.schema || `${item.id}@${item.version}` === type2.schema);
+      if (type === "piece" && field3 === "abilityGroups") return call(body, "author.cluster.list", { piece: object3 }, {}, "groups");
+      if (type === "piece" && node.field === "\u4F4D\u7F6E") return call(body, "spatial.piece-position", { piece: object3 });
+      if (type === "piece" || type === "player") return call(body, `${type}.field`, { [type]: object3 }, { field: field3 }, "value", type === "piece" ? "2" : "1");
+      if (typeof type === "object" && type.kind === "record") {
+        const schema2 = schemas.find((item) => item.id === type.schema || `${item.id}@${item.version}` === type.schema);
         const selected = schema2?.fields.find((item) => item.name === node.field);
         if (!selected) return fail5(node, `\u8BB0\u5F55\u6CA1\u6709\u5B57\u6BB5\u300C${node.field}\u300D`);
         const nodeId = id();
         body.push({ kind: "record.get", id: nodeId, record: object3.value, field: node.field });
         return { value: { kind: "output", node: nodeId, port: "value" }, type: selected.type };
       }
-      if (type2 === "record") return call(body, "data.field", { record: object3 }, { field: field3 }, "value", "2");
-      if (type2 === "cell" && ["x", "y"].includes(field3)) return call(body, "spatial.cell-coordinates", { cell: object3 }, {}, field3);
-      if (type2 === "cell") {
+      if (type === "record") return call(body, "data.field", { record: object3 }, { field: field3 }, "value", "2");
+      if (type === "cell" && ["x", "y"].includes(field3)) return call(body, "spatial.cell-coordinates", { cell: object3 }, {}, field3);
+      if (type === "cell") {
         const cellField = own5({ \u53EF\u884C\u8D70: "walkable", \u88AB\u5360\u7528: "occupied", \u5730\u683C\u6548\u679C: "tileEffects" }, node.field) ?? node.field;
         const result = call(body, "cell.field", { cell: object3 }, { field: cellField });
         return cellField === "tileEffects" ? { ...result, domain: "tile-effects" } : result;
@@ -17897,15 +17883,15 @@ function lowerAuthorExpression(source, options2) {
       }
       const parameters4 = {};
       if (name === "\u5305\u542B" || name === "\u9996\u9879\u5E8F\u53F7") {
-        const type2 = inputs.items?.type;
-        if (typeof type2 !== "object" || type2.kind !== "list" || !sameType(type2.element, inputs.value?.type)) return fail5(node, "\u67E5\u627E\u503C\u5FC5\u987B\u4E0E\u5BB9\u5668\u5143\u7D20\u7C7B\u578B\u4E00\u81F4");
-        parameters4.valueType = encodedType(type2.element);
-        parameters4.itemsType = encodedType(type2);
+        const type = inputs.items?.type;
+        if (typeof type !== "object" || type.kind !== "list" || !sameType(type.element, inputs.value?.type)) return fail5(node, "\u67E5\u627E\u503C\u5FC5\u987B\u4E0E\u5BB9\u5668\u5143\u7D20\u7C7B\u578B\u4E00\u81F4");
+        parameters4.valueType = encodedType(type.element);
+        parameters4.itemsType = encodedType(type);
       }
       if (name === "\u53BB\u91CD" || name === "\u62FC\u63A5") parameters4.valueType = encodedType(inputs.items?.type ?? inputs.left.type);
       if (name === "\u503C\u5217\u8868") {
-        const type2 = inputs.map?.type;
-        const schema2 = typeof type2 === "object" && type2.kind === "record" ? schemas.find((schema3) => schema3.id === type2.schema || `${schema3.id}@${schema3.version}` === type2.schema) : void 0;
+        const type = inputs.map?.type;
+        const schema2 = typeof type === "object" && type.kind === "record" ? schemas.find((schema3) => schema3.id === type.schema || `${schema3.id}@${schema3.version}` === type.schema) : void 0;
         const element = schema2?.fields[0]?.type;
         if (!element || schema2?.fields.some((field3) => !sameType(field3.type, element))) return fail5(node, "\u6620\u5C04\u7684\u503C\u987B\u5177\u6709\u540C\u4E00\u7C7B\u578B");
         parameters4.valueType = encodedType({ kind: "list", element });
@@ -17924,9 +17910,9 @@ function lowerAuthorExpression(source, options2) {
 }
 
 // lib/skill-graph/author-expression-completion.ts
-function authorTypeLabel(type2) {
-  if (typeof type2 === "object") return type2.kind === "list" ? `\u5143\u7EC4<${authorTypeLabel(type2.element)}>` : type2.kind === "set" ? `\u96C6\u5408<${authorTypeLabel(type2.element)}>` : type2.kind === "map" ? `\u6620\u5C04<${authorTypeLabel(type2.key)}, ${authorTypeLabel(type2.value)}>` : type2.kind === "nullable" ? `${authorTypeLabel(type2.value)}\u6216\u7A7A` : "\u7ED3\u6784\u4F53";
-  return { number: "\u6570\u503C", boolean: "\u5E03\u5C14", string: "\u6587\u672C", piece: "\u68CB\u5B50", player: "\u73A9\u5BB6", cell: "\u5730\u683C", card: "\u624B\u724C", status: "\u72B6\u6001", record: "\u7ED3\u6784\u4F53", event: "\u4E8B\u4EF6", null: "\u7A7A" }[type2] ?? type2;
+function authorTypeLabel(type) {
+  if (typeof type === "object") return type.kind === "list" ? `\u5143\u7EC4<${authorTypeLabel(type.element)}>` : type.kind === "set" ? `\u96C6\u5408<${authorTypeLabel(type.element)}>` : type.kind === "map" ? `\u6620\u5C04<${authorTypeLabel(type.key)}, ${authorTypeLabel(type.value)}>` : type.kind === "nullable" ? `${authorTypeLabel(type.value)}\u6216\u7A7A` : "\u7ED3\u6784\u4F53";
+  return { number: "\u6570\u503C", boolean: "\u5E03\u5C14", string: "\u6587\u672C", piece: "\u68CB\u5B50", player: "\u73A9\u5BB6", cell: "\u5730\u683C", card: "\u624B\u724C", status: "\u72B6\u6001", record: "\u7ED3\u6784\u4F53", event: "\u4E8B\u4EF6", null: "\u7A7A" }[type] ?? type;
 }
 function closePrefix(prefix) {
   const stack = [];
@@ -17950,21 +17936,21 @@ function closePrefix(prefix) {
   return prefix + stack.reverse().join("");
 }
 function fieldsFor(value, options2) {
-  const type2 = typeof value.type === "object" && value.type.kind === "nullable" ? value.type.value : value.type;
-  if (type2 === "cell") return { x: "number", y: "number", \u53EF\u884C\u8D70: "boolean", \u88AB\u5360\u7528: "boolean", \u5730\u683C\u6548\u679C: { kind: "list", element: "record" } };
-  if (typeof type2 === "object" && type2.kind === "record") {
-    const schema2 = options2.schemas?.find((schema3) => schema3.id === type2.schema || `${schema3.id}@${schema3.version}` === type2.schema);
+  const type = typeof value.type === "object" && value.type.kind === "nullable" ? value.type.value : value.type;
+  if (type === "cell") return { x: "number", y: "number", \u53EF\u884C\u8D70: "boolean", \u88AB\u5360\u7528: "boolean", \u5730\u683C\u6548\u679C: { kind: "list", element: "record" } };
+  if (typeof type === "object" && type.kind === "record") {
+    const schema2 = options2.schemas?.find((schema3) => schema3.id === type.schema || `${schema3.id}@${schema3.version}` === type.schema);
     return Object.fromEntries((schema2?.fields ?? []).map((field3) => [field3.name, field3.type]));
   }
-  const moduleId = value.domain === "skill-instance" ? "author.skill-instance.field" : value.domain === "card-instance" ? "card.instance-field" : value.domain === "tile-effect" ? "tile.effect-field" : type2 === "piece" ? "piece.field" : type2 === "player" ? "player.field" : type2 === "event" ? "event.field" : void 0;
-  const descriptor3 = moduleId && getGameplayModule(moduleId, type2 === "piece" ? "2" : "1");
+  const moduleId = value.domain === "skill-instance" ? "author.skill-instance.field" : value.domain === "card-instance" ? "card.instance-field" : value.domain === "tile-effect" ? "tile.effect-field" : type === "piece" ? "piece.field" : type === "player" ? "player.field" : type === "event" ? "event.field" : void 0;
+  const descriptor3 = moduleId && getGameplayModule(moduleId, type === "piece" ? "2" : "1");
   const raw = descriptor3 && descriptor3.outputParameterTypeBindings?.value?.types || {};
   const result = {};
   for (const [name, fieldType] of Object.entries(raw)) {
     const label = Object.keys(authorFieldAliases).find((alias) => authorFieldAliases[alias] === name) ?? name;
     result[name === "tileType" ? "\u7C7B\u578B" : label] = fieldType;
   }
-  if (type2 === "piece") {
+  if (type === "piece") {
     result.\u4F4D\u7F6E = "cell";
     result.\u80FD\u529B\u7EC4 = { kind: "list", element: "record" };
   }
@@ -17978,11 +17964,11 @@ function extensionScope(value) {
   if (domain === "card-instance" || domain === "card-instances") return "card";
   if (domain === "cluster-instance" || domain === "cluster-instances") return "cluster";
   if (domain === "tile-effect" || domain === "tile-effects") return "tile-effect";
-  const type2 = typeof value.type === "object" && value.type.kind === "nullable" ? value.type.value : value.type;
-  return type2 === "piece" || type2 === "player" ? type2 : void 0;
+  const type = typeof value.type === "object" && value.type.kind === "nullable" ? value.type.value : value.type;
+  return type === "piece" || type === "player" ? type : void 0;
 }
-function containerMethods(type2) {
-  const selected = typeof type2 === "object" && type2.kind === "nullable" ? type2.value : type2;
+function containerMethods(type) {
+  const selected = typeof type === "object" && type.kind === "nullable" ? type.value : type;
   if (typeof selected !== "object") return [];
   if (selected.kind === "list") return ["\u5305\u542B", "\u9996\u9879\u5E8F\u53F7", "\u7B5B\u9009", "\u9010\u9879\u53D8\u6362", "\u4EFB\u610F\u6EE1\u8DB3", "\u5168\u90E8\u6EE1\u8DB3", "\u67E5\u627E\u9996\u9879", "\u6570\u91CF", "\u622A\u53D6", "\u53CD\u8F6C"];
   if (selected.kind === "set") return ["\u5305\u542B", "\u6570\u91CF", "\u52A0\u5165", "\u79FB\u9664", "\u8F6C\u5143\u7EC4"];
@@ -18041,17 +18027,17 @@ function completeAuthorExpression(prefix, options2) {
     for (const declaration2 of options2.extensions ?? []) if (declaration2.scope === scope) suggestions.push({ label: `${receiver}.${declaration2.name}`, value: `${receiver}.${declaration2.name}`, kind: authorTypeLabel(declaration2.type) });
   }
   if (receiver === "\u5168\u5C40" || receiver === "\u5F53\u524D\u5BF9\u5C40") {
-    for (const [field3, type2] of Object.entries({ turnNumber: "number", currentPlayerId: "player" })) suggestions.push({ label: `${receiver}.${field3}`, value: `${receiver}.${field3}`, kind: authorTypeLabel(type2) });
+    for (const [field3, type] of Object.entries({ turnNumber: "number", currentPlayerId: "player" })) suggestions.push({ label: `${receiver}.${field3}`, value: `${receiver}.${field3}`, kind: authorTypeLabel(type) });
   }
   if (owner) {
     if (extensionScope(owner)) suggestions.push({ label: `${receiver}.extension`, value: `${receiver}.extension`, kind: "\u6269\u5C55\u53D8\u91CF" });
-    for (const [field3, type2] of Object.entries(fieldsFor(owner, { ...options2, schemas }))) suggestions.push({ label: `${receiver}.${field3}`, value: `${receiver}.${field3}`, kind: authorTypeLabel(type2) });
+    for (const [field3, type] of Object.entries(fieldsFor(owner, { ...options2, schemas }))) suggestions.push({ label: `${receiver}.${field3}`, value: `${receiver}.${field3}`, kind: authorTypeLabel(type) });
     for (const method of containerMethods(owner.type)) suggestions.push({ label: `${receiver}.${method}`, value: `${receiver}.${method}()`, kind: "\u65B9\u6CD5", signature: `${receiver}.${method}()` });
   }
   if (receiver === "\u5168\u5C40" || receiver === "\u5F53\u524D\u5BF9\u5C40") suggestions.push({ label: `${receiver}.extension`, value: `${receiver}.extension`, kind: "\u6269\u5C55\u53D8\u91CF" });
   if (dot >= 0) return suggestions;
   for (const [name, value] of Object.entries(bindings)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(value.type) });
-  for (const [name, type2] of Object.entries({ \u5F53\u524D\u68CB\u5B50: "piece", \u5F53\u524D\u73A9\u5BB6: "player", \u76EE\u6807: "piece", \u5F53\u524D\u4E8B\u4EF6: "event", \u5168\u5C40: "record" })) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type2) });
+  for (const [name, type] of Object.entries({ \u5F53\u524D\u68CB\u5B50: "piece", \u5F53\u524D\u73A9\u5BB6: "player", \u76EE\u6807: "piece", \u5F53\u524D\u4E8B\u4EF6: "event", \u5168\u5C40: "record" })) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) });
   if (["skill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u6280\u80FD", value: "\u5F53\u524D\u6280\u80FD", kind: "\u6280\u80FD\u5B9E\u4F8B" });
   if (["rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u89C4\u5219", value: "\u5F53\u524D\u89C4\u5219", kind: "\u89C4\u5219\u5B9E\u4F8B" });
   if (["card", "rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u624B\u724C", value: "\u5F53\u524D\u624B\u724C", kind: "\u624B\u724C\u5B9E\u4F8B" });
@@ -18065,8 +18051,8 @@ function authorExpressionParameterHint(prefix, options2) {
   const marker = "__author_parameter_probe";
   let expected;
   try {
-    lowerAuthorExpression(closePrefix(prefix + marker), { ...options2, observeIdentifier(name, _bindings, _schemas, type2) {
-      if (name === marker) expected = type2;
+    lowerAuthorExpression(closePrefix(prefix + marker), { ...options2, observeIdentifier(name, _bindings, _schemas, type) {
+      if (name === marker) expected = type;
     } });
   } catch {
   }
@@ -18086,7 +18072,7 @@ function describeAuthorReference(reference, prefix, options2) {
   } catch {
   }
   const value = lowerAuthorExpression(reference, { ...options2, bindings, schemas });
-  return { name: reference, type: authorTypeLabel(value.type), fields: Object.entries(fieldsFor(value, { ...options2, schemas })).map(([name, type2]) => ({ name, type: authorTypeLabel(type2) })), ...value.value.kind === "literal" ? { value: value.value.value } : {} };
+  return { name: reference, type: authorTypeLabel(value.type), fields: Object.entries(fieldsFor(value, { ...options2, schemas })).map(([name, type]) => ({ name, type: authorTypeLabel(type) })), ...value.value.kind === "literal" ? { value: value.value.value } : {} };
 }
 
 // lib/skill-graph/module-document.ts

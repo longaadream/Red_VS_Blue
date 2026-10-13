@@ -124,6 +124,7 @@ export const PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES: readonly GameplayModuleDesc
   }),
 ])
 
-export const PROJECTILE_QUERY_HOST_GAMEPLAY_MODULE_IDS = new Set(
+// This derived index has no side effects and is omitted from bundles that do not use it.
+export const PROJECTILE_QUERY_HOST_GAMEPLAY_MODULE_IDS = /* @__PURE__ */ (() => new Set(
   PROJECTILE_QUERY_HOST_GAMEPLAY_MODULES.map(descriptor => `${descriptor.id}@${descriptor.version}`),
-)
+))()

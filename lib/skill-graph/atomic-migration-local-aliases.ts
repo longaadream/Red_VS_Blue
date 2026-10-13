@@ -41,7 +41,7 @@ export const ATOMIC_TEXT_LIST_ALIAS_MODULES = new Set([
 
 const numberType = 'number'
 const stringListType: GameplayValueType = { kind: 'list', element: 'string' }
-const stringListTypeParameter = JSON.stringify(stringListType)
+const stringListTypeParameter = /* @__PURE__ */ JSON.stringify(stringListType)
 
 const output = (node: string, port = 'value'): GameplayValue => ({ kind: 'output', node, port })
 const literal = (value: GameplayLiteral): GameplayValue => ({ kind: 'literal', value })

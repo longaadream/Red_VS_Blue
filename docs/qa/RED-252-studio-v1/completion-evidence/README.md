@@ -13,8 +13,14 @@
 | 本批接口与声明 ESLint | 两组均退出 0 | completion-final-integration-lint.log / completion-final-declaration-lint.log |
 | editor worker bundle、editor tsc、game engine build | 均退出 0 | completion-final-editor-bundle.log / completion-final-editor-tsc.log / completion-final-engine-build.log |
 | 主线基线 | ahead 8、behind 0（最终实现提交前） | completion-final-main-baseline.log |
+| CI 后续模块/表达式回归 | 92/92，退出 0 | completion-ci-cleanup-core-tests.json |
+| CI 后续测试类型清理回归 | 36/36，退出 0 | completion-ci-cleanup-test-fixtures.json |
+| CI 后续目录一致性与完整类型检查 | 2/2；typecheck 退出 0 | completion-ci-cleanup-parity.log / completion-ci-cleanup-typecheck.log |
+| CI 后续全目录 lint | 退出 0，仅命令行排除两份原有未跟踪临时文件 | completion-ci-cleanup-pr-lint.log |
 
 核心整合命令：
+
+首次候选 CI 的 56 项 ESLint 失败原日志为 `completion-ci-eslint-failure.log`。修正只删除未用定义、标注纯派生计算并补齐测试类型；独立核对公开导出及 774 项目录完全一致。首次本地 `npm.cmd run lint` 还扫描到原有未跟踪临时文件，结果保留为 `completion-ci-cleanup-full-lint.log`，不算通过。最终全目录命令是 `npm.cmd run lint -- --ignore-pattern temp-flying-effect.js --ignore-pattern temp-flying-graph.js`；没有改动文件或 ESLint 配置，线上继续原始命令。最终 CI 结果见 PR #240。
 
 ```powershell
 node node_modules/vitest/vitest.mjs run tests/skill-graph tests/game/content-graph-corpus.test.ts tests/game/content-graph-card-rule-corpus.test.ts tests/game/author-captured-damage.test.ts tests/game/author-summon-batch.test.ts tests/game/flow-runtime.test.ts tests/game/effect-batch-core.test.ts tests/game/effect-batch-trigger-context.test.ts tests/game/effect-batch-content-migrations.test.ts --maxWorkers=1

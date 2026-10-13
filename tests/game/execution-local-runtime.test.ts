@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createFlowRuntime } from '../../lib/game/flow-runtime'
+import type { PieceSkill } from '../../lib/game/piece'
 import type { GameplayRecordSchema, GameplayValueType } from '../../lib/skill-graph/module-types'
 import { makePiece, makeState } from '../helpers/minimal-state'
 
@@ -88,7 +89,7 @@ describe('execution local values', () => {
   })
 
   it('keeps skill instance identity through local record read before cooldown mutation', () => {
-    const skill = { skillId: 'skill-1', currentCooldown: 0 } as any
+    const skill: PieceSkill = { skillId: 'skill-1', currentCooldown: 0 }
     const piece = makePiece({ instanceId: 'skill-piece', skills: [skill] })
     const battle = makeState({ pieces: [piece] })
     const flow = createFlowRuntime(battle, { playerId: 'player-red', piece }, 'skill', {})

@@ -2,7 +2,7 @@ import type { AtomicRecipe, AtomicReplacement } from './atomic-graph-rewrite'
 import type { GameplayCallStatement, GameplayValue } from './module-types'
 
 export const ATOMIC_MESSAGE_BUFFER_MODULES = new Set(['followup.message-buffer-start', 'followup.message-buffer-add', 'followup.message-buffer-read'])
-const type = JSON.stringify({ kind: 'list', element: 'string' })
+const type = /* @__PURE__ */ JSON.stringify({ kind: 'list', element: 'string' })
 const out = (node: string, port = 'value'): GameplayValue => ({ kind: 'output', node, port })
 const call = (id: string, module: string, inputs: Record<string, GameplayValue>, parameters?: Record<string, string>): GameplayCallStatement => ({ kind: 'call', id, module, version: '1', inputs, ...(parameters ? { parameters } : {}) })
 

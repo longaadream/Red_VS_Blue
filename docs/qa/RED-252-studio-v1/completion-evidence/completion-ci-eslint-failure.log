@@ -1,0 +1,88 @@
+ESLint zero-new violations	Run npm run lint	﻿2026-10-13T19:22:11.1585841Z ##[group]Run npm run lint
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.1586354Z ^[[36;1mnpm run lint^[[0m
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.1651848Z shell: /usr/bin/bash -e {0}
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.1652137Z ##[endgroup]
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.2713439Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.2714083Z > my-project@0.1.15 lint
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.2714632Z > eslint . --max-warnings 0
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:22:11.2714873Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5567279Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5568591Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/electron-editor/gameplay-module-core.cjs
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5598788Z ##[error]   3868:5  error  'PROJECTILE_QUERY_HOST_GAMEPLAY_MODULE_IDS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5609404Z ##[error]  11489:5  error  'nullablePlayer' is assigned a value but never used                             @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5611597Z ##[error]  11516:5  error  'nullableStringType4' is assigned a value but never used                        @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5613358Z ##[error]  11517:5  error  'stringListType8' is assigned a value but never used                            @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5615017Z ##[error]  11571:5  error  'nullableStringType5' is assigned a value but never used                        @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5616617Z ##[error]  11594:5  error  'listType' is assigned a value but never used                                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5618205Z ##[error]  11595:5  error  'pieceListType9' is assigned a value but never used                             @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5619769Z ##[error]  11629:5  error  'type' is assigned a value but never used                                       @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5621886Z ##[error]  11710:5  error  'stringListTypeParameter' is assigned a value but never used                    @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5623632Z ##[error]  13445:5  error  'CONTEXT_FIELD_MODULE_IDS' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5625338Z ##[error]  13612:5  error  'PREVIEW_FIELD_MODULE_IDS' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5627078Z ##[error]  17732:9  error  Expected an assignment or function call and instead saw an expression           @typescript-eslint/no-unused-expressions
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5628047Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5628401Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/electron-editor/ui/content-graph-core.js
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5629682Z ##[error]   3856:11  error  'PROJECTILE_QUERY_HOST_GAMEPLAY_MODULE_IDS' is assigned a value but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5631777Z ##[error]  11373:11  error  'nullablePlayer' is assigned a value but never used                             @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5633509Z ##[error]  11394:11  error  'nullableStringType4' is assigned a value but never used                        @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5635190Z ##[error]  11395:11  error  'stringListType8' is assigned a value but never used                            @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5636837Z ##[error]  11435:11  error  'nullableStringType5' is assigned a value but never used                        @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5638871Z ##[error]  11452:11  error  'listType' is assigned a value but never used                                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5640711Z ##[error]  11453:11  error  'pieceListType9' is assigned a value but never used                             @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5642404Z ##[error]  11481:11  error  'type' is assigned a value but never used                                       @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5644048Z ##[error]  11546:11  error  'stringListTypeParameter' is assigned a value but never used                    @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5646100Z ##[error]  13259:11  error  'CONTEXT_FIELD_MODULE_IDS' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5647826Z ##[error]  13424:11  error  'PREVIEW_FIELD_MODULE_IDS' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5649635Z ##[error]  17514:15  error  Expected an assignment or function call and instead saw an expression           @typescript-eslint/no-unused-expressions
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5650925Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5651361Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/lib/skill-graph/atomic-migration-status-fields.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5652680Z ##[error]  14:7  error  'nullableStatus' is assigned a value but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5653555Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5653977Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/lib/skill-graph/module-registry-followup-compositions.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5655077Z ##[error]  18:7  error  'pieceListType' is assigned a value but never used       @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5656545Z ##[error]  22:7  error  'nullableRecordType' is assigned a value but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5657378Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5657722Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/electron/sentence-flat-ui-smoke.mjs
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5658805Z ##[error]  326:16  error  'setLiteralNumber' is defined but never used       @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5660227Z ##[error]  696:11  error  'editedSource' is assigned a value but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5661866Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5662477Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/game/author-blizzard-player-source.test.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5664043Z ##[error]  111:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5666184Z ##[error]  113:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5668505Z ##[error]  126:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5669974Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5670854Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/game/author-entity-extension.test.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5672461Z ##[error]   20:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5674862Z ##[error]   35:11   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5677205Z ##[error]   37:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5679557Z ##[error]   58:11   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5682362Z ##[error]   59:55   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5684742Z ##[error]   60:84   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5687092Z ##[error]   67:74   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5689688Z ##[error]   84:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5692365Z ##[error]  103:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5694764Z ##[error]  140:103  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5697136Z ##[error]  142:55   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5699485Z ##[error]  145:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5702430Z ##[error]  227:79   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5703880Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5704569Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/game/author-player-status-identity.test.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5706221Z ##[error]   8:35   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5708698Z ##[error]  11:91   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5711342Z ##[error]  26:71   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5713726Z ##[error]  35:35   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5716070Z ##[error]  38:91   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5718390Z ##[error]  46:71   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5720926Z ##[error]  55:119  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5723275Z ##[error]  59:64   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5724666Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5725309Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/game/execution-local-runtime.test.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5726838Z ##[error]  91:65  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5728265Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5729014Z /home/runner/work/Red_VS_Blue/Red_VS_Blue/tests/skill-graph/atomic-migration-flight-status.test.ts
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5730985Z ##[error]  212:47  error  'instanceId' is defined but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5733363Z ##[error]  231:47  error  'instanceId' is defined but never used  @typescript-eslint/no-unused-vars
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5734886Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5735484Z ✖ 56 problems (56 errors, 0 warnings)
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:13.5735834Z
+ESLint zero-new violations	Run npm run lint	2026-10-13T19:23:14.0409261Z ##[error]Process completed with exit code 1.

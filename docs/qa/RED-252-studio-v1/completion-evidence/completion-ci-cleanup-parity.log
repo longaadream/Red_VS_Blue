@@ -1,0 +1,10 @@
+✔ the shipped sentence editor uses the current typed module catalog (72.4149ms)
+✔ the Node editor exposes the same module catalog as the source registry (47.955ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 890.5908

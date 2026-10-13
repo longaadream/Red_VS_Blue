@@ -11,7 +11,6 @@ import type {
 
 const nullableString: GameplayValueType = { kind: 'nullable', value: 'string' }
 const nullableNumber: GameplayValueType = { kind: 'nullable', value: 'number' }
-const nullableStatus: GameplayValueType = { kind: 'nullable', value: 'status' }
 const nullablePiece: GameplayValueType = { kind: 'nullable', value: 'piece' }
 const nullableRecord: GameplayValueType = { kind: 'nullable', value: 'record' }
 const nullableCellList: GameplayValueType = { kind: 'nullable', value: { kind: 'list', element: 'cell' } }

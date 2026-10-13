@@ -312,6 +312,6 @@ export const CONTEXT_FIELD_GAMEPLAY_MODULES: readonly Descriptor[] = Object.free
 ])
 
 /** Stable ID list for catalog and migration callers. */
-export const CONTEXT_FIELD_MODULE_IDS = Object.freeze([...new Set(CONTEXT_FIELD_GAMEPLAY_MODULES.map(module => module.id))])
+export const CONTEXT_FIELD_MODULE_IDS = /* @__PURE__ */ (() => Object.freeze([...new Set(CONTEXT_FIELD_GAMEPLAY_MODULES.map(module => module.id))]))()
 
 export { BATTLE_FIELD_V2_TYPES, CONTEXT_CARD_FIELD_TYPES, CONTEXT_FIELD_TYPES, CONTEXT_RULE_FIELD_TYPES, CONTEXT_V2_FIELD_TYPES, EVENT_FIELD_V2_TYPES, SKILL_FIELD_TYPES }
