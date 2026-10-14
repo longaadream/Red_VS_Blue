@@ -1,0 +1,109 @@
+{
+  "ok": true,
+  "id": "sentence-authoring-completion",
+  "bodyKinds": [
+    "call",
+    "call",
+    "call",
+    "record.create",
+    "collection",
+    "record.get",
+    "record.with",
+    "defer-choice",
+    "record.get"
+  ],
+  "declarations": {
+    "composites": 1,
+    "continuations": 1
+  },
+  "nestedStatementIds": [
+    "expr-1_1",
+    "expr-1_2",
+    "expr-1_3",
+    "sentence-record.create-1",
+    "sentence-collection.map-1",
+    "sentence-return-1",
+    "sentence-record.get-1",
+    "sentence-record.with-1",
+    "sentence-defer-choice-1",
+    "sentence-return-2",
+    "sentence-return-3"
+  ],
+  "multiEntry": {
+    "route": "sentence-editor",
+    "bothInvalid": {
+      "codeCompiler": null,
+      "previewCompiler": null,
+      "codeType": "string",
+      "previewType": "string"
+    },
+    "reopened": {
+      "codeCompiler": "rvb-gameplay-module-compiler/v3",
+      "previewCompiler": "rvb-gameplay-module-compiler/v3",
+      "codeType": "boolean",
+      "previewType": "boolean"
+    }
+  },
+  "summonCapability": {
+    "invalidSaveRejected": true,
+    "persisted": {
+      "version": 1,
+      "recipe": "stored-or-declared-piece",
+      "maxSummons": 1,
+      "storageExtensionKey": "editor_stored_summon",
+      "ownerScopedStorageExtensionKey": "editor_stored_summon_by_player",
+      "uniqueTemplateId": "editor-template-final",
+      "fallback": {
+        "instanceIdPrefix": "editor-piece-",
+        "templateId": "editor-template-final",
+        "name": "编辑器默认棋子",
+        "faction": "blue",
+        "maxHp": 17,
+        "attack": 5,
+        "defense": 3,
+        "moveRange": 2,
+        "skills": [
+          {
+            "skillId": "holy-smite",
+            "level": 2,
+            "currentCooldown": 1
+          }
+        ]
+      }
+    },
+    "reopened": {
+      "version": 1,
+      "recipe": "stored-or-declared-piece",
+      "maxSummons": 1,
+      "storageExtensionKey": "editor_stored_summon",
+      "ownerScopedStorageExtensionKey": "editor_stored_summon_by_player",
+      "uniqueTemplateId": "editor-template-final",
+      "fallback": {
+        "instanceIdPrefix": "editor-piece-",
+        "templateId": "editor-template-final",
+        "name": "编辑器默认棋子",
+        "faction": "blue",
+        "maxHp": 17,
+        "attack": 5,
+        "defense": 3,
+        "moveRange": 2,
+        "skills": [
+          {
+            "skillId": "holy-smite",
+            "level": 2,
+            "currentCooldown": 1
+          }
+        ]
+      }
+    }
+  },
+  "staticRange": {
+    "restoredCells": 2,
+    "saved": true
+  },
+  "saveBlockedUntilAllEntriesValid": true,
+  "legacyArtifactReconciled": true,
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-authoring-mxZaka\\rvb-content-2ae90203",
+  "screenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\sentence-authoring-completion.png",
+  "blankCardSurface": "card"
+}

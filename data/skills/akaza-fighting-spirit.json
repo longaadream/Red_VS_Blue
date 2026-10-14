@@ -4,7 +4,9 @@
   "description": "对满生命值的敌军造成的伤害提高50%。",
   "keywords": [],
   "targetText": "被动",
-  "effectTags": ["伤害"],
+  "effectTags": [
+    "伤害"
+  ],
   "icon": "👊",
   "kind": "passive",
   "type": "normal",
@@ -13,6 +15,75 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "self",
-  "targeting": { "steps": [] },
-  "code": "function executeSkill() { return { success: false, message: '这是被动技能，自动触发，无法手动使用' }; }"
+  "targeting": {
+    "steps": []
+  },
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { if ((\"这是被动技能，自动触发，无法手动使用\" === __gameplayInvalid) || (\"这是被动技能，自动触发，无法手动使用\" === undefined) || (\"这是被动技能，自动触发，无法手动使用\" === null)) { _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module0 = ({success: false, message: \"这是被动技能，自动触发，无法手动使用\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"result\", __gameplayError, \"result.message\"); _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module0[\"success\"]) === __gameplayInvalid) || ((_module0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module0[\"success\"]), \"message\": (_module0[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "result",
+              "module": "result.message",
+              "version": "1",
+              "inputs": {
+                "message": {
+                  "kind": "literal",
+                  "value": "这是被动技能，自动触发，无法手动使用"
+                }
+              },
+              "parameters": {
+                "success": false
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "values": {
+                "success": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "success"
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "message"
+                }
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:akaza-fighting-spirit",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-akaza-fighting-spirit",
+        "relation": "owned",
+        "source": "pieces/dark-akaza.rules"
+      }
+    ]
+  }
 }

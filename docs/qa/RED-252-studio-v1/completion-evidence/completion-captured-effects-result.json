@@ -1,0 +1,27 @@
+{
+  "applied": {
+    "documents": 276,
+    "entries": 360,
+    "changedEntries": 1,
+    "rewrittenGraphs": 1,
+    "changed": [
+      {
+        "file": "data/rules/rule-hidan-blood-oath-reflect.json",
+        "entries": [
+          "skillCode"
+        ]
+      }
+    ],
+    "guards": [],
+    "errors": []
+  },
+  "again": {
+    "documents": 276,
+    "entries": 360,
+    "changedEntries": 0,
+    "rewrittenGraphs": 0,
+    "changed": [],
+    "guards": [],
+    "errors": []
+  }
+}

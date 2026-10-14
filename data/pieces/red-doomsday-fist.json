@@ -21,5 +21,10 @@
       "level": 1
     }
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:red-doomsday-fist",
+    "links": []
+  }
 }

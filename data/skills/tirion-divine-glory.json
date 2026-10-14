@@ -1,7 +1,7 @@
 {
   "id": "tirion-divine-glory",
   "name": "圣骑士的荣耀",
-  "description": "游戏开始时获得圣盾。失去圣盾时攻击力+1。",
+  "description": "召唤后获得圣盾。失去圣盾时攻击力+1。",
   "keywords": [
     "圣盾"
   ],
@@ -16,5 +16,23 @@
   "maxCharges": 0,
   "powerMultiplier": 1,
   "actionPointCost": 0,
-  "showInUI": true
+  "showInUI": true,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:tirion-divine-glory",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-tirion-divine-shield-start",
+        "relation": "owned",
+        "source": "pieces/blue-tirion-fordring.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-tirion-divine-glory",
+        "relation": "owned",
+        "source": "pieces/blue-tirion-fordring.rules"
+      }
+    ]
+  }
 }

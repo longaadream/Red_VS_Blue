@@ -222,7 +222,7 @@ export function analyzeContentFlow(category: FlowCategory, document: Record<stri
 }
 export function editFlowNode(category: FlowCategory, document: Record<string, unknown>, request: { field: string; hash: string; section: string; node: string; replacement: string }): Record<string, unknown> {
   if (!request || typeof request.replacement !== 'string' || request.replacement.length > 200_000) throw new Error('节点修改参数无效')
-  if (document.skillGraph) throw new Error('此内容由类型化技能图生成，请在原图中修改或先显式解除关联')
+  if (document.skillGraph || document.contentGraph) throw new Error('此内容由类型化技能图生成，请在原图中修改或先显式解除关联')
   const flow = analyzeContentFlow(category, document), field = flow.fields.find(f => f.key === request.field)
   if (!field || field.readOnly || field.hash !== request.hash) throw new Error('源码已改变或为内嵌只读回调，请重新读取流程')
   const node = field.sections.find(s => s.id === request.section)?.nodes.find(n => n.id === request.node)

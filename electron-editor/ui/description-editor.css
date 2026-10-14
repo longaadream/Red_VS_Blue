@@ -1,0 +1,90 @@
+.description-editor-field {
+  position: relative;
+}
+
+.description-editor-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.description-expression-open,
+.description-expression-apply,
+.description-expression-close {
+  border: 1px solid var(--border, #2a3039);
+  border-radius: 5px;
+  cursor: pointer;
+  font: inherit;
+  padding: 5px 9px;
+}
+
+.description-expression-open,
+.description-expression-close {
+  background: var(--surface-2, #1b2028);
+  color: var(--text-dim, #b3bac4);
+}
+
+.description-expression-apply {
+  background: var(--accent, #f05252);
+  color: #fff;
+}
+
+.description-expression-apply:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.description-expression-help,
+.description-expression-status,
+.description-expression-type {
+  color: var(--muted, #7f8997);
+  font-size: 12px;
+}
+
+.description-expression-panel {
+  background: var(--surface, #15191f);
+  border: 1px solid var(--border, #2a3039);
+  border-radius: 7px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+  margin-top: 8px;
+  padding: 9px;
+}
+
+.description-expression-panel[hidden] {
+  display: none;
+}
+
+.description-expression-input {
+  min-width: 0;
+}
+
+.description-expression-panel .ei-root {
+  margin: 0;
+}
+
+.description-expression-panel .ei-editor {
+  min-height: 31px;
+}
+
+.description-expression-state {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 7px 0;
+}
+
+.description-expression-status[data-valid="false"] {
+  color: var(--red, #f06464);
+}
+
+.description-expression-state .description-expression-type {
+  color: var(--muted, #7f8997);
+}
+
+.description-expression-panel .description-expression-actions {
+  justify-content: flex-end;
+  margin-top: 5px;
+}

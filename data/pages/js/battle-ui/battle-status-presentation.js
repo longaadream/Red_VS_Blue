@@ -12,15 +12,45 @@
     visibility: 'board',
   }
 
-  function resolve(status) {
+  function interpolateDescription(description, context) {
+    const text = description == null ? '' : String(description)
+    const renderer = root.RvBSkillDescription
+    return context && renderer && typeof renderer.interpolate === 'function'
+      ? renderer.interpolate(text, context)
+      : text
+  }
+
+  function statusDescriptionContext(status, context) {
+    const result = context && typeof context === 'object' ? Object.assign({}, context) : {}
+    if (!Object.prototype.hasOwnProperty.call(result, 'currentStatus')) result.currentStatus = status
+    if (!Object.prototype.hasOwnProperty.call(result, 'status')) result.status = status
+    return result
+  }
+
+  function descriptionForStatus(status, meta, context) {
+    const source = status && typeof status === 'object' && typeof status.description === 'string' && status.description
+      ? status.description
+      : meta && meta.description
+    // Preserve legacy metadata when a caller has no instance snapshot.  A
+    // concrete context is required before unresolved placeholders become the
+    // explicit “未赋值” marker.
+    return context === undefined
+      ? String(source || '')
+      : interpolateDescription(source || '', statusDescriptionContext(status, context))
+  }
+
+  function resolve(status, context) {
     const registry = root.BattleEffectIcons
     const meta = registry && typeof registry.resolveStatus === 'function'
       ? registry.resolveStatus(status)
       : DEFAULT_DETAIL
+    const resolved = Object.assign({}, meta, {
+      description: descriptionForStatus(status, meta, context),
+    })
     if (registry && typeof registry.labelForStatus === 'function') {
-      return Object.assign({}, meta, { label: registry.labelForStatus(status) })
+      resolved.label = registry.labelForStatus(status)
     }
-    return meta
+    return resolved
   }
 
   function labelForStatus(status) {
@@ -81,6 +111,8 @@
   root.BattleStatusPresentation = {
     MAX_BOARD_STATUSES: MAX_BOARD_STATUSES,
     resolve: resolve,
+    interpolateDescription: interpolateDescription,
+    descriptionForStatus: descriptionForStatus,
     labelForStatus: labelForStatus,
     boardEntries: boardEntries,
     boardOverview: boardOverview,

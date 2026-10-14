@@ -38,5 +38,10 @@
     "demon-summon-4",
     "demon-summon-5"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:kiljaedan",
+    "links": []
+  }
 }

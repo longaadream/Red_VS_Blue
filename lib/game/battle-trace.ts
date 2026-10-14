@@ -24,17 +24,19 @@ const SHA256_PROVIDER_SELF_CHECK_INPUTS = [
   'a'.repeat(8_193),
 ] as const
 
+const UTF8_ENCODER = typeof TextEncoder === 'function' ? new TextEncoder() : undefined
+
 interface Sha256ProviderState {
   version: typeof SHA256_PROVIDER_STATE_VERSION
   provider: Sha256HexProvider
 }
 
-const SHA256_INITIAL_STATE = [
+const SHA256_INITIAL_STATE = new Int32Array([
   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-] as const
+])
 
-const SHA256_ROUND_CONSTANTS = [
+const SHA256_ROUND_CONSTANTS = new Int32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -51,7 +53,15 @@ const SHA256_ROUND_CONSTANTS = [
   0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
   0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
   0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-] as const
+])
+
+// Content hashes are recomputed during battle setup and state verification. A
+// Single entry, capped at 16M UTF-16 code units (at most 32 MiB of string data),
+// avoids retaining an unbounded history or arbitrarily large content payload.
+const SHA256_LARGE_INPUT_CACHE_THRESHOLD = 1_000_000
+const SHA256_LARGE_INPUT_CACHE_MAX_LENGTH = 16 * 1024 * 1024
+let cachedLargeSha256Input: string | undefined
+let cachedLargeSha256Digest: string | undefined
 
 export interface BattleActionTrace {
   index: number
@@ -267,74 +277,103 @@ export function stableJson(value: unknown): string {
 }
 
 export function sha256Hex(value: string): string {
-  const bytes = encodeUtf8(value)
-  const bitLength = bytes.length * 8
-  bytes.push(0x80)
-  while (bytes.length % 64 !== 56) bytes.push(0)
+  if (value.length >= SHA256_LARGE_INPUT_CACHE_THRESHOLD && value === cachedLargeSha256Input) {
+    return cachedLargeSha256Digest!
+  }
+
+  const encoded = encodeUtf8(value)
+  const bitLength = encoded.length * 8
+  const paddedLength = Math.ceil((encoded.length + 9) / 64) * 64
+  const bytes = new Uint8Array(paddedLength)
+  bytes.set(encoded)
+  bytes[encoded.length] = 0x80
 
   const highBitLength = Math.floor(bitLength / 0x1_0000_0000)
   const lowBitLength = bitLength >>> 0
-  for (let shift = 24; shift >= 0; shift -= 8) bytes.push((highBitLength >>> shift) & 0xff)
-  for (let shift = 24; shift >= 0; shift -= 8) bytes.push((lowBitLength >>> shift) & 0xff)
+  const lengthOffset = paddedLength - 8
+  for (let shift = 24; shift >= 0; shift -= 8) {
+    bytes[lengthOffset + (24 - shift) / 8] = (highBitLength >>> shift) & 0xff
+    bytes[lengthOffset + 4 + (24 - shift) / 8] = (lowBitLength >>> shift) & 0xff
+  }
 
-  const hash: number[] = [...SHA256_INITIAL_STATE]
-  const words = new Uint32Array(64)
+  let hash0 = SHA256_INITIAL_STATE[0]
+  let hash1 = SHA256_INITIAL_STATE[1]
+  let hash2 = SHA256_INITIAL_STATE[2]
+  let hash3 = SHA256_INITIAL_STATE[3]
+  let hash4 = SHA256_INITIAL_STATE[4]
+  let hash5 = SHA256_INITIAL_STATE[5]
+  let hash6 = SHA256_INITIAL_STATE[6]
+  let hash7 = SHA256_INITIAL_STATE[7]
+  const words = new Int32Array(16)
+  const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   for (let offset = 0; offset < bytes.length; offset += 64) {
     for (let index = 0; index < 16; index += 1) {
-      const byteOffset = offset + index * 4
-      words[index] = (
-        (bytes[byteOffset] << 24)
-        | (bytes[byteOffset + 1] << 16)
-        | (bytes[byteOffset + 2] << 8)
-        | bytes[byteOffset + 3]
-      ) >>> 0
-    }
-    for (let index = 16; index < 64; index += 1) {
-      const word15 = words[index - 15]
-      const word2 = words[index - 2]
-      const sigma0 = rotateRight(word15, 7) ^ rotateRight(word15, 18) ^ (word15 >>> 3)
-      const sigma1 = rotateRight(word2, 17) ^ rotateRight(word2, 19) ^ (word2 >>> 10)
-      words[index] = (words[index - 16] + sigma0 + words[index - 7] + sigma1) >>> 0
+      words[index] = dataView.getUint32(offset + index * 4)
     }
 
-    let a = hash[0]
-    let b = hash[1]
-    let c = hash[2]
-    let d = hash[3]
-    let e = hash[4]
-    let f = hash[5]
-    let g = hash[6]
-    let h = hash[7]
+    let a = hash0
+    let b = hash1
+    let c = hash2
+    let d = hash3
+    let e = hash4
+    let f = hash5
+    let g = hash6
+    let h = hash7
 
     for (let index = 0; index < 64; index += 1) {
-      const sum1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25)
+      const wordIndex = index & 15
+      let word = words[wordIndex]
+      if (index >= 16) {
+        const word15 = words[(wordIndex + 1) & 15]
+        const word2 = words[(wordIndex + 14) & 15]
+        const sigma0 = ((word15 >>> 7) | (word15 << 25))
+          ^ ((word15 >>> 18) | (word15 << 14))
+          ^ (word15 >>> 3)
+        const sigma1 = ((word2 >>> 17) | (word2 << 15))
+          ^ ((word2 >>> 19) | (word2 << 13))
+          ^ (word2 >>> 10)
+        word = (word + sigma0 + words[(wordIndex + 9) & 15] + sigma1) | 0
+        words[wordIndex] = word
+      }
+      const sum1 = ((e >>> 6) | (e << 26))
+        ^ ((e >>> 11) | (e << 21))
+        ^ ((e >>> 25) | (e << 7))
       const choice = (e & f) ^ (~e & g)
-      const temp1 = (h + sum1 + choice + SHA256_ROUND_CONSTANTS[index] + words[index]) >>> 0
-      const sum0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22)
+      const temp1 = (h + sum1 + choice + SHA256_ROUND_CONSTANTS[index] + word) | 0
+      const sum0 = ((a >>> 2) | (a << 30))
+        ^ ((a >>> 13) | (a << 19))
+        ^ ((a >>> 22) | (a << 10))
       const majority = (a & b) ^ (a & c) ^ (b & c)
-      const temp2 = (sum0 + majority) >>> 0
+      const temp2 = (sum0 + majority) | 0
 
       h = g
       g = f
       f = e
-      e = (d + temp1) >>> 0
+      e = (d + temp1) | 0
       d = c
       c = b
       b = a
-      a = (temp1 + temp2) >>> 0
+      a = (temp1 + temp2) | 0
     }
 
-    hash[0] = (hash[0] + a) >>> 0
-    hash[1] = (hash[1] + b) >>> 0
-    hash[2] = (hash[2] + c) >>> 0
-    hash[3] = (hash[3] + d) >>> 0
-    hash[4] = (hash[4] + e) >>> 0
-    hash[5] = (hash[5] + f) >>> 0
-    hash[6] = (hash[6] + g) >>> 0
-    hash[7] = (hash[7] + h) >>> 0
+    hash0 = (hash0 + a) | 0
+    hash1 = (hash1 + b) | 0
+    hash2 = (hash2 + c) | 0
+    hash3 = (hash3 + d) | 0
+    hash4 = (hash4 + e) | 0
+    hash5 = (hash5 + f) | 0
+    hash6 = (hash6 + g) | 0
+    hash7 = (hash7 + h) | 0
   }
 
-  return hash.map(word => word.toString(16).padStart(8, '0')).join('')
+  const digest = [hash0, hash1, hash2, hash3, hash4, hash5, hash6, hash7]
+    .map(word => (word >>> 0).toString(16).padStart(8, '0'))
+    .join('')
+  if (value.length >= SHA256_LARGE_INPUT_CACHE_THRESHOLD && value.length <= SHA256_LARGE_INPUT_CACHE_MAX_LENGTH) {
+    cachedLargeSha256Input = value
+    cachedLargeSha256Digest = digest
+  }
+  return digest
 }
 
 /**
@@ -936,8 +975,10 @@ function sortForStableJson(value: unknown): unknown {
   return sorted
 }
 
-function encodeUtf8(value: string): number[] {
-  const bytes: number[] = []
+function encodeUtf8(value: string): Uint8Array {
+  if (UTF8_ENCODER) return UTF8_ENCODER.encode(value)
+
+  let byteLength = 0
   for (let index = 0; index < value.length; index += 1) {
     let codePoint = value.charCodeAt(index)
     if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
@@ -953,25 +994,53 @@ function encodeUtf8(value: string): number[] {
     }
 
     if (codePoint <= 0x7f) {
-      bytes.push(codePoint)
+      byteLength += 1
     } else if (codePoint <= 0x7ff) {
-      bytes.push(0xc0 | (codePoint >>> 6), 0x80 | (codePoint & 0x3f))
+      byteLength += 2
     } else if (codePoint <= 0xffff) {
-      bytes.push(0xe0 | (codePoint >>> 12), 0x80 | ((codePoint >>> 6) & 0x3f), 0x80 | (codePoint & 0x3f))
+      byteLength += 3
     } else {
-      bytes.push(
-        0xf0 | (codePoint >>> 18),
-        0x80 | ((codePoint >>> 12) & 0x3f),
-        0x80 | ((codePoint >>> 6) & 0x3f),
-        0x80 | (codePoint & 0x3f),
-      )
+      byteLength += 4
+    }
+  }
+
+  const bytes = new Uint8Array(byteLength)
+  let offset = 0
+  for (let index = 0; index < value.length; index += 1) {
+    let codePoint = value.charCodeAt(index)
+    if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
+      const low = value.charCodeAt(index + 1)
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        codePoint = 0x10000 + ((codePoint - 0xd800) << 10) + (low - 0xdc00)
+        index += 1
+      } else {
+        codePoint = 0xfffd
+      }
+    } else if (codePoint >= 0xdc00 && codePoint <= 0xdfff) {
+      codePoint = 0xfffd
+    }
+
+    if (codePoint <= 0x7f) {
+      bytes[offset] = codePoint
+      offset += 1
+    } else if (codePoint <= 0x7ff) {
+      bytes[offset] = 0xc0 | (codePoint >>> 6)
+      bytes[offset + 1] = 0x80 | (codePoint & 0x3f)
+      offset += 2
+    } else if (codePoint <= 0xffff) {
+      bytes[offset] = 0xe0 | (codePoint >>> 12)
+      bytes[offset + 1] = 0x80 | ((codePoint >>> 6) & 0x3f)
+      bytes[offset + 2] = 0x80 | (codePoint & 0x3f)
+      offset += 3
+    } else {
+      bytes[offset] = 0xf0 | (codePoint >>> 18)
+      bytes[offset + 1] = 0x80 | ((codePoint >>> 12) & 0x3f)
+      bytes[offset + 2] = 0x80 | ((codePoint >>> 6) & 0x3f)
+      bytes[offset + 3] = 0x80 | (codePoint & 0x3f)
+      offset += 4
     }
   }
   return bytes
-}
-
-function rotateRight(value: number, bits: number): number {
-  return (value >>> bits) | (value << (32 - bits))
 }
 
 function withoutReplayRuntimeCaches(state: BattleState): BattleState {

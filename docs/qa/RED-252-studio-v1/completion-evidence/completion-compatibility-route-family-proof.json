@@ -1,0 +1,2135 @@
+{
+  "schema": "rvb-red252-compatibility-route-family-proof/v1",
+  "generatedAt": "2026-10-13T19:14:14.669Z",
+  "source": {
+    "currentRoutes": "output/completion-compatibility-routes.json",
+    "loweringProof": "output/completion-lowering-public-route-proof.json",
+    "method": "Group the current 55 standard-public-composition rows by shared host semantic family, resolve every replacement through the full registry authorModuleUi descriptor, and attach real-host test evidence once per family. Existing bounded runtime proof IDs are reused only as family evidence; they do not mark every route in the family behavior-proven."
+  },
+  "summary": {
+    "currentStandardRouteOnlyCount": 55,
+    "expectedStandardRouteOnlyCount": 55,
+    "familyCount": 10,
+    "assignedRouteCount": 55,
+    "unassignedRouteKeys": [],
+    "publicReplacementCount": 44,
+    "nonStandardPublicReplacementIds": [],
+    "existingBoundedRuntimeProofIds": [
+      "card.hand-add-player-id-text@1",
+      "extension.read-optional-battle@2",
+      "extension.read-optional-piece@1",
+      "extension.read-optional-player@1",
+      "spatial.cardinal-direction@1",
+      "spatial.perpendicular-direction@1",
+      "spatial.perpendicular-cells@1",
+      "projectile.line-cells@1",
+      "spatial.square-cells@1",
+      "projectile.event-cell@1",
+      "projectile.events-from-cell@1",
+      "projectile.trace-strict@1"
+    ],
+    "currentTrueGapIds": [],
+    "evidenceSuiteRuns": [
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 5,
+        "passed": 5,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/content-materialize-template-v2.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 6,
+        "passed": 6,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-card-initialization.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 8,
+        "passed": 8,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 8,
+        "passed": 8,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-choice-cancel.json",
+        "status": "passed",
+        "testCount": 2,
+        "passed": 2,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-cancel-actions.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 3,
+        "passed": 3,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/author-choice-v2.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 29,
+        "passed": 29,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 29,
+        "passed": 29,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 11,
+        "passed": 11,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 11,
+        "passed": 11,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 8,
+        "passed": 8,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 8,
+        "passed": 8,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 20,
+        "passed": 20,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 20,
+        "passed": 20,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 3,
+        "passed": 3,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-player-status-identity.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 26,
+        "passed": 26,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 82,
+        "passed": 82,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/gameplay-module-projectiles.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 9,
+        "passed": 9,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-projectile-queries.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 4,
+        "passed": 4,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/atomic-natural-success.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 18,
+        "passed": 18,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-context-fields.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 13,
+        "passed": 13,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 13,
+        "passed": 13,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+      },
+      {
+        "source": "output/completion-route-family-test-run.json",
+        "status": "passed",
+        "testCount": 3,
+        "passed": 3,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-status-instances.test.ts"
+      },
+      {
+        "source": "output/completion-final-summon-integration.json",
+        "status": "passed",
+        "testCount": 26,
+        "passed": 26,
+        "failed": 0,
+        "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+      }
+    ],
+    "executedEvidenceSuiteCount": 17,
+    "passedEvidenceSuiteCount": 17,
+    "passedEvidenceAssertionCount": 250,
+    "familyEvidenceStatus": [
+      {
+        "family": "card-content",
+        "routeCount": 3,
+        "evidenceFiles": [
+          "tests/skill-graph/content-materialize-template-v2.test.ts",
+          "tests/game/author-card-initialization.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 5,
+            "passed": 5,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/content-materialize-template-v2.test.ts"
+          },
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 6,
+            "passed": 6,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-card-initialization.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "choice-protocol",
+        "routeCount": 22,
+        "evidenceFiles": [
+          "tests/game/author-choice-runtime.test.ts",
+          "tests/game/author-choice-runtime.test.ts",
+          "tests/game/author-choice-cancel-actions.test.ts",
+          "tests/skill-graph/author-choice-v2.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+          },
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+          },
+          {
+            "source": "output/completion-route-family-choice-cancel.json",
+            "status": "passed",
+            "testCount": 2,
+            "passed": 2,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-cancel-actions.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/author-choice-v2.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "effects",
+        "routeCount": 8,
+        "evidenceFiles": [
+          "tests/game/author-effects.test.ts",
+          "tests/game/author-effects.test.ts",
+          "tests/game/author-captured-damage.test.ts",
+          "tests/game/author-captured-damage.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 29,
+            "passed": 29,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+          },
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 29,
+            "passed": 29,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 11,
+            "passed": 11,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 11,
+            "passed": 11,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "lifecycle",
+        "routeCount": 2,
+        "evidenceFiles": [
+          "tests/game/author-summon-batch.test.ts",
+          "tests/game/author-summon-batch.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "query-collection",
+        "routeCount": 5,
+        "evidenceFiles": [
+          "tests/skill-graph/atomic-migration-query-compositions.test.ts",
+          "tests/skill-graph/atomic-migration-query-compositions.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 20,
+            "passed": 20,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 20,
+            "passed": 20,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "piece-reference",
+        "routeCount": 1,
+        "evidenceFiles": [
+          "tests/game/author-player-status-identity.test.ts",
+          "tests/game/flow-runtime.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-player-status-identity.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 26,
+            "passed": 26,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "projectile-spatial",
+        "routeCount": 3,
+        "evidenceFiles": [
+          "tests/game/gameplay-module-projectiles.test.ts",
+          "tests/skill-graph/atomic-migration-projectile-queries.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 82,
+            "passed": 82,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/gameplay-module-projectiles.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 9,
+            "passed": 9,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-projectile-queries.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "result-context",
+        "routeCount": 3,
+        "evidenceFiles": [
+          "tests/game/atomic-natural-success.test.ts",
+          "tests/skill-graph/atomic-migration-context-fields.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 4,
+            "passed": 4,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/atomic-natural-success.test.ts"
+          },
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 18,
+            "passed": 18,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-context-fields.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "skill-cooldown",
+        "routeCount": 1,
+        "evidenceFiles": [
+          "tests/skill-graph/atomic-migration-ability-writes.test.ts",
+          "tests/skill-graph/atomic-migration-ability-writes.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 13,
+            "passed": 13,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 13,
+            "passed": 13,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+          }
+        ]
+      },
+      {
+        "family": "status",
+        "routeCount": 7,
+        "evidenceFiles": [
+          "tests/game/author-status-instances.test.ts",
+          "tests/game/flow-runtime.test.ts"
+        ],
+        "evidenceRuns": [
+          {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-status-instances.test.ts"
+          },
+          {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 26,
+            "passed": 26,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+          }
+        ]
+      }
+    ],
+    "candidateOnlyRouteKeys": [],
+    "behaviorProvenRouteCount": 0,
+    "behaviorUnverifiedRouteCount": 55,
+    "semanticShapeCoverage": [
+      {
+        "family": "card-content",
+        "shapes": [
+          "typed template materialization",
+          "controlled/ref hand gain",
+          "authoritative returned card identity"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/content-materialize-template-v2.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-card-initialization.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 3,
+        "routeSpecificUncertaintyKeys": [
+          "card.hand-add-controlled@1",
+          "card.hand-add-ref@1",
+          "content.materialize-template@1"
+        ]
+      },
+      {
+        "family": "choice-protocol",
+        "shapes": [
+          "single selection returns a scalar",
+          "multi selection preserves click order and bounds",
+          "manual cancellation resumes with the typed cancellation value",
+          "suspend/replay resumes once after a real diagnostic boundary",
+          "authenticated piece/cell choice handles",
+          "empty zero-minimum choice versus impossible selector"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-cancel-actions.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/author-choice-v2.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 22,
+        "routeSpecificUncertaintyKeys": [
+          "choice.as-result@1",
+          "choice.as-string-list@1",
+          "choice.cell-options@1",
+          "choice.cell@1",
+          "choice.grid-candidates@1",
+          "choice.hand-cards-bounded@1",
+          "choice.hand-cards@1",
+          "choice.is-array@1",
+          "choice.is-pending@1",
+          "choice.is-strict-string-list@1",
+          "choice.is-unresolved@1",
+          "choice.option-id-value@1",
+          "choice.option-selected@1",
+          "choice.option-value@1",
+          "choice.piece-candidates@1",
+          "choice.piece@1",
+          "choice.raw-string-value@1",
+          "choice.strict-string-list@1",
+          "choice.strict-string@1",
+          "choice.target-cell-by-range@1",
+          "choice.target-cell@1",
+          "choice.target-piece@1"
+        ]
+      },
+      {
+        "family": "effects",
+        "shapes": [
+          "scalar non-queued damage/heal",
+          "ordered tuple targets and amounts, including duplicate entries",
+          "record source and record target authentication",
+          "player/card/piece attribution",
+          "queued follow-up during processing without recursive re-entry",
+          "captured source lifetime and captured rule removal"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 8,
+        "routeSpecificUncertaintyKeys": [
+          "effect.damage-captured@1",
+          "effect.damage-from-player@1",
+          "effect.damage@1",
+          "effect.heal-many@1",
+          "effect.heal@1",
+          "effect.queue-damage@1",
+          "effect.queue-heal@1",
+          "effect.status-record@1"
+        ]
+      },
+      {
+        "family": "lifecycle",
+        "shapes": [
+          "same-batch summon commit before after-events",
+          "occupancy/invalid-position rollback",
+          "detached instance identity and flow state",
+          "caster/target lifecycle event distinction"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 2,
+        "routeSpecificUncertaintyKeys": [
+          "lifecycle.queue-summon@1",
+          "lifecycle.zero-health@1"
+        ]
+      },
+      {
+        "family": "query-collection",
+        "shapes": [
+          "player rotation and candidate ordering",
+          "typed piece/cell envelopes before filtering",
+          "one-based index and out-of-range empty result",
+          "missing source/target safe result",
+          "ordered cells retained through mapping/filtering"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 5,
+        "routeSpecificUncertaintyKeys": [
+          "collection.live-piece-at@1",
+          "query.affectable-pieces-from-source@1",
+          "query.piece@1",
+          "query.pieces-in-square@1",
+          "query.player@1"
+        ]
+      },
+      {
+        "family": "piece-reference",
+        "shapes": [
+          "active-first stable identity",
+          "graveyard identity remains distinct",
+          "stale/same-ID/cross-execution handles are rejected"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-player-status-identity.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 1,
+        "routeSpecificUncertaintyKeys": [
+          "piece.require@1"
+        ]
+      },
+      {
+        "family": "projectile-spatial",
+        "shapes": [
+          "canonical x/y coordinates discard decoration",
+          "ordered path and trace cells",
+          "terrain/occupancy blocking",
+          "enemy ordering on trace",
+          "missing source and invalid index boundaries"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/gameplay-module-projectiles.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-projectile-queries.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 3,
+        "routeSpecificUncertaintyKeys": [
+          "projectile.cardinal-cells@1",
+          "spatial.cardinal-cells-ordered@1",
+          "spatial.cells-within-range@1"
+        ]
+      },
+      {
+        "family": "result-context",
+        "shapes": [
+          "result.action host execution",
+          "typed context field reads",
+          "missing context value policy",
+          "player-id text from the authenticated player value"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/atomic-natural-success.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-context-fields.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 3,
+        "routeSpecificUncertaintyKeys": [
+          "ref.player-id-text@1",
+          "result.action-ui@1",
+          "result.card-action@1"
+        ]
+      },
+      {
+        "family": "skill-cooldown",
+        "shapes": [
+          "positive cooldown reset",
+          "duplicate instance independence",
+          "source-order all-eligible reset"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 1,
+        "routeSpecificUncertaintyKeys": [
+          "skill.reset-cooldown@1"
+        ]
+      },
+      {
+        "family": "status",
+        "shapes": [
+          "duplicate IDs selected by authenticated object identity",
+          "exact selected-instance removal",
+          "stale handle cannot retarget a new same-ID status",
+          "duration write and invalid-counter rejection",
+          "source identity filtering"
+        ],
+        "evidenceSuites": [
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-status-instances.test.ts",
+          "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+        ],
+        "routeSpecificUncertaintyCount": 7,
+        "routeSpecificUncertaintyKeys": [
+          "status.append-record@1",
+          "status.clear-piece-tags@1",
+          "status.remove-id@1",
+          "status.remove-player-id@1",
+          "status.remove-record@1",
+          "status.set-number@1",
+          "status.set-remaining-uses@1"
+        ]
+      }
+    ],
+    "interpretation": "Family host evidence validates the shared host contract and composition ingredients. It is not a per-route behavior equivalence claim; the 55 active route IDs remain explicitly unverified until representative executions cover their route-specific lowerings."
+  },
+  "families": [
+    {
+      "family": "card-content",
+      "routeCount": 3,
+      "routes": [
+        {
+          "key": "card.hand-add-controlled@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "ref.card-definition@1",
+            "author.card.gain@1"
+          ]
+        },
+        {
+          "key": "card.hand-add-ref@1",
+          "activeCallCount": 7,
+          "publicReplacementIds": [
+            "ref.card-template@1",
+            "content.materialize-template@2",
+            "author.card.gain@1"
+          ]
+        },
+        {
+          "key": "content.materialize-template@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "ref.card-template@1",
+            "content.materialize-template@2",
+            "author.card.gain@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "ref.card-definition@1",
+        "author.card.gain@1",
+        "ref.card-template@1",
+        "content.materialize-template@2"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Resolve a typed card/template definition, materialize a validated instance, and hand it to the authoritative gain host.",
+      "semanticShapes": [
+        "typed template materialization",
+        "controlled/ref hand gain",
+        "authoritative returned card identity"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/skill-graph/content-materialize-template-v2.test.ts",
+          "line": 109,
+          "status": "found",
+          "claim": "The real flow host materializes a typed template and passes the created card into card gain.",
+          "source": "])('materializes %s and feeds the typed definition directly into card gain', (_scenario, templateId, cardId) => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 5,
+            "passed": 5,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/content-materialize-template-v2.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-card-initialization.test.ts",
+          "line": 13,
+          "status": "found",
+          "claim": "The card initialization host returns the authoritative gained instance.",
+          "source": "it('compiles a typed card reference and returns the initialized gained instance', () => withRuleRuntime(new RuleRuntime({ rootSeed: 43 }), () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 6,
+            "passed": 6,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-card-initialization.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [
+        "card.hand-add-player-id-text@1"
+      ],
+      "routeSpecificUncertainty": [
+        {
+          "key": "card.hand-add-controlled@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "card.hand-add-ref@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "content.materialize-template@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "family-runtime-proof-exists-route-ids-still-unverified"
+    },
+    {
+      "family": "choice-protocol",
+      "routeCount": 22,
+      "routes": [
+        {
+          "key": "choice.as-result@1",
+          "activeCallCount": 116,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.as-string-list@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.cell-options@1",
+          "activeCallCount": 4,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.cell@1",
+          "activeCallCount": 47,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.grid-candidates@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.hand-cards-bounded@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.hand-cards@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.is-array@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "choice.as-array@1",
+            "collection.length@1"
+          ]
+        },
+        {
+          "key": "choice.is-pending@1",
+          "activeCallCount": 4,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.is-strict-string-list@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.is-unresolved@1",
+          "activeCallCount": 108,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.option-id-value@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.option-selected@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.option-value@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.piece-candidates@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.piece@1",
+          "activeCallCount": 57,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.raw-string-value@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.strict-string-list@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.strict-string@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "author.choice.option@2",
+            "author.choice.option@3"
+          ]
+        },
+        {
+          "key": "choice.target-cell-by-range@1",
+          "activeCallCount": 8,
+          "publicReplacementIds": [
+            "author.choice.target-cell@1",
+            "author.choice.option@2"
+          ]
+        },
+        {
+          "key": "choice.target-cell@1",
+          "activeCallCount": 39,
+          "publicReplacementIds": [
+            "author.choice.target-cell@1",
+            "author.choice.option@2"
+          ]
+        },
+        {
+          "key": "choice.target-piece@1",
+          "activeCallCount": 57,
+          "publicReplacementIds": [
+            "author.choice.target-piece@1",
+            "author.choice.option@2"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "author.choice.option@2",
+        "author.choice.option@3",
+        "choice.as-array@1",
+        "collection.length@1",
+        "author.choice.target-cell@1",
+        "author.choice.target-piece@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Build typed option/target choices and use the suspend/replay host for selection, bounds, cancellation, and authenticated target handles.",
+      "semanticShapes": [
+        "single selection returns a scalar",
+        "multi selection preserves click order and bounds",
+        "manual cancellation resumes with the typed cancellation value",
+        "suspend/replay resumes once after a real diagnostic boundary",
+        "authenticated piece/cell choice handles",
+        "empty zero-minimum choice versus impossible selector"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/author-choice-runtime.test.ts",
+          "line": 12,
+          "status": "found",
+          "claim": "The production choice host preserves click order and multi-value shape.",
+          "source": "it('selects distinct options with equal values in click order and preserves multi shape', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-choice-runtime.test.ts",
+          "line": 81,
+          "status": "found",
+          "claim": "The production choice host suspends and resumes a dependent effect exactly once.",
+          "source": "it('suspends twice through real diagnostic boundaries, then runs the dependent effect once', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-runtime.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-choice-cancel-actions.test.ts",
+          "line": 46,
+          "status": "found",
+          "claim": "The production choice host resumes a cancelled indexed choice with its typed cancellation value.",
+          "source": "it('resumes an indexed choice using its typed cancellation value after a manual cancel', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-choice-cancel.json",
+            "status": "passed",
+            "testCount": 2,
+            "passed": 2,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-choice-cancel-actions.test.ts"
+          }
+        },
+        {
+          "file": "tests/skill-graph/author-choice-v2.test.ts",
+          "line": 120,
+          "status": "found",
+          "claim": "The compiled public choice graph opens and resumes through the real suspendable interaction host.",
+          "source": "it('opens a real suspendable multi selector with dynamic bounds and selected player', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/author-choice-v2.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "choice.as-result@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.as-string-list@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.cell-options@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.cell@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.grid-candidates@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.hand-cards-bounded@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.hand-cards@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.is-array@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.is-pending@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.is-strict-string-list@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.is-unresolved@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.option-id-value@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.option-selected@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.option-value@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.piece-candidates@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.piece@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.raw-string-value@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.strict-string-list@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.strict-string@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.target-cell-by-range@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.target-cell@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "choice.target-piece@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "effects",
+      "routeCount": 8,
+      "routes": [
+        {
+          "key": "effect.damage-captured@1",
+          "activeCallCount": 31,
+          "publicReplacementIds": [
+            "source.capture@1",
+            "collection.singleton@1",
+            "author.effect.damage@2"
+          ]
+        },
+        {
+          "key": "effect.damage-from-player@1",
+          "activeCallCount": 6,
+          "publicReplacementIds": [
+            "author.effect.damage@2"
+          ]
+        },
+        {
+          "key": "effect.damage@1",
+          "activeCallCount": 44,
+          "publicReplacementIds": [
+            "author.effect.damage@2"
+          ]
+        },
+        {
+          "key": "effect.heal-many@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.effect.heal@2"
+          ]
+        },
+        {
+          "key": "effect.heal@1",
+          "activeCallCount": 13,
+          "publicReplacementIds": [
+            "author.effect.heal@2"
+          ]
+        },
+        {
+          "key": "effect.queue-damage@1",
+          "activeCallCount": 4,
+          "publicReplacementIds": [
+            "author.effect.damage@2",
+            "author.effect.heal@2"
+          ]
+        },
+        {
+          "key": "effect.queue-heal@1",
+          "activeCallCount": 3,
+          "publicReplacementIds": [
+            "author.effect.damage@2",
+            "author.effect.heal@2"
+          ]
+        },
+        {
+          "key": "effect.status-record@1",
+          "activeCallCount": 4,
+          "publicReplacementIds": [
+            "record.empty@1",
+            "record.set-key@1",
+            "status.apply-record@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "source.capture@1",
+        "collection.singleton@1",
+        "author.effect.damage@2",
+        "author.effect.heal@2",
+        "record.empty@1",
+        "record.set-key@1",
+        "status.apply-record@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Resolve typed source/target records and dispatch ordered damage/heal/status effects through the effect-chain host; queue timing remains host-owned.",
+      "semanticShapes": [
+        "scalar non-queued damage/heal",
+        "ordered tuple targets and amounts, including duplicate entries",
+        "record source and record target authentication",
+        "player/card/piece attribution",
+        "queued follow-up during processing without recursive re-entry",
+        "captured source lifetime and captured rule removal"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/author-effects.test.ts",
+          "line": 174,
+          "status": "found",
+          "claim": "The real effect host returns authoritative scalar damage.",
+          "source": "it('applies one target and returns the authoritative scalar damage result', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 29,
+            "passed": 29,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-effects.test.ts",
+          "line": 216,
+          "status": "found",
+          "claim": "The real effect host preserves scalar and ordered tuple healing.",
+          "source": "it('heals scalar and ordered tuple targets through the same facade', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 29,
+            "passed": 29,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-effects.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-captured-damage.test.ts",
+          "line": 137,
+          "status": "found",
+          "claim": "The real processing host queues one captured effect and settles it after the current hit without re-entry.",
+          "source": "it('queues once in processing and settles after the current hit without re-entry', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 11,
+            "passed": 11,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-captured-damage.test.ts",
+          "line": 328,
+          "status": "found",
+          "claim": "The real host preserves captured source identity for rule removal after departure.",
+          "source": "it('removes rules from the captured object after departure, never from a replacement with the same id', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 11,
+            "passed": 11,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-captured-damage.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "effect.damage-captured@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.damage-from-player@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.damage@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.heal-many@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.heal@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.queue-damage@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.queue-heal@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "effect.status-record@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "lifecycle",
+      "routeCount": 2,
+      "routes": [
+        {
+          "key": "lifecycle.queue-summon@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "author.effect.summon@1"
+          ]
+        },
+        {
+          "key": "lifecycle.zero-health@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "event.field@1",
+            "piece.write-field@2",
+            "effect.force-defeat@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "author.effect.summon@1",
+        "event.field@1",
+        "piece.write-field@2",
+        "effect.force-defeat@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Send summon/defeat operations to the lifecycle host, preserving batch order, occupancy checks, and independent continuation.",
+      "semanticShapes": [
+        "same-batch summon commit before after-events",
+        "occupancy/invalid-position rollback",
+        "detached instance identity and flow state",
+        "caster/target lifecycle event distinction"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/author-summon-batch.test.ts",
+          "line": 161,
+          "status": "found",
+          "claim": "The real summon host commits one batch before after-events and keeps result alignment.",
+          "source": "it('commits a same-batch summon before after events and preserves result input alignment', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/author-summon-batch.test.ts",
+          "line": 225,
+          "status": "found",
+          "claim": "The real host preserves detached instance identity and flow state.",
+          "source": "it('returns the exact detached instance, retaining skills, ownership, core, extension, and flow state', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 8,
+            "passed": 8,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-summon-batch.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "lifecycle.queue-summon@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "lifecycle.zero-health@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "query-collection",
+      "routeCount": 5,
+      "routes": [
+        {
+          "key": "collection.live-piece-at@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "query.pieces@1",
+            "collection.at@1"
+          ]
+        },
+        {
+          "key": "query.affectable-pieces-from-source@1",
+          "activeCallCount": 3,
+          "publicReplacementIds": [
+            "query.pieces@1"
+          ]
+        },
+        {
+          "key": "query.piece@1",
+          "activeCallCount": 360,
+          "publicReplacementIds": [
+            "query.pieces@1",
+            "collection.at@1"
+          ]
+        },
+        {
+          "key": "query.pieces-in-square@1",
+          "activeCallCount": 3,
+          "publicReplacementIds": [
+            "spatial.map-cells@1",
+            "spatial.cell-coordinates@1",
+            "query.pieces@1"
+          ]
+        },
+        {
+          "key": "query.player@1",
+          "activeCallCount": 45,
+          "publicReplacementIds": [
+            "query.players@1",
+            "compare.values@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "query.pieces@1",
+        "collection.at@1",
+        "spatial.map-cells@1",
+        "spatial.cell-coordinates@1",
+        "query.players@1",
+        "compare.values@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Query live entities through authoritative host ordering, then compose collection access/filtering while preserving one-based and ordered semantics.",
+      "semanticShapes": [
+        "player rotation and candidate ordering",
+        "typed piece/cell envelopes before filtering",
+        "one-based index and out-of-range empty result",
+        "missing source/target safe result",
+        "ordered cells retained through mapping/filtering"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/skill-graph/atomic-migration-query-compositions.test.ts",
+          "line": 142,
+          "status": "found",
+          "claim": "The query composition exercises player resolution and candidate ordering through the flow query host.",
+          "source": "it('keeps player rotation, case-insensitive matching, and candidate order', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 20,
+            "passed": 20,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+          }
+        },
+        {
+          "file": "tests/skill-graph/atomic-migration-query-compositions.test.ts",
+          "line": 297,
+          "status": "found",
+          "claim": "The query composition preserves typed piece/cell envelopes before filtering.",
+          "source": "it('keeps typed piece and cell candidate envelopes after record construction', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 20,
+            "passed": 20,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-query-compositions.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "collection.live-piece-at@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "query.affectable-pieces-from-source@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "query.piece@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "query.pieces-in-square@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "query.player@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "piece-reference",
+      "routeCount": 1,
+      "routes": [
+        {
+          "key": "piece.require@1",
+          "activeCallCount": 30,
+          "publicReplacementIds": [
+            "query.pieces@1",
+            "collection.at@1",
+            "piece.resolve-including-graveyard@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "query.pieces@1",
+        "collection.at@1",
+        "piece.resolve-including-graveyard@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Resolve a piece reference with the host lifetime policy; active/graveyard lookup and invalid handles remain authenticated host behavior.",
+      "semanticShapes": [
+        "active-first stable identity",
+        "graveyard identity remains distinct",
+        "stale/same-ID/cross-execution handles are rejected"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/author-player-status-identity.test.ts",
+          "line": 54,
+          "status": "found",
+          "claim": "The real flow host distinguishes active and graveyard identities without minting a replacement handle.",
+          "source": "it('reads piece status instances by stable id from active pieces and graveyard without minting ids', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-player-status-identity.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/flow-runtime.test.ts",
+          "line": 136,
+          "status": "found",
+          "claim": "The real flow host uses active-first identity resolution and leaves the graveyard copy unchanged.",
+          "source": "it('writes stored numeric and presentation fields with active-first resolution', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 26,
+            "passed": 26,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "piece.require@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "projectile-spatial",
+      "routeCount": 3,
+      "routes": [
+        {
+          "key": "projectile.cardinal-cells@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "spatial.cardinal-cells@1",
+            "collection.at@1",
+            "collection.singleton@1",
+            "collection.concat@1"
+          ]
+        },
+        {
+          "key": "spatial.cardinal-cells-ordered@1",
+          "activeCallCount": 3,
+          "publicReplacementIds": [
+            "spatial.cardinal-cells@1",
+            "collection.at@1",
+            "collection.concat@1"
+          ]
+        },
+        {
+          "key": "spatial.cells-within-range@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "spatial.map-cells@1",
+            "spatial.cell-distance@1",
+            "compare.values@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "spatial.cardinal-cells@1",
+        "collection.at@1",
+        "collection.singleton@1",
+        "collection.concat@1",
+        "spatial.map-cells@1",
+        "spatial.cell-distance@1",
+        "compare.values@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Construct canonical coordinates and ordered cell paths, then delegate terrain/event traversal to the production spatial/projectile host.",
+      "semanticShapes": [
+        "canonical x/y coordinates discard decoration",
+        "ordered path and trace cells",
+        "terrain/occupancy blocking",
+        "enemy ordering on trace",
+        "missing source and invalid index boundaries"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/gameplay-module-projectiles.test.ts",
+          "line": 627,
+          "status": "found",
+          "claim": "The real projectile host preserves ordered path facts.",
+          "source": "it('keeps path facts ordered while hellfire kills the first target', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 82,
+            "passed": 82,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/gameplay-module-projectiles.test.ts"
+          }
+        },
+        {
+          "file": "tests/skill-graph/atomic-migration-projectile-queries.test.ts",
+          "line": 169,
+          "status": "found",
+          "claim": "The projectile/query host keeps trace enemy ordering and terrain traversal.",
+          "source": "it('preserves trace enemy ordering and unrestricted terrain traversal', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 9,
+            "passed": 9,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-projectile-queries.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [
+        "spatial.cardinal-direction@1",
+        "spatial.perpendicular-direction@1",
+        "spatial.perpendicular-cells@1",
+        "projectile.line-cells@1",
+        "spatial.square-cells@1",
+        "projectile.event-cell@1",
+        "projectile.events-from-cell@1",
+        "projectile.trace-strict@1"
+      ],
+      "routeSpecificUncertainty": [
+        {
+          "key": "projectile.cardinal-cells@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "spatial.cardinal-cells-ordered@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "spatial.cells-within-range@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "family-runtime-proof-exists-route-ids-still-unverified"
+    },
+    {
+      "family": "result-context",
+      "routeCount": 3,
+      "routes": [
+        {
+          "key": "ref.player-id-text@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "context.field@4",
+            "text.from-value@1"
+          ]
+        },
+        {
+          "key": "result.action-ui@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "result.action@1",
+            "record.set-key@1"
+          ]
+        },
+        {
+          "key": "result.card-action@1",
+          "activeCallCount": 5,
+          "publicReplacementIds": [
+            "result.action@1",
+            "record.set-key@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "context.field@4",
+        "text.from-value@1",
+        "result.action@1",
+        "record.set-key@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Read typed context values and construct result records; result success/message/action shape is consumed by the host action protocol.",
+      "semanticShapes": [
+        "result.action host execution",
+        "typed context field reads",
+        "missing context value policy",
+        "player-id text from the authenticated player value"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/atomic-natural-success.test.ts",
+          "line": 39,
+          "status": "found",
+          "claim": "The real rule host executes result.action graphs and observes the returned action record.",
+          "source": "module: 'result.action',",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 4,
+            "passed": 4,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/atomic-natural-success.test.ts"
+          }
+        },
+        {
+          "file": "tests/skill-graph/atomic-migration-context-fields.test.ts",
+          "line": 91,
+          "status": "found",
+          "claim": "The context-field host tests preserve typed event/context reads and missing-value policy.",
+          "source": "call('damage', 'context.field', {}, { field: 'damage' }),",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 18,
+            "passed": 18,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-context-fields.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "ref.player-id-text@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "result.action-ui@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "result.card-action@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "skill-cooldown",
+      "routeCount": 1,
+      "routes": [
+        {
+          "key": "skill.reset-cooldown@1",
+          "activeCallCount": 4,
+          "publicReplacementIds": [
+            "skill.instances@1",
+            "skill.instance-field@1",
+            "skill.set-instance-cooldown@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "skill.instances@1",
+        "skill.instance-field@1",
+        "skill.set-instance-cooldown@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Enumerate skill instances and mutate only the selected cooldown state through the skill host, retaining duplicates and exclusion rules.",
+      "semanticShapes": [
+        "positive cooldown reset",
+        "duplicate instance independence",
+        "source-order all-eligible reset"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/skill-graph/atomic-migration-ability-writes.test.ts",
+          "line": 296,
+          "status": "found",
+          "claim": "The cooldown host preserves duplicate instance independence and positive-only reset policy.",
+          "source": "it('resets only positive cooldowns and keeps duplicate skill instances independent', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 13,
+            "passed": 13,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+          }
+        },
+        {
+          "file": "tests/skill-graph/atomic-migration-ability-writes.test.ts",
+          "line": 320,
+          "status": "found",
+          "claim": "The cooldown host resets all eligible instances in source order.",
+          "source": "it('resets all positive cooldowns when no exclusion is supplied', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 13,
+            "passed": 13,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/skill-graph/atomic-migration-ability-writes.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "skill.reset-cooldown@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    },
+    {
+      "family": "status",
+      "routeCount": 7,
+      "routes": [
+        {
+          "key": "status.append-record@1",
+          "activeCallCount": 10,
+          "publicReplacementIds": [
+            "record.empty@1",
+            "record.set-key@1",
+            "status.apply-record@1"
+          ]
+        },
+        {
+          "key": "status.clear-piece-tags@1",
+          "activeCallCount": 1,
+          "publicReplacementIds": [
+            "status.instances@2",
+            "status.remove-instance-lifecycle@1"
+          ]
+        },
+        {
+          "key": "status.remove-id@1",
+          "activeCallCount": 23,
+          "publicReplacementIds": [
+            "status.instances@2",
+            "status.instance-field@1",
+            "status.remove-instance-lifecycle@1"
+          ]
+        },
+        {
+          "key": "status.remove-player-id@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "status.instances@2",
+            "status.instance-field@1",
+            "status.remove-instance-lifecycle@1"
+          ]
+        },
+        {
+          "key": "status.remove-record@1",
+          "activeCallCount": 11,
+          "publicReplacementIds": [
+            "status.query-instances@1",
+            "status.instance-field@1",
+            "status.remove-instance@1"
+          ]
+        },
+        {
+          "key": "status.set-number@1",
+          "activeCallCount": 16,
+          "publicReplacementIds": [
+            "status.find-instance@1",
+            "status.set-number-instance@1"
+          ]
+        },
+        {
+          "key": "status.set-remaining-uses@1",
+          "activeCallCount": 2,
+          "publicReplacementIds": [
+            "status.find-instance@1",
+            "status.set-number-instance@1"
+          ]
+        }
+      ],
+      "publicReplacementIds": [
+        "record.empty@1",
+        "record.set-key@1",
+        "status.apply-record@1",
+        "status.instances@2",
+        "status.remove-instance-lifecycle@1",
+        "status.instance-field@1",
+        "status.query-instances@1",
+        "status.remove-instance@1",
+        "status.find-instance@1",
+        "status.set-number-instance@1"
+      ],
+      "nonStandardPublicReplacementIds": [],
+      "semantics": "Build typed status records or authenticated status-instance handles, then apply/remove the exact selected instance through the lifecycle host.",
+      "semanticShapes": [
+        "duplicate IDs selected by authenticated object identity",
+        "exact selected-instance removal",
+        "stale handle cannot retarget a new same-ID status",
+        "duration write and invalid-counter rejection",
+        "source identity filtering"
+      ],
+      "hostEvidence": [
+        {
+          "file": "tests/game/author-status-instances.test.ts",
+          "line": 6,
+          "status": "found",
+          "claim": "The real status host filters by source identity and removes exactly the selected instance.",
+          "source": "it('filters by source identity and removes exactly the selected object even with duplicate IDs', () => {",
+          "testRun": {
+            "source": "output/completion-route-family-test-run.json",
+            "status": "passed",
+            "testCount": 3,
+            "passed": 3,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/author-status-instances.test.ts"
+          }
+        },
+        {
+          "file": "tests/game/flow-runtime.test.ts",
+          "line": 170,
+          "status": "found",
+          "claim": "The real status host updates only the selected status and rejects invalid counters.",
+          "source": "it('updates only the identified status and declared numeric fields without emitting removal events', () => {",
+          "testRun": {
+            "source": "output/completion-final-summon-integration.json",
+            "status": "passed",
+            "testCount": 26,
+            "passed": 26,
+            "failed": 0,
+            "suite": "C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/game/flow-runtime.test.ts"
+          }
+        }
+      ],
+      "boundedRuntimeProofIds": [],
+      "routeSpecificUncertainty": [
+        {
+          "key": "status.append-record@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.clear-piece-tags@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.remove-id@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.remove-player-id@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.remove-record@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.set-number@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        },
+        {
+          "key": "status.set-remaining-uses@1",
+          "reason": "No route-specific legacy-versus-public execution is recorded; shared family host evidence does not establish this route ID equivalent."
+        }
+      ],
+      "behaviorStatus": "host-family-evidence-route-ids-unverified"
+    }
+  ],
+  "remainingBehaviorUnverifiedRoutes": [
+    "card.hand-add-controlled@1",
+    "card.hand-add-ref@1",
+    "choice.as-result@1",
+    "choice.as-string-list@1",
+    "choice.cell-options@1",
+    "choice.cell@1",
+    "choice.grid-candidates@1",
+    "choice.hand-cards-bounded@1",
+    "choice.hand-cards@1",
+    "choice.is-array@1",
+    "choice.is-pending@1",
+    "choice.is-strict-string-list@1",
+    "choice.is-unresolved@1",
+    "choice.option-id-value@1",
+    "choice.option-selected@1",
+    "choice.option-value@1",
+    "choice.piece-candidates@1",
+    "choice.piece@1",
+    "choice.raw-string-value@1",
+    "choice.strict-string-list@1",
+    "choice.strict-string@1",
+    "choice.target-cell-by-range@1",
+    "choice.target-cell@1",
+    "choice.target-piece@1",
+    "collection.live-piece-at@1",
+    "content.materialize-template@1",
+    "effect.damage-captured@1",
+    "effect.damage-from-player@1",
+    "effect.damage@1",
+    "effect.heal-many@1",
+    "effect.heal@1",
+    "effect.queue-damage@1",
+    "effect.queue-heal@1",
+    "effect.status-record@1",
+    "lifecycle.queue-summon@1",
+    "lifecycle.zero-health@1",
+    "piece.require@1",
+    "projectile.cardinal-cells@1",
+    "query.affectable-pieces-from-source@1",
+    "query.piece@1",
+    "query.pieces-in-square@1",
+    "query.player@1",
+    "ref.player-id-text@1",
+    "result.action-ui@1",
+    "result.card-action@1",
+    "skill.reset-cooldown@1",
+    "spatial.cardinal-cells-ordered@1",
+    "spatial.cells-within-range@1",
+    "status.append-record@1",
+    "status.clear-piece-tags@1",
+    "status.remove-id@1",
+    "status.remove-player-id@1",
+    "status.remove-record@1",
+    "status.set-number@1",
+    "status.set-remaining-uses@1"
+  ],
+  "interfaceGaps": [],
+  "notes": [
+    "All publicReplacementIds in this report are checked with authorModuleUi(full registry descriptor).authoring === standard.",
+    "A test file is recorded only when the script finds the stated host assertion line; no test is run by this report generator.",
+    "The report does not convert a shared family test into proof for every active route and does not hide route-specific nullable, ordering, identity, or timing boundaries."
+  ]
+}

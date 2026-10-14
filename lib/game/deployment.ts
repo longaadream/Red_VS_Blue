@@ -94,6 +94,7 @@ export function toPublicBattleState(
   viewerPlayerId?: string,
 ): BattleState {
   const projected = cloneSerializable(state)
+  if (projected.extensions) delete projected.extensions.authorOutOfPlay
   const viewerId = String(viewerPlayerId ?? '').trim().toLowerCase()
   projectSkillPresentation(state, projected, viewerPlayerId)
   projectSourceTurnMarkers(state, projected, viewerId)

@@ -141,7 +141,7 @@ describe('Tracer Recall option resolution', () => {
     expect((configured.extensions)!.recallData).toEqual([])
   })
 
-  it('cancels Recall and consumes the snapshot when the exact saved cell is occupied', () => {
+  it('restores saved information and consumes the snapshot even when the saved cell is occupied', () => {
     const trigger = loadSkill('recall-move-trigger')
     const tracer = makePiece({
       instanceId: 'blocked-tracer', templateId: 'tracer', ownerPlayerId: 'player-red',
@@ -168,7 +168,8 @@ describe('Tracer Recall option resolution', () => {
       skill: { id: trigger.id, name: trigger.name, type: trigger.type, powerMultiplier: 1 },
     } as unknown as import('@/lib/game/skills').SkillExecutionContext, state)
 
-    expect(tracer).toMatchObject({ x: 4, y: 3, currentHp: 3 })
+    // Approved Recall contract: position and instance information restore independently.
+    expect(tracer).toMatchObject({ x: 4, y: 3, currentHp: 11 })
     expect(state.extensions!.recallData).toEqual([])
   })
 

@@ -8,6 +8,9 @@ const path = require('path')
 
 const REQUIRED_ARCHIVE_FILES = [
   'electron-editor/dist/main.js',
+  'electron-editor/dist/gameplay-module-core.cjs',
+  'electron-editor/ui/gameplay-module-editor.js',
+  'electron-editor/ui/gameplay-module-editor.css',
   'electron-editor/dist/preload.js',
   'electron-editor/dist/training-preview.js',
   'electron-editor/dist/training-resources.js',

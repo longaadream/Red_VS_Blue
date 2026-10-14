@@ -17,8 +17,1038 @@
   "targeting": {
     "steps": []
   },
-  "code": "function executeSkill(context) {\n  var caster = context.piece; var player = battle.players.find(function(p) { return p.playerId === caster.ownerPlayerId; });\n  if (!player) return { success: false, message: '未找到玩家' };\n  function isOrdinaryHoly(card) {\n  return card && ['holy-smite', 'holy-heal', 'holy-charge'].indexOf(card.cardId) !== -1;\n}\n  var eligible = player.hand.filter(function(card) { var state = card.contentState || {}; return isOrdinaryHoly(card) && !state.velenHolyProphecy && !state.velenHolyProphecyEnhanced; });\n  if (eligible.length === 0) return { success: false, message: '没有可预言的圣光手牌' };\n  var cardNames = { 'holy-smite': '圣光惩击', 'holy-heal': '圣光治疗', 'holy-charge': '圣光充能' };\n  var options = eligible.map(function(card) { return { label: card.name || cardNames[card.cardId], value: card.instanceId }; });\n  var choice = selectOption({ title: '圣光预言：选择一张圣光手牌', options: options, selectionMode: 'single', presentation: 'hand', minSelections: 1, maxSelections: 1 });\n  if (choice === undefined || choice === null || choice.needsOptionSelection) return choice;\n  var card = eligible.find(function(item) { return item.instanceId === choice; });\n  if (!card) return { success: false, message: '选择的手牌已无法被预言' };\n  if (!card.contentState) card.contentState = {}; card.contentState.velenHolyProphecy = { sourcePieceId: caster.instanceId, createdTurnNumber: battle.turn.turnNumber };\n  return { success: true, message: caster.name + '留下了圣光预言' };\n}",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {} }; }",
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"caster-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"caster\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).ownerPlayerId); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner\", __gameplayError, \"piece.owner\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined)) { _module3 = __gameplayInvalid; } else { var _module3 = (flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"player-exists\", __gameplayError, \"query.has-player\"); _module3 = __gameplayInvalid; } try { var _condition5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"exists\")) ? _module3[\"exists\"] : _module3); if (_condition5 !== __gameplayInvalid && _condition5) {  } else if (_condition5 !== __gameplayInvalid) { try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"未找到玩家\" === __gameplayInvalid) || (\"未找到玩家\" === null)) { _module4 = __gameplayInvalid; } else { var _module4 = (({success: false, message: \"未找到玩家\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"missing-player-result\", __gameplayError, \"result.action\"); _module4 = __gameplayInvalid; } try { if (!((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4) === __gameplayInvalid))) { return ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"result\")) ? _module4[\"result\"] : _module4); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"missing-player-result-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"missing-player\", __gameplayError); _condition5 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2)))) { _module6 = __gameplayInvalid; } else { var _module6 = ((function(playerId,cardId){var hand=flow.cards.hand(playerId);return(Array.isArray(hand)?hand:[]).filter(function(card){return card&&(cardId===null||card.cardId===cardId);}).map(function(card){return card.instanceId;});})(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2),null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"hand\", __gameplayError, \"card.hand-instances\"); _module6 = __gameplayInvalid; } var _loopRoot27 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection7 = __gameplayInvalid; var _items8 = ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"cards\")) ? _module6[\"cards\"] : _module6); var _capture13 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2); if (Array.isArray(_items8) && _capture13 !== __gameplayInvalid && _capture13 !== undefined) { if (_items8.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues26 = [];  for (var _index9 = 0; _index9 < _items8.length; _index9 += 1) { __gameplayConsumeIteration(); var _item10 = _items8[_index9]; var _collectionResult11 = __gameplayInvalid; _collectionDone12: { try { if ((_capture13 === __gameplayInvalid) || (_capture13 === undefined) || (_capture13 === null) || (_capture13 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_capture13)) || (_item10 === __gameplayInvalid) || (_item10 === undefined) || (_item10 === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((function(playerId,instanceId){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;});return card&&typeof card.cardId==='string'?card.cardId:'';})(_capture13,_item10)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-definition\", __gameplayError, \"card.read-definition-id\"); _module14 = __gameplayInvalid; } try { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === null) || (\"holy-smite\" === __gameplayInvalid) || (\"holy-smite\" === undefined) || (\"holy-smite\" === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === \"holy-smite\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-smite\", __gameplayError, \"compare.equal-string\"); _module15 = __gameplayInvalid; } try { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === null) || (\"holy-heal\" === __gameplayInvalid) || (\"holy-heal\" === undefined) || (\"holy-heal\" === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === \"holy-heal\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-heal\", __gameplayError, \"compare.equal-string\"); _module16 = __gameplayInvalid; } try { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === null) || (\"holy-charge\" === __gameplayInvalid) || (\"holy-charge\" === undefined) || (\"holy-charge\" === null)) { _module17 = __gameplayInvalid; } else { var _module17 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"cardId\")) ? _module14[\"cardId\"] : _module14) === \"holy-charge\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-charge\", __gameplayError, \"compare.equal-string\"); _module17 = __gameplayInvalid; } try { if ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === null) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === __gameplayInvalid) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === undefined) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) || ((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-ordinary-a\", __gameplayError, \"logic.or\"); _module18 = __gameplayInvalid; } try { if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === null)) { _module19 = __gameplayInvalid; } else { var _module19 = ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) || ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-ordinary\", __gameplayError, \"logic.or\"); _module19 = __gameplayInvalid; } try { if ((_capture13 === __gameplayInvalid) || (_capture13 === undefined) || (_capture13 === null) || (_capture13 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_capture13)) || (_item10 === __gameplayInvalid) || (_item10 === undefined) || (_item10 === null)) { _module20 = __gameplayInvalid; } else { var _module20 = ((function(playerId,instanceId,field){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;}),state=card&&card.contentState;return Boolean(state&&state[field]);})(_capture13,_item10,\"velenHolyProphecy\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-prophecy\", __gameplayError, \"card.read-content-boolean\"); _module20 = __gameplayInvalid; } try { if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === null)) { _module21 = __gameplayInvalid; } else { var _module21 = (!(((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-no-prophecy\", __gameplayError, \"logic.not\"); _module21 = __gameplayInvalid; } try { if ((((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === undefined) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === null) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === __gameplayInvalid) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === undefined) || (((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21) === null)) { _module22 = __gameplayInvalid; } else { var _module22 = ((((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) && ((_module21 !== null && typeof _module21 === \"object\" && Object.prototype.hasOwnProperty.call(_module21, \"value\")) ? _module21[\"value\"] : _module21))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-without-prophecy\", __gameplayError, \"logic.and\"); _module22 = __gameplayInvalid; } try { if ((_capture13 === __gameplayInvalid) || (_capture13 === undefined) || (_capture13 === null) || (_capture13 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_capture13)) || (_item10 === __gameplayInvalid) || (_item10 === undefined) || (_item10 === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((function(playerId,instanceId,field){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;}),state=card&&card.contentState;return Boolean(state&&state[field]);})(_capture13,_item10,\"velenHolyProphecyEnhanced\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-enhanced\", __gameplayError, \"card.read-content-boolean\"); _module23 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = (!(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-no-enhanced\", __gameplayError, \"logic.not\"); _module24 = __gameplayInvalid; } try { if ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === null) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24) === null)) { _module25 = __gameplayInvalid; } else { var _module25 = ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) && ((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-without-enhanced\", __gameplayError, \"logic.and\"); _module25 = __gameplayInvalid; } try { if (!((((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25) === __gameplayInvalid))) { _collectionResult11 = { \"value\": ((_module25 !== null && typeof _module25 === \"object\" && Object.prototype.hasOwnProperty.call(_module25, \"value\")) ? _module25[\"value\"] : _module25) }; break _collectionDone12; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-return\", __gameplayError); } } if (_collectionResult11 !== __gameplayInvalid && _collectionResult11 != null && _collectionResult11[\"value\"]) { _collectionValues26.push(_item10); } } var _collection7 = _collectionValues26; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot27) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"eligible\", new Error(\"gameplay shared iteration budget exceeded\")); _collection7 = __gameplayInvalid; } else { __gameplayRecordFault(\"eligible\", __gameplayError); _collection7 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection7 === __gameplayInvalid) || (_collection7 === undefined) || (_collection7 === null)) { _module28 = __gameplayInvalid; } else { var _module28 = (Array.isArray(_collection7) ? _collection7.length : 0); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"eligible-count\", __gameplayError, \"list.count\"); _module28 = __gameplayInvalid; } try { if ((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"count\")) ? _module28[\"count\"] : _module28) === __gameplayInvalid) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"count\")) ? _module28[\"count\"] : _module28) === undefined) || (((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"count\")) ? _module28[\"count\"] : _module28) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module29 = __gameplayInvalid; } else { var _module29 = ((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"count\")) ? _module28[\"count\"] : _module28) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-eligible\", __gameplayError, \"compare.greater-than\"); _module29 = __gameplayInvalid; } try { var _condition66 = ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29); if (_condition66 !== __gameplayInvalid && _condition66) { var _loopRoot48 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection30 = __gameplayInvalid; var _items31 = _collection7; var _capture36 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2); if (Array.isArray(_items31) && _capture36 !== __gameplayInvalid && _capture36 !== undefined) { if (_items31.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues47 = [];  for (var _index32 = 0; _index32 < _items31.length; _index32 += 1) { __gameplayConsumeIteration(); var _item33 = _items31[_index32]; var _collectionResult34 = __gameplayInvalid; _collectionDone35: { try { if ((_capture36 === __gameplayInvalid) || (_capture36 === undefined) || (_capture36 === null) || (_capture36 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_capture36)) || (_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null)) { _module37 = __gameplayInvalid; } else { var _module37 = ((function(playerId,instanceId){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;});return card&&typeof card.cardId==='string'?card.cardId:'';})(_capture36,_item33)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-definition\", __gameplayError, \"card.read-definition-id\"); _module37 = __gameplayInvalid; } try { if ((_capture36 === __gameplayInvalid) || (_capture36 === undefined) || (_capture36 === null) || (_capture36 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_capture36)) || (_item33 === __gameplayInvalid) || (_item33 === undefined) || (_item33 === null)) { _module38 = __gameplayInvalid; } else { var _module38 = ((function(playerId,instanceId){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;});return card&&card.name?String(card.name):null;})(_capture36,_item33)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-name\", __gameplayError, \"card.read-definition-name\"); _module38 = __gameplayInvalid; } try { if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) === undefined)) { _module39 = __gameplayInvalid; } else { var _module39 = ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) !== null && ((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) !== undefined)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-has-name\", __gameplayError, \"value.present-string\"); _module39 = __gameplayInvalid; } try { if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38) === undefined)) { _module40 = __gameplayInvalid; } else { var _module40 = (((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38)) == null ? \"\" : String(((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"name\")) ? _module38[\"name\"] : _module38)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-name-text\", __gameplayError, \"value.string-or-empty\"); _module40 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === null) || (\"holy-smite\" === __gameplayInvalid) || (\"holy-smite\" === undefined) || (\"holy-smite\" === null)) { _module41 = __gameplayInvalid; } else { var _module41 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === \"holy-smite\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-is-smite\", __gameplayError, \"compare.equal-string\"); _module41 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === null) || (\"holy-heal\" === __gameplayInvalid) || (\"holy-heal\" === undefined) || (\"holy-heal\" === null)) { _module42 = __gameplayInvalid; } else { var _module42 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === \"holy-heal\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-is-heal\", __gameplayError, \"compare.equal-string\"); _module42 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === null) || (\"holy-charge\" === __gameplayInvalid) || (\"holy-charge\" === undefined) || (\"holy-charge\" === null)) { _module43 = __gameplayInvalid; } else { var _module43 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"cardId\")) ? _module37[\"cardId\"] : _module37) === \"holy-charge\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-is-charge\", __gameplayError, \"compare.equal-string\"); _module43 = __gameplayInvalid; } try { if ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === __gameplayInvalid) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === undefined) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === null) || (\"圣光惩击\" === __gameplayInvalid) || (\"圣光惩击\" === undefined) || (\"圣光惩击\" === null) || (\"圣光治疗\" === __gameplayInvalid) || (\"圣光治疗\" === undefined) || (\"圣光治疗\" === null)) { _module44 = __gameplayInvalid; } else { var _module44 = ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) ? \"圣光惩击\" : \"圣光治疗\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-fallback-smite\", __gameplayError, \"value.select-text\"); _module44 = __gameplayInvalid; } try { if ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"value\")) ? _module43[\"value\"] : _module43) === __gameplayInvalid) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"value\")) ? _module43[\"value\"] : _module43) === undefined) || (((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"value\")) ? _module43[\"value\"] : _module43) === null) || (\"圣光充能\" === __gameplayInvalid) || (\"圣光充能\" === undefined) || (\"圣光充能\" === null) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === __gameplayInvalid) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === undefined) || (((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44) === null)) { _module45 = __gameplayInvalid; } else { var _module45 = ((((_module43 !== null && typeof _module43 === \"object\" && Object.prototype.hasOwnProperty.call(_module43, \"value\")) ? _module43[\"value\"] : _module43) ? \"圣光充能\" : ((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"text\")) ? _module44[\"text\"] : _module44))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-fallback\", __gameplayError, \"value.select-text\"); _module45 = __gameplayInvalid; } try { if ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"present\")) ? _module39[\"present\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"present\")) ? _module39[\"present\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"present\")) ? _module39[\"present\"] : _module39) === null) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === __gameplayInvalid) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === undefined) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === null) || (((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === __gameplayInvalid) || (((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === undefined) || (((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45) === null)) { _module46 = __gameplayInvalid; } else { var _module46 = ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"present\")) ? _module39[\"present\"] : _module39) ? ((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) : ((_module45 !== null && typeof _module45 === \"object\" && Object.prototype.hasOwnProperty.call(_module45, \"text\")) ? _module45[\"text\"] : _module45))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-chosen-name\", __gameplayError, \"value.select-text\"); _module46 = __gameplayInvalid; } try { if (!((((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) === __gameplayInvalid))) { _collectionResult34 = { \"value\": ((_module46 !== null && typeof _module46 === \"object\" && Object.prototype.hasOwnProperty.call(_module46, \"text\")) ? _module46[\"text\"] : _module46) }; break _collectionDone35; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"labels-return\", __gameplayError); } } if (_collectionResult34 !== __gameplayInvalid && _collectionResult34 != null) { _collectionValues47.push(_collectionResult34[\"value\"]); } } var _collection30 = _collectionValues47; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot48) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"labels\", new Error(\"gameplay shared iteration budget exceeded\")); _collection30 = __gameplayInvalid; } else { __gameplayRecordFault(\"labels\", __gameplayError); _collection30 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2))) || (_collection7 === __gameplayInvalid) || (_collection7 === undefined) || (_collection7 === null) || (_collection30 === __gameplayInvalid) || (_collection30 === undefined) || (_collection30 === null)) { _module49 = __gameplayInvalid; } else { var _module49 = (flow.choice.option({title:\"圣光预言：选择一张圣光手牌\",options:(_collection7).map(function(value,index){return{label:_collection30[index]===undefined?value:_collection30[index],value:value};}),selectionMode:\"single\",presentation:\"hand\",minSelections:1,maxSelections:1})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"choice\", __gameplayError, \"choice.hand-cards\"); _module49 = __gameplayInvalid; } try { if ((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) === __gameplayInvalid)) { _module50 = __gameplayInvalid; } else { var _module50 = ((!((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) || Boolean(((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49).needsTargetSelection) || Boolean(((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49).needsOptionSelection))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"choice-unresolved\", __gameplayError, \"choice.is-unresolved\"); _module50 = __gameplayInvalid; } try { var _condition52 = ((_module50 !== null && typeof _module50 === \"object\" && Object.prototype.hasOwnProperty.call(_module50, \"value\")) ? _module50[\"value\"] : _module50); if (_condition52 !== __gameplayInvalid && _condition52) { try { if ((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) === __gameplayInvalid)) { _module51 = __gameplayInvalid; } else { var _module51 = (((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"pending-result\", __gameplayError, \"choice.as-result\"); _module51 = __gameplayInvalid; } try { if (!((((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"result\")) ? _module51[\"result\"] : _module51) === __gameplayInvalid))) { return ((_module51 !== null && typeof _module51 === \"object\" && Object.prototype.hasOwnProperty.call(_module51, \"result\")) ? _module51[\"result\"] : _module51); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"pending-result-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"choice-pending\", __gameplayError); _condition52 = __gameplayInvalid; } try { if ((((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) === __gameplayInvalid)) { _module53 = __gameplayInvalid; } else { var _module53 = ((typeof ((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) === \"string\" ? ((_module49 !== null && typeof _module49 === \"object\" && Object.prototype.hasOwnProperty.call(_module49, \"choice\")) ? _module49[\"choice\"] : _module49) : \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"selected\", __gameplayError, \"choice.strict-string\"); _module53 = __gameplayInvalid; } try { if ((_collection7 === __gameplayInvalid) || (_collection7 === undefined) || (_collection7 === null) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === __gameplayInvalid) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === undefined) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === null)) { _module54 = __gameplayInvalid; } else { var _module54 = ((Array.isArray(_collection7)&&_collection7.indexOf(((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53))!==-1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"selected-valid\", __gameplayError, \"collection.contains-string\"); _module54 = __gameplayInvalid; } try { var _condition64 = ((_module54 !== null && typeof _module54 === \"object\" && Object.prototype.hasOwnProperty.call(_module54, \"contains\")) ? _module54[\"contains\"] : _module54); if (_condition64 !== __gameplayInvalid && _condition64) { try { var _module55 = (battle.turn.turnNumber); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"turn\", __gameplayError, \"turn.number\"); _module55 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module56 = __gameplayInvalid; } else { var _module56 = ((flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).instanceId)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"caster-id\", __gameplayError, \"piece.identifier\"); _module56 = __gameplayInvalid; } try { var _record57 = ((function(__gameplayRecordValue0, __gameplayRecordValue1){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"sourcePieceId\"] = __gameplayRecordValue0; __gameplayRecord[\"createdTurnNumber\"] = __gameplayRecordValue1; return __gameplayRecord; })(((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"id\")) ? _module56[\"id\"] : _module56), ((_module55 !== null && typeof _module55 === \"object\" && Object.prototype.hasOwnProperty.call(_module55, \"value\")) ? _module55[\"value\"] : _module55))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"prophecy-record\", __gameplayError); _record57 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2))) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === __gameplayInvalid) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === undefined) || (((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53) === null) || (_record57 === __gameplayInvalid) || (_record57 === undefined) || (_record57 === null)) { _module58 = __gameplayInvalid; } else { var _module58 = ((function(playerId,instanceId,field,record){var hand=flow.cards.hand(playerId),card=(Array.isArray(hand)?hand:[]).find(function(item){return item&&item.instanceId===instanceId;});if(!card)return false;if(!card.contentState)card.contentState={};card.contentState[field]={sourcePieceId:record.sourcePieceId,createdTurnNumber:record.createdTurnNumber};return true;})(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2),((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"text\")) ? _module53[\"text\"] : _module53),\"velenHolyProphecy\",_record57)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"set-record\", __gameplayError, \"card.set-content-record\"); _module58 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2)))) { _module59 = __gameplayInvalid; } else { var _module59 = (flow.rules.add(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"player\")) ? _module2[\"player\"] : _module2), \"rule-velen-delayed-effects\", \"player\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"install-delayed-rule\", __gameplayError, \"rule.apply-player\"); _module59 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module60 = __gameplayInvalid; } else { var _module60 = (String(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"name\"])); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"caster-name\", __gameplayError, \"attribute.text\"); _module60 = __gameplayInvalid; } try { if ((((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"text\")) ? _module60[\"text\"] : _module60) === __gameplayInvalid) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"text\")) ? _module60[\"text\"] : _module60) === undefined) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"text\")) ? _module60[\"text\"] : _module60) === null) || (\"留下了圣光预言\" === __gameplayInvalid) || (\"留下了圣光预言\" === undefined) || (\"留下了圣光预言\" === null)) { _module61 = __gameplayInvalid; } else { var _module61 = ((((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"text\")) ? _module60[\"text\"] : _module60) + \"留下了圣光预言\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message\", __gameplayError, \"text.concat\"); _module61 = __gameplayInvalid; } try { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"text\")) ? _module61[\"text\"] : _module61) === __gameplayInvalid) || (((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"text\")) ? _module61[\"text\"] : _module61) === null)) { _module62 = __gameplayInvalid; } else { var _module62 = (({success: true, message: ((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"text\")) ? _module61[\"text\"] : _module61)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-result\", __gameplayError, \"result.action\"); _module62 = __gameplayInvalid; } try { if (!((((_module62 !== null && typeof _module62 === \"object\" && Object.prototype.hasOwnProperty.call(_module62, \"result\")) ? _module62[\"result\"] : _module62) === __gameplayInvalid))) { return ((_module62 !== null && typeof _module62 === \"object\" && Object.prototype.hasOwnProperty.call(_module62, \"result\")) ? _module62[\"result\"] : _module62); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"success-result-return\", __gameplayError); } } else if (_condition64 !== __gameplayInvalid) { try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"选择的手牌已无法被预言\" === __gameplayInvalid) || (\"选择的手牌已无法被预言\" === null)) { _module63 = __gameplayInvalid; } else { var _module63 = (({success: false, message: \"选择的手牌已无法被预言\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"invalid-selected-result\", __gameplayError, \"result.action\"); _module63 = __gameplayInvalid; } try { if (!((((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"result\")) ? _module63[\"result\"] : _module63) === __gameplayInvalid))) { return ((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"result\")) ? _module63[\"result\"] : _module63); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"invalid-selected-result-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"selected-valid-branch\", __gameplayError); _condition64 = __gameplayInvalid; } } else if (_condition66 !== __gameplayInvalid) { try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (\"没有可预言的圣光手牌\" === __gameplayInvalid) || (\"没有可预言的圣光手牌\" === null)) { _module65 = __gameplayInvalid; } else { var _module65 = (({success: false, message: \"没有可预言的圣光手牌\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"no-eligible-result\", __gameplayError, \"result.action\"); _module65 = __gameplayInvalid; } try { if (!((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"result\")) ? _module65[\"result\"] : _module65) === __gameplayInvalid))) { return ((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"result\")) ? _module65[\"result\"] : _module65); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"no-eligible-result-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"no-eligible\", __gameplayError); _condition66 = __gameplayInvalid; } }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; if (skillDef && typeof skillDef === \"object\") context[\"__gameplayModuleDiagnosticHost\"] = skillDef[\"__gameplayModuleDiagnosticHost\"]; var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { if ((\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === __gameplayInvalid) || (\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === undefined) || (\"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。\", expectedValues: {}})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"preview\", __gameplayError, \"preview.result\"); _module0 = __gameplayInvalid; } try { if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
   "range": "self",
-  "concealTargetInBattleLog": true
+  "concealTargetInBattleLog": true,
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "选择一张未经强化的圣光手牌。你的下回合开始时，若其仍在手中，将其强化50%。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      },
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "schemas": [
+            {
+              "id": "velen-holy-prophecy",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "sourcePieceId",
+                  "type": "string"
+                },
+                {
+                  "name": "createdTurnNumber",
+                  "type": "number"
+                }
+              ]
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "caster-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "caster",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "caster-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "piece.owner",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "caster",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "player-exists",
+              "module": "query.has-player",
+              "version": "1",
+              "inputs": {
+                "playerId": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "missing-player",
+              "condition": {
+                "kind": "output",
+                "node": "player-exists",
+                "port": "exists"
+              },
+              "then": [],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "missing-player-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "未找到玩家"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "missing-player-result-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "missing-player-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "hand",
+              "module": "card.hand-instances",
+              "version": "1",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "collection",
+              "id": "eligible",
+              "method": "filter",
+              "items": {
+                "kind": "output",
+                "node": "hand",
+                "port": "cards"
+              },
+              "item": "card",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "player"
+                }
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "eligible-definition",
+                  "module": "card.read-definition-id",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "input",
+                      "name": "player"
+                    },
+                    "card": {
+                      "kind": "input",
+                      "name": "card"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-smite",
+                  "module": "compare.equal-string",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-definition",
+                      "port": "cardId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "holy-smite"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-heal",
+                  "module": "compare.equal-string",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-definition",
+                      "port": "cardId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "holy-heal"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-charge",
+                  "module": "compare.equal-string",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-definition",
+                      "port": "cardId"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "holy-charge"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-ordinary-a",
+                  "module": "logic.or",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-smite",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "eligible-heal",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-ordinary",
+                  "module": "logic.or",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-ordinary-a",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "eligible-charge",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-prophecy",
+                  "module": "card.read-content-boolean",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "input",
+                      "name": "player"
+                    },
+                    "card": {
+                      "kind": "input",
+                      "name": "card"
+                    }
+                  },
+                  "parameters": {
+                    "field": "velenHolyProphecy"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-no-prophecy",
+                  "module": "logic.not",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "eligible-prophecy",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-without-prophecy",
+                  "module": "logic.and",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-ordinary",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "eligible-no-prophecy",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-enhanced",
+                  "module": "card.read-content-boolean",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "input",
+                      "name": "player"
+                    },
+                    "card": {
+                      "kind": "input",
+                      "name": "card"
+                    }
+                  },
+                  "parameters": {
+                    "field": "velenHolyProphecyEnhanced"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-no-enhanced",
+                  "module": "logic.not",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "eligible-enhanced",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "eligible-without-enhanced",
+                  "module": "logic.and",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "eligible-without-prophecy",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "eligible-no-enhanced",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "eligible-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "eligible-without-enhanced",
+                    "port": "value"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "eligible-count",
+              "module": "list.count",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "eligible",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "has-eligible",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "eligible-count",
+                  "port": "count"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "no-eligible",
+              "condition": {
+                "kind": "output",
+                "node": "has-eligible",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "collection",
+                  "id": "labels",
+                  "method": "map",
+                  "items": {
+                    "kind": "output",
+                    "node": "eligible",
+                    "port": "value"
+                  },
+                  "item": "card",
+                  "inputs": {
+                    "player": {
+                      "kind": "output",
+                      "node": "owner",
+                      "port": "player"
+                    }
+                  },
+                  "body": [
+                    {
+                      "kind": "call",
+                      "id": "labels-definition",
+                      "module": "card.read-definition-id",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "input",
+                          "name": "player"
+                        },
+                        "card": {
+                          "kind": "input",
+                          "name": "card"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-name",
+                      "module": "card.read-definition-name",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "input",
+                          "name": "player"
+                        },
+                        "card": {
+                          "kind": "input",
+                          "name": "card"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-has-name",
+                      "module": "value.present-string",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "labels-name",
+                          "port": "name"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-name-text",
+                      "module": "value.string-or-empty",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "labels-name",
+                          "port": "name"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-is-smite",
+                      "module": "compare.equal-string",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "labels-definition",
+                          "port": "cardId"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "holy-smite"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-is-heal",
+                      "module": "compare.equal-string",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "labels-definition",
+                          "port": "cardId"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "holy-heal"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-is-charge",
+                      "module": "compare.equal-string",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "labels-definition",
+                          "port": "cardId"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "holy-charge"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-fallback-smite",
+                      "module": "value.select-text",
+                      "version": "1",
+                      "inputs": {
+                        "condition": {
+                          "kind": "output",
+                          "node": "labels-is-smite",
+                          "port": "value"
+                        },
+                        "whenTrue": {
+                          "kind": "literal",
+                          "value": "圣光惩击"
+                        },
+                        "whenFalse": {
+                          "kind": "literal",
+                          "value": "圣光治疗"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-fallback",
+                      "module": "value.select-text",
+                      "version": "1",
+                      "inputs": {
+                        "condition": {
+                          "kind": "output",
+                          "node": "labels-is-charge",
+                          "port": "value"
+                        },
+                        "whenTrue": {
+                          "kind": "literal",
+                          "value": "圣光充能"
+                        },
+                        "whenFalse": {
+                          "kind": "output",
+                          "node": "labels-fallback-smite",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "labels-chosen-name",
+                      "module": "value.select-text",
+                      "version": "1",
+                      "inputs": {
+                        "condition": {
+                          "kind": "output",
+                          "node": "labels-has-name",
+                          "port": "present"
+                        },
+                        "whenTrue": {
+                          "kind": "output",
+                          "node": "labels-name-text",
+                          "port": "text"
+                        },
+                        "whenFalse": {
+                          "kind": "output",
+                          "node": "labels-fallback",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "labels-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "labels-chosen-name",
+                        "port": "text"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "choice",
+                  "module": "choice.hand-cards",
+                  "version": "1",
+                  "inputs": {
+                    "player": {
+                      "kind": "output",
+                      "node": "owner",
+                      "port": "player"
+                    },
+                    "cards": {
+                      "kind": "output",
+                      "node": "eligible",
+                      "port": "value"
+                    },
+                    "labels": {
+                      "kind": "output",
+                      "node": "labels",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {
+                    "title": "圣光预言：选择一张圣光手牌",
+                    "selectionMode": "single",
+                    "minSelections": 1,
+                    "maxSelections": 1
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "choice-unresolved",
+                  "module": "choice.is-unresolved",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "choice-pending",
+                  "condition": {
+                    "kind": "output",
+                    "node": "choice-unresolved",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "pending-result",
+                      "module": "choice.as-result",
+                      "version": "1",
+                      "inputs": {
+                        "choice": {
+                          "kind": "output",
+                          "node": "choice",
+                          "port": "choice"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "pending-result-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "pending-result",
+                        "port": "result"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "call",
+                  "id": "selected",
+                  "module": "choice.strict-string",
+                  "version": "1",
+                  "inputs": {
+                    "choice": {
+                      "kind": "output",
+                      "node": "choice",
+                      "port": "choice"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "selected-valid",
+                  "module": "collection.contains-string",
+                  "version": "1",
+                  "inputs": {
+                    "items": {
+                      "kind": "output",
+                      "node": "eligible",
+                      "port": "value"
+                    },
+                    "value": {
+                      "kind": "output",
+                      "node": "selected",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "selected-valid-branch",
+                  "condition": {
+                    "kind": "output",
+                    "node": "selected-valid",
+                    "port": "contains"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "turn",
+                      "module": "turn.number",
+                      "version": "1",
+                      "inputs": {},
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "caster-id",
+                      "module": "piece.identifier",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "caster",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "record.create",
+                      "id": "prophecy-record",
+                      "schema": "velen-holy-prophecy@1",
+                      "fields": {
+                        "sourcePieceId": {
+                          "kind": "output",
+                          "node": "caster-id",
+                          "port": "id"
+                        },
+                        "createdTurnNumber": {
+                          "kind": "output",
+                          "node": "turn",
+                          "port": "value"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "set-record",
+                      "module": "card.set-content-record",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "owner",
+                          "port": "player"
+                        },
+                        "card": {
+                          "kind": "output",
+                          "node": "selected",
+                          "port": "text"
+                        },
+                        "record": {
+                          "kind": "output",
+                          "node": "prophecy-record",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "field": "velenHolyProphecy"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "install-delayed-rule",
+                      "module": "rule.apply-player",
+                      "version": "1",
+                      "inputs": {
+                        "target": {
+                          "kind": "output",
+                          "node": "owner",
+                          "port": "player"
+                        }
+                      },
+                      "parameters": {
+                        "ruleId": "rule-velen-delayed-effects"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "caster-name",
+                      "module": "attribute.text",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "caster",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "attribute": "name"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "message",
+                      "module": "text.concat",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "caster-name",
+                          "port": "text"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": "留下了圣光预言"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "success-result",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": true
+                        },
+                        "message": {
+                          "kind": "output",
+                          "node": "message",
+                          "port": "text"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "success-result-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "success-result",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "invalid-selected-result",
+                      "module": "result.action",
+                      "version": "1",
+                      "inputs": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        },
+                        "message": {
+                          "kind": "literal",
+                          "value": "选择的手牌已无法被预言"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "return",
+                      "id": "invalid-selected-result-return",
+                      "value": {
+                        "kind": "output",
+                        "node": "invalid-selected-result",
+                        "port": "result"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "no-eligible-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "没有可预言的圣光手牌"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "no-eligible-result-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "no-eligible-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:velen-holy-prophecy",
+    "links": [
+      {
+        "collection": "cards",
+        "id": "holy-smite",
+        "relation": "shared",
+        "source": "skills.velen-holy-prophecy.gameplayModules.entries.code.graph.body[12].then[0].body[9].inputs.right.value"
+      },
+      {
+        "collection": "cards",
+        "id": "holy-heal",
+        "relation": "shared",
+        "source": "skills.velen-holy-prophecy.gameplayModules.entries.code.graph.body[12].then[0].body[10].inputs.right.value"
+      },
+      {
+        "collection": "cards",
+        "id": "holy-charge",
+        "relation": "shared",
+        "source": "skills.velen-holy-prophecy.gameplayModules.entries.code.graph.body[12].then[0].body[11].inputs.right.value"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-velen-delayed-effects",
+        "relation": "shared",
+        "source": "pieces/velen.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-velen-death-cleanup",
+        "relation": "shared",
+        "source": "pieces/velen.rules"
+      }
+    ]
+  }
 }

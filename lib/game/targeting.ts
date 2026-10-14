@@ -1,4 +1,5 @@
 import { isContentAvailable, battleContentMode } from './content-availability'
+import { authorTargetMetadata } from '../skill-graph/author-target-metadata'
 import { areMatchAllies } from './match-teams'
 import { canAffectAdventureTarget } from './adventure-boundary'
 /* eslint-disable @typescript-eslint/no-explicit-any -- RED-59 validates legacy data-authored definitions and action envelopes at runtime. */
@@ -429,6 +430,8 @@ function getDeclaredSteps(definition: any, kind: 'skill' | 'card'): SelectionSte
     return steps
   }
 
+  const authorSteps = authorTargetMetadata(definition?.gameplayModules?.entries?.code?.graph)
+  if (authorSteps?.length) return authorSteps
   if (/\bselectOption\s*\(/.test(String(definition?.code || ''))) return undefined
   const fromCode = extractTargetSpecsFromCode(String(definition?.code || ''), kind)
   if (fromCode.length > 0) return fromCode

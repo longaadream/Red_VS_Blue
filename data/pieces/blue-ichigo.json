@@ -12,15 +12,32 @@
     "moveRange": 4
   },
   "skills": [
-    { "skillId": "ichigo-zangetsu", "level": 1 },
-    { "skillId": "ichigo-getsuga-tensho", "level": 1 },
-    { "skillId": "ichigo-bankai-tensa-zangetsu", "level": 1 }
+    {
+      "skillId": "ichigo-zangetsu",
+      "level": 1
+    },
+    {
+      "skillId": "ichigo-getsuga-tensho",
+      "level": 1
+    },
+    {
+      "skillId": "ichigo-bankai-tensa-zangetsu",
+      "level": 1
+    }
   ],
   "rules": [
     "rule-ichigo-black-getsuga-teleport"
   ],
   "transformedSkills": [
-    { "skillId": "ichigo-black-getsuga-tensho", "triggeredBy": "ichigo-bankai-tensa-zangetsu" }
+    {
+      "skillId": "ichigo-black-getsuga-tensho",
+      "triggeredBy": "ichigo-bankai-tensa-zangetsu"
+    }
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:blue-ichigo",
+    "links": []
+  }
 }

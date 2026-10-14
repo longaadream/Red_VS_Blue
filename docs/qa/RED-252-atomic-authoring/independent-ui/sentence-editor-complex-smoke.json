@@ -1,0 +1,135 @@
+{
+  "ok": true,
+  "sourceIds": [
+    "naruto-shadow-clone",
+    "kiljaedan-demonic-pact"
+  ],
+  "checks": [
+    "production catalog IDs opened in real Electron",
+    "complex graph sentence projection rendered without false simple controls",
+    "advanced route opened and exposed registered statements",
+    "no-op save preserved exact graph and unknown metadata",
+    "page reload preserved exact graph and metadata",
+    "sentence condition control changed the correct Naruto graph",
+    "changed graph and metadata saved and reloaded exactly"
+  ],
+  "results": [
+    {
+      "id": "naruto-shadow-clone",
+      "name": "影分身之术",
+      "kind": "active",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "skill",
+        "bodyCount": 7,
+        "bodyIds": [
+          "source",
+          "mode-options",
+          "mode",
+          "target",
+          "origin",
+          "is-teleport",
+          "mode-branch"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 11,
+        "semanticNodes": 11,
+        "nodeKinds": [
+          "call",
+          "record.create",
+          "if"
+        ]
+      },
+      "advanced": {
+        "statements": 7
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone.png"
+      ]
+    },
+    {
+      "id": "kiljaedan-demonic-pact",
+      "name": "恶魔仪式",
+      "kind": "passive",
+      "graph": {
+        "version": "rvb-gameplay-modules/v1",
+        "surface": "triggerSkill",
+        "bodyCount": 15,
+        "bodyIds": [
+          "holder-ref",
+          "holder-present",
+          "missing-holder",
+          "holder-guard",
+          "holder",
+          "owner",
+          "snapshot",
+          "detached",
+          "detach-failed",
+          "detach-guard",
+          "store",
+          "store-failed",
+          "store-guard",
+          "add-card",
+          "done"
+        ],
+        "compositeIds": [],
+        "continuationIds": []
+      },
+      "rendered": {
+        "nodes": 18,
+        "semanticNodes": 18,
+        "nodeKinds": [
+          "call",
+          "if",
+          "return"
+        ]
+      },
+      "advanced": {
+        "statements": 15
+      },
+      "screenshots": [
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact-default.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact-advanced.png",
+        "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact.png"
+      ]
+    }
+  ],
+  "trials": [],
+  "edit": {
+    "id": "naruto-shadow-clone",
+    "addedNodeId": "sentence-condition-1",
+    "beforeBodyIds": [
+      "source",
+      "mode-options",
+      "mode",
+      "target",
+      "origin",
+      "is-teleport",
+      "mode-branch"
+    ],
+    "afterBodyIds": [
+      "source",
+      "mode-options",
+      "mode",
+      "target",
+      "origin",
+      "is-teleport",
+      "mode-branch",
+      "sentence-condition-1"
+    ]
+  },
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-naruto-shadow-clone.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact-default.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact-advanced.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\independent-ui\\sentence-editor-complex-kiljaedan-demonic-pact.png"
+  ],
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-complex-sentence-smoke-4x5Yyw\\rvb-content-bcdc334c"
+}

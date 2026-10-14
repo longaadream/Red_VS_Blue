@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "startedAt": "2026-10-12T04:27:48.588Z",
+  "completedAt": "2026-10-12T04:27:58.020Z",
+  "checks": [
+    "real Electron mount",
+    "registered palette",
+    "category filters and collapsible groups",
+    "structured text binding controls",
+    "typed literal parameters",
+    "typed prior-output reference",
+    "composite navigation and persistence",
+    "module document save and reload",
+    "unknown fields preserved",
+    "controls fit detail pane",
+    "normal flow before long palette list",
+    "wrapped categories without horizontal overflow",
+    "expanded flow starts within 220px",
+    "expanded workspace save entry forwarding with Escape focus and scroll restore",
+    "narrow layout without horizontal overflow"
+  ],
+  "screenshots": [
+    "gameplay-module-editor.png",
+    "gameplay-module-editor-expanded.png"
+  ]
+}

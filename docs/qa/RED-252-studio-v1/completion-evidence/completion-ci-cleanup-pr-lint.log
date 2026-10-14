@@ -1,0 +1,3 @@
+
+> my-project@0.1.15 lint
+> eslint . --max-warnings 0 --ignore-pattern temp-flying-effect.js --ignore-pattern temp-flying-graph.js

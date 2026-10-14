@@ -3,6 +3,1272 @@
   "name": "流星腰带",
   "description": "保护普里莫自身3×3内的其他友军，由普里莫代为承受伤害。",
   "priority": 200,
-  "trigger": { "type": "beforeDamageRedirect" },
-  "skillCode": "var guard=context.rulePiece,target=context.piece;if(!guard||guard.currentHp<=0||!battle.pieces.some(function(piece){return piece.instanceId===guard.instanceId&&piece.currentHp>0;}))return{success:false,message:''};if(!target||target.instanceId===guard.instanceId||target.currentHp<=0||!arePlayersAllied(battle,target.ownerPlayerId,guard.ownerPlayerId))return{success:false,message:''};if(guard.x==null||guard.y==null||target.x==null||target.y==null||Math.abs(target.x-guard.x)>1||Math.abs(target.y-guard.y)>1)return{success:false,message:''};var status=(guard.statusTags||[]).some(function(tag){return tag.type==='el-primo-meteor-belt';});if(!status||!context.damageRedirectQueue||!context.damageRedirectQueue.push({target:guard}))return{success:false,message:''};return{success:true,blocked:true,message:guard.name+'代替'+target.name+'承受伤害'};"
+  "trigger": {
+    "type": "beforeDamageRedirect"
+  },
+  "skillCode": "var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = ((context.rulePiece ? context.rulePiece.instanceId : null)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard\", __gameplayError, \"ref.rule-piece\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-resolved\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"currentHp\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-hp\", __gameplayError, \"piece.field\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module3 = __gameplayInvalid; } else { var _module3 = ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-living\", __gameplayError, \"compare.greater-than\"); _module3 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3) === null)) { _module4 = __gameplayInvalid; } else { var _module4 = (!(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-alive-not\", __gameplayError, \"logic.not\"); _module4 = __gameplayInvalid; } try { var _condition5 = ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"value\")) ? _module4[\"value\"] : _module4); if (_condition5 !== __gameplayInvalid && _condition5) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-alive-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-alive\", __gameplayError); _condition5 = __gameplayInvalid; } try { var _module6 = ((context.piece ? context.piece.instanceId : null)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target\", __gameplayError, \"ref.event-piece\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6)))) { _module7 = __gameplayInvalid; } else { var _module7 = (flow.query.hasPiece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6)) ? flow.query.piece(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"piece\")) ? _module6[\"piece\"] : _module6)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-resolved\", __gameplayError, \"query.piece\"); _module7 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module8 = __gameplayInvalid; } else { var _module8 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))[\"currentHp\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-hp\", __gameplayError, \"piece.field\"); _module8 = __gameplayInvalid; } try { if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module9 = __gameplayInvalid; } else { var _module9 = ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-living\", __gameplayError, \"compare.greater-than\"); _module9 = __gameplayInvalid; } try { if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === null)) { _module10 = __gameplayInvalid; } else { var _module10 = (!(((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive-not\", __gameplayError, \"logic.not\"); _module10 = __gameplayInvalid; } try { var _condition74 = ((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9); if (_condition74 !== __gameplayInvalid && _condition74) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) !== ((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"different\", __gameplayError, \"compare.values\"); _module11 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === null)) { _module12 = __gameplayInvalid; } else { var _module12 = (!(((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"not-self-not\", __gameplayError, \"logic.not\"); _module12 = __gameplayInvalid; } try { var _condition73 = ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11); if (_condition73 !== __gameplayInvalid && _condition73) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module13 = __gameplayInvalid; } else { var _module13 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-owner\", __gameplayError, \"piece.field\"); _module13 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module14 = __gameplayInvalid; } else { var _module14 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-owner\", __gameplayError, \"piece.field\"); _module14 = __gameplayInvalid; } try { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === null) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14)))) { _module15 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module15 = ((function(record){var result=({value:(flow.query.playerText(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14), \"faction\"))});result.exists=record[\"faction\"]!==undefined&&record[\"faction\"]!==null;return result;})(flow.query.player(((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"allied--left-faction\", __gameplayError, \"player.field\"); _module15 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13)))) { _module16 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module16 = ((function(record){var result=({value:(flow.query.playerText(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13), \"faction\"))});result.exists=record[\"faction\"]!==undefined&&record[\"faction\"]!==null;return result;})(flow.query.player(((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"allied--right-faction\", __gameplayError, \"player.field\"); _module16 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module15[\"value\"]) === __gameplayInvalid) || ((_module15[\"value\"]) === undefined) || ((_module16[\"value\"]) === __gameplayInvalid) || ((_module16[\"value\"]) === undefined)) { _module17 = __gameplayInvalid; } else { var _module17 = (((_module15[\"value\"]) === (_module16[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"allied\", __gameplayError, \"compare.values\"); _module17 = __gameplayInvalid; } try { if ((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = (!(((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"ally-not\", __gameplayError, \"logic.not\"); _module18 = __gameplayInvalid; } try { var _condition72 = ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17); if (_condition72 !== __gameplayInvalid && _condition72) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module19 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module19 = ((function(piece){if(piece===__gameplayInvalid)return __gameplayInvalid;if(piece==null)return {value:null,defined:false};if(typeof piece!==\"object\"||Array.isArray(piece))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(piece,\"x\");var value=piece[\"x\"];if(value===undefined||value===null)return {value:null,defined:defined};return {value:value,defined:defined};})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-position--x\", __gameplayError, \"piece.optional-field\"); _module19 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module19[\"value\"]) === __gameplayInvalid) || ((_module19[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module20 = __gameplayInvalid; } else { var _module20 = (((_module19[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-position--x-check\", __gameplayError, \"compare.values\"); _module20 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module21 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module21 = ((function(piece){if(piece===__gameplayInvalid)return __gameplayInvalid;if(piece==null)return {value:null,defined:false};if(typeof piece!==\"object\"||Array.isArray(piece))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(piece,\"y\");var value=piece[\"y\"];if(value===undefined||value===null)return {value:null,defined:defined};return {value:value,defined:defined};})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-position--y\", __gameplayError, \"piece.optional-field\"); _module21 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module21[\"value\"]) === __gameplayInvalid) || ((_module21[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module22 = __gameplayInvalid; } else { var _module22 = (((_module21[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-position--y-check\", __gameplayError, \"compare.values\"); _module22 = __gameplayInvalid; } try { if ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === __gameplayInvalid) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === undefined) || (((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) === null) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20) && ((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-position\", __gameplayError, \"logic.and\"); _module23 = __gameplayInvalid; } try { if ((((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === __gameplayInvalid) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === undefined) || (((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = (!(((_module23 !== null && typeof _module23 === \"object\" && Object.prototype.hasOwnProperty.call(_module23, \"value\")) ? _module23[\"value\"] : _module23))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-on-board-not\", __gameplayError, \"logic.not\"); _module24 = __gameplayInvalid; } try { var _condition25 = ((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"value\")) ? _module24[\"value\"] : _module24); if (_condition25 !== __gameplayInvalid && _condition25) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-on-board-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-on-board\", __gameplayError); _condition25 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module26 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module26 = ((function(piece){if(piece===__gameplayInvalid)return __gameplayInvalid;if(piece==null)return {value:null,defined:false};if(typeof piece!==\"object\"||Array.isArray(piece))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(piece,\"x\");var value=piece[\"x\"];if(value===undefined||value===null)return {value:null,defined:defined};return {value:value,defined:defined};})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-position--x\", __gameplayError, \"piece.optional-field\"); _module26 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module26[\"value\"]) === __gameplayInvalid) || ((_module26[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module27 = __gameplayInvalid; } else { var _module27 = (((_module26[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-position--x-check\", __gameplayError, \"compare.values\"); _module27 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module28 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } else { var _module28 = ((function(piece){if(piece===__gameplayInvalid)return __gameplayInvalid;if(piece==null)return {value:null,defined:false};if(typeof piece!==\"object\"||Array.isArray(piece))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(piece,\"y\");var value=piece[\"y\"];if(value===undefined||value===null)return {value:null,defined:defined};return {value:value,defined:defined};})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-position--y\", __gameplayError, \"piece.optional-field\"); _module28 = { \"value\": __gameplayInvalid, \"defined\": __gameplayInvalid }; } try { if (((_module28[\"value\"]) === __gameplayInvalid) || ((_module28[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module29 = __gameplayInvalid; } else { var _module29 = (((_module28[\"value\"]) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-position--y-check\", __gameplayError, \"compare.values\"); _module29 = __gameplayInvalid; } try { if ((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === __gameplayInvalid) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === undefined) || (((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) === null) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === null)) { _module30 = __gameplayInvalid; } else { var _module30 = ((((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27) && ((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-position\", __gameplayError, \"logic.and\"); _module30 = __gameplayInvalid; } try { if ((((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === __gameplayInvalid) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === undefined) || (((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30) === null)) { _module31 = __gameplayInvalid; } else { var _module31 = (!(((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-on-board-not\", __gameplayError, \"logic.not\"); _module31 = __gameplayInvalid; } try { var _condition71 = ((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30); if (_condition71 !== __gameplayInvalid && _condition71) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module32 = __gameplayInvalid; } else { var _module32 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"x\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-x\", __gameplayError, \"piece.field\"); _module32 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module33 = __gameplayInvalid; } else { var _module33 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))[\"x\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-x\", __gameplayError, \"piece.field\"); _module33 = __gameplayInvalid; } try { if ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"value\")) ? _module32[\"value\"] : _module32) === __gameplayInvalid) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"value\")) ? _module32[\"value\"] : _module32) === undefined) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"value\")) ? _module32[\"value\"] : _module32) === null) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33) === __gameplayInvalid) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33) === undefined) || (((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33) === null)) { _module34 = __gameplayInvalid; } else { var _module34 = ((((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"value\")) ? _module32[\"value\"] : _module32) - ((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"value\")) ? _module33[\"value\"] : _module33))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-difference\", __gameplayError, \"math.subtract\"); _module34 = __gameplayInvalid; } try { if ((((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === __gameplayInvalid) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === undefined) || (((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = (Math.abs(((_module34 !== null && typeof _module34 === \"object\" && Object.prototype.hasOwnProperty.call(_module34, \"value\")) ? _module34[\"value\"] : _module34))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-distance\", __gameplayError, \"math.abs\"); _module35 = __gameplayInvalid; } try { if ((((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"value\")) ? _module35[\"value\"] : _module35) === __gameplayInvalid) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"value\")) ? _module35[\"value\"] : _module35) === undefined) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"value\")) ? _module35[\"value\"] : _module35) === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module36 = __gameplayInvalid; } else { var _module36 = ((((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"value\")) ? _module35[\"value\"] : _module35) <= 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-near\", __gameplayError, \"compare.less-or-equal\"); _module36 = __gameplayInvalid; } try { if ((((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === undefined) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36) === null)) { _module37 = __gameplayInvalid; } else { var _module37 = (!(((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-range-not\", __gameplayError, \"logic.not\"); _module37 = __gameplayInvalid; } try { var _condition70 = ((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"value\")) ? _module36[\"value\"] : _module36); if (_condition70 !== __gameplayInvalid && _condition70) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module38 = __gameplayInvalid; } else { var _module38 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"y\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-y\", __gameplayError, \"piece.field\"); _module38 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module39 = __gameplayInvalid; } else { var _module39 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7))[\"y\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-y\", __gameplayError, \"piece.field\"); _module39 = __gameplayInvalid; } try { if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === undefined) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) === null) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39) === null)) { _module40 = __gameplayInvalid; } else { var _module40 = ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"value\")) ? _module38[\"value\"] : _module38) - ((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"value\")) ? _module39[\"value\"] : _module39))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-difference\", __gameplayError, \"math.subtract\"); _module40 = __gameplayInvalid; } try { if ((((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40) === __gameplayInvalid) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40) === undefined) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40) === null)) { _module41 = __gameplayInvalid; } else { var _module41 = (Math.abs(((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"value\")) ? _module40[\"value\"] : _module40))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-distance\", __gameplayError, \"math.abs\"); _module41 = __gameplayInvalid; } try { if ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === __gameplayInvalid) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === undefined) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module42 = __gameplayInvalid; } else { var _module42 = ((((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"value\")) ? _module41[\"value\"] : _module41) <= 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-near\", __gameplayError, \"compare.less-or-equal\"); _module42 = __gameplayInvalid; } try { if ((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"value\")) ? _module42[\"value\"] : _module42) === __gameplayInvalid) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"value\")) ? _module42[\"value\"] : _module42) === undefined) || (((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"value\")) ? _module42[\"value\"] : _module42) === null)) { _module43 = __gameplayInvalid; } else { var _module43 = (!(((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"value\")) ? _module42[\"value\"] : _module42))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-range-not\", __gameplayError, \"logic.not\"); _module43 = __gameplayInvalid; } try { var _condition69 = ((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"value\")) ? _module42[\"value\"] : _module42); if (_condition69 !== __gameplayInvalid && _condition69) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module44 = __gameplayInvalid; } else { var _module44 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status--statusTags\", __gameplayError, \"piece.field\"); _module44 = __gameplayInvalid; } var _loopRoot55 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection45 = __gameplayInvalid; var _items46 = ((_module44 !== null && typeof _module44 === \"object\" && Object.prototype.hasOwnProperty.call(_module44, \"value\")) ? _module44[\"value\"] : _module44); var _capture51 = \"el-primo-meteor-belt\"; if (Array.isArray(_items46) && _capture51 !== __gameplayInvalid && _capture51 !== undefined) { if (_items46.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues54 = [];  for (var _index47 = 0; _index47 < _items46.length; _index47 += 1) { __gameplayConsumeIteration(); var _item48 = _items46[_index47]; var _collectionResult49 = __gameplayInvalid; _collectionDone50: { try { if ((_item48 === __gameplayInvalid) || (_item48 === undefined) || (_item48 === null)) { _module52 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module52 = ((function(record){var result=({value:((function(record){if(record===__gameplayInvalid||record===null||typeof record!==\"object\")return __gameplayInvalid;var value=record[\"type\"];return value===undefined||value===null?null:(typeof value===\"string\"?value:__gameplayInvalid);})(record))});result.exists=record[\"type\"]!==undefined&&record[\"type\"]!==null;return result;})(_item48)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status--field\", __gameplayError, \"data.field\"); _module52 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module52[\"value\"]) === __gameplayInvalid) || ((_module52[\"value\"]) === undefined) || (_capture51 === __gameplayInvalid) || (_capture51 === undefined)) { _module53 = __gameplayInvalid; } else { var _module53 = (((_module52[\"value\"]) === _capture51)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status--matches\", __gameplayError, \"compare.values\"); _module53 = __gameplayInvalid; } try { if (!((((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"value\")) ? _module53[\"value\"] : _module53) === __gameplayInvalid))) { _collectionResult49 = { \"value\": ((_module53 !== null && typeof _module53 === \"object\" && Object.prototype.hasOwnProperty.call(_module53, \"value\")) ? _module53[\"value\"] : _module53) }; break _collectionDone50; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status--filter-return\", __gameplayError); } } if (_collectionResult49 !== __gameplayInvalid && _collectionResult49 != null && _collectionResult49[\"value\"]) { _collectionValues54.push(_item48); } } var _collection45 = _collectionValues54; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot55) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"status--filtered\", new Error(\"gameplay shared iteration budget exceeded\")); _collection45 = __gameplayInvalid; } else { __gameplayRecordFault(\"status--filtered\", __gameplayError); _collection45 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection45 === __gameplayInvalid) || (_collection45 === undefined) || (_collection45 === null)) { _module56 = __gameplayInvalid; } else { var _module56 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection45)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status--count\", __gameplayError, \"collection.length\"); _module56 = __gameplayInvalid; } try { if ((((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"value\")) ? _module56[\"value\"] : _module56) === __gameplayInvalid) || (((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"value\")) ? _module56[\"value\"] : _module56) === undefined) || (((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"value\")) ? _module56[\"value\"] : _module56) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module57 = __gameplayInvalid; } else { var _module57 = ((((_module56 !== null && typeof _module56 === \"object\" && Object.prototype.hasOwnProperty.call(_module56, \"value\")) ? _module56[\"value\"] : _module56) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"status\", __gameplayError, \"compare.greater-than\"); _module57 = __gameplayInvalid; } try { if ((((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"value\")) ? _module57[\"value\"] : _module57) === __gameplayInvalid) || (((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"value\")) ? _module57[\"value\"] : _module57) === undefined) || (((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"value\")) ? _module57[\"value\"] : _module57) === null)) { _module58 = __gameplayInvalid; } else { var _module58 = (!(((_module57 !== null && typeof _module57 === \"object\" && Object.prototype.hasOwnProperty.call(_module57, \"value\")) ? _module57[\"value\"] : _module57))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-status-not\", __gameplayError, \"logic.not\"); _module58 = __gameplayInvalid; } try { var _condition59 = ((_module58 !== null && typeof _module58 === \"object\" && Object.prototype.hasOwnProperty.call(_module58, \"value\")) ? _module58[\"value\"] : _module58); if (_condition59 !== __gameplayInvalid && _condition59) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-status-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-status\", __gameplayError); _condition59 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module60 = __gameplayInvalid; } else { var _module60 = (Boolean(context.damageRedirectQueue && context.damageRedirectQueue.push({target: flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))}))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"redirect\", __gameplayError, \"event.enqueue-damage-redirect\"); _module60 = __gameplayInvalid; } try { if ((((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"accepted\")) ? _module60[\"accepted\"] : _module60) === __gameplayInvalid) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"accepted\")) ? _module60[\"accepted\"] : _module60) === undefined) || (((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"accepted\")) ? _module60[\"accepted\"] : _module60) === null)) { _module61 = __gameplayInvalid; } else { var _module61 = (!(((_module60 !== null && typeof _module60 === \"object\" && Object.prototype.hasOwnProperty.call(_module60, \"accepted\")) ? _module60[\"accepted\"] : _module60))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"accepted-not\", __gameplayError, \"logic.not\"); _module61 = __gameplayInvalid; } try { var _condition62 = ((_module61 !== null && typeof _module61 === \"object\" && Object.prototype.hasOwnProperty.call(_module61, \"value\")) ? _module61[\"value\"] : _module61); if (_condition62 !== __gameplayInvalid && _condition62) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"accepted-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"accepted\", __gameplayError); _condition62 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module63 = __gameplayInvalid; } else { var _module63 = ({value:(flow.query.pieceText(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"guard-name\", __gameplayError, \"piece.field\"); _module63 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) === null) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7)))) { _module64 = __gameplayInvalid; } else { var _module64 = ({value:(flow.query.pieceText(((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"piece\")) ? _module7[\"piece\"] : _module7), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-name\", __gameplayError, \"piece.field\"); _module64 = __gameplayInvalid; } try { if ((((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === __gameplayInvalid) || (((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === undefined) || (((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) === null) || (\"代替\" === __gameplayInvalid) || (\"代替\" === undefined) || (\"代替\" === null)) { _module65 = __gameplayInvalid; } else { var _module65 = ((((_module63 !== null && typeof _module63 === \"object\" && Object.prototype.hasOwnProperty.call(_module63, \"value\")) ? _module63[\"value\"] : _module63) + \"代替\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-prefix\", __gameplayError, \"text.concat\"); _module65 = __gameplayInvalid; } try { if ((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"text\")) ? _module65[\"text\"] : _module65) === __gameplayInvalid) || (((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"text\")) ? _module65[\"text\"] : _module65) === undefined) || (((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"text\")) ? _module65[\"text\"] : _module65) === null) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === __gameplayInvalid) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === undefined) || (((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64) === null)) { _module66 = __gameplayInvalid; } else { var _module66 = ((((_module65 !== null && typeof _module65 === \"object\" && Object.prototype.hasOwnProperty.call(_module65, \"text\")) ? _module65[\"text\"] : _module65) + ((_module64 !== null && typeof _module64 === \"object\" && Object.prototype.hasOwnProperty.call(_module64, \"value\")) ? _module64[\"value\"] : _module64))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-target\", __gameplayError, \"text.concat\"); _module66 = __gameplayInvalid; } try { if ((((_module66 !== null && typeof _module66 === \"object\" && Object.prototype.hasOwnProperty.call(_module66, \"text\")) ? _module66[\"text\"] : _module66) === __gameplayInvalid) || (((_module66 !== null && typeof _module66 === \"object\" && Object.prototype.hasOwnProperty.call(_module66, \"text\")) ? _module66[\"text\"] : _module66) === undefined) || (((_module66 !== null && typeof _module66 === \"object\" && Object.prototype.hasOwnProperty.call(_module66, \"text\")) ? _module66[\"text\"] : _module66) === null) || (\"承受伤害\" === __gameplayInvalid) || (\"承受伤害\" === undefined) || (\"承受伤害\" === null)) { _module67 = __gameplayInvalid; } else { var _module67 = ((((_module66 !== null && typeof _module66 === \"object\" && Object.prototype.hasOwnProperty.call(_module66, \"text\")) ? _module66[\"text\"] : _module66) + \"承受伤害\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message\", __gameplayError, \"text.concat\"); _module67 = __gameplayInvalid; } try { if ((((_module67 !== null && typeof _module67 === \"object\" && Object.prototype.hasOwnProperty.call(_module67, \"text\")) ? _module67[\"text\"] : _module67) === __gameplayInvalid) || (((_module67 !== null && typeof _module67 === \"object\" && Object.prototype.hasOwnProperty.call(_module67, \"text\")) ? _module67[\"text\"] : _module67) === undefined) || (((_module67 !== null && typeof _module67 === \"object\" && Object.prototype.hasOwnProperty.call(_module67, \"text\")) ? _module67[\"text\"] : _module67) === null)) { _module68 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module68 = (({success: true, blocked: true, message: ((_module67 !== null && typeof _module67 === \"object\" && Object.prototype.hasOwnProperty.call(_module67, \"text\")) ? _module67[\"text\"] : _module67)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"blocked\", __gameplayError, \"event.block\"); _module68 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module68[\"success\"]) === __gameplayInvalid) || ((_module68[\"blocked\"]) === __gameplayInvalid) || ((_module68[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module68[\"success\"]), \"blocked\": (_module68[\"blocked\"]), \"message\": (_module68[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"done\", __gameplayError); } } else if (_condition69 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-range-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"y-range\", __gameplayError); _condition69 = __gameplayInvalid; } } else if (_condition70 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-range-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"x-range\", __gameplayError); _condition70 = __gameplayInvalid; } } else if (_condition71 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-on-board-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-on-board\", __gameplayError); _condition71 = __gameplayInvalid; } } else if (_condition72 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"ally-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"ally\", __gameplayError); _condition72 = __gameplayInvalid; } } else if (_condition73 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"not-self-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"not-self\", __gameplayError); _condition73 = __gameplayInvalid; } } else if (_condition74 !== __gameplayInvalid) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive-failure\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"target-alive\", __gameplayError); _condition74 = __gameplayInvalid; }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "blocked",
+              "type": "boolean",
+              "optional": true
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "guard",
+              "module": "ref.rule-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "guard-resolved",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "guard",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "guard-hp",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "guard-resolved",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "currentHp"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "guard-living",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "guard-hp",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "guard-alive-not",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "guard-living",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "guard-alive",
+              "condition": {
+                "kind": "output",
+                "node": "guard-alive-not",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "guard-alive-failure",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "target",
+              "module": "ref.event-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "target-resolved",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "target",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "target-hp",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "target-resolved",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "currentHp"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "target-living",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "target-hp",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "target-alive-not",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "target-living",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "target-alive",
+              "condition": {
+                "kind": "output",
+                "node": "target-living",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "different",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "guard-resolved",
+                      "port": "piece"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "target-resolved",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "piece",
+                    "operator": "!="
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "not-self-not",
+                  "module": "logic.not",
+                  "version": "1",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "different",
+                      "port": "value"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "if",
+                  "id": "not-self",
+                  "condition": {
+                    "kind": "output",
+                    "node": "different",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "guard-owner",
+                      "module": "piece.field",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "guard-resolved",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "field": "ownerPlayerId"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "target-owner",
+                      "module": "piece.field",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "target-resolved",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "field": "ownerPlayerId"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "allied--left-faction",
+                      "module": "player.field",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "target-owner",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "field": "faction"
+                      },
+                      "layout": {
+                        "sentenceExpression": {
+                          "owner": "allied",
+                          "input": "left"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "allied--right-faction",
+                      "module": "player.field",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "guard-owner",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "field": "faction"
+                      },
+                      "layout": {
+                        "sentenceExpression": {
+                          "owner": "allied",
+                          "input": "right"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "allied",
+                      "module": "compare.values",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "allied--left-faction",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "output",
+                          "node": "allied--right-faction",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                        "operator": "=="
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "ally-not",
+                      "module": "logic.not",
+                      "version": "1",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "allied",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "ally",
+                      "condition": {
+                        "kind": "output",
+                        "node": "allied",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "guard-position--x",
+                          "module": "piece.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "guard-resolved",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "x",
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard-position--x-check",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "guard-position--x",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": null
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}",
+                            "operator": "!="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard-position--y",
+                          "module": "piece.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "guard-resolved",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "y",
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard-position--y-check",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "guard-position--y",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": null
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}",
+                            "operator": "!="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard-position",
+                          "module": "logic.and",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "guard-position--x-check",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "guard-position--y-check",
+                              "port": "value"
+                            }
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "guard-on-board-not",
+                          "module": "logic.not",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "guard-position",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "if",
+                          "id": "guard-on-board",
+                          "condition": {
+                            "kind": "output",
+                            "node": "guard-on-board-not",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "return",
+                              "id": "guard-on-board-failure",
+                              "values": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": false
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": ""
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-position--x",
+                          "module": "piece.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "target-resolved",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "x",
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-position--x-check",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "target-position--x",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": null
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}",
+                            "operator": "!="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-position--y",
+                          "module": "piece.optional-field",
+                          "version": "1",
+                          "inputs": {
+                            "piece": {
+                              "kind": "output",
+                              "node": "target-resolved",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "field": "y",
+                            "valueType": "number"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-position--y-check",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "target-position--y",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "literal",
+                              "value": null
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"number\"}",
+                            "operator": "!="
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-position",
+                          "module": "logic.and",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "target-position--x-check",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "output",
+                              "node": "target-position--y-check",
+                              "port": "value"
+                            }
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "target-on-board-not",
+                          "module": "logic.not",
+                          "version": "1",
+                          "inputs": {
+                            "value": {
+                              "kind": "output",
+                              "node": "target-position",
+                              "port": "value"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "if",
+                          "id": "target-on-board",
+                          "condition": {
+                            "kind": "output",
+                            "node": "target-position",
+                            "port": "value"
+                          },
+                          "then": [
+                            {
+                              "kind": "call",
+                              "id": "guard-x",
+                              "module": "piece.field",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "guard-resolved",
+                                  "port": "piece"
+                                }
+                              },
+                              "parameters": {
+                                "field": "x"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "target-x",
+                              "module": "piece.field",
+                              "version": "1",
+                              "inputs": {
+                                "piece": {
+                                  "kind": "output",
+                                  "node": "target-resolved",
+                                  "port": "piece"
+                                }
+                              },
+                              "parameters": {
+                                "field": "x"
+                              }
+                            },
+                            {
+                              "kind": "call",
+                              "id": "x-difference",
+                              "module": "math.subtract",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "guard-x",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "output",
+                                  "node": "target-x",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "x-distance",
+                              "module": "math.abs",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "x-difference",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "x-near",
+                              "module": "compare.less-or-equal",
+                              "version": "1",
+                              "inputs": {
+                                "left": {
+                                  "kind": "output",
+                                  "node": "x-distance",
+                                  "port": "value"
+                                },
+                                "right": {
+                                  "kind": "literal",
+                                  "value": 1
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "call",
+                              "id": "x-range-not",
+                              "module": "logic.not",
+                              "version": "1",
+                              "inputs": {
+                                "value": {
+                                  "kind": "output",
+                                  "node": "x-near",
+                                  "port": "value"
+                                }
+                              },
+                              "parameters": {}
+                            },
+                            {
+                              "kind": "if",
+                              "id": "x-range",
+                              "condition": {
+                                "kind": "output",
+                                "node": "x-near",
+                                "port": "value"
+                              },
+                              "then": [
+                                {
+                                  "kind": "call",
+                                  "id": "guard-y",
+                                  "module": "piece.field",
+                                  "version": "1",
+                                  "inputs": {
+                                    "piece": {
+                                      "kind": "output",
+                                      "node": "guard-resolved",
+                                      "port": "piece"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "field": "y"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "target-y",
+                                  "module": "piece.field",
+                                  "version": "1",
+                                  "inputs": {
+                                    "piece": {
+                                      "kind": "output",
+                                      "node": "target-resolved",
+                                      "port": "piece"
+                                    }
+                                  },
+                                  "parameters": {
+                                    "field": "y"
+                                  }
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "y-difference",
+                                  "module": "math.subtract",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "guard-y",
+                                      "port": "value"
+                                    },
+                                    "right": {
+                                      "kind": "output",
+                                      "node": "target-y",
+                                      "port": "value"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "y-distance",
+                                  "module": "math.abs",
+                                  "version": "1",
+                                  "inputs": {
+                                    "value": {
+                                      "kind": "output",
+                                      "node": "y-difference",
+                                      "port": "value"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "y-near",
+                                  "module": "compare.less-or-equal",
+                                  "version": "1",
+                                  "inputs": {
+                                    "left": {
+                                      "kind": "output",
+                                      "node": "y-distance",
+                                      "port": "value"
+                                    },
+                                    "right": {
+                                      "kind": "literal",
+                                      "value": 1
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "call",
+                                  "id": "y-range-not",
+                                  "module": "logic.not",
+                                  "version": "1",
+                                  "inputs": {
+                                    "value": {
+                                      "kind": "output",
+                                      "node": "y-near",
+                                      "port": "value"
+                                    }
+                                  },
+                                  "parameters": {}
+                                },
+                                {
+                                  "kind": "if",
+                                  "id": "y-range",
+                                  "condition": {
+                                    "kind": "output",
+                                    "node": "y-near",
+                                    "port": "value"
+                                  },
+                                  "then": [
+                                    {
+                                      "kind": "call",
+                                      "id": "status--statusTags",
+                                      "module": "piece.field",
+                                      "version": "1",
+                                      "inputs": {
+                                        "piece": {
+                                          "kind": "output",
+                                          "node": "guard-resolved",
+                                          "port": "piece"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "field": "statusTags"
+                                      }
+                                    },
+                                    {
+                                      "kind": "collection",
+                                      "id": "status--filtered",
+                                      "method": "filter",
+                                      "items": {
+                                        "kind": "output",
+                                        "node": "status--statusTags",
+                                        "port": "value"
+                                      },
+                                      "inputs": {
+                                        "expected": {
+                                          "kind": "literal",
+                                          "value": "el-primo-meteor-belt"
+                                        }
+                                      },
+                                      "body": [
+                                        {
+                                          "kind": "call",
+                                          "id": "status--field",
+                                          "module": "data.field",
+                                          "version": "1",
+                                          "inputs": {
+                                            "record": {
+                                              "kind": "input",
+                                              "name": "item"
+                                            }
+                                          },
+                                          "parameters": {
+                                            "field": "type"
+                                          }
+                                        },
+                                        {
+                                          "kind": "call",
+                                          "id": "status--matches",
+                                          "module": "compare.values",
+                                          "version": "1",
+                                          "inputs": {
+                                            "left": {
+                                              "kind": "output",
+                                              "node": "status--field",
+                                              "port": "value"
+                                            },
+                                            "right": {
+                                              "kind": "input",
+                                              "name": "expected"
+                                            }
+                                          },
+                                          "parameters": {
+                                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                                            "operator": "=="
+                                          }
+                                        },
+                                        {
+                                          "kind": "return",
+                                          "id": "status--filter-return",
+                                          "value": {
+                                            "kind": "output",
+                                            "node": "status--matches",
+                                            "port": "value"
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "status--count",
+                                      "module": "collection.length",
+                                      "version": "1",
+                                      "inputs": {
+                                        "items": {
+                                          "kind": "output",
+                                          "node": "status--filtered",
+                                          "port": "value"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "status",
+                                      "module": "compare.greater-than",
+                                      "version": "1",
+                                      "inputs": {
+                                        "left": {
+                                          "kind": "output",
+                                          "node": "status--count",
+                                          "port": "value"
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": 0
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "has-status-not",
+                                      "module": "logic.not",
+                                      "version": "1",
+                                      "inputs": {
+                                        "value": {
+                                          "kind": "output",
+                                          "node": "status",
+                                          "port": "value"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "if",
+                                      "id": "has-status",
+                                      "condition": {
+                                        "kind": "output",
+                                        "node": "has-status-not",
+                                        "port": "value"
+                                      },
+                                      "then": [
+                                        {
+                                          "kind": "return",
+                                          "id": "has-status-failure",
+                                          "values": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": false
+                                            },
+                                            "message": {
+                                              "kind": "literal",
+                                              "value": ""
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "redirect",
+                                      "module": "event.enqueue-damage-redirect",
+                                      "version": "1",
+                                      "inputs": {
+                                        "target": {
+                                          "kind": "output",
+                                          "node": "guard-resolved",
+                                          "port": "piece"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "accepted-not",
+                                      "module": "logic.not",
+                                      "version": "1",
+                                      "inputs": {
+                                        "value": {
+                                          "kind": "output",
+                                          "node": "redirect",
+                                          "port": "accepted"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "if",
+                                      "id": "accepted",
+                                      "condition": {
+                                        "kind": "output",
+                                        "node": "accepted-not",
+                                        "port": "value"
+                                      },
+                                      "then": [
+                                        {
+                                          "kind": "return",
+                                          "id": "accepted-failure",
+                                          "values": {
+                                            "success": {
+                                              "kind": "literal",
+                                              "value": false
+                                            },
+                                            "message": {
+                                              "kind": "literal",
+                                              "value": ""
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "guard-name",
+                                      "module": "piece.field",
+                                      "version": "1",
+                                      "inputs": {
+                                        "piece": {
+                                          "kind": "output",
+                                          "node": "guard-resolved",
+                                          "port": "piece"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "field": "name"
+                                      }
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "target-name",
+                                      "module": "piece.field",
+                                      "version": "1",
+                                      "inputs": {
+                                        "piece": {
+                                          "kind": "output",
+                                          "node": "target-resolved",
+                                          "port": "piece"
+                                        }
+                                      },
+                                      "parameters": {
+                                        "field": "name"
+                                      }
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "message-prefix",
+                                      "module": "text.concat",
+                                      "version": "1",
+                                      "inputs": {
+                                        "left": {
+                                          "kind": "output",
+                                          "node": "guard-name",
+                                          "port": "value"
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": "代替"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "message-target",
+                                      "module": "text.concat",
+                                      "version": "1",
+                                      "inputs": {
+                                        "left": {
+                                          "kind": "output",
+                                          "node": "message-prefix",
+                                          "port": "text"
+                                        },
+                                        "right": {
+                                          "kind": "output",
+                                          "node": "target-name",
+                                          "port": "value"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "message",
+                                      "module": "text.concat",
+                                      "version": "1",
+                                      "inputs": {
+                                        "left": {
+                                          "kind": "output",
+                                          "node": "message-target",
+                                          "port": "text"
+                                        },
+                                        "right": {
+                                          "kind": "literal",
+                                          "value": "承受伤害"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "call",
+                                      "id": "blocked",
+                                      "module": "event.block",
+                                      "version": "1",
+                                      "inputs": {
+                                        "message": {
+                                          "kind": "output",
+                                          "node": "message",
+                                          "port": "text"
+                                        }
+                                      },
+                                      "parameters": {}
+                                    },
+                                    {
+                                      "kind": "return",
+                                      "id": "done",
+                                      "values": {
+                                        "success": {
+                                          "kind": "output",
+                                          "node": "blocked",
+                                          "port": "success"
+                                        },
+                                        "blocked": {
+                                          "kind": "output",
+                                          "node": "blocked",
+                                          "port": "blocked"
+                                        },
+                                        "message": {
+                                          "kind": "output",
+                                          "node": "blocked",
+                                          "port": "message"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "kind": "return",
+                                      "id": "y-range-failure",
+                                      "values": {
+                                        "success": {
+                                          "kind": "literal",
+                                          "value": false
+                                        },
+                                        "message": {
+                                          "kind": "literal",
+                                          "value": ""
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "kind": "return",
+                                  "id": "x-range-failure",
+                                  "values": {
+                                    "success": {
+                                      "kind": "literal",
+                                      "value": false
+                                    },
+                                    "message": {
+                                      "kind": "literal",
+                                      "value": ""
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ],
+                          "else": [
+                            {
+                              "kind": "return",
+                              "id": "target-on-board-failure",
+                              "values": {
+                                "success": {
+                                  "kind": "literal",
+                                  "value": false
+                                },
+                                "message": {
+                                  "kind": "literal",
+                                  "value": ""
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "return",
+                          "id": "ally-failure",
+                          "values": {
+                            "success": {
+                              "kind": "literal",
+                              "value": false
+                            },
+                            "message": {
+                              "kind": "literal",
+                              "value": ""
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "return",
+                      "id": "not-self-failure",
+                      "values": {
+                        "success": {
+                          "kind": "literal",
+                          "value": false
+                        },
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "return",
+                  "id": "target-alive-failure",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

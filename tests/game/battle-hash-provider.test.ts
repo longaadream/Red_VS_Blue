@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { describe, expect, it, vi } from 'vitest'
@@ -27,6 +27,12 @@ const EQUIVALENCE_INPUTS = [
   `prefix-${'0123456789abcdef'.repeat(1024)}-suffix`,
 ]
 
+const ACTUAL_SKILL_DEFINITION_PAYLOAD = readdirSync(resolve(process.cwd(), 'data/skills'))
+  .filter(fileName => fileName.endsWith('.json'))
+  .sort()
+  .map(fileName => readFileSync(resolve(process.cwd(), 'data/skills', fileName), 'utf8'))
+  .join('\n')
+
 describe('battle SHA-256 provider', () => {
   it('keeps the browser-safe and Node UTF-8 digests byte-for-byte equivalent', () => {
     const browserDigests = EQUIVALENCE_INPUTS.map(value => sha256Hex(value))
@@ -36,6 +42,19 @@ describe('battle SHA-256 provider', () => {
 
     expect(nodeDigests).toEqual(browserDigests)
     expect(EQUIVALENCE_INPUTS.map(nodeSha256Hex)).toEqual(browserDigests)
+  })
+
+  it('matches native SHA-256 at UTF-8 block boundaries and for the actual multi-megabyte skill payload', () => {
+    const boundaryInputs = [0, 1, 2, 3, 54, 55, 56, 57, 63, 64, 65, 127, 128, 129]
+      .map(length => `${'a'.repeat(length)}红🗡️`)
+      .concat(['\ud800', '\udc00', '😀'.repeat(1024)])
+
+    for (const input of boundaryInputs) {
+      expect(sha256Hex(input)).toBe(nodeSha256Hex(input))
+    }
+
+    expect(Buffer.byteLength(ACTUAL_SKILL_DEFINITION_PAYLOAD, 'utf8')).toBeGreaterThan(1_000_000)
+    expect(sha256Hex(ACTUAL_SKILL_DEFINITION_PAYLOAD)).toBe(nodeSha256Hex(ACTUAL_SKILL_DEFINITION_PAYLOAD))
   })
 
   it('self-checks every required UTF-8 edge class before installation', () => {

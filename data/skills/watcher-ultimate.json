@@ -17,6 +17,732 @@
   "actionPointCost": 0,
   "range": "self",
   "requiresTarget": false,
-  "code": "function executeSkill(context) { var sourcePiece = context.piece; var player = battle.players.find(function(p) { return p.playerId === sourcePiece.ownerPlayerId; }); if (!player) return { message: '找不到玩家', success: false }; if (!player.hand) player.hand = []; var maxHand = 10; var added = 0; var calm = 0; var rage = 0; var cards = ['watcher-calm', 'watcher-rage']; var i = 0; while (player.hand.length < maxHand) { addCardToHand(cards[i % 2], sourcePiece.ownerPlayerId); added++; if (i % 2 === 0) calm++; else rage++; i++; } if (added === 0) return { message: sourcePiece.name + '手牌已满，无法使用潦草急救', success: false }; return { message: sourcePiece.name + '释放潦草急救，手牌被平静(' + calm + ')和暴怒(' + rage + ')填满', success: true }; }",
-  "previewCode": "function calculatePreview(piece, skillDef) { return { description: \"用【平静】与【暴怒】填满手牌。\", expectedValues: {} }; }"
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"source\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner\", __gameplayError, \"piece.field\"); _module2 = __gameplayInvalid; } try { if ((0 === __gameplayInvalid) || (0 === null)) { _module3 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module3 = ((flow.execution.declare(\"number\",[],0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"calm\", __gameplayError, \"local.declare\"); _module3 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((0 === __gameplayInvalid) || (0 === null)) { _module4 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module4 = ((flow.execution.declare(\"number\",[],0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"rage\", __gameplayError, \"local.declare\"); _module4 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } var _loopRoot26 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _whileIterations5 = 0; while (true) { var _whileCondition7 = __gameplayInvalid; var _whileCapture9 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2); if (_whileCapture9 !== __gameplayInvalid && _whileCapture9 !== undefined) { _whileConditionDone8: { try { if ((_whileCapture9 === __gameplayInvalid) || (_whileCapture9 === undefined) || (_whileCapture9 === null) || (_whileCapture9 != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(_whileCapture9))) { _module10 = __gameplayInvalid; } else { var _module10 = ((function(playerId,cardId){var hand=flow.cards.hand(playerId);return(Array.isArray(hand)?hand:[]).filter(function(card){return card&&(cardId===null||card.cardId===cardId);}).map(function(card){return card.instanceId;});})(_whileCapture9,null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"while-size--hand\", __gameplayError, \"card.hand-instances\"); _module10 = __gameplayInvalid; } try { if ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"cards\")) ? _module10[\"cards\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"cards\")) ? _module10[\"cards\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"cards\")) ? _module10[\"cards\"] : _module10) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"cards\")) ? _module10[\"cards\"] : _module10))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"while-size\", __gameplayError, \"collection.length\"); _module11 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === null) || (10 === __gameplayInvalid) || (10 === undefined) || (10 === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) < 10)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"while-room\", __gameplayError, \"compare.less-than\"); _module12 = __gameplayInvalid; } try { if (!((((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) === __gameplayInvalid))) { _whileCondition7 = { \"value\": ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) }; break _whileConditionDone8; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"while-result\", __gameplayError); } } } if (!(_whileCondition7 !== __gameplayInvalid && _whileCondition7 != null && _whileCondition7[\"value\"] === true)) break; if (_whileIterations5 >= 256) { throw new Error(\"gameplay while iteration budget exceeded: fill-hand\"); } __gameplayConsumeIteration(); var _whileIndex6 = _whileIterations5; try { if ((_whileIndex6 === __gameplayInvalid) || (_whileIndex6 === undefined) || (_whileIndex6 === null) || (2 === __gameplayInvalid) || (2 === undefined) || (2 === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((_whileIndex6 % 2)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"iteration-parity\", __gameplayError, \"math.modulo\"); _module13 = __gameplayInvalid; } try { if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"iteration-calm\", __gameplayError, \"compare.values\"); _module14 = __gameplayInvalid; } try { var _condition25 = ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14); if (_condition25 !== __gameplayInvalid && _condition25) { try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2)))) { _module15 = __gameplayInvalid; } else { var _module15 = (flow.cards.add(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2), \"watcher-calm\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"add-calm\", __gameplayError, \"card.hand-add\"); _module15 = __gameplayInvalid; } try { if (((_module3[\"handle\"]) === __gameplayInvalid) || ((_module3[\"handle\"]) === undefined) || ((_module3[\"handle\"]) === null)) { _module16 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module16 = ((flow.execution.read((_module3[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-calm--counter-read\", __gameplayError, \"local.read\"); _module16 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module16[\"value\"]) === __gameplayInvalid) || ((_module16[\"value\"]) === undefined) || ((_module16[\"value\"]) === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module17 = __gameplayInvalid; } else { var _module17 = (((_module16[\"value\"]) + 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-calm--counter-add\", __gameplayError, \"math.add\"); _module17 = __gameplayInvalid; } try { if (((_module3[\"handle\"]) === __gameplayInvalid) || ((_module3[\"handle\"]) === undefined) || ((_module3[\"handle\"]) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((flow.execution.write((_module3[\"handle\"]),\"number\",[],((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-calm--counter-write\", __gameplayError, \"local.write\"); _module18 = __gameplayInvalid; } try { if (((_module3[\"handle\"]) === __gameplayInvalid) || ((_module3[\"handle\"]) === undefined) || ((_module3[\"handle\"]) === null)) { _module19 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module19 = ((flow.execution.read((_module3[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-calm\", __gameplayError, \"local.read\"); _module19 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } } else if (_condition25 !== __gameplayInvalid) { try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2)))) { _module20 = __gameplayInvalid; } else { var _module20 = (flow.cards.add(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2), \"watcher-rage\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"add-rage\", __gameplayError, \"card.hand-add\"); _module20 = __gameplayInvalid; } try { if (((_module4[\"handle\"]) === __gameplayInvalid) || ((_module4[\"handle\"]) === undefined) || ((_module4[\"handle\"]) === null)) { _module21 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module21 = ((flow.execution.read((_module4[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-rage--counter-read\", __gameplayError, \"local.read\"); _module21 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module21[\"value\"]) === __gameplayInvalid) || ((_module21[\"value\"]) === undefined) || ((_module21[\"value\"]) === null) || (1 === __gameplayInvalid) || (1 === undefined) || (1 === null)) { _module22 = __gameplayInvalid; } else { var _module22 = (((_module21[\"value\"]) + 1)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-rage--counter-add\", __gameplayError, \"math.add\"); _module22 = __gameplayInvalid; } try { if (((_module4[\"handle\"]) === __gameplayInvalid) || ((_module4[\"handle\"]) === undefined) || ((_module4[\"handle\"]) === null) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22) === null)) { _module23 = __gameplayInvalid; } else { var _module23 = ((flow.execution.write((_module4[\"handle\"]),\"number\",[],((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"value\")) ? _module22[\"value\"] : _module22)))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-rage--counter-write\", __gameplayError, \"local.write\"); _module23 = __gameplayInvalid; } try { if (((_module4[\"handle\"]) === __gameplayInvalid) || ((_module4[\"handle\"]) === undefined) || ((_module4[\"handle\"]) === null)) { _module24 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module24 = ((flow.execution.read((_module4[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"count-rage\", __gameplayError, \"local.read\"); _module24 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"card-kind\", __gameplayError); _condition25 = __gameplayInvalid; } _whileIterations5 += 1; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot26) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"fill-hand\", new Error(\"gameplay shared iteration budget exceeded\")); } else { __gameplayRecordFault(\"fill-hand\", __gameplayError); } } finally { __gameplayLoopDepth -= 1; } try { if (((_module3[\"handle\"]) === __gameplayInvalid) || ((_module3[\"handle\"]) === undefined) || ((_module3[\"handle\"]) === null)) { _module27 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module27 = ((flow.execution.read((_module3[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"calm-count\", __gameplayError, \"local.read\"); _module27 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module4[\"handle\"]) === __gameplayInvalid) || ((_module4[\"handle\"]) === undefined) || ((_module4[\"handle\"]) === null)) { _module28 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module28 = ((flow.execution.read((_module4[\"handle\"]),\"number\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"rage-count\", __gameplayError, \"local.read\"); _module28 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module27[\"value\"]) === __gameplayInvalid) || ((_module27[\"value\"]) === undefined) || ((_module27[\"value\"]) === null) || ((_module28[\"value\"]) === __gameplayInvalid) || ((_module28[\"value\"]) === undefined) || ((_module28[\"value\"]) === null)) { _module29 = __gameplayInvalid; } else { var _module29 = (((_module27[\"value\"]) + (_module28[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"total\", __gameplayError, \"math.add\"); _module29 = __gameplayInvalid; } try { if ((((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === __gameplayInvalid) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === undefined) || (((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module30 = __gameplayInvalid; } else { var _module30 = ((((_module29 !== null && typeof _module29 === \"object\" && Object.prototype.hasOwnProperty.call(_module29, \"value\")) ? _module29[\"value\"] : _module29) === 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"empty\", __gameplayError, \"compare.values\"); _module30 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module31 = __gameplayInvalid; } else { var _module31 = ({value:(flow.query.pieceText(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"name\"))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"name\", __gameplayError, \"piece.field\"); _module31 = __gameplayInvalid; } try { var _condition34 = ((_module30 !== null && typeof _module30 === \"object\" && Object.prototype.hasOwnProperty.call(_module30, \"value\")) ? _module30[\"value\"] : _module30); if (_condition34 !== __gameplayInvalid && _condition34) { try { if ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === __gameplayInvalid) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === undefined) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === null) || (\"手牌已满，无法使用潦草急救\" === __gameplayInvalid) || (\"手牌已满，无法使用潦草急救\" === undefined) || (\"手牌已满，无法使用潦草急救\" === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) + \"手牌已满，无法使用潦草急救\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"full-text\", __gameplayError, \"text.concat\"); _module32 = __gameplayInvalid; } try { if ((false === __gameplayInvalid) || (false === undefined) || (false === null) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === __gameplayInvalid) || (((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32) === null)) { _module33 = __gameplayInvalid; } else { var _module33 = (({success: false, message: ((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"text\")) ? _module32[\"text\"] : _module32)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"full-result\", __gameplayError, \"result.action\"); _module33 = __gameplayInvalid; } try { if (!((((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"result\")) ? _module33[\"result\"] : _module33) === __gameplayInvalid))) { return ((_module33 !== null && typeof _module33 === \"object\" && Object.prototype.hasOwnProperty.call(_module33, \"result\")) ? _module33[\"result\"] : _module33); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"full-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"no-additions\", __gameplayError); _condition34 = __gameplayInvalid; } try { if (((_module27[\"value\"]) === __gameplayInvalid) || ((_module27[\"value\"]) === undefined) || ((_module27[\"value\"]) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = (String((_module27[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"calm-text\", __gameplayError, \"text.from-value\"); _module35 = __gameplayInvalid; } try { if (((_module28[\"value\"]) === __gameplayInvalid) || ((_module28[\"value\"]) === undefined) || ((_module28[\"value\"]) === null)) { _module36 = __gameplayInvalid; } else { var _module36 = (String((_module28[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"rage-text\", __gameplayError, \"text.from-value\"); _module36 = __gameplayInvalid; } try { if ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === __gameplayInvalid) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === undefined) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === null) || (\"释放潦草急救，手牌被平静(\" === __gameplayInvalid) || (\"释放潦草急救，手牌被平静(\" === undefined) || (\"释放潦草急救，手牌被平静(\" === null)) { _module37 = __gameplayInvalid; } else { var _module37 = ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) + \"释放潦草急救，手牌被平静(\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"text-0\", __gameplayError, \"text.concat\"); _module37 = __gameplayInvalid; } try { if ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === __gameplayInvalid) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === undefined) || (((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) === null) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === __gameplayInvalid) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === undefined) || (((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35) === null)) { _module38 = __gameplayInvalid; } else { var _module38 = ((((_module37 !== null && typeof _module37 === \"object\" && Object.prototype.hasOwnProperty.call(_module37, \"text\")) ? _module37[\"text\"] : _module37) + ((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"text\")) ? _module35[\"text\"] : _module35))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"text-1\", __gameplayError, \"text.concat\"); _module38 = __gameplayInvalid; } try { if ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === __gameplayInvalid) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === undefined) || (((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) === null) || (\")和暴怒(\" === __gameplayInvalid) || (\")和暴怒(\" === undefined) || (\")和暴怒(\" === null)) { _module39 = __gameplayInvalid; } else { var _module39 = ((((_module38 !== null && typeof _module38 === \"object\" && Object.prototype.hasOwnProperty.call(_module38, \"text\")) ? _module38[\"text\"] : _module38) + \")和暴怒(\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"text-2\", __gameplayError, \"text.concat\"); _module39 = __gameplayInvalid; } try { if ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === __gameplayInvalid) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === undefined) || (((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) === null) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === __gameplayInvalid) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === undefined) || (((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36) === null)) { _module40 = __gameplayInvalid; } else { var _module40 = ((((_module39 !== null && typeof _module39 === \"object\" && Object.prototype.hasOwnProperty.call(_module39, \"text\")) ? _module39[\"text\"] : _module39) + ((_module36 !== null && typeof _module36 === \"object\" && Object.prototype.hasOwnProperty.call(_module36, \"text\")) ? _module36[\"text\"] : _module36))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"text-3\", __gameplayError, \"text.concat\"); _module40 = __gameplayInvalid; } try { if ((((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === __gameplayInvalid) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === undefined) || (((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) === null) || (\")填满\" === __gameplayInvalid) || (\")填满\" === undefined) || (\")填满\" === null)) { _module41 = __gameplayInvalid; } else { var _module41 = ((((_module40 !== null && typeof _module40 === \"object\" && Object.prototype.hasOwnProperty.call(_module40, \"text\")) ? _module40[\"text\"] : _module40) + \")填满\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"text-4\", __gameplayError, \"text.concat\"); _module41 = __gameplayInvalid; } try { if ((true === __gameplayInvalid) || (true === undefined) || (true === null) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === __gameplayInvalid) || (((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41) === null)) { _module42 = __gameplayInvalid; } else { var _module42 = (({success: true, message: ((_module41 !== null && typeof _module41 === \"object\" && Object.prototype.hasOwnProperty.call(_module41, \"text\")) ? _module41[\"text\"] : _module41)})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"result\", __gameplayError, \"result.action\"); _module42 = __gameplayInvalid; } try { if (!((((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"result\")) ? _module42[\"result\"] : _module42) === __gameplayInvalid))) { return ((_module42 !== null && typeof _module42 === \"object\" && Object.prototype.hasOwnProperty.call(_module42, \"result\")) ? _module42[\"result\"] : _module42); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"done\", __gameplayError); } }",
+  "previewCode": "function calculatePreview(piece, skillDef, currentCooldown) { var context = { piece: piece, skillDef: skillDef, currentCooldown: currentCooldown }; if (skillDef && typeof skillDef === \"object\") context[\"__gameplayModuleDiagnosticHost\"] = skillDef[\"__gameplayModuleDiagnosticHost\"]; var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { if ((\"用【平静】与【暴怒】填满手牌。\" === __gameplayInvalid) || (\"用【平静】与【暴怒】填满手牌。\" === undefined) || (\"用【平静】与【暴怒】填满手牌。\" === null)) { _module0 = __gameplayInvalid; } else { var _module0 = (({description: \"用【平静】与【暴怒】填满手牌。\", expectedValues: {}})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"preview\", __gameplayError, \"preview.result\"); _module0 = __gameplayInvalid; } try { if (!((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0) === __gameplayInvalid))) { return ((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"result\")) ? _module0[\"result\"] : _module0); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "previewCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "preview",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "preview",
+              "module": "preview.result",
+              "version": "1",
+              "inputs": {
+                "description": {
+                  "kind": "literal",
+                  "value": "用【平静】与【暴怒】填满手牌。"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "value": {
+                "kind": "output",
+                "node": "preview",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      },
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "outputs": [
+            {
+              "name": "result",
+              "type": "record",
+              "nullable": true
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "source",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "ownerPlayerId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "calm",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {
+                "initial": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "rage",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {
+                "initial": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "while",
+              "id": "fill-hand",
+              "index": "iteration",
+              "budget": 256,
+              "condition": {
+                "inputs": {
+                  "player": {
+                    "kind": "output",
+                    "node": "owner",
+                    "port": "value"
+                  }
+                },
+                "body": [
+                  {
+                    "kind": "call",
+                    "id": "while-size--hand",
+                    "module": "card.hand-instances",
+                    "version": "1",
+                    "inputs": {
+                      "player": {
+                        "kind": "input",
+                        "name": "player"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "while-size",
+                    "module": "collection.length",
+                    "version": "1",
+                    "inputs": {
+                      "items": {
+                        "kind": "output",
+                        "node": "while-size--hand",
+                        "port": "cards"
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "call",
+                    "id": "while-room",
+                    "module": "compare.less-than",
+                    "version": "1",
+                    "inputs": {
+                      "left": {
+                        "kind": "output",
+                        "node": "while-size",
+                        "port": "value"
+                      },
+                      "right": {
+                        "kind": "literal",
+                        "value": 10
+                      }
+                    },
+                    "parameters": {}
+                  },
+                  {
+                    "kind": "return",
+                    "id": "while-result",
+                    "value": {
+                      "kind": "output",
+                      "node": "while-room",
+                      "port": "value"
+                    }
+                  }
+                ]
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "iteration-parity",
+                  "module": "math.modulo",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "fill-hand",
+                      "port": "index"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 2
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "iteration-calm",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "iteration-parity",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 0
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "number",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "if",
+                  "id": "card-kind",
+                  "condition": {
+                    "kind": "output",
+                    "node": "iteration-calm",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "add-calm",
+                      "module": "card.hand-add",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "owner",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "cardId": "watcher-calm"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-calm--counter-read",
+                      "module": "local.read",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "calm",
+                          "port": "handle"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-calm--counter-add",
+                      "module": "math.add",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "count-calm--counter-read",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-calm--counter-write",
+                      "module": "local.write",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "calm",
+                          "port": "handle"
+                        },
+                        "value": {
+                          "kind": "output",
+                          "node": "count-calm--counter-add",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-calm",
+                      "module": "local.read",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "calm",
+                          "port": "handle"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "add-rage",
+                      "module": "card.hand-add",
+                      "version": "1",
+                      "inputs": {
+                        "player": {
+                          "kind": "output",
+                          "node": "owner",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "cardId": "watcher-rage"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-rage--counter-read",
+                      "module": "local.read",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "rage",
+                          "port": "handle"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-rage--counter-add",
+                      "module": "math.add",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "count-rage--counter-read",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 1
+                        }
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-rage--counter-write",
+                      "module": "local.write",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "rage",
+                          "port": "handle"
+                        },
+                        "value": {
+                          "kind": "output",
+                          "node": "count-rage--counter-add",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "count-rage",
+                      "module": "local.read",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "rage",
+                          "port": "handle"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "number"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "calm-count",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "calm",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "rage-count",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "rage",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "total",
+              "module": "math.add",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "calm-count",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "rage-count",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "empty",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "total",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              },
+              "parameters": {
+                "valueType": "number",
+                "operator": "=="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "name",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "source",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "name"
+              }
+            },
+            {
+              "kind": "if",
+              "id": "no-additions",
+              "condition": {
+                "kind": "output",
+                "node": "empty",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "full-text",
+                  "module": "text.concat",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "name",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": "手牌已满，无法使用潦草急救"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "full-result",
+                  "module": "result.action",
+                  "version": "1",
+                  "inputs": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "full-text",
+                      "port": "text"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "return",
+                  "id": "full-return",
+                  "value": {
+                    "kind": "output",
+                    "node": "full-result",
+                    "port": "result"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "calm-text",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "calm-count",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "rage-text",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "rage-count",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "text-0",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "name",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "释放潦草急救，手牌被平静("
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "text-1",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "text-0",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "calm-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "text-2",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "text-1",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")和暴怒("
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "text-3",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "text-2",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "rage-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "text-4",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "text-3",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ")填满"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "result",
+              "module": "result.action",
+              "version": "1",
+              "inputs": {
+                "success": {
+                  "kind": "literal",
+                  "value": true
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "text-4",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "done",
+              "value": {
+                "kind": "output",
+                "node": "result",
+                "port": "result"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:watcher-ultimate",
+    "links": [
+      { "collection": "cards", "id": "watcher-calm", "relation": "owned", "source": "skills.watcher-ultimate.gameplayModules.entries.code.graph.body[5].body[2].then[0].parameters.cardId" },
+      { "collection": "cards", "id": "watcher-rage", "relation": "owned", "source": "skills.watcher-ultimate.gameplayModules.entries.code.graph.body[5].body[2].else[0].parameters.cardId" }
+    ]
+  }
 }

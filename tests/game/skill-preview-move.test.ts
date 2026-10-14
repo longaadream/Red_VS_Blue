@@ -173,6 +173,12 @@ describe('isolated public ordinary move preview', () => {
     const actual = applyBattleAction(state, action)
     const before = JSON.stringify(state)
     const result = previewBattleAction(state, action, 'player-red')
+    const actualBurn = actual.pieces.find(piece => piece.instanceId === 'mover')?.statusTags
+      .find(tag => tag.type === 'amaterasu-burn') as Record<string, unknown> | undefined
+    expect(actualBurn).toBeDefined()
+    // The typed optional field may be absent or explicitly empty; neither
+    // carries a private caster identity into the public projection.
+    expect(actualBurn?.sourcePieceId ?? null).toBeNull()
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     const contactStatuses = (snapshot: BattleState) => snapshot.pieces.find(piece => piece.instanceId === 'mover')?.statusTags
@@ -180,6 +186,9 @@ describe('isolated public ordinary move preview', () => {
     expect(contactStatuses(result.snapshot)).toEqual(contactStatuses(actual))
     expect(result.snapshot.pieces.find(piece => piece.instanceId === 'mover')?.statusTags)
       .toEqual(expect.arrayContaining([expect.objectContaining({ type: 'amaterasu-burn', stacks: 1 })]))
+    const previewBurn = result.snapshot.pieces.find(piece => piece.instanceId === 'mover')?.statusTags
+      .find(tag => tag.type === 'amaterasu-burn') as Record<string, unknown> | undefined
+    expect(previewBurn?.sourcePieceId ?? null).toBeNull()
     expect(JSON.stringify(state)).toBe(before)
   })
 

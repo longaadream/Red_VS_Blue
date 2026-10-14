@@ -665,7 +665,11 @@ describe('interrupted skill release', () => {
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementationOnce(() => ({
       success: false, messages: [], blocked: false, needsOptionSelection: true, options: ['yes'],
       title: 'Choose', pendingRuleId: 'blocked-rule', pendingRuleSourceId: 'blocked-pending-caster',
-    })).mockImplementationOnce(() => ({ success: true, messages: ['blocked'], blocked: true }))
+    })).mockImplementationOnce((provisional) => {
+      provisional.pieces[0].currentHp = 1
+      provisional.extensions!.provisionalReaction = true
+      return { success: true, messages: ['blocked'], blocked: true }
+    })
 
     const pending = applyBattleAction(state, {
       type: 'useBasicSkill', playerId: 'player-red', pieceId: 'blocked-pending-caster', skillId: 'blocked-pending-skill',
@@ -677,6 +681,10 @@ describe('interrupted skill release', () => {
     })
 
     expect(resumed.players[0].actionPoints).toBe(2)
+    expect(resumed.pendingOptionSelection).toBeUndefined()
+    expect(resumed.pendingTargetSelection).toBeUndefined()
+    expect(resumed.pieces[0].currentHp).toBe(state.pieces[0].currentHp)
+    expect(resumed.extensions!.provisionalReaction).toBeUndefined()
     expect(resumed.extensions!.executed).toBeUndefined()
     expect(resumed.actions!.some((entry: BattleActionLog) => entry.type === 'useBasicSkill')).toBe(false)
     vi.mocked(globalTriggerSystem.checkTriggers).mockImplementation(() => TRIGGER_OK)

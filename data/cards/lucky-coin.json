@@ -10,6 +10,230 @@
   "type": "active",
   "actionPointCost": 0,
   "icon": "Coins",
-  "code": "function executeCard(context) {\n  const player = battle.players.find(p => p.playerId === playerId);\n  if (!player) return { success: false, message: '找不到玩家' };\n  player.actionPoints += 1;\n  return { success: true, message: `幸运币：获得1点行动力（当前：${player.actionPoints}）` };\n}",
-  "image": "the-coin.jpg"
+  "code": "function executeCard(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.player()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"player-ref\", __gameplayError, \"ref.player\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPlayer(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)) ? flow.query.player(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"player\")) ? _module0[\"player\"] : _module0)).playerId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"player\", __gameplayError, \"query.player\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1))) || ((1) === __gameplayInvalid) || ((1) === undefined) || ((1) === null)) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.resources.add(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"player\")) ? _module1[\"player\"] : _module1), \"actionPoints\", (1))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"updated-action-points\", __gameplayError, \"resource.adjust\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null)) { _module3 = __gameplayInvalid; } else { var _module3 = (String(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"number-text\", __gameplayError, \"text.from-value\"); _module3 = __gameplayInvalid; } try { if (((1) === __gameplayInvalid) || ((1) === undefined) || ((1) === null)) { _module4 = __gameplayInvalid; } else { var _module4 = (String((1))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"gain-text\", __gameplayError, \"text.from-value\"); _module4 = __gameplayInvalid; } try { if ((\"幸运币：获得\" === __gameplayInvalid) || (\"幸运币：获得\" === undefined) || (\"幸运币：获得\" === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4) === null)) { _module5 = __gameplayInvalid; } else { var _module5 = ((\"幸运币：获得\" + ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"text\")) ? _module4[\"text\"] : _module4))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"gain-prefix\", __gameplayError, \"text.concat\"); _module5 = __gameplayInvalid; } try { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) === null) || (\"点行动力（当前：\" === __gameplayInvalid) || (\"点行动力（当前：\" === undefined) || (\"点行动力（当前：\" === null)) { _module6 = __gameplayInvalid; } else { var _module6 = ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"text\")) ? _module5[\"text\"] : _module5) + \"点行动力（当前：\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"gain-suffix\", __gameplayError, \"text.concat\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) === null) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === null)) { _module7 = __gameplayInvalid; } else { var _module7 = ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"text\")) ? _module6[\"text\"] : _module6) + ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message-prefix\", __gameplayError, \"text.concat\"); _module7 = __gameplayInvalid; } try { if ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"text\")) ? _module7[\"text\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"text\")) ? _module7[\"text\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"text\")) ? _module7[\"text\"] : _module7) === null) || (\"）\" === __gameplayInvalid) || (\"）\" === undefined) || (\"）\" === null)) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"text\")) ? _module7[\"text\"] : _module7) + \"）\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"message\", __gameplayError, \"text.concat\"); _module8 = __gameplayInvalid; } try { if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8) === null)) { _module9 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module9 = ({success: true, message: ((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"text\")) ? _module8[\"text\"] : _module8)}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"result--result-message\", __gameplayError, \"result.message\"); _module9 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module9[\"success\"]) === __gameplayInvalid) || ((_module9[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module9[\"success\"]), \"message\": (_module9[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return-success\", __gameplayError); } }",
+  "image": "the-coin.jpg",
+  "gameplayModules": {
+    "textBindings": {
+      "description": {
+        "template": "获得{{amount}}点行动点。",
+        "values": {
+          "amount": {
+            "entry": "code",
+            "input": "gain"
+          }
+        }
+      }
+    },
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "card",
+          "inputs": [
+            {
+              "name": "gain",
+              "type": "number",
+              "label": "获得行动点"
+            }
+          ],
+          "inputBindings": {
+            "gain": 1
+          },
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": true
+            }
+          ],
+          "composites": [],
+          "body": [
+            {
+              "kind": "call",
+              "id": "player-ref",
+              "module": "ref.player",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "player",
+              "module": "query.player",
+              "version": "1",
+              "inputs": {
+                "playerId": {
+                  "kind": "output",
+                  "node": "player-ref",
+                  "port": "player"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "updated-action-points",
+              "module": "resource.adjust",
+              "version": "1",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "player",
+                  "port": "player"
+                },
+                "amount": {
+                  "kind": "input",
+                  "name": "gain"
+                }
+              },
+              "parameters": {
+                "resource": "actionPoints"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "number-text",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "updated-action-points",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "gain-text",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "input",
+                  "name": "gain"
+                }
+              },
+              "parameters": {
+                "valueType": "number"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "gain-prefix",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "literal",
+                  "value": "幸运币：获得"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "gain-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "gain-suffix",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "gain-prefix",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "点行动力（当前："
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "message-prefix",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "gain-suffix",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "number-text",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "message",
+              "module": "text.concat",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "message-prefix",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "）"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "result--result-message",
+              "module": "result.message",
+              "version": "1",
+              "inputs": {
+                "message": {
+                  "kind": "output",
+                  "node": "message",
+                  "port": "text"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "return",
+              "id": "return-success",
+              "values": {
+                "success": {
+                  "kind": "output",
+                  "node": "result--result-message",
+                  "port": "success"
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "result--result-message",
+                  "port": "message"
+                }
+              }
+            }
+          ],
+          "schemas": []
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

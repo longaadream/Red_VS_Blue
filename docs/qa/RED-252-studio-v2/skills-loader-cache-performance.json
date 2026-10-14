@@ -1,0 +1,60 @@
+{
+  "task": "bounded-skill-loader-cache-and-hydrated-state-copy",
+  "measuredAt": "2026-10-12T05:25:21.985Z",
+  "sourceCache": {
+    "entry": "Private strictly validated JSON bytes keyed by path, content ID and file stat signature.",
+    "sharedHit": "Parse into independent context-local definitions.",
+    "sameContextHit": "Strict assertion rechecks caller mutations.",
+    "invalidation": [
+      "file signature",
+      "clearSkillDefinitionCache",
+      "RVB_FORCE_RULE_RELOAD"
+    ]
+  },
+  "hydration": {
+    "behavior": "withServerSkills eagerly enumerates all skill definitions; no lazy Proxy remains.",
+    "regression": "An unread skill is first accessed by triggerSkill after safeCloneBattleState and executes successfully; nested definitions remain independent."
+  },
+  "cloneOptimization": {
+    "scope": "Only ordinary JSON skillsById trees at the original stringify traversal position.",
+    "behavior": "Descriptor-based recursive copies retain every definition, keys, unknown fields and independent mutable objects; large immutable strings can be reused.",
+    "fallback": "Unsupported values remain on the same original JSON.stringify traversal, without retrying getters or toJSON.",
+    "boundary": "Arbitrary JavaScript Proxy traps are not part of file-backed JSON content; no general Proxy equivalence is claimed.",
+    "microbenchmarkMs": {
+      "json": [
+        30.89,
+        32.78,
+        32.57,
+        28.41,
+        28.73,
+        28.81,
+        29.35,
+        28.59
+      ],
+      "optimized": [
+        11.32,
+        8.94,
+        8.99,
+        7.65,
+        6.31,
+        7.14,
+        6.51,
+        7.96
+      ]
+    },
+    "profile": "authority-skillsbyid-cpu-profile-20261012.json"
+  },
+  "validation": {
+    "report": "authoring-final-performance-tests.json",
+    "tests": 19,
+    "passed": 19,
+    "failed": 0,
+    "authority": "100 contiguous transitions pass unchanged p95 < 100ms requirement.",
+    "typecheck": "npm.cmd run typecheck: passed",
+    "lint": "Targeted changed files: passed"
+  },
+  "withdrawnApproach": {
+    "name": "Lazy skill projection",
+    "status": "Reverted after independent review found that JSON cloning could omit unread passive triggered skills. Its earlier passing performance figures are not evidence for the final implementation."
+  }
+}

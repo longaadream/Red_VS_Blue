@@ -1,8 +1,8 @@
 {
   "id": "velen",
-  "name": "\u7ef4\u4f26",
+  "name": "维伦",
   "faction": "good",
-  "description": "\u8fdc\u89c1\u8005\u4e0e\u5fb7\u83b1\u5c3c\u4eba\u7684\u7cbe\u795e\u9886\u8896\uff0c\u80fd\u591f\u9884\u89c1\u5e76\u6539\u5199\u672a\u6765\uff1b\u4ed6\u4f7f\u5723\u5149\u624b\u724c\u5ef6\u8fdf\u5b8c\u6210\uff0c\u4ee5\u66f4\u5f3a\u7684\u6548\u679c\u5e87\u62a4\u961f\u4f0d\u3002",
+  "description": "远见者与德莱尼人的精神领袖，能够预见并改写未来；他使圣光手牌延迟完成，以更强的效果庇护队伍。",
   "rarity": "legendary",
   "image": "velen.jpg",
   "stats": {
@@ -38,5 +38,10 @@
     "holy-heal",
     "holy-charge"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:velen",
+    "links": []
+  }
 }

@@ -421,9 +421,9 @@ function commandCardId(command: Record<string, unknown>, beforeState: BattleStat
   const player = beforeState.players.find(entry => !playerId || entry.playerId === playerId)
   const hand = Array.isArray(player?.hand) ? player.hand : []
   const card = hand.find(entry => entry && typeof entry === 'object'
-    && text((entry as Record<string, unknown>).instanceId) === cardInstanceId)
+    && text(entry.instanceId) === cardInstanceId)
   return card && typeof card === 'object'
-    ? text((card as Record<string, unknown>).cardId)
+    ? text(card.cardId)
     : undefined
 }
 

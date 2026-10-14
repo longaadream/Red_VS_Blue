@@ -237,7 +237,13 @@ describe('RED-139 approved content migrations', () => {
       debuffs: [],
       ruleTags: [],
     })
-    expect(clone.displaySkills).toEqual(firstFixture.naruto.skills)
+    // The real host assigns stable skill-instance identities before taking
+    // the display snapshot. Cooldowns still reflect the creation moment,
+    // before charging this cast; the source's cooldown changes afterward.
+    const initializedSkills = authority.state.pieces.find(piece => piece.instanceId === 'naruto')!.skills
+    expect(clone.displaySkills).toEqual(firstFixture.naruto.skills.map((skill: any, index: number) => ({
+      ...skill, instanceId: initializedSkills[index].instanceId,
+    })))
     expect(clone.displayStatusTags).toEqual([firstFixture.naruto.statusTags[0]])
     expect(clone.rules.map((rule: any) => rule.id).sort()).toEqual([
       'rule-naruto-clone-died',
@@ -494,6 +500,9 @@ describe('RED-139 approved content migrations', () => {
       + mutateCode
       + " context.summonQueue.push({ summons: [{ x: 2, y: 1, variant: 'summon' }], sourceId: caster.instanceId });"
       + " return { success: true, message: 'corrupt source probe' }; }"
+    // This intentional corruption probe replaces the executable; do not keep
+    // the production graph that would reject it before the summon boundary.
+    delete definition.gameplayModules
     const beforeHash = hashBattleState(fixture.state)
     const beforeJson = JSON.stringify(fixture.state)
     const triggerBefore = globalTriggerSystem.snapshotTransactionState()

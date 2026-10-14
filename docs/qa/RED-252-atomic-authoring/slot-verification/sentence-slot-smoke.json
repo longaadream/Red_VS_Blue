@@ -1,0 +1,148 @@
+{
+  "task": "RED-252 atomic authoring sentence slots",
+  "role": "independent real Electron verification",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-slot-smoke-dXPBHi\\rvb-content-25e1176e",
+  "evidence": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\slot-verification",
+  "checks": [
+    {
+      "name": "damage sentence uses natural Chinese and amount is atomic",
+      "ok": true,
+      "detail": {
+        "projection": "对当前目标造成5点普通伤害，来源为当前棋子",
+        "focused": {
+          "className": "sentence-inline-editor sentence-statement-editor sentence-slot-only-editor",
+          "text": "编辑输入：数量关闭编辑数量数值数量5展开绘制相对范围Tab 补全 · Ctrl / ⌘ + Enter 应用应用下一项：伤害类型",
+          "moduleSelect": false,
+          "inputs": [
+            "amount"
+          ],
+          "parameters": [],
+          "slotEditor": "input:amount",
+          "chooser": false
+        },
+        "composed": {
+          "kind": "output",
+          "node": "expr-1_2",
+          "port": "value"
+        }
+      }
+    },
+    {
+      "name": "record field and named return slots write canonical AST keys",
+      "ok": true,
+      "detail": {
+        "hp": {
+          "kind": "output",
+          "node": "expr-1_2",
+          "port": "value"
+        },
+        "retained": {
+          "kind": "literal",
+          "value": "保留字段"
+        },
+        "values": {
+          "result": {
+            "kind": "output",
+            "node": "expr-2_2",
+            "port": "value"
+          }
+        },
+        "field": "hp"
+      }
+    },
+    {
+      "name": "extension dependencies gate later controls and retain incompatible values",
+      "ok": true,
+      "detail": {
+        "write": {
+          "parameters": {
+            "namespace": "content",
+            "name": "flag",
+            "path": "stats.hp",
+            "valueType": "boolean"
+          },
+          "value": {
+            "kind": "literal",
+            "value": 7
+          }
+        },
+        "mismatch": "待重填：当前是数值，此处需要布尔值",
+        "focusAfterType": {
+          "tag": "SELECT",
+          "slot": "",
+          "inside": true,
+          "panel": true
+        },
+        "focusAfterTab": {
+          "tag": "BUTTON",
+          "slot": "",
+          "inside": true,
+          "panel": true
+        },
+        "focusAfterEscape": {
+          "popover": false,
+          "slot": "ext-write:parameter:valueType",
+          "inside": true
+        }
+      }
+    },
+    {
+      "name": "collection local input, defer graph/payload, return.value and more fields remain editable",
+      "ok": true,
+      "detail": {
+        "collection": {
+          "local": {
+            "kind": "output",
+            "node": "expr-1_2",
+            "port": "value"
+          }
+        },
+        "defer": {
+          "graph": "alternate@1",
+          "payload": {
+            "kind": "literal",
+            "value": "updated-payload"
+          }
+        },
+        "return": {
+          "kind": "literal",
+          "value": "updated-return"
+        },
+        "config": {
+          "present": true,
+          "summary": "变量、返回值与结构定义",
+          "schemas": true,
+          "declarations": true
+        }
+      }
+    },
+    {
+      "name": "changed graph survives file serialization and remount",
+      "ok": true,
+      "detail": {
+        "body": [
+          "expr-1_1",
+          "expr-1_2",
+          "collection-main",
+          "defer-main",
+          "return-value"
+        ],
+        "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-slot-smoke-dXPBHi\\rvb-content-25e1176e\\data\\skills\\sentence-slot-smoke.json"
+      }
+    }
+  ],
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\slot-verification\\natural-damage-amount-slot.png"
+  ],
+  "catalog": {
+    "count": 729,
+    "required": [
+      "author.effect.damage",
+      "extension.read-player",
+      "extension.write-player",
+      "math.add"
+    ]
+  },
+  "ok": true,
+  "failureCount": 0
+}

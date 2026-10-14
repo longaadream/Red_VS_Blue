@@ -1,0 +1,16 @@
+{
+  "scope": "The two editor-content-pipeline source-text assertions were already absent from the before-turn working copy, not a clean origin/main test run.",
+  "beforeTurnBackup": "C:/Users/lngsc/AppData/Local/Temp/rvb-workbench-ui-before-x3bqhycu/electron-editor/ui/index.html",
+  "assertions": [
+    {
+      "needle": "let draft = clone(data)",
+      "presentBeforeTurn": false,
+      "presentNow": false
+    },
+    {
+      "needle": "data-editor-mode=\"json\"",
+      "presentBeforeTurn": false,
+      "presentNow": false
+    }
+  ]
+}

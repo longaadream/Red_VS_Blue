@@ -66,5 +66,344 @@
       }
     ]
   },
-  "code": "function executeSkill(context) { var caster = context.piece; var result = Number(context.selectedOption); if (!Number.isInteger(result) || result < 1 || result > 10) { return { success: false, message: 'Invalid Recall action count' }; } if (!battle.extensions) { battle.extensions = {}; } if (!battle.extensions.recallData) { battle.extensions.recallData = []; } var data = battle.extensions.recallData; data = data.filter(function(r) { return r.pieceId !== caster.instanceId; }); data.push({ pieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId, projectionVisibility: 'owner', targetCount: result, actionCount: 0, snapshot: { x: caster.x, y: caster.y, hp: caster.currentHp, shield: caster.shield, statusTags: caster.statusTags ? JSON.parse(JSON.stringify(caster.statusTags)) : [], buffs: caster.buffs ? JSON.parse(JSON.stringify(caster.buffs)) : [], debuffs: caster.debuffs ? JSON.parse(JSON.stringify(caster.debuffs)) : [] } }); battle.extensions.recallData = data; return { success: true, message: caster.name + '已设置回溯' }; }"
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner\", __gameplayError, \"piece.field\"); _module1 = __gameplayInvalid; } try { var _record2 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6, __gameplayRecordValue7, __gameplayRecordValue8, __gameplayRecordValue9){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid) || (__gameplayRecordValue7 === __gameplayInvalid) || (__gameplayRecordValue8 === __gameplayInvalid) || (__gameplayRecordValue9 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"1\"] = __gameplayRecordValue0; __gameplayRecord[\"2\"] = __gameplayRecordValue1; __gameplayRecord[\"3\"] = __gameplayRecordValue2; __gameplayRecord[\"4\"] = __gameplayRecordValue3; __gameplayRecord[\"5\"] = __gameplayRecordValue4; __gameplayRecord[\"6\"] = __gameplayRecordValue5; __gameplayRecord[\"7\"] = __gameplayRecordValue6; __gameplayRecord[\"8\"] = __gameplayRecordValue7; __gameplayRecord[\"9\"] = __gameplayRecordValue8; __gameplayRecord[\"10\"] = __gameplayRecordValue9; return __gameplayRecord; })(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"options\", __gameplayError); _record2 = __gameplayInvalid; } try { if ((_record2 === __gameplayInvalid) || (_record2 === undefined) || (_record2 === null)) { _module3 = __gameplayInvalid; } else { var _module3 = ((function(value){return {value: flow.values.require(value, (function(raw){return typeof raw === \"string\" && raw.trim().startsWith(\"{\") ? JSON.parse(raw) : raw;})(\"number\"), [{\"id\":\"atomic-recall-record@1\",\"version\":\"1\",\"fields\":[{\"name\":\"piece\",\"type\":\"piece\",\"nullable\":true},{\"name\":\"pieceKey\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"player\"},{\"name\":\"position\",\"type\":\"cell\"},{\"name\":\"targetCount\",\"type\":\"number\"},{\"name\":\"actionCount\",\"type\":\"number\"},{\"name\":\"snapshot\",\"type\":\"record\"}]},{\"id\":\"atomic-recall-options@1\",\"version\":\"1\",\"fields\":[{\"name\":\"1\",\"type\":\"number\"},{\"name\":\"2\",\"type\":\"number\"},{\"name\":\"3\",\"type\":\"number\"},{\"name\":\"4\",\"type\":\"number\"},{\"name\":\"5\",\"type\":\"number\"},{\"name\":\"6\",\"type\":\"number\"},{\"name\":\"7\",\"type\":\"number\"},{\"name\":\"8\",\"type\":\"number\"},{\"name\":\"9\",\"type\":\"number\"},{\"name\":\"10\",\"type\":\"number\"}]}])};})(flow.choice.authorOption({options: (function(values){return Object.keys(values || {}).map(function(label){return {label: label, value: values[label]};});})(_record2), title: \"选择回溯次数\", canCancel: true}, \"selected\"))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"selected\", __gameplayError, \"author.choice.option\"); _module3 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module4 = __gameplayInvalid; } else { var _module4 = (flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) && {x: flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).x, y: flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).y}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"position\", __gameplayError, \"spatial.piece-position\"); _module4 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module5 = __gameplayInvalid; } else { var _module5 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))[\"instanceId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"piece-key\", __gameplayError, \"piece.field\"); _module5 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module6 = __gameplayInvalid; } else { var _module6 = (flow.instances.copy(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"snapshot\", __gameplayError, \"instance.copy-piece\"); _module6 = __gameplayInvalid; } try { var _record7 = ((function(__gameplayRecordValue0, __gameplayRecordValue1, __gameplayRecordValue2, __gameplayRecordValue3, __gameplayRecordValue4, __gameplayRecordValue5, __gameplayRecordValue6){ if ((__gameplayRecordValue0 === __gameplayInvalid) || (__gameplayRecordValue1 === __gameplayInvalid) || (__gameplayRecordValue2 === __gameplayInvalid) || (__gameplayRecordValue3 === __gameplayInvalid) || (__gameplayRecordValue4 === __gameplayInvalid) || (__gameplayRecordValue5 === __gameplayInvalid) || (__gameplayRecordValue6 === __gameplayInvalid)) return __gameplayInvalid; var __gameplayRecord = {}; __gameplayRecord[\"piece\"] = __gameplayRecordValue0; __gameplayRecord[\"pieceKey\"] = __gameplayRecordValue1; __gameplayRecord[\"owner\"] = __gameplayRecordValue2; __gameplayRecord[\"position\"] = __gameplayRecordValue3; __gameplayRecord[\"targetCount\"] = __gameplayRecordValue4; __gameplayRecord[\"actionCount\"] = __gameplayRecordValue5; __gameplayRecord[\"snapshot\"] = __gameplayRecordValue6; return __gameplayRecord; })(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0), ((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5), ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1), ((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"cell\")) ? _module4[\"cell\"] : _module4), ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"value\")) ? _module3[\"value\"] : _module3), 0, ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"snapshot\")) ? _module6[\"snapshot\"] : _module6))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"record\", __gameplayError); _record7 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1)))) { _module8 = __gameplayInvalid; } else { var _module8 = (flow.extension.declareMap(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1),\"content\",\"recall-records\",{\"schema\":{\"id\":\"atomic-recall-record@1\",\"version\":\"1\",\"fields\":[{\"name\":\"piece\",\"type\":\"piece\",\"nullable\":true},{\"name\":\"pieceKey\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"player\"},{\"name\":\"position\",\"type\":\"cell\"},{\"name\":\"targetCount\",\"type\":\"number\"},{\"name\":\"actionCount\",\"type\":\"number\"},{\"name\":\"snapshot\",\"type\":\"record\"}]},\"schemas\":[{\"id\":\"atomic-recall-record@1\",\"version\":\"1\",\"fields\":[{\"name\":\"piece\",\"type\":\"piece\",\"nullable\":true},{\"name\":\"pieceKey\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"player\"},{\"name\":\"position\",\"type\":\"cell\"},{\"name\":\"targetCount\",\"type\":\"number\"},{\"name\":\"actionCount\",\"type\":\"number\"},{\"name\":\"snapshot\",\"type\":\"record\"}]}],\"keyField\":\"pieceKey\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"declare-records\", __gameplayError, \"extension.map-declare\"); _module8 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPlayer === \"function\" && !flow.query.hasPlayer(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1))) || (_record7 === __gameplayInvalid) || (_record7 === undefined) || (_record7 === null)) { _module9 = __gameplayInvalid; } else { var _module9 = (flow.extension.mapPut(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"value\")) ? _module1[\"value\"] : _module1),\"content\",\"recall-records\",{\"schema\":{\"id\":\"atomic-recall-record@1\",\"version\":\"1\",\"fields\":[{\"name\":\"piece\",\"type\":\"piece\",\"nullable\":true},{\"name\":\"pieceKey\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"player\"},{\"name\":\"position\",\"type\":\"cell\"},{\"name\":\"targetCount\",\"type\":\"number\"},{\"name\":\"actionCount\",\"type\":\"number\"},{\"name\":\"snapshot\",\"type\":\"record\"}]},\"schemas\":[{\"id\":\"atomic-recall-record@1\",\"version\":\"1\",\"fields\":[{\"name\":\"piece\",\"type\":\"piece\",\"nullable\":true},{\"name\":\"pieceKey\",\"type\":\"string\"},{\"name\":\"owner\",\"type\":\"player\"},{\"name\":\"position\",\"type\":\"cell\"},{\"name\":\"targetCount\",\"type\":\"number\"},{\"name\":\"actionCount\",\"type\":\"number\"},{\"name\":\"snapshot\",\"type\":\"record\"}]}],\"keyField\":\"pieceKey\"},_record7)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"put-record\", __gameplayError, \"extension.map-put\"); _module9 = __gameplayInvalid; } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:recall",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-recall-skill",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-recall-move",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-recall-endturn",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      }
+    ]
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "schemas": [
+            {
+              "id": "atomic-recall-record@1",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "piece",
+                  "type": "piece",
+                  "nullable": true
+                },
+                {
+                  "name": "pieceKey",
+                  "type": "string"
+                },
+                {
+                  "name": "owner",
+                  "type": "player"
+                },
+                {
+                  "name": "position",
+                  "type": "cell"
+                },
+                {
+                  "name": "targetCount",
+                  "type": "number"
+                },
+                {
+                  "name": "actionCount",
+                  "type": "number"
+                },
+                {
+                  "name": "snapshot",
+                  "type": "record"
+                }
+              ]
+            },
+            {
+              "id": "atomic-recall-options@1",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "1",
+                  "type": "number"
+                },
+                {
+                  "name": "2",
+                  "type": "number"
+                },
+                {
+                  "name": "3",
+                  "type": "number"
+                },
+                {
+                  "name": "4",
+                  "type": "number"
+                },
+                {
+                  "name": "5",
+                  "type": "number"
+                },
+                {
+                  "name": "6",
+                  "type": "number"
+                },
+                {
+                  "name": "7",
+                  "type": "number"
+                },
+                {
+                  "name": "8",
+                  "type": "number"
+                },
+                {
+                  "name": "9",
+                  "type": "number"
+                },
+                {
+                  "name": "10",
+                  "type": "number"
+                }
+              ]
+            }
+          ],
+          "outputs": [],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "ownerPlayerId"
+              }
+            },
+            {
+              "kind": "record.create",
+              "id": "options",
+              "schema": "atomic-recall-options@1",
+              "fields": {
+                "1": {
+                  "kind": "literal",
+                  "value": 1
+                },
+                "2": {
+                  "kind": "literal",
+                  "value": 2
+                },
+                "3": {
+                  "kind": "literal",
+                  "value": 3
+                },
+                "4": {
+                  "kind": "literal",
+                  "value": 4
+                },
+                "5": {
+                  "kind": "literal",
+                  "value": 5
+                },
+                "6": {
+                  "kind": "literal",
+                  "value": 6
+                },
+                "7": {
+                  "kind": "literal",
+                  "value": 7
+                },
+                "8": {
+                  "kind": "literal",
+                  "value": 8
+                },
+                "9": {
+                  "kind": "literal",
+                  "value": 9
+                },
+                "10": {
+                  "kind": "literal",
+                  "value": 10
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "selected",
+              "module": "author.choice.option",
+              "version": "1",
+              "inputs": {
+                "options": {
+                  "kind": "output",
+                  "node": "options",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "number",
+                "title": "选择回溯次数",
+                "canCancel": true
+              }
+            },
+            {
+              "kind": "call",
+              "id": "position",
+              "module": "spatial.piece-position",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "piece-key",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "instanceId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "snapshot",
+              "module": "instance.copy-piece",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "record.create",
+              "id": "record",
+              "schema": "atomic-recall-record@1",
+              "fields": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                },
+                "pieceKey": {
+                  "kind": "output",
+                  "node": "piece-key",
+                  "port": "value"
+                },
+                "owner": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "value"
+                },
+                "position": {
+                  "kind": "output",
+                  "node": "position",
+                  "port": "cell"
+                },
+                "targetCount": {
+                  "kind": "output",
+                  "node": "selected",
+                  "port": "value"
+                },
+                "actionCount": {
+                  "kind": "literal",
+                  "value": 0
+                },
+                "snapshot": {
+                  "kind": "output",
+                  "node": "snapshot",
+                  "port": "snapshot"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "declare-records",
+              "module": "extension.map-declare",
+              "version": "1",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "namespace": "content",
+                "name": "recall-records",
+                "schema": "atomic-recall-record@1",
+                "keyField": "pieceKey"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "put-record",
+              "module": "extension.map-put",
+              "version": "1",
+              "inputs": {
+                "player": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "value"
+                },
+                "item": {
+                  "kind": "output",
+                  "node": "record",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "namespace": "content",
+                "name": "recall-records",
+                "schema": "atomic-recall-record@1",
+                "keyField": "pieceKey"
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { resolveEditorWorkspacePathV1 } from './content-pipeline-ipc'
+import { nonDiscoveryDefinitionReason } from './content-discovery-policy'
 
 type Manifest = Record<string, string>
 type Task = { schema: 'rvb-creative-task/v1'; id: string; title: string; brief: string; criteria: string; createdAt: string; baseline: Manifest; baselineHash: string }
@@ -334,8 +335,9 @@ export class CreativeWorkbench {
           continue
         }
         if (!record(value) || value.id !== id) { add(relative, '内容 ID 必须与文件名一致'); continue }
-        // battle-setup explicitly loads this system rule by ID outside the discovery manifest.
-        if (!ids.includes(id) && relative !== 'data/rules/rule-lucky-coin-gamestart.json') add(relative, '内容未登记到 manifest，游戏可能无法发现它')
+        // Packaging and ordinary discovery have different scopes. Only the
+        // explicitly audited generated/archived definitions may stay unlisted.
+        if (!ids.includes(id) && !nonDiscoveryDefinitionReason(relative)) add(relative, '内容未登记到 manifest，游戏可能无法发现它')
         for (const field of ['skills', 'rules', 'playerRules', 'relatedCards']) {
           if (value[field] === undefined) continue
           if (!Array.isArray(value[field])) { add(relative, `${field} 必须是引用数组`); continue }

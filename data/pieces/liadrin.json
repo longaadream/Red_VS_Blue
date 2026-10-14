@@ -1,8 +1,8 @@
 {
   "id": "liadrin",
-  "name": "\u8389\u4e9a\u5fb7\u7433",
+  "name": "莉亚德琳",
   "faction": "good",
-  "description": "\u8840\u9a91\u58eb\u9886\u8896\uff0c\u901a\u8fc7\u62bd\u53d6\u5723\u76fe\u4e0d\u65ad\u79ef\u7d2f\u5723\u5149\u624b\u724c\uff0c\u5e76\u4ee5\u7a46\u9c81\u7684\u633d\u6b4c\u5c06\u79ef\u84c4\u8f6c\u5316\u4e3a\u5168\u573a\u6cbb\u7597\u4e0e\u771f\u5b9e\u4f24\u5bb3\u3002",
+  "description": "血骑士领袖，通过抽取圣盾不断积累圣光手牌，并以穆鲁的挽歌将积蓄转化为全场治疗与真实伤害。",
   "rarity": "legendary",
   "image": "liadrin.jpg",
   "stats": {
@@ -33,5 +33,10 @@
     "holy-heal",
     "holy-charge"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:liadrin",
+    "links": []
+  }
 }

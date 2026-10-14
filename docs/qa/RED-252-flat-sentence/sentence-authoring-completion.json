@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "id": "sentence-authoring-completion",
+  "bodyKinds": [
+    "record.create",
+    "collection",
+    "record.get",
+    "record.with",
+    "defer-choice",
+    "record.get"
+  ],
+  "declarations": {
+    "composites": 1,
+    "continuations": 1
+  },
+  "nestedStatementIds": [
+    "sentence-record.create-1",
+    "sentence-collection.map-1",
+    "sentence-return-1",
+    "sentence-record.get-1",
+    "sentence-record.with-1",
+    "sentence-defer-choice-1",
+    "sentence-return-2",
+    "sentence-return-3"
+  ],
+  "multiEntry": {
+    "route": "sentence-editor",
+    "bothInvalid": {
+      "codeCompiler": null,
+      "previewCompiler": null,
+      "codeType": "string",
+      "previewType": "string"
+    },
+    "reopened": {
+      "codeCompiler": "rvb-gameplay-module-compiler/v2",
+      "previewCompiler": "rvb-gameplay-module-compiler/v2",
+      "codeType": "boolean",
+      "previewType": "boolean"
+    }
+  },
+  "saveBlockedUntilAllEntriesValid": true,
+  "legacyArtifactReconciled": true,
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-authoring-Llbuvg\\rvb-content-4da1f173",
+  "screenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\sentence-authoring-completion.png",
+  "blankCardSurface": "card"
+}

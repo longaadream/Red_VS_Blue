@@ -1,4 +1,5 @@
 import type { BattleState } from './turn'
+import type { AuthorEntityExtensionDeclarations } from './author-entity-extension'
 
 export interface AdventureHandCard {
   cardId: string
@@ -10,6 +11,8 @@ export interface AdventureHandCard {
   icon?: string
   type?: string
   additionPrepared?: true
+  extension?: Record<string, unknown>
+  authorExtensionDeclarations?: AuthorEntityExtensionDeclarations
   contentState?: { adventure?: { lifetime: 'run' | 'encounter'; sourceId: string } }
 }
 export interface AdventureCardPlayer {

@@ -1,0 +1,22 @@
+{
+  "passed": false,
+  "error": "Error: UI condition timed out: document.querySelector('#build-btn') && document.querySelector('#build-btn').offsetParent !== null\n    at until (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-shell-smoke.mjs:221:9)\n    at async file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-shell-smoke.mjs:408:3",
+  "childStderr": "\r\nDevTools listening on ws://127.0.0.1:60299/devtools/browser/820b47b4-ccb4-4c77-807f-b7b8754fb3cd\r\n",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-studio-shell-smoke-by47yS\\rvb-content-bad5e774",
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\piece-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\skill-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\expression-inline.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\status-library.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\piece-status-editor.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\rule-status-editor.png"
+  ],
+  "renderer": {
+    "url": "file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/electron-editor/ui/index.html",
+    "active": "<body class=\"studio-surface\" data-shell-route=\"build\">\n<aside id=\"sidebar\">\n  <div class=\"brand\"><img class=\"studio-brand-image\" src=\"assets/studio-brand.png\" alt=\"\" aria-hidden=\"true\"><div class=\"brand-copy\"><strong>Red VS Blue</strong><span>内容工作台</span></div></div>\n  <nav id=\"tab-bar\" aria-label=\"编辑器模块\">\n    <button class=\"tab-btn\" data-tab=\"workbench\" data-shell-nav=\"workbench\" data-short=\"任务\"><img class=\"tab-icon\" src=\"assets/icons/workbench.svg\" alt=\"\" aria-hidden=\"true\"><span class=\"tab-label\">创作工作台</span></button>\n    <div class=\"tool-separator\">内容</div>\n    <button class=\"tab-btn\" data",
+    "status": "",
+    "build": "",
+    "body": "Red VS Blue\n内容工作台\n创作工作台\n棋子\n能力组\n卡牌\n规则\n素材\n资源包\n组合效果 · 保存内容\n生成资源包 · 试用验证\n内容工作台\n资源包\n生成资源包\n保存全部（1）\n项目\n1\n内容\n检查工作区\n2\n设置\n包名与版本\n3\n生成\n写入本地包\n4\n结果\n检查输出\n资源版本与发布\n\n先确认内容、图片和 PVE 文件来自当前工作区。生成资源包只会写入本地文件，不会上传或发布。\n\n8\n常规 JSON\n0\nPVE JSON\n3\n图片资源\n新增 6\n+ data/pieces/studio-piece.json\n+ data/rules/studio-rule.json\n+ data/skills/studio-literal.json\n+ images/status-new.png\n+ images/status-old.png\n+ images/studio-piece.png\n覆盖 5\n~ data/cards/manifest.json\n~ data/pieces/manifest.json\n~ data/rules/manifest.json\n~ data/skills/fireball.json\n~ data/skills/manifest.json\n删除 820\n− data/cards/armor-attack-defense.json\n− data/cards/armor-attack-heal.json\n− data/cards/armor-attack-speed.json\n− data/cards/armor-defense-heal.json\n− data/cards/armor-defense-speed.json\n− data/cards/armor-heal-speed.json\n− data/cards/demon-summon-1.json\n− data/cards/demon-summon-2.json\n− data/cards/demon-summon-3.json\n− data/cards/demon-summon-4.json\n− data/cards/demon-summon-5.json\n− data/cards/hashirama-edo-nature-heal.json\n− data/cards/hashirama-edo-thousand-hands.json\n− data/cards/holy-charge.json\n− data/cards/holy-heal.json\n− data/cards/holy-smite.json\n− data/cards/lucky-coin.json\n− data/cards/pve-blood-curse.json\n− data/cards/pve-blood-cut.json\n− data/cards/pve-blood-debt.json\n− data/cards/pve-blood-drink.json\n− data/cards/pve-blood-etch.json\n− data/cards/pve-blood-flame.json\n− data/cards/pve-blood-revenge.json\n− data/cards/pve-blood-stop.json\n− data/cards/pve-blood-ward.json\n− data/cards/pve-blood-wounds.json\n− data/cards/pve-light-arrow.json\n− data/cards/pve-light-burst.json\n− data/cards/pve-light-call.json\n− data/cards/pve-light-comfort.json\n− data/cards/pve-light-moon.json\n− data/cards/pve-light-overheal.json\n− data/cards/pve-light-prayer.json\n− data/cards/pve-light-spark.json\n− data/cards/pve-light-study.json\n− data/car"
+  },
+  "failureScreenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-flat-sentence\\shell\\smoke-failure.png"
+}

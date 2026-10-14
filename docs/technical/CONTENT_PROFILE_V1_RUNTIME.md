@@ -61,6 +61,11 @@ RED-114 resolver。旧 `pack.json` ZIP 明确拒绝，不自动迁移。
 2. 将该 reference 写入 `candidate`；
 3. 保持 `stable`、Server 环境与 renderer 根不变。
 
+`packages/<packageHash>` 和 `profiles/<resolvedProfileHash>` 的临时目录提交在 Windows 上对
+瞬时 `EPERM`/`EACCES` 最多重试 3 次，每次等待 100ms；其他错误立即失败，重试耗尽也失败。
+目标目录的现有校验仍然是权威判断，不能覆盖已存在的内容。该有限重试不适用于
+`active.json`、`activation.lock` 或 `audit/**` 的其他 rename 操作。
+
 重复安装相同字节和 hash 是幂等操作。若已有激活事务，安装返回 `PROFILE_STORE_BUSY`。
 
 ## 4. 两阶段激活

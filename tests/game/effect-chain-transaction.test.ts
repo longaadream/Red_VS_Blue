@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { hashBattleState, runBattleAction } from '@/lib/game/battle-runner'
 import {
@@ -35,6 +35,10 @@ import { DEFAULT_SKILLS } from '@/lib/game/skill-repository'
 import { TriggerSystem, globalTriggerSystem } from '@/lib/game/triggers'
 import { applyBattleAction, type BattleState } from '@/lib/game/turn'
 import { makePiece, makeState } from '../helpers/minimal-state'
+import { compileGameplayModuleGraphV2, GAMEPLAY_MODULE_COMPILER_V2_VERSION } from '@/lib/skill-graph/module-compiler'
+import { GAMEPLAY_MODULE_REGISTRY } from '@/lib/skill-graph/module-registry'
+import { GAMEPLAY_MODULE_DOCUMENT_VERSION } from '@/lib/skill-graph/module-document'
+import type { GameplayModuleGraph } from '@/lib/skill-graph/module-types'
 
 const ROOT_SEED = 139_139
 let previousRules: any[] = []
@@ -2361,9 +2365,9 @@ describe('RED-139 authoritative EffectChain transactions', () => {
   })
 
 
-  it('fails a real authored Rule skillCode closed instead of returning a soft failure', () => {
+  it('keeps v1 authored Rule failures fatal while isolating the approved v2 artifact', () => {
     const skillId = 'transaction-authored-rule-ordinary-error'
-    const state = skillState(skillId, `function executeSkill(context) {
+    const skillCode = `function executeSkill(context) {
       var source = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-source'; });
       var target = context.battle.pieces.find(function(piece) { return piece.instanceId === 'transaction-target'; });
       try {
@@ -2371,41 +2375,106 @@ describe('RED-139 authoritative EffectChain transactions', () => {
       } catch (error) {}
       context.battle.extensions.authoredRuleOrdinaryLeak = true;
       return { success: true };
-    }`)
-    const target = state.pieces.find(piece => piece.instanceId === 'transaction-target') as any
-    const authoredRule = loadRuleById('rule-watcher-rage-taken', true)
-    expect(authoredRule).toBeDefined()
-    if (!authoredRule) return
-    target.rules = [authoredRule]
-    target.statusTags = { invalidSerializedShape: true }
-    const beforeHash = hashBattleState(state)
-    const beforeJson = JSON.stringify(state)
-    const triggerBefore = globalTriggerSystem.snapshotTransactionState()
-
-    let caught: unknown
-    try {
-      runBattleAction(
-        state,
-        skillAction(skillId, 'transaction-authored-rule-ordinary-action'),
-        { rootSeed: ROOT_SEED },
-      )
-    } catch (error) {
-      caught = error
+    }`
+    const ruleId = 'rule-watcher-rage-taken'
+    const legacyRule = {
+      id: ruleId,
+      name: '暴怒·受创加倍',
+      description: '（暴怒姿态）受到的伤害翻倍',
+      trigger: { type: 'beforeDamageTaken' },
+      skillCode: "var piece = context.rulePiece; if (!piece) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== piece.instanceId) return { success: false, message: '' }; var rageStance = piece.statusTags && piece.statusTags.find(function(t) { return t.type === 'rage-stance'; }); if (!rageStance) return { success: false, message: '' }; var baseDamage = context.damage || 0; context.damage = baseDamage * 2; return { success: true, message: piece.name + '处于暴怒姿态，受到双倍伤害！' + baseDamage + '→' + context.damage + '点' };",
     }
 
-    expect(caught).toBeInstanceOf(EffectChainFatalError)
-    expect((caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
-    expect((caught as EffectChainFatalError).cause).toBeInstanceOf(Error)
-    expect((caught as EffectChainFatalError).context).toMatchObject({
-      kind: 'damage',
-      skillId: 'rule-watcher-rage-taken',
-      sourceId: 'transaction-target',
-      targetId: 'transaction-source',
-      detached: false,
+    const runWithRule = (rule: any, actionId: string) => {
+      const state = skillState(skillId, skillCode)
+      const target = state.pieces.find(piece => piece.instanceId === 'transaction-target') as any
+      target.rules = [rule]
+      target.statusTags = { invalidSerializedShape: true }
+      const beforeHash = hashBattleState(state)
+      const beforeJson = JSON.stringify(state)
+      const triggerBefore = globalTriggerSystem.snapshotTransactionState()
+      let caught: unknown
+      let actionResult: unknown
+      try {
+        actionResult = runBattleAction(state, skillAction(skillId, actionId), { rootSeed: ROOT_SEED })
+      } catch (error) {
+        caught = error
+      }
+      return { state, target, beforeHash, beforeJson, triggerBefore, caught, actionResult }
+    }
+
+    // Keep this compiler-v2 fault-isolation fixture independent of later
+    // gameplay migrations that replace status.has-piece with atomic nodes.
+    const artifactGraph: GameplayModuleGraph = {
+      version: 'rvb-gameplay-modules/v1', surface: 'rule', outputs: [{ name: 'success', type: 'boolean' }],
+      body: [
+        { kind: 'call', id: 'holder', module: 'ref.holder', version: '1' },
+        { kind: 'call', id: 'has-status', module: 'status.has-piece', version: '1', inputs: { piece: { kind: 'output', node: 'holder', port: 'piece' } }, parameters: { statusType: 'rage-stance' } },
+        { kind: 'call', id: 'write-damage', module: 'event.write-number', version: '1', inputs: { value: { kind: 'literal', value: 4 } }, parameters: { field: 'damage', inputPolicy: 'host' } },
+        { kind: 'return', id: 'done', values: { success: { kind: 'literal', value: true } } },
+      ],
+    }
+    const compiledArtifact = compileGameplayModuleGraphV2(artifactGraph, GAMEPLAY_MODULE_REGISTRY)
+    const artifact = { ...legacyRule, skillCode: compiledArtifact.code, gameplayModules: {
+      version: GAMEPLAY_MODULE_DOCUMENT_VERSION,
+      entries: { skillCode: { graph: artifactGraph, compilerVersion: GAMEPLAY_MODULE_COMPILER_V2_VERSION } },
+    } }
+    const authoredRule = withTemporaryProfile({ rules: { [ruleId]: artifact } }, () => loadRuleById(ruleId, true))
+    expect(authoredRule).toBeDefined()
+    if (!authoredRule) return
+    const diagnosticLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const v2 = withTemporaryProfile({ rules: { [ruleId]: artifact } }, () => runWithRule(authoredRule, 'transaction-authored-rule-v2-action'))
+      expect(v2.caught).toBeUndefined()
+      const committedV2 = (v2.actionResult as any)?.state as BattleState
+      expect(committedV2).toBeDefined()
+      // The enclosing authored SkillCode continues after the faulty status
+      // probe. The existing v2 artifact leaves the later damage module
+      // independent from that probe, so its authored 2 -> 4 result is
+      // committed while the diagnostic remains observable.
+      expect(hp(committedV2)).toBe(26)
+      expect(committedV2.extensions?.authoredRuleOrdinaryLeak).toBe(true)
+      expect(committedV2.pieces.find(piece => piece.instanceId === 'transaction-target')?.statusTags)
+        .toEqual({ invalidSerializedShape: true })
+      const diagnostic = diagnosticLog.mock.calls
+        .filter(([label]) => label === '[gameplay-module-diagnostic]')
+        .map(([, value]) => value)
+        .find(value => (value as any)?.contentId === ruleId)
+      expect(diagnostic).toMatchObject({
+        statementId: 'has-status',
+        moduleId: 'status.has-piece',
+        surface: 'rule',
+        contentId: ruleId,
+        actorPlayerId: 'player-blue',
+        turn: 7,
+        phase: 'action',
+        rootSeed: ROOT_SEED,
+        actionId: 'transaction-authored-rule-v2-action',
+        chainId: 'effect-chain:transaction-authored-rule-v2-action',
+      })
+    } finally {
+      diagnosticLog.mockRestore()
+    }
+
+    withTemporaryProfile({ rules: { [ruleId]: legacyRule } }, () => {
+      const v1Rule = loadRuleById(ruleId, true)
+      expect(v1Rule).toBeDefined()
+      if (!v1Rule) return
+      const v1 = runWithRule(v1Rule, 'transaction-authored-rule-v1-action')
+      expect(v1.caught).toBeInstanceOf(EffectChainFatalError)
+      expect((v1.caught as EffectChainFatalError).code).toBe('RVB_EFFECT_CHAIN_BATCH_REJECTED')
+      expect((v1.caught as EffectChainFatalError).cause).toBeInstanceOf(Error)
+      expect((v1.caught as EffectChainFatalError).context).toMatchObject({
+        kind: 'damage',
+        skillId: ruleId,
+        sourceId: 'transaction-target',
+        targetId: 'transaction-source',
+        detached: false,
+      })
+      expect(hashBattleState(v1.state)).toBe(v1.beforeHash)
+      expect(JSON.stringify(v1.state)).toBe(v1.beforeJson)
+      expect(globalTriggerSystem.snapshotTransactionState()).toEqual(v1.triggerBefore)
     })
-    expect(hashBattleState(state)).toBe(beforeHash)
-    expect(JSON.stringify(state)).toBe(beforeJson)
-    expect(globalTriggerSystem.snapshotTransactionState()).toEqual(triggerBefore)
   })
   it('rethrows an ordinary reactive CardCode error after root SkillCode catches it', () => {
     let attemptedRuntime: RuleRuntime | undefined

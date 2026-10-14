@@ -1,0 +1,31 @@
+{
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-l5Yrto\\rvb-content-83fb0edb",
+  "source": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-l5Yrto\\rvb-content-83fb0edb\\sources\\current-workspace",
+  "archive": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-authoring-final-l5Yrto\\red252-authoring-final.rvbpack",
+  "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+  "published": false,
+  "channel": "authoring",
+  "build": {
+    "exitCode": 0,
+    "stdout": "[RVB content] PASS build\n[RVB content] packageHash=854820a520b57766c7af6bd7e09adefa15409b02682728572e4cedd6d69f84de\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T050406958Z-build-90296-15b7ff7f-276b-4f3b-8d85-2e9bd83b1780\\report.json\n",
+    "stderr": ""
+  },
+  "validate": {
+    "exitCode": 0,
+    "stdout": "[RVB content] PASS validate\n[RVB content] packageHash=854820a520b57766c7af6bd7e09adefa15409b02682728572e4cedd6d69f84de\n[RVB content] report=C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\package-validation\\RED-252\\20261012T050408734Z-validate-109732-6a661c43-b967-4bbc-9718-99dac02aacf7\\report.json\n",
+    "stderr": ""
+  },
+  "archiveInspection": {
+    "files": 548,
+    "documents": 293,
+    "semanticEntries": 381,
+    "sourceMismatches": [],
+    "compiledDocumentValidation": "pass"
+  },
+  "runtimeArchiveSmoke": {
+    "status": "not-run-policy-refused",
+    "reason": "AUTHORING_PREVIEW_ONLY",
+    "priorPolicyEvidence": "authoring-official-package.json",
+    "note": "Same unsigned authoring channel; runtime policy was not changed. Game tests and editor preview provide runtime evidence."
+  }
+}

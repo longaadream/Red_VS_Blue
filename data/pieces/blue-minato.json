@@ -34,5 +34,10 @@
     "rule-minato-anchor-end-turn",
     "rule-minato-flying-raijin-trigger"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:blue-minato",
+    "links": []
+  }
 }

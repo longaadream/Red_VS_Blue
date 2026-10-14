@@ -32,5 +32,10 @@
   "rules": [
     "rule-naruto-clone-endturn-charge"
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:blue-naruto",
+    "links": []
+  }
 }

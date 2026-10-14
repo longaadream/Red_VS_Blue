@@ -22,7 +22,8 @@ function amaterasuFixture() {
     maxHp: 10,
     x: 1,
     y: 0,
-    statusTags: [{ id: 'burn', type: 'amaterasu-burn', stacks: 1 }],
+    // Delayed damage retains the player captured when this status was made.
+    statusTags: [{ id: 'burn', type: 'amaterasu-burn', stacks: 1, ownerPlayerId: 'player-red' }],
   }))
   const state = makeState({ pieces: [ally, victim], currentPlayerId: 'player-blue' })
   state.extensions = { amaterasuOwnerPlayerId: 'player-red' }
@@ -71,7 +72,7 @@ function tick(fixture: ReturnType<typeof amaterasuFixture>, ruleId = 'rule-sasuk
   return new TriggerSystem().checkTriggers(fixture.state, { type: 'endTurn', playerId: 'player-blue' })
 }
 
-it.each(['rule-sasuke-amaterasu-damage', 'rule-sasuke-amaterasu-endturn'])('%s preserves living source and uses player after source death, omission or legacy missing identity', ruleId => {
+it.each(['rule-sasuke-amaterasu-damage', 'rule-sasuke-amaterasu-endturn'])('%s keeps the captured player source regardless of the original piece lifecycle', ruleId => {
   for (const mode of ['alive', 'dead', 'missing', 'legacy'] as const) {
     const fixture = amaterasuFixture()
     const caster = asPieceInstance(makePiece({ instanceId: 'original-caster', ownerPlayerId: 'player-red', x: 2, y: 1, currentHp: mode === 'dead' ? 0 : 10 }))
@@ -81,8 +82,8 @@ it.each(['rule-sasuke-amaterasu-damage', 'rule-sasuke-amaterasu-endturn'])('%s p
     tick(fixture, ruleId)
     expect(fixture.victim.currentHp).toBe(8)
     expect(damagePayloads(fixture.state)).toContainEqual(expect.objectContaining({
-      sourceId: mode === 'alive' ? caster.instanceId : 'player-red',
-      damageSource: { kind: mode === 'alive' ? 'piece' : 'player', sourceId: mode === 'alive' ? caster.instanceId : 'player-red', playerId: 'player-red' },
+      sourceId: 'player-red',
+      damageSource: { kind: 'player', sourceId: 'player-red', playerId: 'player-red' },
     }))
   }
 })
@@ -121,7 +122,7 @@ it.each(['alive', 'dead', 'missing'])('toxin source %s preserves damage and cons
   expect(state.players[0].rules).toEqual([])
   expect(state.extensions.tileEffects).toEqual([])
   expect(damagePayloads(state)).toContainEqual(expect.objectContaining({
-    damageSource: { kind: mode === 'alive' ? 'piece' : 'player', sourceId: mode === 'alive' ? caster.instanceId : 'player-red', playerId: 'player-red' },
+    damageSource: { kind: 'player', sourceId: 'player-red', playerId: 'player-red' },
   }))
 })
 
@@ -146,7 +147,7 @@ it('does not donate damage or kill passives to an unrelated ally and retains con
   expect(fixture.state.extensions?.tileEffects).toContainEqual(expect.objectContaining({ tileType: 'charge-crystal', x: 1, y: 0 }))
 })
 
-it('records Itachi as the actual living source through the real skill before falling back after death', () => {
+it('captures the same player through the real Itachi skill and retains it after the piece dies', () => {
   const fixture = amaterasuFixture()
   fixture.victim.statusTags = []
   const skill = JSON.parse(readFileSync('data/skills/itachi-amaterasu.json', 'utf8')) as SkillDefinition
@@ -159,7 +160,8 @@ it('records Itachi as the actual living source through the real skill before fal
   expect(fixture.state.extensions?.amaterasuCells).toContainEqual(expect.objectContaining({ sourcePieceId: caster.instanceId, ownerPlayerId: caster.ownerPlayerId }))
   expect(fixture.victim.statusTags).toContainEqual(expect.objectContaining({ sourcePieceId: caster.instanceId }))
   tick(fixture)
-  expect(damagePayloads(fixture.state)).toContainEqual(expect.objectContaining({ sourceId: caster.instanceId, damageSource: expect.objectContaining({ kind: 'piece' }) }))
+  expect(fixture.victim.currentHp).toBe(8)
+  expect(damagePayloads(fixture.state)).toContainEqual(expect.objectContaining({ sourceId: 'player-red', damageSource: expect.objectContaining({ kind: 'player' }) }))
   fixture.state.pieces = fixture.state.pieces.filter(piece => piece.instanceId !== caster.instanceId)
   fixture.state.graveyard = [{ ...caster, currentHp: 0 }]
   tick(fixture)

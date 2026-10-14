@@ -1,0 +1,3028 @@
+{
+  "schema": "rvb-red252-compatibility-behavior-proof/v1",
+  "generatedAt": "2026-10-13T19:14:09.163Z",
+  "source": {
+    "compositionProof": "output/completion-compatibility-composition-proof.json",
+    "currentRoutes": "output/completion-compatibility-routes.json",
+    "method": "Compile each stored standard graph and a one-call current legacy descriptor graph, then execute both against the same deterministic host harness and compare result/error/diagnostic tuples.",
+    "coverage": "The 16 stored composition graphs only; this is a bounded behavior audit, not a claim about all standard routes."
+  },
+  "summary": {
+    "routeCount": 16,
+    "behaviorEquivalent": 9,
+    "behaviorMismatched": 7,
+    "exactCaseCount": 119,
+    "totalCaseCount": 128,
+    "behaviorBoundaryMismatches": 9,
+    "behaviorAuthoringGaps": 0,
+    "equivalentIds": [
+      "query.affectable-pieces@1",
+      "query.enemies-on-cells@1",
+      "query.enemies-on-ordered-cells@1",
+      "query.piece-by-id@1",
+      "query.piece-by-identifier@1",
+      "query.pieces-in-rectangle@1",
+      "query.pieces-on-cells-all@1",
+      "spatial.cell-walkable@1",
+      "spatial.clip-cells@1"
+    ],
+    "mismatches": [
+      {
+        "id": "card.cell-unoccupied@1",
+        "cases": [
+          "missing-cell"
+        ],
+        "analysis": [
+          {
+            "case": "missing-cell",
+            "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+            "classification": "host-invalid-dependency",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "choice.first-cell-reference@1",
+        "cases": [
+          "empty"
+        ],
+        "analysis": [
+          {
+            "case": "empty",
+            "analysis": "legacy returns null for an empty choice array, while collection.at propagates an invalid dependency; an unresolved choice is an approved host protocol boundary with no author fallback",
+            "classification": "approved-empty-choice",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "choice.first-piece-reference@1",
+        "cases": [
+          "empty",
+          "missing-reference"
+        ],
+        "analysis": [
+          {
+            "case": "empty",
+            "analysis": "legacy returns null for an empty choice array, while collection.at propagates an invalid dependency; an unresolved choice is an approved host protocol boundary with no author fallback",
+            "classification": "approved-empty-choice",
+            "validAuthorInput": false,
+            "authoringGap": false
+          },
+          {
+            "case": "missing-reference",
+            "analysis": "legacy returns an unvalidated pieceId string, while the public composition authenticates the live piece and returns null; this is the approved invalid-handle behavior, not a public authoring gap",
+            "classification": "approved-invalid-reference",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "spatial.cell-require@1",
+        "cases": [
+          "missing-cell"
+        ],
+        "analysis": [
+          {
+            "case": "missing-cell",
+            "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+            "classification": "host-invalid-dependency",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "spatial.cell-unoccupied-except@1",
+        "cases": [
+          "empty",
+          "missing-cell"
+        ],
+        "analysis": [
+          {
+            "case": "empty",
+            "analysis": "this fixture is an empty battle with ignorePiece=\"red-source\", so the excluded instance handle is absent; it is not a legal empty exclusion list. The legacy typed piece input rejects that missing handle before lowering, while the public graph propagates the invalid dependency. The legal zero-other-occupant case uses the authenticated red-source in the single fixture and is exact.",
+            "classification": "approved-invalid-reference",
+            "validAuthorInput": false,
+            "authoringGap": false
+          },
+          {
+            "case": "missing-cell",
+            "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+            "classification": "host-invalid-dependency",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "spatial.cell-unoccupied@1",
+        "cases": [
+          "missing-cell"
+        ],
+        "analysis": [
+          {
+            "case": "missing-cell",
+            "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+            "classification": "host-invalid-dependency",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      },
+      {
+        "id": "spatial.cell-walkable-safe@1",
+        "cases": [
+          "missing-cell"
+        ],
+        "analysis": [
+          {
+            "case": "missing-cell",
+            "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+            "classification": "host-invalid-dependency",
+            "validAuthorInput": false,
+            "authoringGap": false
+          }
+        ]
+      }
+    ],
+    "currentRouteReportGeneratedAt": "2026-10-13T19:01:04.482Z",
+    "currentTrueGaps": []
+  },
+  "proofs": [
+    {
+      "id": "card.cell-unoccupied@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "missing-cell"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "missing-cell",
+          "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+          "classification": "host-invalid-dependency",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "choice.first-cell-reference@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "empty"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "empty",
+          "analysis": "legacy returns null for an empty choice array, while collection.at propagates an invalid dependency; an unresolved choice is an approved host protocol boundary with no author fallback",
+          "classification": "approved-empty-choice",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "choice.first-piece-reference@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": false,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "blue-one"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "empty",
+        "missing-reference"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "empty",
+          "analysis": "legacy returns null for an empty choice array, while collection.at propagates an invalid dependency; an unresolved choice is an approved host protocol boundary with no author fallback",
+          "classification": "approved-empty-choice",
+          "validAuthorInput": false,
+          "authoringGap": false
+        },
+        {
+          "case": "missing-reference",
+          "analysis": "legacy returns an unvalidated pieceId string, while the public composition authenticates the live piece and returns null; this is the approved invalid-handle behavior, not a public authoring gap",
+          "classification": "approved-invalid-reference",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.affectable-pieces@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": [
+        "Compared with a deterministic normal target-policy host stub; adventure-specific target rules remain a host boundary."
+      ]
+    },
+    {
+      "id": "query.enemies-on-cells@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.enemies-on-ordered-cells@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.piece-by-id@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.piece-by-identifier@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "piece": "red-source"
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.pieces-in-rectangle@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally",
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "red-ally",
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-source",
+                "blue-two",
+                "blue-one",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "query.pieces-on-cells-all@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two",
+                "red-ally"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "red-ally",
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "red-ally",
+                "blue-enemy"
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "pieces": [
+                "blue-one",
+                "blue-two"
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "spatial.cell-require@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": null
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cell": {
+                "x": 1,
+                "y": 0
+              }
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "missing-cell"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "missing-cell",
+          "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+          "classification": "host-invalid-dependency",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": [
+        "The generated composition uses a typed field/coordinate read and therefore exposes nullable-input behavior for verification."
+      ]
+    },
+    {
+      "id": "spatial.cell-unoccupied-except@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": false,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": false,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "empty",
+        "missing-cell"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "empty",
+          "analysis": "this fixture is an empty battle with ignorePiece=\"red-source\", so the excluded instance handle is absent; it is not a legal empty exclusion list. The legacy typed piece input rejects that missing handle before lowering, while the public graph propagates the invalid dependency. The legal zero-other-occupant case uses the authenticated red-source in the single fixture and is exact.",
+          "classification": "approved-invalid-reference",
+          "validAuthorInput": false,
+          "authoringGap": false
+        },
+        {
+          "case": "missing-cell",
+          "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+          "classification": "host-invalid-dependency",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "spatial.cell-unoccupied@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "missing-cell"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "missing-cell",
+          "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+          "classification": "host-invalid-dependency",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "spatial.cell-walkable-safe@1",
+      "compileProof": true,
+      "behaviorEquivalent": false,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": false,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": false
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "value": true
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [
+        "missing-cell"
+      ],
+      "mismatchAnalysis": [
+        {
+          "case": "missing-cell",
+          "analysis": "the legacy nullable adapter returns its explicit false/null value, while the typed public graph propagates the missing dependency; this is the approved host invalid-dependency boundary, not an author fallback gap",
+          "classification": "host-invalid-dependency",
+          "validAuthorInput": false,
+          "authoringGap": false
+        }
+      ],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": [
+        "The generated composition uses a typed field/coordinate read and therefore exposes nullable-input behavior for verification."
+      ]
+    },
+    {
+      "id": "spatial.cell-walkable@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "__undefined": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "walkable": true
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": []
+    },
+    {
+      "id": "spatial.clip-cells@1",
+      "compileProof": true,
+      "behaviorEquivalent": true,
+      "cases": [
+        {
+          "name": "empty",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "single",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "multiple",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "duplicate-order",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "ally-enemy",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-cell",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": []
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": []
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "missing-reference",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          }
+        },
+        {
+          "name": "decorated",
+          "equal": true,
+          "current": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "legacy": {
+            "result": {
+              "cells": [
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                }
+              ]
+            },
+            "diagnostics": []
+          },
+          "note": "Adds an unrelated marker to expose canonical-cell versus input-object identity."
+        }
+      ],
+      "mismatches": [],
+      "mismatchAnalysis": [],
+      "exactCases": [
+        "empty",
+        "single",
+        "multiple",
+        "duplicate-order",
+        "ally-enemy",
+        "missing-cell",
+        "missing-reference",
+        "decorated"
+      ],
+      "notes": [
+        "The legacy adapter canonicalizes every returned cell; the public composition filters in caller order and reconstructs each retained cell from pure x/y coordinates."
+      ]
+    }
+  ],
+  "limitations": [
+    "The host harness models live-piece query ordering, ally/enemy ownership, map tiles, and the normal target-policy branch; it does not replace the production host or prove adventure-specific policy.",
+    "A mismatch is retained with its current/legacy tuple and explicit classification. The bounded mismatches here are approved invalid-reference, empty-choice, or host invalid-dependency boundaries; none is counted as an authoring gap.",
+    "The route catalog still has 55 standard-public-composition rows without this bounded execution proof; they remain unverified in the route report.",
+    "Retired captured queue/remove/summon IDs are excluded from the active route set after migration. Any remaining true gap is read from the current route report rather than assumed by this proof."
+  ]
+}

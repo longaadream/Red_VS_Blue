@@ -1,0 +1,38 @@
+[
+  {
+    "slot": "record-create:parameter:schema",
+    "name": "schema",
+    "kind": "parameter",
+    "text": "【smoke-record@1】"
+  },
+  {
+    "slot": "record-create:input:field:hp",
+    "name": "field:hp",
+    "kind": "input",
+    "text": "【3】"
+  },
+  {
+    "slot": "record-create:input:field:label",
+    "name": "field:label",
+    "kind": "input",
+    "text": "【保留字段】"
+  },
+  {
+    "slot": "record-get:input:record",
+    "name": "record",
+    "kind": "input",
+    "text": "【record-create · value】"
+  },
+  {
+    "slot": "record-get:parameter:field",
+    "name": "field",
+    "kind": "parameter",
+    "text": "【hp】"
+  },
+  {
+    "slot": "return-result:input:return:result",
+    "name": "return:result",
+    "kind": "input",
+    "text": "【9】"
+  }
+]

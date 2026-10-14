@@ -44,6 +44,18 @@ describe('RED-185 contested charge crystals', () => {
     expect(() => flow.effects.tileBatch([{ id: 'flow-a', tileType: 'blizzard', x: 3, y: 1 }])).toThrow('Duplicate tile effect ID')
   })
 
+  it.each([undefined, {}])('rejects a duplicate batch without creating a missing container (%j)', extensions => {
+    const state = makeState() as any
+    state.extensions = extensions
+    const before = structuredClone(state)
+
+    expect(() => appendTileEffectsBatch(state, [
+      { id: 'duplicate', tileType: 'amaterasu', x: 1, y: 1 },
+      { id: 'duplicate', tileType: 'amaterasu', x: 2, y: 1 },
+    ])).toThrow('Duplicate tile effect ID')
+    expect(state).toEqual(before)
+  })
+
   it('uses an explicit origin for expand instead of the bounding-box center', () => {
     const state = makeState() as any
     const flow = createFlowRuntime(state, { piece: state.pieces[0], skill: { id: 'origin-test' } }, 'skill', {})

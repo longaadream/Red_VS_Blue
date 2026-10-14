@@ -29,5 +29,10 @@
     "rule-freeze-prevent-move",
     "rule-freeze-prevent-skill"
   ],
-  "isDefault": true
+  "isDefault": true,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:jaina",
+    "links": []
+  }
 }

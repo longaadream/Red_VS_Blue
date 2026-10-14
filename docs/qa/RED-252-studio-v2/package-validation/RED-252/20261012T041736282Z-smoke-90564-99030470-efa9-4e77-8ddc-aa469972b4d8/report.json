@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "rvb-content-report/v1",
+  "taskId": "RED-252",
+  "operation": "smoke",
+  "caller": "cli",
+  "channel": "authoring",
+  "status": "REFUSED",
+  "exitCode": 3,
+  "startedAt": "2026-10-12T04:17:36.282Z",
+  "finishedAt": "2026-10-12T04:17:36.283Z",
+  "command": {
+    "name": "smoke",
+    "args": [
+      "<base>",
+      "<patch-chain>",
+      "--seed",
+      "<seed>"
+    ]
+  },
+  "identity": {
+    "packageHash": null,
+    "publisherKeyId": null,
+    "signature": null,
+    "capabilities": [],
+    "resolvedProfileHash": null,
+    "authorityContentHash": null,
+    "engineAbi": null,
+    "contentAbi": null
+  },
+  "seed": 2521012,
+  "smoke": null,
+  "refusal": {
+    "code": "AUTHORING_PREVIEW_ONLY",
+    "stage": "policy",
+    "message": "Authoring packages are for editing only; sign and explicitly trust the publisher before runtime testing."
+  }
+}

@@ -1,0 +1,5834 @@
+{
+  "write": true,
+  "documents": 293,
+  "entries": 381,
+  "changedEntries": 381,
+  "rewrittenGraphs": 258,
+  "changed": [
+    {
+      "file": "data/skills/aizen-black-coffin.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/aizen-kyoka-suiguetsu.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/aizen-shunpo.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-annihilation.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-disorder.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-fighting-spirit.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-flash-step.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/alfonso-freeze.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/alfonso-kick.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/alfonso-water-dash.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/anti-heal-block.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-frostmourne.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-howling-blast.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-icebound-fortitude.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-lich-covenant.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ashbringer.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/biotic-grenade.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-deadly-gaze.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-lethal-strike.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-lethal-toxin.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-toxin-damage.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blessed-hammer.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blink.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blizzard-damage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blizzard.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blood-echo-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blood-echo.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/colt-big-stride.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/colt-bullet-storm.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/colt-piercing.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/colt-revolver.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/death-blossom.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/divine-blessing.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/divine-shield-defense.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/earthshatter.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/edgar-fisticuffs.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/edgar-pogo-jump.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/el-primo-elbow.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/el-primo-meteor-belt.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/el-primo-punch.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-blessing.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/elune-guidance-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-guidance.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-protection-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-protection.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/fel-blessing.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/fireball.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/freeze-prevent.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/frostbolt.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grant-lucky-coin.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grimmjow-destruction-instinct.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grimmjow-gran-rey-cero.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grimmjow-hunting-instinct.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grimmjow-panther-claw.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/grimmjow-resurreccion.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hand-cannon.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/hardy-block-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hardy-block.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-regen.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-sage-buddha.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-dragon.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-spike.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hellfire-shotgun.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hidan-blood-oath.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hidan-sacrifice.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hidan-undying.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/holy-light-descend.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/holy-shield-defense.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-bankai-tensa-zangetsu.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-black-getsuga-tensho.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-getsuga-tensho.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-zangetsu.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-blade-dash.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-demon-strike.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-eye-beam.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-metamorphosis.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/initial-draw.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/itachi-amaterasu.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/itachi-totsuka-blade.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/itachi-tsukuyomi.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-amakakeru.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-ryusosen.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-ryutsuisen.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kiljaedan-demonic-pact.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kiljaedan-fel-fire.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kiljaedan-soul-drain.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/light-extraction.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/light-of-the-light.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/max-full-speed.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/max-phase-shifter.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/max-speed-shot.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-flying-raijin-passive.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-kunai-formula.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-rasengan.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/minato-spiral-barrage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/mortis-bat-support.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/mortis-shovel-charge.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muru-lament.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-blood-whip.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-demon-body.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-flesh-regeneration.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-parasitism.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/nano-boost-damage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/nano-boost.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/naruto-rasengan.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/naruto-sage-mode.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/naruto-shadow-clone.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/naruto-vanguard.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/obito-ally-teleport.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/obito-grudge.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/obito-kamui.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/obito-space-time.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/pulse-pistol-move.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/pulse-pistol.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/rafaam-curse-amplify.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/rafaam-curse-ward.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/rafaam-temporal-distortion.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/reap-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/reap.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/recall-endturn-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/recall-move-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/recall-skill-trigger.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/recall.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/rocket-punch.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-amaterasu.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-chidori.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-indra-arrow.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-kagutsuchi.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-susanoo.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-bolt.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-chaos-control.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-chaos-spear.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-ride-sweep.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-step-teleport.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-step.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-bandage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-dash.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-shotgun.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-super-shell.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shield-of-light.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-combustion-passive.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-flame-spirit.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-infinite-blade.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sleep-dart.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sleep-prevent.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sleep-remove.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sonic-homing-attack.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sonic-spin-dash.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sonic-super-form.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/soul-fracture.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-armor-assembly.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-mechanical-support.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-twin-flight.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tirion-holy-recall.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/turalyon-expedition-order.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/turalyon-grand-crusade.json",
+      "entries": [
+        "code",
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/turalyon-lightforged-march.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ulquiorra-black-cero.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ulquiorra-cero.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ulquiorra-high-speed-regeneration.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ulquiorra-resurreccion.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-fate-shelter.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-holy-prophecy.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-thousand-futures-ultimate.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-claw-rend.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-corrosion.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-host-transfer.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-symbiote-drag.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/watcher-ultimate.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-end.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-expire.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-rewrite.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-akaza-damage-mark.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-akaza-fighting-spirit.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound-retaliate.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-lich-covenant.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-slow-restore.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-blackwidow-toxin-player.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-blood-oath-tick.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-chidori-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-colt-big-stride.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-colt-zone-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-damage-buff.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-divine-shield.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-el-primo-injury-counter.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-el-primo-meteor-belt.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-elune-guidance.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-elune-protection-player.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-elune-protection.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-destruction-instinct.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-resurreccion.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hashirama-edo-regen.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-blood-oath-reflect.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-dying-immune.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-undying-tick.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-undying.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-ichigo-black-getsuga-teleport.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-illidan-demon-strike.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-itachi-tsukuyomi.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken-boost.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-lucky-coin-gamestart.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-mangekyo-friendly-death.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-max-phase-recast-expire.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-minato-anchor-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-minato-flying-raijin-trigger.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-momentum-consume.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-momentum-gain.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-mortis-damage-counter.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-damage-reduction.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-damage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-end.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-died.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-endturn-charge.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-one-hit.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-block-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immunity.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-tick.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-obito-grudge-reset.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-obito-grudge.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-obito-kamui-block.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-ward.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-temporal-distortion.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-reap.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-damage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-stack.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shadow-chaos-spear-restore.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shelly-bandage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-combustion.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-cooldown-once.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-execute-option.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-infinite-blade-recast.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-kill-track.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-no-heal.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-silence-burst.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-silenced-block.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sonic-free-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-soul-fracture-player.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-soul-fracture.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-armor-recovery.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune-target.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-reservation-block.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-resolve.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-glory.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-shield-start.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-turalyon-lightforged-march.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-dealt.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-taken.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-resurreccion.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-velen-death-cleanup.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-velen-delayed-effects.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-velen-fate-target.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-venom-corrosion-immobile.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-watcher-form.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-dealt.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-taken.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-watcher-shield.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/cards/armor-attack-defense.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/armor-attack-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/armor-attack-speed.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/armor-defense-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/armor-defense-speed.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/armor-heal-speed.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-1.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-2.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-3.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-4.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/demon-summon-5.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-nature-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-thousand-hands.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/holy-charge.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/holy-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/holy-smite.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/lucky-coin.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/rafaam-curse-sample.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/sample-reactive-card.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/soul-fragment.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/watcher-calm.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/watcher-rage.json",
+      "entries": [
+        "code"
+      ]
+    }
+  ],
+  "guards": [
+    {
+      "file": "data/skills/aizen-kyoka-suiguetsu.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "has-opponent",
+            "module": "query.has-player",
+            "scope": "skill.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/akaza-flash-step.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 6,
+        "guardedIfs": 3,
+        "missingChecks": 0,
+        "validChecks": 3,
+        "unboundGuards": 3,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "source-alive",
+            "module": "piece.alive",
+            "scope": "skill.body/source-guard.then",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "scope": "skill.body/source-guard.then",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "scope": "skill.body/source-guard.then/source-alive-guard.then/target-present-guard.then",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "still-present",
+            "module": "query.has-piece",
+            "ifId": "still-present-guard",
+            "scope": "skill.body/source-guard.then/source-alive-guard.then/target-present-guard.then/target-valid-guard.then/marked-guard.then/adjacent-guard.then/walkable-guard.then/vacant-guard.then/move-guard.then/changed-guard.then",
+            "reason": "fallback-has-else-branch"
+          },
+          {
+            "callId": "still-alive",
+            "module": "piece.alive",
+            "ifId": "still-alive-guard",
+            "scope": "skill.body/source-guard.then/source-alive-guard.then/target-present-guard.then/target-valid-guard.then/marked-guard.then/adjacent-guard.then/walkable-guard.then/vacant-guard.then/move-guard.then/changed-guard.then/still-present-guard.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/alfonso-kick.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/alfonso-water-dash.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "first-piece",
+            "module": "query.has-piece",
+            "ifId": "first-present",
+            "scope": "skill.body/source-guard.then/target-wait-or-cancel.else/direction-guard.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/anti-heal-block.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/arthas-frostmourne.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "has-player",
+            "module": "query.has-player",
+            "scope": "skill.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/arthas-howling-blast.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-branch",
+            "scope": "skill.body/enemy-loop.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/blizzard-damage.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "owner-exists",
+            "module": "query.has-player",
+            "ifId": "owner-missing",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/blood-echo-trigger.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "triggerSkill.body",
+            "reason": "fallback-has-else-branch"
+          },
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "triggerSkill.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-check",
+            "scope": "triggerSkill.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/divine-shield-defense.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/edgar-fisticuffs.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 3,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "scope": "skill.body/hit-sequence.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "scope": "skill.body/hit-sequence.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "source-exists-after",
+            "module": "query.has-piece",
+            "scope": "skill.body/hit-sequence.body/hit-guard.then",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/edgar-pogo-jump.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/el-primo-elbow.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/elune-blessing.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-player",
+            "ifId": "owner-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/elune-guidance-trigger.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-check",
+            "scope": "triggerSkill.body",
+            "reason": "fallback-has-else-branch"
+          },
+          {
+            "callId": "tyrande-exists",
+            "module": "query.has-piece",
+            "ifId": "tyrande-check",
+            "scope": "triggerSkill.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/elune-protection-trigger.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "tyrande-exists",
+            "module": "query.has-piece",
+            "ifId": "tyrande-check",
+            "scope": "triggerSkill.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/freeze-prevent.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/grant-lucky-coin.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "player-present",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/grimmjow-panther-claw.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 2,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "scope": "skill.body/claw-sequence.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "scope": "skill.body/claw-sequence.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/hardy-block-trigger.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/hidan-sacrifice.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "exists",
+            "module": "query.has-piece",
+            "scope": "skill.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/ichigo-bankai-tensa-zangetsu.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "unwrap-dependent-guard",
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-check",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/ichigo-black-getsuga-tensho.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "holder-alive",
+            "module": "piece.alive",
+            "ifId": "holder-alive-check",
+            "scope": "skill.body/enemy-check.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/illidan-blade-dash.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/kenshin-amakakeru.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "unwrap-dependent-guard",
+            "callId": "owner-present",
+            "module": "query.has-player",
+            "ifId": "owner-branch",
+            "scope": "skill.body/target-present-branch.then/target-alive-branch.then/has-cells-branch.then/landing-present-branch.then/move-branch.then/killed-branch.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/kiljaedan-demonic-pact.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/max-phase-shifter.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/mortis-shovel-charge.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/muru-lament.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/muzan-blood-whip.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-guard",
+            "scope": "skill.body/damage-targets.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/muzan-demon-body.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 0,
+        "validChecks": 3,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "enemy-alive-before",
+            "module": "piece.alive",
+            "ifId": "enemy-alive-guard",
+            "scope": "skill.body/source-guard.then/target-wait-or-cancel.else/direction-guard.then/distance-guard.else/walkable-guard.then/unoccupied-guard.then/path-guard.then/move-success-guard.then/move-path-guard.then/source-alive-after-move-guard.then/enemy-loop.body",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "enemy-alive-after",
+            "module": "piece.alive",
+            "ifId": "root-alive-guard",
+            "scope": "skill.body/source-guard.then/target-wait-or-cancel.else/direction-guard.then/distance-guard.else/walkable-guard.then/unoccupied-guard.then/path-guard.then/move-success-guard.then/move-path-guard.then/source-alive-after-move-guard.then/enemy-loop.body/enemy-alive-guard.then",
+            "reason": "body-has-independent-work"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/nano-boost-damage.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-source",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/naruto-rasengan.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "ifId": "dead-target-guard",
+            "scope": "skill.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/obito-ally-teleport.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/obito-space-time.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/pulse-pistol-move.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "caster-exists",
+            "module": "query.has-piece",
+            "ifId": "missing-source",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/pulse-pistol.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 2,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "caster-exists",
+            "module": "query.has-piece",
+            "scope": "triggerSkill.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "trigger-exists",
+            "module": "query.has-piece",
+            "scope": "triggerSkill.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/rafaam-curse-amplify.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "enemy-present",
+            "module": "query.has-player",
+            "ifId": "enemy-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/rocket-punch.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/sasuke-chidori.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-guard",
+            "scope": "skill.body/damage-enemies.then/apply-immobile.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/shadow-ride-sweep.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "moved-present",
+            "module": "query.has-piece",
+            "ifId": "moved-write",
+            "scope": "skill.body/source-guard.then/target-wait-or-cancel.else/direction-guard.then/trace-guard.then/landing-guard.then/move-guard.then",
+            "reason": "body-has-independent-work"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/shadow-step-teleport.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/shadow-step.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/shishio-flame-spirit.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-branch",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/sleep-prevent.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/sleep-remove.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "missing-subject",
+            "scope": "triggerSkill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/sonic-homing-attack.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/sonic-spin-dash.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 7,
+        "guardedIfs": 7,
+        "missingChecks": 0,
+        "validChecks": 7,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "enemy-moved-target-alive",
+            "module": "piece.alive",
+            "ifId": "enemy-moved-silence",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.then/enemy-move.then/enemy-move-success.then/enemy-moved-empowered-silence.then",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "enemy-moved-present",
+            "module": "query.has-piece",
+            "ifId": "enemy-moved-write",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.then/enemy-move.then/enemy-move-success.then",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "enemy-stationary-target-alive",
+            "module": "piece.alive",
+            "ifId": "enemy-stationary-silence",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.then/enemy-move.else/enemy-stationary-empowered-silence.then",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "enemy-stationary-present",
+            "module": "query.has-piece",
+            "ifId": "enemy-stationary-write",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.then/enemy-move.else",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "no-enemy-moved-present",
+            "module": "query.has-piece",
+            "ifId": "no-enemy-moved-write",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.else/no-enemy-move.then/no-enemy-move-success.then",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "no-enemy-stationary-present",
+            "module": "query.has-piece",
+            "ifId": "no-enemy-stationary-write",
+            "scope": "skill.body/source-guard.then/direction-guard.then/enemy-or-empty.else/no-enemy-move.else",
+            "reason": "body-has-independent-work"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/sonic-super-form.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "unwrap-dependent-guard",
+            "callId": "player-present",
+            "module": "query.has-player",
+            "ifId": "grant-check",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/tails-armor-assembly.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "owner-present",
+            "module": "query.has-player",
+            "ifId": "owner-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/tails-mechanical-support.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "skill.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/velen-holy-prophecy.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "missing-player",
+            "scope": "skill.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/velen-thousand-futures-ultimate.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "missing-player",
+            "scope": "skill.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/venom-host-transfer.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "scope": "skill.body/source-guard.then/target-wait-or-cancel.else/self-guard.else",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/skills/venom-symbiote-drag.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/skills/watcher-ultimate.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-player",
+            "ifId": "missing-player",
+            "scope": "skill.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-end.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-expire.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-rewrite.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 4,
+        "guardedIfs": 4,
+        "missingChecks": 3,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "aizen-alive",
+            "module": "piece.alive",
+            "ifId": "aizen-alive-check",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          },
+          {
+            "callId": "answer-replacement-present",
+            "module": "query.has-piece",
+            "ifId": "answer-missing-check",
+            "scope": "rule.body/selected-answer-branch.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-akaza-damage-mark.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "require-target",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-akaza-fighting-spirit.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "require-target",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-victim",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound-retaliate.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "board",
+            "module": "query.has-piece",
+            "ifId": "board-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-arthas-icebound.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-arthas-lich-covenant.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-arthas-slow-restore.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-blackwidow-toxin-player.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "rule.body",
+            "reason": "fallback-has-else-branch"
+          },
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-guard",
+            "scope": "rule.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-chidori-immobile.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-colt-big-stride.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-colt-zone-endturn.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "source-alive",
+            "module": "piece.alive",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-damage-buff.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "piece-exists",
+            "module": "query.has-piece",
+            "ifId": "piece-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-divine-shield.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-el-primo-injury-counter.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-el-primo-meteor-belt.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "guard-exists",
+            "module": "query.has-piece",
+            "ifId": "guard-present",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-present",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-elune-guidance.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-check",
+            "scope": "rule.body",
+            "reason": "fallback-has-else-branch"
+          },
+          {
+            "callId": "tyrande-exists",
+            "module": "query.has-piece",
+            "ifId": "tyrande-check",
+            "scope": "rule.body",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-elune-protection-player.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "owner-exists",
+            "module": "query.has-player",
+            "ifId": "require-owner",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-elune-protection.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "owner-exists",
+            "module": "query.has-player",
+            "ifId": "require-owner",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-grimmjow-destruction-instinct.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "grimm-exists",
+            "module": "query.has-piece",
+            "ifId": "grimm-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "enemy-exists",
+            "module": "query.has-piece",
+            "ifId": "enemy-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "grimm-exists",
+            "module": "query.has-piece",
+            "ifId": "grimm-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "enemy-exists",
+            "module": "query.has-piece",
+            "ifId": "enemy-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-grimmjow-resurreccion.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-hashirama-edo-regen.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-hidan-undying-tick.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "hidan-exists",
+            "module": "query.has-piece",
+            "ifId": "hidan-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-ichigo-black-getsuga-teleport.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "source-alive",
+            "module": "piece.alive",
+            "scope": "rule.continuation:ichigo-black-getsuga-teleport-complete.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-illidan-demon-strike.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-itachi-tsukuyomi.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken-boost.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "piece-exists",
+            "module": "query.has-piece",
+            "ifId": "piece-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-kenshin-tenken.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-lucky-coin-gamestart.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "unwrap-dependent-guard",
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "add-card",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-mangekyo-friendly-death.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 2,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "witness-exists",
+            "module": "query.has-piece",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "dead-exists",
+            "module": "query.has-piece",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-max-phase-recast-expire.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "piece-exists",
+            "module": "query.has-piece",
+            "ifId": "piece-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-minato-anchor-end-turn.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-momentum-consume.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "rule.body/side-branch.then/side-target-branch.then/valid-side-branch.then/side-ray-origins.body/side-ray-events.body/side-piece-event.then",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-momentum-gain.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-mortis-damage-counter.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "require-target",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-muzan-damage-reduction.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "defender-exists",
+            "module": "query.has-piece",
+            "ifId": "defender-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-damage.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-end.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-died.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 0,
+        "validChecks": 3,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "rule.body/holder-guard.then"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "attacker-present",
+            "module": "query.has-piece",
+            "ifId": "attacker-guard",
+            "scope": "rule.body/holder-guard.then/source-guard.then/same-guard.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-immobile.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 0,
+        "validChecks": 3,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "event-present",
+            "module": "query.has-piece",
+            "ifId": "event-guard",
+            "scope": "rule.body/holder-guard.then/alive-branch.then"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-branch",
+            "scope": "rule.body/holder-guard.then",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-one-hit.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "source-present",
+            "module": "query.has-piece",
+            "ifId": "source-guard",
+            "scope": "rule.body/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-block-skill.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immobile.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-immunity.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-naruto-sage-tick.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 1,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "unwrap-dependent-guard",
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "reward-player",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-obito-grudge-reset.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "obito-exists",
+            "module": "query.has-piece",
+            "ifId": "obito-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-obito-grudge.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-obito-kamui-block.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 0,
+        "missingChecks": 0,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "attacker-exists",
+            "module": "query.has-piece",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-end-turn.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "player-present",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-ward.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "rule-piece-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "event-piece-present",
+            "module": "query.has-piece",
+            "ifId": "event-piece-guard",
+            "scope": "rule.body/holder-guard.then"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "enemy-present",
+            "module": "query.has-player",
+            "scope": "rule.body/holder-guard.then/event-piece-guard.then/same-piece-guard.then/turn-guard.then/unused-guard.then",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-damage.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 1,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "live-target-present",
+            "module": "query.has-piece",
+            "ifId": "live-target-guard",
+            "scope": "rule.body/damage-pieces-loop.body",
+            "reason": "body-has-independent-work"
+          },
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "scope": "rule.body/damage-pieces-loop.body/live-target-guard.then",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-move.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "moved-guard",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-shadow-chaos-spear-restore.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 1,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "caster-exists",
+            "module": "query.has-piece",
+            "ifId": "caster-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "ifId": "restore-target",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-shelly-bandage.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-burn-move.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-check",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-combustion.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-cooldown-once.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 2,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-has-piece",
+            "module": "query.has-piece",
+            "ifId": "target-alive-check",
+            "scope": "rule.body/already-fired.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-execute-option.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 4,
+        "guardedIfs": 4,
+        "missingChecks": 4,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "ifId": "target-alive-check",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-infinite-blade-recast.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 6,
+        "guardedIfs": 5,
+        "missingChecks": 4,
+        "validChecks": 1,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-exists-check",
+            "scope": "rule.body/target-choice-branch.then"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "ifId": "alive-check",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          },
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "scope": "rule.body/target-choice-branch.then",
+            "reason": "unbound-guard"
+          },
+          {
+            "callId": "still-alive",
+            "module": "piece.alive",
+            "ifId": "self-death",
+            "scope": "rule.body/target-choice-branch.then/target-valid-branch.then",
+            "reason": "fallback-has-else-branch"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-kill-track.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 3,
+        "guardedIfs": 3,
+        "missingChecks": 3,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "require-target",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-no-heal.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-shishio-silence-burst.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 4,
+        "guardedIfs": 4,
+        "missingChecks": 4,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "target-exists",
+            "module": "query.has-piece",
+            "ifId": "target-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "ifId": "target-alive-check",
+            "scope": "rule.body",
+            "reason": "alive-boundary-not-proven"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-silenced-block.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-sonic-free-move.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-soul-fracture-player.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "owner-exists",
+            "module": "query.has-player",
+            "ifId": "owner-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-armor-recovery.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune-target.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-flight-immune.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable-skill.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-flight-inoperable.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tails-flight-resolve.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-present",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "event-player-present",
+            "module": "query.has-player",
+            "ifId": "event-player-guard",
+            "scope": "rule.body/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-glory.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-tirion-divine-shield-start.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-dealt.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-damage-taken.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "require-source",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-ulquiorra-resurreccion.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-velen-death-cleanup.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-velen-delayed-effects.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 1,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": [
+          {
+            "callId": "alive",
+            "module": "piece.alive",
+            "scope": "rule.body",
+            "reason": "unbound-guard"
+          }
+        ]
+      }
+    },
+    {
+      "file": "data/rules/rule-velen-fate-target.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-check",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "source-exists",
+            "module": "query.has-piece",
+            "ifId": "source-check",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-venom-corrosion-immobile.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 0,
+        "validChecks": 2,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "holder-exists",
+            "module": "query.has-piece",
+            "ifId": "holder-guard",
+            "scope": "rule.composite:shared.status-event-guard"
+          },
+          {
+            "kind": "promote-valid-branch",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "subject-exists-guard",
+            "scope": "rule.composite:shared.status-event-guard/holder-guard.then"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-watcher-form.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 1,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "piece-exists",
+            "module": "query.has-piece",
+            "ifId": "piece-required",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-dealt.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-watcher-rage-taken.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/rules/rule-watcher-shield.json",
+      "entry": "skillCode",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 2,
+        "validChecks": 0,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "exists",
+            "module": "query.has-piece",
+            "ifId": "require-holder",
+            "scope": "rule.body"
+          },
+          {
+            "kind": "remove-defensive-fallback",
+            "callId": "subject-exists",
+            "module": "query.has-piece",
+            "ifId": "require-subject",
+            "scope": "rule.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-attack-defense.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-attack-heal.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-attack-speed.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-defense-heal.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-defense-speed.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/armor-heal-speed.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "target-present",
+            "module": "query.has-piece",
+            "ifId": "target-guard",
+            "scope": "card.body/target-pending.else"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/holy-charge.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "has-player",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "card.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/holy-heal.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "has-player",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "card.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/holy-smite.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "has-player",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "card.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/lucky-coin.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 1,
+        "guardedIfs": 1,
+        "missingChecks": 0,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [
+          {
+            "kind": "promote-valid-branch",
+            "callId": "player-exists",
+            "module": "query.has-player",
+            "ifId": "player-guard",
+            "scope": "card.body"
+          }
+        ],
+        "retained": []
+      }
+    },
+    {
+      "file": "data/cards/watcher-rage.json",
+      "entry": "code",
+      "report": {
+        "scannedGuardCalls": 2,
+        "guardedIfs": 2,
+        "missingChecks": 1,
+        "validChecks": 1,
+        "unboundGuards": 0,
+        "changes": [],
+        "retained": [
+          {
+            "callId": "target-alive",
+            "module": "piece.alive",
+            "ifId": "target-guard",
+            "scope": "card.body",
+            "reason": "alive-boundary-not-proven"
+          },
+          {
+            "callId": "has-owner",
+            "module": "query.has-player",
+            "ifId": "restore-action-point",
+            "scope": "card.body/calm-exit.then",
+            "reason": "body-has-independent-work"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

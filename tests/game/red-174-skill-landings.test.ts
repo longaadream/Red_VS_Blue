@@ -132,6 +132,9 @@ describe('RED-174 skill landing contracts', () => {
     expect(repeatedPendingRun.stateHash).toBe(pendingRun.stateHash)
     const pending = pendingRun.state
     expect(pending.pendingOptionSelection).toMatchObject({ playerId: 'player-red' })
+    expect(pending.pendingOptionSelection!.options.map(option => (
+      option && typeof option === 'object' ? (option as { value?: unknown; id?: unknown }).value ?? (option as { id?: unknown }).id : option
+    ))).toEqual(['yes', 'no'])
     const resolveAction = {
       type: 'pendingOptionSelect' as const, playerId: 'player-red', selectedOption: 'yes',
       selectionId: pending.pendingOptionSelection!.selectionId,

@@ -15,5 +15,78 @@
   "powerMultiplier": 1,
   "actionPointCost": 0,
   "range": "self",
-  "code": "function executeSkill() { return { success: false, message: '' }; }"
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module0 = ({success: false, message: \"\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"result\", __gameplayError, \"result.message\"); _module0 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module0[\"success\"]) === __gameplayInvalid) || ((_module0[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module0[\"success\"]), \"message\": (_module0[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return\", __gameplayError); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "result",
+              "module": "result.message",
+              "version": "1",
+              "inputs": {
+                "message": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {
+                "success": false
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return",
+              "values": {
+                "success": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "success"
+                },
+                "message": {
+                  "kind": "output",
+                  "node": "result",
+                  "port": "message"
+                }
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:ulquiorra-high-speed-regeneration",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-ulquiorra-damage-dealt",
+        "relation": "shared",
+        "source": "pieces/dark-ulquiorra.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-ulquiorra-damage-taken",
+        "relation": "shared",
+        "source": "pieces/dark-ulquiorra.rules"
+      }
+    ]
+  }
 }

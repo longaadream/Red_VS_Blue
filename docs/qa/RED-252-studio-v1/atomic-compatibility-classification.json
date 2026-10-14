@@ -1,0 +1,4993 @@
+{
+  "reviewDate": "2026-10-13",
+  "reviewer": "atomic_full_review",
+  "baseline": "docs/qa/RED-252-studio-v1/atomic-catalog-audit.json",
+  "scope": "Frozen 267 compatibility-still-used descriptors in the supplied catalog; counts are baseline counts, not a claim that concurrent migration work remains unfinished.",
+  "method": "Inspected each registered descriptor lowering and description, plus relevant flow-runtime state/capture/lifecycle delegates. Classification is manual per descriptor; private status is not evidence of atomicity. No gameplay source edits or runtime tests in this audit.",
+  "definitions": {
+    "M": "必须组合迁移",
+    "H": "合理权威宿主原语",
+    "G": "通用读取但缺公开命名整合",
+    "P": "协议适配必要"
+  },
+  "categoryNotes": {
+    "必须组合迁移": "The wrapper contains derived policy, aggregation, record construction or field fallback that should move to generic graph composition. Its underlying controlled write, lifecycle, RNG or batch boundary may still be necessary; do not remove that boundary.",
+    "合理权威宿主原语": "A concrete controlled write, lifecycle, queued operation, identity/capture/time or generic execution-local state boundary. This does not endorse existing private naming or bypassing validation.",
+    "通用读取但缺公开命名整合": "Includes user-approved generic mathematical/spatial operations and range queries as well as basic reads. Exposing/unifying their contract is required; exploding distance into arithmetic is not required.",
+    "协议适配必要": "Compatibility with pending/choice/result forms. Can consolidate under typed public protocol APIs; this is not a claim every specialized name must remain."
+  },
+  "counts": {
+    "协议适配必要": 29,
+    "合理权威宿主原语": 71,
+    "必须组合迁移": 128,
+    "通用读取但缺公开命名整合": 39
+  },
+  "limitations": [
+    "This is a scope classification, not an implementation correctness verdict.",
+    "Several composition migrations were already assigned or in progress; baseline usage is intentionally retained for complete traceability.",
+    "Stateful composition requires controlled writes and exact raw-versus-lifecycle semantics; mutation of snapshot reads is not an acceptable replacement.",
+    "Source line numbers may move under concurrent edits.",
+    "A generic host boundary can have derived result fields that should be composed separately; reasons call out material examples."
+  ],
+  "items": [
+    {
+      "key": "choice.is-unresolved@1",
+      "label": "选择未完成或已取消",
+      "calls": 116,
+      "entries": [
+        "data/cards/armor-attack-defense.json#code",
+        "data/cards/armor-attack-heal.json#code",
+        "data/cards/armor-attack-speed.json#code",
+        "data/cards/armor-defense-heal.json#code",
+        "data/cards/armor-defense-speed.json#code",
+        "data/cards/armor-heal-speed.json#code",
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/soul-fragment.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-shishio-execute-option.json#skillCode",
+        "data/rules/rule-watcher-form.json#skillCode",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/arthas-lich-covenant.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/hidan-blood-oath.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/itachi-tsukuyomi.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/light-of-the-light.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/naruto-rasengan.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/obito-space-time.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sasuke-amaterasu.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/shield-of-light.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sleep-dart.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/tails-armor-assembly.json#code",
+        "data/skills/tails-mechanical-support.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/turalyon-expedition-order.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/velen-fate-shelter.json#code",
+        "data/skills/velen-holy-prophecy.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code",
+        "data/skills/venom-claw-rend.json#code",
+        "data/skills/venom-host-transfer.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "挂起与取消的旧协议联合判断，需统一选择结果接口，不能当普通布尔字段等价替换。",
+      "sourcepath": "lib/skill-graph/module-registry-query.ts:17",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-query.ts:17"
+      ]
+    },
+    {
+      "key": "choice.as-result@1",
+      "label": "返回权威选择结果",
+      "calls": 120,
+      "entries": [
+        "data/cards/armor-attack-defense.json#code",
+        "data/cards/armor-attack-heal.json#code",
+        "data/cards/armor-attack-speed.json#code",
+        "data/cards/armor-defense-heal.json#code",
+        "data/cards/armor-defense-speed.json#code",
+        "data/cards/armor-heal-speed.json#code",
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/soul-fragment.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-shishio-execute-option.json#skillCode",
+        "data/rules/rule-watcher-form.json#skillCode",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/arthas-lich-covenant.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/hidan-blood-oath.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/itachi-tsukuyomi.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/light-of-the-light.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/naruto-rasengan.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/obito-space-time.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sasuke-amaterasu.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/shield-of-light.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sleep-dart.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/tails-armor-assembly.json#code",
+        "data/skills/tails-mechanical-support.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/turalyon-expedition-order.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/velen-fate-shelter.json#code",
+        "data/skills/velen-holy-prophecy.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code",
+        "data/skills/venom-claw-rend.json#code",
+        "data/skills/venom-host-transfer.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "原样返回选择协议对象，保持pending载荷与返回形状。",
+      "sourcepath": "lib/skill-graph/module-registry-query.ts:19",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-query.ts:19"
+      ]
+    },
+    {
+      "key": "event.enqueue-damage-redirect@1",
+      "label": "请求替代承受当前伤害",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-el-primo-meteor-belt.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "写入当前伤害重定向队列，队列时机属于事件权威边界。",
+      "sourcepath": "lib/skill-graph/module-registry-damage-redirect.ts:20",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-damage-redirect.ts:20"
+      ]
+    },
+    {
+      "key": "tile.add-reservation@1",
+      "label": "添加地格预留标记",
+      "calls": 2,
+      "entries": [
+        "data/skills/tails-twin-flight.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造flightId地格记录并删掉tileBatch附加字段；记录构造移到图，需保留原形状的通用tile提交策略。",
+      "sourcepath": "lib/skill-graph/module-registry-flight-primitives.ts:120",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-flight-primitives.ts:120"
+      ]
+    },
+    {
+      "key": "tile.clear-flight-reservations@1",
+      "label": "清理飞行预留",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-tails-flight-resolve.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "按effectType和flightId过滤tileEffects；筛选移到图，保留通用受控tile替换。",
+      "sourcepath": "lib/skill-graph/module-registry-flight-primitives.ts:136",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-flight-primitives.ts:136"
+      ]
+    },
+    {
+      "key": "effect.teleport-if-present@1",
+      "label": "按存在性传送",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-tails-flight-resolve.json#skillCode",
+        "data/skills/kenshin-amakakeru.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "空引用检查加通用move，属于fallback包装；使用引擎失效传播加通用传送，校验false输出兼容。",
+      "sourcepath": "lib/skill-graph/module-registry-flight-primitives.ts:152",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-flight-primitives.ts:152"
+      ]
+    },
+    {
+      "key": "status.find-flight@1",
+      "label": "读取飞行记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-tails-flight-resolve.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "首个type+ownerId状态读取和存活ally筛选；字段/集合组合，保留appliedTurn=-1和其他非finite默认。",
+      "sourcepath": "lib/skill-graph/module-registry-flight-primitives.ts:177",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-flight-primitives.ts:177"
+      ]
+    },
+    {
+      "key": "status.remove-by-flight@1",
+      "label": "按飞行标识移除状态",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-tails-flight-resolve.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "先按flightId过滤再逐条lifecycle.remove；保留移除事件，仅将选择策略移到图。",
+      "sourcepath": "lib/skill-graph/module-registry-flight-primitives.ts:196",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-flight-primitives.ts:196"
+      ]
+    },
+    {
+      "key": "spatial.cell-walkable@1",
+      "label": "检查地格可行走",
+      "calls": 10,
+      "entries": [
+        "data/cards/demon-summon-5.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用地图可走事实，无内容常量；整合公开cell/map字段或空间查询命名。",
+      "sourcepath": "lib/skill-graph/module-registry-summon-primitives.ts:101",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-summon-primitives.ts:101"
+      ]
+    },
+    {
+      "key": "lifecycle.zero-health@1",
+      "label": "将棋子生命置零",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-naruto-clone-one-hit.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "afterDamageTaken和source身份校验后置零，由DeathBatch完成死亡，不能以任意字段写替代。",
+      "sourcepath": "lib/skill-graph/module-registry-summon-primitives.ts:128",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-summon-primitives.ts:128"
+      ]
+    },
+    {
+      "key": "ability.mark-spent@1",
+      "label": "记录能力已消耗",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-hidan-undying.json#skillCode",
+        "data/rules/rule-shelly-bandage.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "一次性ability标记存储，使用声明extension布尔写；执行次数判断不应由专用ability键封装。",
+      "sourcepath": "lib/skill-graph/module-registry-abilities.ts:22",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-abilities.ts:22"
+      ]
+    },
+    {
+      "key": "identity.host-time@1",
+      "label": "宿主标识时间",
+      "calls": 12,
+      "entries": [
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/skills/alfonso-freeze.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/sleep-dart.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "宿主绑定时钟是标识/回放输入边界，保留调用次数与时机。",
+      "sourcepath": "lib/skill-graph/module-registry-abilities.ts:87",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-abilities.ts:87"
+      ]
+    },
+    {
+      "key": "status.remove-player-records@1",
+      "label": "移除玩家状态记录（不触发事件）",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-elune-protection-player.json#skillCode",
+        "data/rules/rule-rafaam-temporal-distortion.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "flow.status.removePlayerRecords仅按type过滤原数组，无生命周期事件；filter加通用raw提交。",
+      "sourcepath": "lib/skill-graph/module-registry-status-events.ts:25",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-events.ts:25"
+      ]
+    },
+    {
+      "key": "status.remove-record@1",
+      "label": "直接移除首个匹配状态记录",
+      "calls": 11,
+      "entries": [
+        "data/rules/rule-arthas-slow-restore.json#skillCode",
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-shadow-chaos-spear-restore.json#skillCode",
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/sleep-remove.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "首个匹配raw状态删除是受控变更边界，必须区分lifecycle删除；公开通用selector接口。",
+      "sourcepath": "lib/skill-graph/module-registry-status-events.ts:40",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-events.ts:40"
+      ]
+    },
+    {
+      "key": "status.set-number@1",
+      "label": "设定状态数值",
+      "calls": 16,
+      "entries": [
+        "data/cards/watcher-calm.json#code",
+        "data/rules/rule-arthas-slow-restore.json#skillCode",
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-naruto-sage-tick.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-move.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode",
+        "data/rules/rule-shishio-combustion.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-dealt.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-taken.json#skillCode",
+        "data/rules/rule-watcher-shield.json#skillCode",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受控状态字段有限值写入；可整合typed状态写，但不是作者直接修改快照。",
+      "sourcepath": "lib/skill-graph/module-registry-status-events.ts:105",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-events.ts:105"
+      ]
+    },
+    {
+      "key": "status.remove-id@1",
+      "label": "按标识移除状态",
+      "calls": 25,
+      "entries": [
+        "data/cards/watcher-calm.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode",
+        "data/rules/rule-damage-buff.json#skillCode",
+        "data/rules/rule-divine-shield.json#skillCode",
+        "data/rules/rule-elune-guidance.json#skillCode",
+        "data/rules/rule-hidan-undying-tick.json#skillCode",
+        "data/rules/rule-illidan-demon-strike.json#skillCode",
+        "data/rules/rule-itachi-tsukuyomi.json#skillCode",
+        "data/rules/rule-kenshin-tenken-boost.json#skillCode",
+        "data/rules/rule-max-phase-recast-expire.json#skillCode",
+        "data/rules/rule-naruto-sage-immunity.json#skillCode",
+        "data/rules/rule-naruto-sage-tick.json#skillCode",
+        "data/rules/rule-obito-grudge-reset.json#skillCode",
+        "data/rules/rule-ulquiorra-resurreccion.json#skillCode",
+        "data/rules/rule-watcher-shield.json#skillCode",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/divine-shield-defense.json#code",
+        "data/skills/elune-guidance-trigger.json#code",
+        "data/skills/holy-shield-defense.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "status.remove触发生命周期与关联清理；保留单次权威提交。",
+      "sourcepath": "lib/skill-graph/module-registry-status-events.ts:120",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-events.ts:120"
+      ]
+    },
+    {
+      "key": "source.capture@1",
+      "label": "保留本次结算来源",
+      "calls": 76,
+      "entries": [
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/hashirama-edo-nature-heal.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/holy-heal.json#code",
+        "data/cards/holy-smite.json#code",
+        "data/cards/soul-fragment.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-hidan-blood-oath-reflect.json#skillCode",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hidan-sacrifice.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/kiljaedan-soul-drain.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muzan-blood-whip.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/shishio-flame-spirit.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/venom-host-transfer.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "执行期来源捕获句柄支持来源离场后结算，不能变为普通piece快照。",
+      "sourcepath": "lib/skill-graph/module-registry-area-effects.ts:9",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-area-effects.ts:9"
+      ]
+    },
+    {
+      "key": "effect.damage-many-captured@1",
+      "label": "使用已保留来源批量伤害",
+      "calls": 11,
+      "entries": [
+        "data/skills/colt-piercing.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/kiljaedan-soul-drain.json#code",
+        "data/skills/shelly-super-shell.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "已捕获来源的整体伤害批次，保留死亡/事件顺序，不能逐目标foreach替换。",
+      "sourcepath": "lib/skill-graph/module-registry-area-effects.ts:15",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-area-effects.ts:15"
+      ]
+    },
+    {
+      "key": "effect.heal-many-captured@1",
+      "label": "使用已保留来源批量治疗",
+      "calls": 4,
+      "entries": [
+        "data/skills/holy-light-descend.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "已捕获来源的整体治疗批次，保留批次与来源寿命。",
+      "sourcepath": "lib/skill-graph/module-registry-area-effects.ts:15",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-area-effects.ts:15"
+      ]
+    },
+    {
+      "key": "effect.damage-many@1",
+      "label": "同时伤害多个目标",
+      "calls": 7,
+      "entries": [
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/death-blossom.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/sasuke-chidori.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "通用伤害批次权威提交，保留伤害类型拼写和省略skillId语义。",
+      "sourcepath": "lib/skill-graph/module-registry-area-effects.ts:15",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-area-effects.ts:15"
+      ]
+    },
+    {
+      "key": "choice.option-id-value@1",
+      "label": "已选选项标识",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-watcher-form.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "旧选择字符串/id/value联合形状归一化，应集中协议解码而非内容字段猜测。",
+      "sourcepath": "lib/skill-graph/module-registry-status-timers.ts:85",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-timers.ts:85"
+      ]
+    },
+    {
+      "key": "status.read-reference@1",
+      "label": "读取状态关联棋子",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-shadow-chaos-spear-restore.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "首个状态查找+引用字段+存在校验；使用状态集合find、data.field、query.piece。",
+      "sourcepath": "lib/skill-graph/module-registry-status-timers.ts:127",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-timers.ts:127"
+      ]
+    },
+    {
+      "key": "status.consume-counter@1",
+      "label": "推进状态生命周期计数",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-hidan-undying-tick.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "consumeCounter只find后取fallback并减1，未触发生命周期；减法/缺省移到图，受控写保留。",
+      "sourcepath": "lib/skill-graph/module-registry-status-timers.ts:165",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-timers.ts:165"
+      ]
+    },
+    {
+      "key": "effect.damage-with-killer@1",
+      "label": "以指定归属提交伤害",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-hidan-undying-tick.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "伤害提交携带killerPlayer归因与输入策略；必要权威能力，可统一伤害接口参数。",
+      "sourcepath": "lib/skill-graph/module-registry-status-timers.ts:185",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-timers.ts:185"
+      ]
+    },
+    {
+      "key": "choice.required-option-pair@1",
+      "label": "必选二元选项",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-watcher-form.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定二元选项构造可用record/list加通用option；不可取消和playerId必须显式保留。",
+      "sourcepath": "lib/skill-graph/module-registry-status-timers.ts:203",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-status-timers.ts:203"
+      ]
+    },
+    {
+      "key": "choice.string-options@1",
+      "label": "选择文本选项",
+      "calls": 2,
+      "entries": [
+        "data/skills/tails-armor-assembly.json#code",
+        "data/skills/turalyon-expedition-order.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "字符串/标签zip构造选项加option；保留未声明参数的宿主默认，避免强填默认。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:110",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:110"
+      ]
+    },
+    {
+      "key": "choice.as-string-list@1",
+      "label": "读取多选文本",
+      "calls": 1,
+      "entries": [
+        "data/skills/tails-armor-assembly.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "旧多选包装解码，区别原数组与value数组及元素value，属于选择协议兼容。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:157",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:157"
+      ]
+    },
+    {
+      "key": "choice.status-tags@1",
+      "label": "选择棋子状态",
+      "calls": 1,
+      "entries": [
+        "data/skills/tails-mechanical-support.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "状态集合构造带序号及none选项后通用option；选项内容应在图，选择恢复仍宿主。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:171",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:171"
+      ]
+    },
+    {
+      "key": "content.enemy-player@1",
+      "label": "查找敌方玩家",
+      "calls": 5,
+      "entries": [
+        "data/rules/rule-hidan-undying-tick.json#skillCode",
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode",
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/rafaam-curse-amplify.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "nextMatchOpponent按owner索引后循环查敌人；players旋转+关系find，不能直接原顺序find。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:271",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:271"
+      ]
+    },
+    {
+      "key": "content.copy-card@1",
+      "label": "复制卡牌定义",
+      "calls": 1,
+      "entries": [
+        "data/skills/rafaam-curse-amplify.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "动态定义复制和身份注册边界，静态定义沿用ID；不能复制源码为任意写。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:298",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:298"
+      ]
+    },
+    {
+      "key": "content.materialize-template@1",
+      "label": "实例化卡牌模板",
+      "calls": 1,
+      "entries": [
+        "data/skills/tails-armor-assembly.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受信模板实例化和内容注册是宿主边界，保留schema与模板校验。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:310",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:310"
+      ]
+    },
+    {
+      "key": "card.hand-add-ref@1",
+      "label": "加入动态卡牌手牌",
+      "calls": 7,
+      "entries": [
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/skills/elune-blessing.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/initial-draw.json#code",
+        "data/skills/rafaam-curse-amplify.json#code",
+        "data/skills/tails-armor-assembly.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "以动态cardId调用手牌生命周期，容量/实例化/事件由宿主处理。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:328",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:328"
+      ]
+    },
+    {
+      "key": "attribute.set-current-hp@1",
+      "label": "设定当前生命",
+      "calls": 5,
+      "entries": [
+        "data/rules/rule-elune-protection-player.json#skillCode",
+        "data/rules/rule-hashirama-edo-regen.json#skillCode",
+        "data/rules/rule-hidan-undying.json#skillCode",
+        "data/rules/rule-shelly-bandage.json#skillCode",
+        "data/rules/rule-tails-armor-recovery.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "无治疗事件的受控HP写入口，需与治疗及死亡结算分离。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:342",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:342"
+      ]
+    },
+    {
+      "key": "status.append-record@1",
+      "label": "兼容性直写棋子状态",
+      "calls": 19,
+      "entries": [
+        "data/cards/armor-attack-defense.json#code",
+        "data/cards/armor-attack-heal.json#code",
+        "data/cards/armor-attack-speed.json#code",
+        "data/cards/armor-defense-heal.json#code",
+        "data/cards/armor-defense-speed.json#code",
+        "data/cards/armor-heal-speed.json#code",
+        "data/rules/rule-mortis-damage-counter.json#skillCode",
+        "data/rules/rule-obito-grudge.json#skillCode",
+        "data/rules/rule-shishio-combustion.json#skillCode",
+        "data/rules/rule-shishio-cooldown-once.json#skillCode",
+        "data/rules/rule-shishio-kill-track.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-dealt.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-taken.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "经过JSON及id/type校验的raw状态追加，无事件策略必须显式保留。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:387",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:387"
+      ]
+    },
+    {
+      "key": "status.remove-choice@1",
+      "label": "按选择移除状态",
+      "calls": 2,
+      "entries": [
+        "data/skills/tails-mechanical-support.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "状态选择索引/none解码后raw删除，索引协议与原始删除语义必须受控；可解码与删除分层。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:398",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:398"
+      ]
+    },
+    {
+      "key": "status.refresh-temporary@1",
+      "label": "刷新临时状态",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-sonic-free-move.json#skillCode",
+        "data/skills/tails-mechanical-support.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "refreshTemporary是type首项find或raw创建再多字段赋值，无lifecycle事件；图分支+typed写。",
+      "sourcepath": "lib/skill-graph/module-registry-content-generation.ts:409",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-content-generation.ts:409"
+      ]
+    },
+    {
+      "key": "choice.from-pieces@1",
+      "label": "棋子候选集合",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "piece列表map成候选再localeCompare排序；保留排序，通用候选record构造。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:130",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:130"
+      ]
+    },
+    {
+      "key": "choice.from-cells@1",
+      "label": "地格候选集合",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cell列表map成候选再y/x排序；通用map/sort/record。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:136",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:136"
+      ]
+    },
+    {
+      "key": "choice.selected-pieces@1",
+      "label": "读取已选棋子",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "选择候选过滤type/存在/HP、去重、排序；协议解码外的存活筛选策略应图组合。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:142",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:142"
+      ]
+    },
+    {
+      "key": "choice.raw-string-value@1",
+      "label": "已选选项值",
+      "calls": 1,
+      "entries": [
+        "data/skills/turalyon-expedition-order.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "仅接受原始字符串的选择协议解码；不能改成接受对象或String强转。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:170",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:170"
+      ]
+    },
+    {
+      "key": "piece.require@1",
+      "label": "解析可空棋子",
+      "calls": 15,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "可空piece解析重复query.piece；整合公开引用解析，失效处理归编译器。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:191",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:191"
+      ]
+    },
+    {
+      "key": "spatial.walkable-cells@1",
+      "label": "可行走地格集合",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "地图walkable过滤再y/x排序及cell投影；通用地图集合操作即可。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:203",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:203"
+      ]
+    },
+    {
+      "key": "spatial.formation-selection-valid@1",
+      "label": "编队选择有效",
+      "calls": 2,
+      "entries": [
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "硬编码选择1..3、唯一、ally、isCore、HP；纯集合/比较组合。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:209",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:209"
+      ]
+    },
+    {
+      "key": "query.adventure-allies@1",
+      "label": "远征可影响友方",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "canAffectAdventureTarget是游戏规则可影响边界；可公开通用query筛选参数，不能仅用owner比较取代。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:218",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:218"
+      ]
+    },
+    {
+      "key": "player.require@1",
+      "label": "解析可空玩家",
+      "calls": 13,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode",
+        "data/rules/rule-blackwidow-toxin-player.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/rules/rule-rafaam-temporal-distortion.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/turalyon-expedition-order.json#code",
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "可空player或context.playerId的fallback，context字段+显式选择；与授权无关。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:269",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:269"
+      ]
+    },
+    {
+      "key": "spatial.cell-walkable-safe@1",
+      "label": "地格可行走（可空）",
+      "calls": 11,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/shadow-chaos-control.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "可空版地图可走事实，与cell-walkable整合；fallback由引擎接口统一定义。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:291",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:291"
+      ]
+    },
+    {
+      "key": "spatial.cell-coordinates-safe@1",
+      "label": "读取可空地格坐标",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "可空cell坐标默认0是便利fallback，通用字段/选择或引擎失效传播。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:297",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:297"
+      ]
+    },
+    {
+      "key": "spatial.cell-require@1",
+      "label": "解析可空地格",
+      "calls": 20,
+      "entries": [
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "对旧延迟cell载荷做整数坐标解码，属于协议到typed cell边界。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:303",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:303"
+      ]
+    },
+    {
+      "key": "spatial.cell-unoccupied@1",
+      "label": "地格无存活棋子",
+      "calls": 21,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用存活占位查询含ignore，可与公开空间查询统一，不要求拆成每个坐标比较。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:309",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:309"
+      ]
+    },
+    {
+      "key": "spatial.formation-candidates@1",
+      "label": "编队集结点",
+      "calls": 2,
+      "entries": [
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定五格编队容量、中心无占位、范围和排序策略；offset/filter/length组合。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:315",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:315"
+      ]
+    },
+    {
+      "key": "spatial.formation-slots@1",
+      "label": "编队落脚格",
+      "calls": 1,
+      "entries": [
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定五格编队落点筛选及take人数；保持中心上下左右特定顺序与chosen占位豁免。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:325",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:325"
+      ]
+    },
+    {
+      "key": "movement.adventure-destinations@1",
+      "label": "远征移动落点",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "正常移动目标与canPlaceAdventurePiece共同构成合法行动边界；通用移动查询应公开此policy。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:334",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:334"
+      ]
+    },
+    {
+      "key": "spatial.nearest-adjacent-landing@1",
+      "label": "最近相邻落点",
+      "calls": 1,
+      "entries": [
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "相邻候选中按参考点取最近项；offset查询/filter/distance/reduce，等距取先。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:343",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:343"
+      ]
+    },
+    {
+      "key": "spatial.random-adjacent-landing@1",
+      "label": "随机相邻落点",
+      "calls": 2,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定offset+reserved/占位过滤后random；组合候选，保留一次权威随机调用及空集合语义。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:353",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:353"
+      ]
+    },
+    {
+      "key": "movement.adventure-move@1",
+      "label": "远征位移",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "freeMove是移动生命周期提交，保留行动/事件/位置权威。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:362",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:362"
+      ]
+    },
+    {
+      "key": "rule.append-reference@1",
+      "label": "追加规则引用",
+      "calls": 1,
+      "entries": [
+        "data/skills/turalyon-grand-crusade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "rule引用按id去重追加；查询/构造移到图，需通用raw rule写入口且不安装规则。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:385",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:385"
+      ]
+    },
+    {
+      "key": "marker.anchor-exists@1",
+      "label": "锚点存在",
+      "calls": 2,
+      "entries": [
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "extension中source/x/y成员判断；字段/collection.some组合。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:404",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:404"
+      ]
+    },
+    {
+      "key": "marker.anchor-candidates@1",
+      "label": "可标记锚点地格",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-minato-anchor-end-turn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "walkable/range/占用过滤加可选y/x排序；通用空间查询加排序。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:410",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:410"
+      ]
+    },
+    {
+      "key": "marker.anchor-place@1",
+      "label": "放置空间锚点",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-minato-anchor-end-turn.json#skillCode",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "anchor去重刷新、限量淘汰和tile联动属内容策略；通用受控extension/tile提交，保留时钟/身份。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:419",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:419"
+      ]
+    },
+    {
+      "key": "marker.anchor-remove@1",
+      "label": "移除空间锚点",
+      "calls": 2,
+      "entries": [
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "按source/坐标过滤anchor与tile两个集合；组合筛选后受控联合提交。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:429",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:429"
+      ]
+    },
+    {
+      "key": "marker.nearby-enemies@1",
+      "label": "锚点附近敌人",
+      "calls": 1,
+      "entries": [
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "通用敌方查询后cell距离过滤，是marker别名；公开通用范围query可替换。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:439",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:439"
+      ]
+    },
+    {
+      "key": "status.mark-apply@1",
+      "label": "应用来源标记",
+      "calls": 3,
+      "entries": [
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "状态存在则stacks增加否则构造record并add；内容分支移到图，已有分支不可重发applied事件。",
+      "sourcepath": "lib/skill-graph/module-registry-pending-spatial.ts:460",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-pending-spatial.ts:460"
+      ]
+    },
+    {
+      "key": "player.set-buff-record@1",
+      "label": "设置玩家增益记录",
+      "calls": 1,
+      "entries": [
+        "data/skills/elune-blessing.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "玩家buff记录受控写入可作为typed字段提交；不允许图修改query返回对象。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:55",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:55"
+      ]
+    },
+    {
+      "key": "source.capture-event-piece@1",
+      "label": "保留当前事件棋子",
+      "calls": 13,
+      "entries": [
+        "data/cards/sample-reactive-card.json#code",
+        "data/rules/rule-arthas-icebound-retaliate.json#skillCode",
+        "data/rules/rule-hidan-blood-oath-reflect.json#skillCode",
+        "data/rules/rule-soul-fracture-player.json#skillCode",
+        "data/rules/rule-soul-fracture.json#skillCode",
+        "data/skills/blood-echo-trigger.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "事件来源捕获允许离场后结算，需事件权限和执行期句柄。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:60",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:60"
+      ]
+    },
+    {
+      "key": "source.require-present@1",
+      "label": "解析已确认事件来源",
+      "calls": 11,
+      "entries": [
+        "data/cards/sample-reactive-card.json#code",
+        "data/rules/rule-arthas-icebound-retaliate.json#skillCode",
+        "data/rules/rule-hidan-blood-oath-reflect.json#skillCode",
+        "data/rules/rule-soul-fracture-player.json#skillCode",
+        "data/rules/rule-soul-fracture.json#skillCode",
+        "data/skills/blood-echo-trigger.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "capturedOwner校验执行期句柄有效性，适合引擎输入校验；不应删掉句柄寿命约束。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:72",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:72"
+      ]
+    },
+    {
+      "key": "effect.damage-captured@1",
+      "label": "结算已保留事件对象伤害",
+      "calls": 31,
+      "entries": [
+        "data/cards/sample-reactive-card.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hidan-sacrifice.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/kiljaedan-soul-drain.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/muzan-blood-whip.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "捕获来源伤害权威提交，维持来源归因和死亡后结算。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:82",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:82"
+      ]
+    },
+    {
+      "key": "query.living-template@1",
+      "label": "查询玩家拥有的存活模板棋子",
+      "calls": 6,
+      "entries": [
+        "data/cards/hashirama-edo-nature-heal.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/watcher-calm.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-elune-guidance.json#skillCode",
+        "data/skills/elune-guidance-trigger.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "owner/template/HP筛选首项，通用query/filter/find；严格owner不是同盟。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:121",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:121"
+      ]
+    },
+    {
+      "key": "query.affectable-pieces@1",
+      "label": "查询卡牌可影响的存活棋子",
+      "calls": 3,
+      "entries": [
+        "data/cards/holy-charge.json#code",
+        "data/cards/holy-heal.json#code",
+        "data/cards/holy-smite.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "canAffectAdventureTarget封装真实游戏可影响规则，作为通用query policy保留。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:142",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:142"
+      ]
+    },
+    {
+      "key": "attribute.adjust-captured@1",
+      "label": "调整已保留棋子属性",
+      "calls": 7,
+      "entries": [
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "捕获来源属性写支持离场后完成效果，非普通现役piece字段写。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:204",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:204"
+      ]
+    },
+    {
+      "key": "effect.damage-from-player@1",
+      "label": "以玩家来源造成伤害",
+      "calls": 6,
+      "entries": [
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/holy-smite.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "玩家伤害来源构造加damage权威边界，归因实体策略应统一到通用伤害source参数。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:214",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:214"
+      ]
+    },
+    {
+      "key": "player.consume-buff@1",
+      "label": "消耗玩家增益并返回倍率",
+      "calls": 3,
+      "entries": [
+        "data/cards/holy-charge.json#code",
+        "data/cards/holy-heal.json#code",
+        "data/cards/holy-smite.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "buff uses>0分支、减1、multiplier读取；通用buff字段/比较/写，不是伤害权威。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:276",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:276"
+      ]
+    },
+    {
+      "key": "effect.status-record@1",
+      "label": "通过卡牌状态生命周期应用状态记录",
+      "calls": 4,
+      "entries": [
+        "data/cards/holy-charge.json#code",
+        "data/cards/watcher-calm.json#code",
+        "data/cards/watcher-rage.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "status.add/旧card status facade是生命周期入口，保留inputPolicy差异。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:295",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:295"
+      ]
+    },
+    {
+      "key": "summon.unique-template-available@1",
+      "label": "检查唯一储存召唤是否尚未上场",
+      "calls": 1,
+      "entries": [
+        "data/cards/demon-summon-5.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "scoped/legacy存储命中或无活模板棋子；纯extension/集合谓词，owner规范化与短路需保持。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:316",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:316"
+      ]
+    },
+    {
+      "key": "card.cell-unoccupied@1",
+      "label": "检查卡牌召唤地格为空",
+      "calls": 1,
+      "entries": [
+        "data/cards/demon-summon-5.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "card前缀只是通用占位读取别名；整合公开空间占位原语。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:342",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:342"
+      ]
+    },
+    {
+      "key": "lifecycle.summon-captured@1",
+      "label": "排队召唤已保留棋子",
+      "calls": 1,
+      "entries": [
+        "data/cards/demon-summon-5.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "已捕获来源排队召唤，涉及生命周期、死亡及身份，不拆成数组插入。",
+      "sourcepath": "lib/skill-graph/module-registry-card-operations.ts:387",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-card-operations.ts:387"
+      ]
+    },
+    {
+      "key": "event.skill-cast-count@1",
+      "label": "读取本回合技能释放次数",
+      "calls": 1,
+      "entries": [
+        "data/skills/max-speed-shot.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "actions按turn/piece/skill/interrupted过滤后length；内容聚合应图表达。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:65",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:65"
+      ]
+    },
+    {
+      "key": "projectile.line-cells@1",
+      "label": "生成正向地格线",
+      "calls": 9,
+      "entries": [
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shelly-super-shell.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用正交方向/有限射线地格数学操作，用户认可空间原语；整合line/ray命名。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:88",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:88"
+      ]
+    },
+    {
+      "key": "projectile.trace-enemies@1",
+      "label": "记录可穿越弹道敌人",
+      "calls": 1,
+      "entries": [
+        "data/skills/sasuke-chidori.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "tracePath后筛enemy事件并投影，射线原语保留；过滤/结果打包移到图。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:124",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:124"
+      ]
+    },
+    {
+      "key": "query.pieces-in-square@1",
+      "label": "查询方形范围棋子",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-shishio-infinite-blade-recast.json#skillCode",
+        "data/skills/arthas-howling-blast.json#code",
+        "data/skills/pulse-pistol-move.json#code",
+        "data/skills/pulse-pistol.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用关系与方形范围query符合用户认可范围筛选；合并公开query参数。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:186",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:186"
+      ]
+    },
+    {
+      "key": "query.pieces-in-rectangle@1",
+      "label": "按地格顺序查询矩形棋子",
+      "calls": 2,
+      "entries": [
+        "data/skills/biotic-grenade.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "矩形空间查询可为通用原语，但必须公开dx外层/dy内层及每格首项顺序契约。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:204",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:204"
+      ]
+    },
+    {
+      "key": "query.enemies-on-cells@1",
+      "label": "查询地格线敌人",
+      "calls": 2,
+      "entries": [
+        "data/skills/colt-piercing.json#code",
+        "data/skills/mortis-bat-support.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用关系+地格集合查询，不含角色策略；整合公开query。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:255",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:255"
+      ]
+    },
+    {
+      "key": "query.enemies-on-ordered-cells@1",
+      "label": "按地格顺序查询敌人",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/skills/muzan-blood-whip.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用有序地格关系查询，保留cell优先/board次序与实例去重，公开顺序参数。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:267",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:267"
+      ]
+    },
+    {
+      "key": "projectile.cardinal-cells@1",
+      "label": "生成四向顺序地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/muzan-blood-whip.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用正交地格构造，保留右左下上和距离递增顺序；统一空间原语命名。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:279",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:279"
+      ]
+    },
+    {
+      "key": "query.faction-enemies-on-cells@1",
+      "label": "按阵营查询地格线敌人",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-bolt.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "旧faction不等内容谓词不等于allied关系；piece.faction比较+cells membership组合。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:292",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:292"
+      ]
+    },
+    {
+      "key": "query.enemies-on-index@1",
+      "label": "查询地格线序号敌人",
+      "calls": 8,
+      "entries": [
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/shelly-super-shell.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cells索引读取再query敌人；collection.at+通用cell query，保留owner优先。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:316",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:316"
+      ]
+    },
+    {
+      "key": "query.hand-card-instances@1",
+      "label": "查询手牌实例",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-bolt.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "hand过滤cardId并投影instanceId；通用hand-records/filter/field。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:337",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:337"
+      ]
+    },
+    {
+      "key": "status.remove-player-id@1",
+      "label": "按标识移除玩家状态",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-blackwidow-toxin-player.json#skillCode",
+        "data/skills/blizzard-damage.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "玩家状态lifecycle删除，需保留scope与事件。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:380",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:380"
+      ]
+    },
+    {
+      "key": "status.clear-piece-tags@1",
+      "label": "清空棋子状态",
+      "calls": 1,
+      "entries": [
+        "data/skills/hashirama-edo-wood-spike.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "raw清空状态是特殊但明确受控写策略；公开raw列表替换，不能误改为逐项lifecycle删除。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:390",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:390"
+      ]
+    },
+    {
+      "key": "result.action-ui@1",
+      "label": "构造带表现提示的行动结果",
+      "calls": 2,
+      "entries": [
+        "data/skills/blizzard-damage.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "success/message/showUIEffects旧结果协议构造；可统一公开结果构造器，不属玩法原语。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:444",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:444"
+      ]
+    },
+    {
+      "key": "skill.add-player@1",
+      "label": "玩家获得技能",
+      "calls": 1,
+      "entries": [
+        "data/skills/blizzard.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "玩家技能生命周期添加，定义和去重属于宿主。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:454",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:454"
+      ]
+    },
+    {
+      "key": "skill.remove-player@1",
+      "label": "玩家移除技能",
+      "calls": 1,
+      "entries": [
+        "data/skills/blizzard-damage.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "玩家技能生命周期删除，关联清理由宿主。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:465",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:465"
+      ]
+    },
+    {
+      "key": "tile.add-markers@1",
+      "label": "批量添加地格标记",
+      "calls": 1,
+      "entries": [
+        "data/skills/blizzard.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cells map为tile records后tileBatch；构造移图，整体表现批次及expand origin保持。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:476",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:476"
+      ]
+    },
+    {
+      "key": "tile.add-persistent-markers@1",
+      "label": "添加永久地格标记",
+      "calls": 1,
+      "entries": [
+        "data/skills/sasuke-indra-arrow.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "永久tile和extension按坐标去重及登记来源；组合数据策略，需保留presentationQueue联合提交时机。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:494",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:494"
+      ]
+    },
+    {
+      "key": "attribute.adjust-max-hp@1",
+      "label": "调整生命上限",
+      "calls": 2,
+      "entries": [
+        "data/skills/hashirama-edo-wood-dragon.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "maxHp受控写维护正值及不低于当前HP不变量。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:527",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:527"
+      ]
+    },
+    {
+      "key": "effect.displace@1",
+      "label": "按路径位移棋子",
+      "calls": 4,
+      "entries": [
+        "data/skills/earthshatter.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/sasuke-chidori.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "统一位移提交含路径穿越策略，不可拆为坐标写。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:569",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:569"
+      ]
+    },
+    {
+      "key": "effect.damage-without-skill-id@1",
+      "label": "造成无技能标识伤害",
+      "calls": 1,
+      "entries": [
+        "data/skills/naruto-rasengan.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "省略skillId的旧伤害事件语义；通用damage接口必须支持显式省略，先保留边界。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:594",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:594"
+      ]
+    },
+    {
+      "key": "skill.reset-cooldown@1",
+      "label": "重置技能冷却",
+      "calls": 4,
+      "entries": [
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/muru-lament.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "指定技能冷却重置入口，可统一typed技能状态写；不是任意快照赋值。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:620",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:620"
+      ]
+    },
+    {
+      "key": "projectile.zone-set@1",
+      "label": "写入弹道区域记录",
+      "calls": 2,
+      "entries": [
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-revolver.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造source/kind/direction/turns并写extension[source]；通用record+声明存储，方向校验为通用数学约束。",
+      "sourcepath": "lib/skill-graph/module-registry-projectiles.ts:639",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-projectiles.ts:639"
+      ]
+    },
+    {
+      "key": "event.last-move-distance@1",
+      "label": "读取最近移动路径长度",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-momentum-gain.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "actions倒序find该piece的move后path.length；不是权威事件读取原子。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:36",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:36"
+      ]
+    },
+    {
+      "key": "piece.name-by-id@1",
+      "label": "读取棋子名称",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-shishio-kill-track.json#skillCode",
+        "data/skills/arthas-howling-blast.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "board+graveyard查找再name/template/fallback；字段/选择组合，保留离场查询。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:64"
+      ]
+    },
+    {
+      "key": "status.set-record-number@1",
+      "label": "兼容性更新状态数值字段",
+      "calls": 17,
+      "entries": [
+        "data/rules/rule-akaza-damage-mark.json#skillCode",
+        "data/rules/rule-mortis-damage-counter.json#skillCode",
+        "data/rules/rule-obito-grudge.json#skillCode",
+        "data/rules/rule-shishio-cooldown-once.json#skillCode",
+        "data/rules/rule-shishio-kill-track.json#skillCode",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/shadow-chaos-control.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受限状态number单字段raw写；需要公开typed通用写命名，不必图直接改记录。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:86",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:86"
+      ]
+    },
+    {
+      "key": "status.set-record-text@1",
+      "label": "兼容性更新状态文本字段",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-akaza-damage-mark.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受限状态string单字段raw写；与typed状态写统一。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:95",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:95"
+      ]
+    },
+    {
+      "key": "status.set-record-boolean@1",
+      "label": "兼容性更新状态布尔字段",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-akaza-damage-mark.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受限状态boolean单字段raw写；与typed状态写统一。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:104",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:104"
+      ]
+    },
+    {
+      "key": "status.clear-record-field@1",
+      "label": "清空兼容性状态字段",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-akaza-damage-mark.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "受限状态字段置null的raw写；不可替换成delete或lifecycle重建。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:113",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:113"
+      ]
+    },
+    {
+      "key": "attribute.set-momentum@1",
+      "label": "设定动能",
+      "calls": 9,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-momentum-gain.json#skillCode",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/sonic-spin-dash.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "momentum受控字段写可整合通用piece写；保持number返回值，无需内容计算native。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:122",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:122"
+      ]
+    },
+    {
+      "key": "skill.adjust-all-cooldowns@1",
+      "label": "调整全部技能冷却",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-shishio-cooldown-once.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "遍历技能执行add或max冷却策略；collection foreach+math+通用单技能冷却写。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:129",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:129"
+      ]
+    },
+    {
+      "key": "value.is-finite@1",
+      "label": "检查有限数值",
+      "calls": 14,
+      "entries": [
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-muzan-regeneration-damage.json#skillCode",
+        "data/rules/rule-muzan-regeneration-end.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/skills/venom-host-transfer.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "Number.isFinite通用类型/数值谓词，可公开并统一命名。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:144",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:144"
+      ]
+    },
+    {
+      "key": "event.actions@1",
+      "label": "读取战斗动作记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "actions原始集合读取；整合battle.field并返回快照。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:151",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:151"
+      ]
+    },
+    {
+      "key": "event.action-text@1",
+      "label": "读取动作文本字段",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "action字段读取加String/fallback；data.field+显式转换/缺省。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:158",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:158"
+      ]
+    },
+    {
+      "key": "event.action-number@1",
+      "label": "读取动作数值字段",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "action.turn或payload.finalDamage读取加Number/fallback；字段组合。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:166",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:166"
+      ]
+    },
+    {
+      "key": "event.action-piece@1",
+      "label": "读取动作棋子字段",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "action.payload.targetId类型判断+fallback；字段/选择组合。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:174",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:174"
+      ]
+    },
+    {
+      "key": "state.read-piece-number@1",
+      "label": "读取棋子兼容计数",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "封闭namespace数字读取加fallback，通用extension.read与声明替代。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:182",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:182"
+      ]
+    },
+    {
+      "key": "state.write-piece-number@1",
+      "label": "写入棋子兼容计数",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-muzan-regeneration-damage.json#skillCode",
+        "data/rules/rule-muzan-regeneration-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "封闭namespace数字写，通用声明extension.write替代，保持原flowState布局。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:191",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:191"
+      ]
+    },
+    {
+      "key": "state.read-player-number@1",
+      "label": "读取玩家兼容计数",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-el-primo-injury-counter.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "玩家兼容path数字读取和truthy fallback；通用已声明存储读取，保留镜像布局。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:200",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:200"
+      ]
+    },
+    {
+      "key": "state.write-player-number@1",
+      "label": "写入玩家兼容计数",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-el-primo-injury-counter.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "玩家计数兼容path写入，需通用存储backend保持旧镜像，不改存档。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:209",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:209"
+      ]
+    },
+    {
+      "key": "effect.queue-damage@1",
+      "label": "排队伤害",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-grimmjow-destruction-instinct.json#skillCode",
+        "data/rules/rule-hidan-dying-immune.json#skillCode",
+        "data/rules/rule-obito-kamui-block.json#skillCode",
+        "data/rules/rule-shishio-combustion.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "获准damageQueue请求写，保持延迟结算及队列权限。",
+      "sourcepath": "lib/skill-graph/module-registry-counter-passives.ts:218",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-counter-passives.ts:218"
+      ]
+    },
+    {
+      "key": "rule.remove-captured@1",
+      "label": "移除已保留来源的规则",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-hidan-blood-oath-reflect.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "捕获来源rule移除，句柄与离场寿命约束必须宿主处理。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:17",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:17"
+      ]
+    },
+    {
+      "key": "effect.queue-damage-captured@1",
+      "label": "将已保留来源伤害加入队列",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-hidan-blood-oath-reflect.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "捕获来源延迟伤害队列，不能提前伤害或重解析来源。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:24",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:24"
+      ]
+    },
+    {
+      "key": "source.captured-piece-reference@1",
+      "label": "已保留来源的棋子引用",
+      "calls": 5,
+      "entries": [
+        "data/rules/rule-arthas-icebound-retaliate.json#skillCode",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/muzan-demon-body.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "不透明captured句柄标识读取；不能用data.field绕过句柄，整合公开source字段接口。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:32",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:32"
+      ]
+    },
+    {
+      "key": "local.counter-create@1",
+      "label": "创建本次执行计数器",
+      "calls": 31,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/watcher-ultimate.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "执行期局部累加句柄创建，通用局部状态原语，不是角色专用；不可持久化。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:77",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:77"
+      ]
+    },
+    {
+      "key": "local.counter-add@1",
+      "label": "累加本次执行计数",
+      "calls": 40,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/watcher-ultimate.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "执行期局部累加写，通用且需句柄校验；可另行统一AST赋值。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:85",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:85"
+      ]
+    },
+    {
+      "key": "local.counter-read@1",
+      "label": "读取本次执行计数",
+      "calls": 29,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/watcher-ultimate.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "执行期局部counter读取，公开通用局部值接口。",
+      "sourcepath": "lib/skill-graph/module-registry-execution-locals.ts:92",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-execution-locals.ts:92"
+      ]
+    },
+    {
+      "key": "choice.target-cell-by-range@1",
+      "label": "按计算范围选择地格",
+      "calls": 8,
+      "entries": [
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sonic-spin-dash.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "已认可目标选择协议，图提供range，宿主维护pending与取消。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:61",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:61"
+      ]
+    },
+    {
+      "key": "spatial.cardinal-direction@1",
+      "label": "计算正交方向",
+      "calls": 11,
+      "entries": [
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用正交方向/距离数学构造，用户认可，不需爆成abs/add。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:74",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:74"
+      ]
+    },
+    {
+      "key": "spatial.random-cardinal-landing@1",
+      "label": "随机正交相邻落点",
+      "calls": 1,
+      "entries": [
+        "data/skills/sonic-homing-attack.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定上右下左候选过滤后random；offset/filter+通用random，保持抽样次数。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:91",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:91"
+      ]
+    },
+    {
+      "key": "spatial.square-cells@1",
+      "label": "生成方形范围地格",
+      "calls": 2,
+      "entries": [
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/sasuke-amaterasu.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用方形地格生成，用户认可空间构造；实际dx外层dy内层，文案顺序与实现不一致需记录。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:104",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:104"
+      ]
+    },
+    {
+      "key": "spatial.perpendicular-cells@1",
+      "label": "计算正交两侧地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-ride-sweep.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用垂直相对坐标构造，用户认可空间函数。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:118",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:118"
+      ]
+    },
+    {
+      "key": "context.primary-target-rewritten@1",
+      "label": "读取规则改写目标事实",
+      "calls": 3,
+      "entries": [
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/venom-host-transfer.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "context.ruleRewrittenPrimaryTargetPieceId===target，字段+比较可替代专用谓词。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:127",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:127"
+      ]
+    },
+    {
+      "key": "effect.displace-policy@1",
+      "label": "按路径策略提交位移",
+      "calls": 16,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "位移权威提交含policy；steps/changed派生输出可字段/reduce，提交边界必须保留。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:190",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:190"
+      ]
+    },
+    {
+      "key": "effect.swap-pieces@1",
+      "label": "原子交换棋子位置",
+      "calls": 1,
+      "entries": [
+        "data/skills/venom-host-transfer.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "swap需一次联合提交快照与回滚，不能两个独立move替代。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:218",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:218"
+      ]
+    },
+    {
+      "key": "projectile.trace-strict@1",
+      "label": "严格正交弹道观察",
+      "calls": 1,
+      "entries": [
+        "data/skills/alfonso-kick.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "query.path的严格方向验证/RangeError是几何查询边界；可统一trace接口，保持错误协议。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:232",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:232"
+      ]
+    },
+    {
+      "key": "movement.first-piece-on-trace@1",
+      "label": "读取射线首个棋子",
+      "calls": 2,
+      "entries": [
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/rocket-punch.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "已有events按阻挡截断并读取首piece、敌我与字段；collection find/takeWhile+字段查询组合。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:248",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:248"
+      ]
+    },
+    {
+      "key": "movement.bounce-candidates@1",
+      "label": "查询 bounce 候选敌人",
+      "calls": 4,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "通用enemy/range query再排除已访问集合；滤除策略应图中表达。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:290",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:290"
+      ]
+    },
+    {
+      "key": "local.string-list-create@1",
+      "label": "创建本次执行文本集合",
+      "calls": 3,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-howling-blast.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "通用执行期可变字符串集合创建，无对局写；可统一局部collection原语。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:311",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:311"
+      ]
+    },
+    {
+      "key": "local.string-list-read@1",
+      "label": "读取本次执行文本集合",
+      "calls": 5,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-howling-blast.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用局部集合读取，应公开统一，不视为内容专属。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:319",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:319"
+      ]
+    },
+    {
+      "key": "local.string-list-append@1",
+      "label": "追加本次执行文本集合",
+      "calls": 9,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/arthas-howling-blast.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "通用局部集合追加，不涉及持久化；可统一AST局部集合写。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:327",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:327"
+      ]
+    },
+    {
+      "key": "status.remove-expired-turn-type@1",
+      "label": "移除过期回合状态",
+      "calls": 1,
+      "entries": [
+        "data/skills/max-phase-shifter.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "type及turn筛选后逐条status.remove；图filter/foreach，保持逐条生命周期。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:335",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:335"
+      ]
+    },
+    {
+      "key": "source.capture-list@1",
+      "label": "按路径顺序保留棋子集合",
+      "calls": 7,
+      "entries": [
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/shadow-ride-sweep.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "对列表map captureSource，单项捕获权威保留，集合组合移图。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:350",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:350"
+      ]
+    },
+    {
+      "key": "effect.damage-captured-list@1",
+      "label": "使用已保留目标批量伤害",
+      "calls": 5,
+      "entries": [
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/shadow-ride-sweep.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "捕获目标map identifier后提交整体damageManyCaptured；映射移图，禁止拆伤害批次。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:361",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:361"
+      ]
+    },
+    {
+      "key": "status.refresh-position@1",
+      "label": "刷新位置状态",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-step.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "type首项find并写value/intensity/remainingDuration；只是位置载荷包装，无生命周期。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:382",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:382"
+      ]
+    },
+    {
+      "key": "tile.add-marker@1",
+      "label": "添加地格标记",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-step.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cell/source构造tile记录再提交并清除额外字段；通用record+保形tile写策略。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:392",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:392"
+      ]
+    },
+    {
+      "key": "tile.clear-marker@1",
+      "label": "清理来源地格标记",
+      "calls": 5,
+      "entries": [
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/shadow-step.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "type/source过滤tile记录，通用tile集合filter+受控提交。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:409",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:409"
+      ]
+    },
+    {
+      "key": "effect.teleport-with-change@1",
+      "label": "读取传送实际位移",
+      "calls": 3,
+      "entries": [
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/alfonso-water-dash.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "move结果再计算changes.length，使用通用move+data.field/length；不能另造移动提交。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:418",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:418"
+      ]
+    },
+    {
+      "key": "lifecycle.remove-enemy@1",
+      "label": "强制移除敌方棋子",
+      "calls": 1,
+      "entries": [
+        "data/skills/obito-space-time.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "主动移除棋子生命周期，不能等价为hp=0或数组删除。",
+      "sourcepath": "lib/skill-graph/module-registry-movement-family.ts:433",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-movement-family.ts:433"
+      ]
+    },
+    {
+      "key": "status.replace-related-rules@1",
+      "label": "替换状态关联规则",
+      "calls": 1,
+      "entries": [
+        "data/skills/divine-blessing.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "id/type首状态find再替换relatedRules，无安装移除事件；组合查找+通用状态写。",
+      "sourcepath": "lib/skill-graph/module-registry-holy-support.ts:22",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-holy-support.ts:22"
+      ]
+    },
+    {
+      "key": "collection.text-list-create@1",
+      "label": "创建文本集合",
+      "calls": 7,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode",
+        "data/rules/rule-shishio-burn-endturn.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "空文本集合字面量，无宿主规则；统一collection literal。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:60",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:60"
+      ]
+    },
+    {
+      "key": "collection.text-list-add@1",
+      "label": "追加文本集合项",
+      "calls": 12,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode",
+        "data/rules/rule-shishio-burn-endturn.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "通用图内局部集合追加，保留引用语义或迁移到局部AST赋值，不是战斗authority。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:67",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:67"
+      ]
+    },
+    {
+      "key": "spatial.perpendicular-direction@1",
+      "label": "计算侧向正交方向",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用左右垂直方向数学函数，认可空间原语范围。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:76",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:76"
+      ]
+    },
+    {
+      "key": "projectile.events-from-cell-bounded@1",
+      "label": "读取截至阻挡处的射线事件",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "query.path后按boundary/阻挡terrain截断；路径原语保留，结果过滤移图。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:111",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:111"
+      ]
+    },
+    {
+      "key": "projectile.first-enemy-on-path@1",
+      "label": "读取射线首个敌人",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "首路径事件按友军/阻挡停止，敌方首项选择；通用trace+有序collection组合。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:121",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:121"
+      ]
+    },
+    {
+      "key": "piece.by-template@1",
+      "label": "按模板查询棋子",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "template/owner/alive首项查找，通用query/filter/find。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:131",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:131"
+      ]
+    },
+    {
+      "key": "query.all-pieces@1",
+      "label": "查询战场和墓地棋子",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-velen-death-cleanup.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "board+graveyard全部身份集合是通用查询scope，公开命名整合。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:148",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:148"
+      ]
+    },
+    {
+      "key": "query.pieces-on-cells-all@1",
+      "label": "查询地格上的存活棋子",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode",
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用cells+relation空间查询，用户认可；整合query参数。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:156",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:156"
+      ]
+    },
+    {
+      "key": "query.normal-move-cells@1",
+      "label": "查询普通移动落点",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-colt-big-stride.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "normalMoveTargets体现合法移动规则，不可替代为空格几何过滤。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:170",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:170"
+      ]
+    },
+    {
+      "key": "result.blocked@1",
+      "label": "构造阻挡结果",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/rules/rule-shishio-execute-option.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "blocked/success/message结果协议构造，统一结果接口。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:224",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:224"
+      ]
+    },
+    {
+      "key": "status.valid-side-cells@1",
+      "label": "查询仍在地图内的侧向地格",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "status左右字段投影并验证地图存在；保留顺序重复，不检查walkable。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:281",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:281"
+      ]
+    },
+    {
+      "key": "status.remove-type-raw@1",
+      "label": "直接移除同类型状态",
+      "calls": 6,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode",
+        "data/rules/rule-velen-fate-target.json#skillCode",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/sonic-super-form.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "按type筛选raw状态数组并算数量；图filter+通用raw替换，不能lifecycle删除。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:296",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:296"
+      ]
+    },
+    {
+      "key": "status.remove-source-type-raw@1",
+      "label": "移除单棋子来源状态",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-velen-death-cleanup.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "board/graveyard按source+type过滤状态；字段组合及raw提交，保持离场范围。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:304",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:304"
+      ]
+    },
+    {
+      "key": "rule.remove-id-raw@1",
+      "label": "移除单棋子规则记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-velen-death-cleanup.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "单目标raw规则删除需要受控写，保留string/object规则表示及无生命周期语义。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:313",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:313"
+      ]
+    },
+    {
+      "key": "extension.read-list@1",
+      "label": "读取扩展地格集合",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode",
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "封闭extension列表读取并默认[]，通用声明extension.read替代，不隐式创建。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:325",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:325"
+      ]
+    },
+    {
+      "key": "extension.cells-for-source@1",
+      "label": "按来源筛选扩展地格",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "source筛选+整数坐标+cell投影，通用filter/map。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:333",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:333"
+      ]
+    },
+    {
+      "key": "extension.record-source@1",
+      "label": "读取扩展来源棋子",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "record.sourceId字段加存在校验，data.field+query.piece。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:348",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:348"
+      ]
+    },
+    {
+      "key": "extension.read-number@1",
+      "label": "读取扩展数值",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "record字段Number/fallback，data.field+转换/选择。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:355",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:355"
+      ]
+    },
+    {
+      "key": "extension.read-text@1",
+      "label": "读取扩展文本",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-colt-zone-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "record字段String/fallback，data.field+转换/选择。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:363",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:363"
+      ]
+    },
+    {
+      "key": "choice.option-pair-cancel@1",
+      "label": "可取消二选一",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-shishio-execute-option.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定二选项及cancelValue构造+option；记录列表在图中，pending宿主保留。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:407",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:407"
+      ]
+    },
+    {
+      "key": "choice.grid-candidates@1",
+      "label": "构造地格选择结果",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "grid pending结果信封，固定协议键应统一公开请求构造，不必图手写宿主协议。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:419",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:419"
+      ]
+    },
+    {
+      "key": "choice.piece-candidates@1",
+      "label": "构造棋子选择结果",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-shishio-infinite-blade-recast.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "piece pending请求信封，整合通用选择请求构造及候选输入。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:427",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:427"
+      ]
+    },
+    {
+      "key": "choice.option-selected@1",
+      "label": "读取已选选项",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-shishio-execute-option.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "字符串或value选择解码，保持旧形状兼容。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:435",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:435"
+      ]
+    },
+    {
+      "key": "card.clear-content-records@1",
+      "label": "清除来源内容记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-velen-death-cleanup.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "手牌按contentState.sourcePieceId过滤再删字段；图query/filter，通用card状态写。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:453",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:453"
+      ]
+    },
+    {
+      "key": "card.set-content-boolean@1",
+      "label": "写入手牌布尔声明",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "单实例contentState布尔受控写，可统一typed card写；快照不可变。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:468",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:468"
+      ]
+    },
+    {
+      "key": "card.clear-content-field@1",
+      "label": "删除手牌内容声明",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "单实例contentState字段delete边界，不能用null替换。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:476",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:476"
+      ]
+    },
+    {
+      "key": "card.set-effect-modifier@1",
+      "label": "替换手牌效果修饰记录",
+      "calls": 6,
+      "entries": [
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造单元素effectModifiers整体替换，record/list移到图，通用card属性提交保留。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:484",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:484"
+      ]
+    },
+    {
+      "key": "card.set-presentation@1",
+      "label": "替换手牌展示记录",
+      "calls": 6,
+      "entries": [
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造presentation记录再写，record移到图，通用card typed写。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:500",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:500"
+      ]
+    },
+    {
+      "key": "skill.boolean-flag@1",
+      "label": "读取技能布尔标记",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-momentum-consume.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "技能定义字段Boolean读取，skill.field替代内容flag别名。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-velen-colt.ts:511",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-velen-colt.ts:511"
+      ]
+    },
+    {
+      "key": "query.living-template-faction@1",
+      "label": "按阵营查询存活模板棋子",
+      "calls": 1,
+      "entries": [
+        "data/skills/elune-protection-trigger.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "template+faction+alive首项，通用piece字段与find。",
+      "sourcepath": "lib/skill-graph/module-registry-authoring-completion.ts:43",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-authoring-completion.ts:43"
+      ]
+    },
+    {
+      "key": "query.enemies-on-cardinal-segment@1",
+      "label": "查询正交线段敌人",
+      "calls": 1,
+      "entries": [
+        "data/skills/grimmjow-gran-rey-cero.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用正交线段敌方查询可整合空间query；保持来源距离稳定排序与不含起点。",
+      "sourcepath": "lib/skill-graph/module-registry-authoring-completion.ts:60",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-authoring-completion.ts:60"
+      ]
+    },
+    {
+      "key": "followup.status-records@1",
+      "label": "按类型读取状态记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "type/appliedTurn过滤statusTags，通用status集合filter。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:58",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:58"
+      ]
+    },
+    {
+      "key": "followup.status-player-field@1",
+      "label": "读取状态玩家引用",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-expire.json#skillCode",
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "首id状态的opponentPlayerId字段读取，find+data.field。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:69",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:69"
+      ]
+    },
+    {
+      "key": "followup.remove-status-types@1",
+      "label": "移除多种状态类型",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-expire.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "types集合匹配后raw过滤，无生命周期；图filter+受控raw写。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:80",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:80"
+      ]
+    },
+    {
+      "key": "followup.damage-status@1",
+      "label": "结算状态延迟伤害",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "status.sourceId解析board/graveyard再delayedDamage提交；字段/引用拆出，damage权威保留且禁止batch语义漂移。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:90",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:90"
+      ]
+    },
+    {
+      "key": "followup.message-buffer-start@1",
+      "label": "开始消息集合",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "专用__rvbFollowupMessages上下文变量，改通用局部集合，不能污染pending/外部上下文。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:117",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:117"
+      ]
+    },
+    {
+      "key": "followup.message-buffer-add@1",
+      "label": "追加规则消息",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "专用消息缓冲append，使用通用局部集合/reduce。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:127",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:127"
+      ]
+    },
+    {
+      "key": "followup.message-buffer-read@1",
+      "label": "读取规则消息",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "专用缓冲join分号/length/delete，通用局部结果组合，保持消息顺序。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:137",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:137"
+      ]
+    },
+    {
+      "key": "followup.counter.increment-player@1",
+      "label": "递增玩家内容计数",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定mangekyoDeaths玩家计数Number/default/+1，声明extension+math+write。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:147",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:147"
+      ]
+    },
+    {
+      "key": "followup.piece-name-with-template@1",
+      "label": "读取棋子名称并回退模板",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "board/graveyard名称模板ID多级truthy fallback，字段/选择组合。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:158",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:158"
+      ]
+    },
+    {
+      "key": "followup.piece-template-id@1",
+      "label": "读取棋子模板标识",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "board/graveyard模板ID读取和空字符串fallback，统一piece字段scope。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:168",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:168"
+      ]
+    },
+    {
+      "key": "followup.primary-mangekyo-witness@1",
+      "label": "万花筒首位见证者",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "owner+万花筒status过滤及localeCompare首项见证者，纯集合谓词，包含HP0。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:178",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:178"
+      ]
+    },
+    {
+      "key": "followup.action.append@1",
+      "label": "追加动作记录",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "action日志追加是受控可观察写，需通用action record校验，不是extension随意写。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-rules.ts:198",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-rules.ts:198"
+      ]
+    },
+    {
+      "key": "status.set-remaining-uses@1",
+      "label": "设定状态剩余次数",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-illidan-demon-strike.json#skillCode",
+        "data/rules/rule-kenshin-tenken.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "remainingUses受限finite数值直接写，公开typed raw状态写；不自动consume/删除。",
+      "sourcepath": "lib/skill-graph/module-registry-followup-status-rules.ts:60",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-followup-status-rules.ts:60"
+      ]
+    },
+    {
+      "key": "card.set-content-record@1",
+      "label": "写入手牌内容记录",
+      "calls": 1,
+      "entries": [
+        "data/skills/velen-holy-prophecy.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造仅sourcePieceId/createdTurnNumber记录再写卡牌，构造移图，typed写保留。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:91",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:91"
+      ]
+    },
+    {
+      "key": "choice.hand-cards@1",
+      "label": "选择手牌实例",
+      "calls": 2,
+      "entries": [
+        "data/skills/velen-holy-prophecy.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "hand呈现模式的选择协议，统一option参数可复用，保持labels缺省及取消。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:103",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:103"
+      ]
+    },
+    {
+      "key": "choice.is-strict-string-list@1",
+      "label": "检查严格文本多选",
+      "calls": 2,
+      "entries": [
+        "data/skills/muru-lament.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "严格旧多选字符串协议验证，不能接受混合/包装数组。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:124",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:124"
+      ]
+    },
+    {
+      "key": "choice.strict-string@1",
+      "label": "读取严格文本选项",
+      "calls": 1,
+      "entries": [
+        "data/skills/velen-holy-prophecy.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "严格原始字符串协议解码，保留对象无效。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:135",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:135"
+      ]
+    },
+    {
+      "key": "choice.strict-string-list@1",
+      "label": "读取严格文本多选",
+      "calls": 2,
+      "entries": [
+        "data/skills/muru-lament.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "严格字符串数组协议解码，保持混合数组整体无效。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:146",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:146"
+      ]
+    },
+    {
+      "key": "choice.is-array@1",
+      "label": "检查多选数组",
+      "calls": 2,
+      "entries": [
+        "data/skills/muru-lament.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用Array.isArray类型判断，公开value类型谓词替代choice专名。",
+      "sourcepath": "lib/skill-graph/module-registry-velen-skills.ts:157",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-velen-skills.ts:157"
+      ]
+    },
+    {
+      "key": "spatial.shuffle-cardinal-cells@1",
+      "label": "随机打乱正交相邻地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/kenshin-ryutsuisen.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "固定四格构造加FisherYates洗牌；通用shuffle边界必须固定3次RNG，不能sort(random)。",
+      "sourcepath": "lib/skill-graph/module-registry-kenshin.ts:53",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-kenshin.ts:53"
+      ]
+    },
+    {
+      "key": "query.piece-by-identifier@1",
+      "label": "按状态来源解析棋子",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-blackwidow-toxin-player.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "字符串身份解析与query.piece重复，统一公开引用解析。",
+      "sourcepath": "lib/skill-graph/module-registry-toxin.ts:106",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-toxin.ts:106"
+      ]
+    },
+    {
+      "key": "effect.damage-with-player-fallback@1",
+      "label": "按棋子或玩家来源造成伤害",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-blackwidow-toxin-player.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "存活piece或player来源fallback选择后伤害；策略移到图/统一source构造，damage仍权威。",
+      "sourcepath": "lib/skill-graph/module-registry-toxin.ts:164",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-toxin.ts:164"
+      ]
+    },
+    {
+      "key": "attribute.read-stored@1",
+      "label": "读取在场或墓地棋子属性",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-rafaam-temporal-distortion.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "board/graveyard属性读取、exists及0缺省；通用piece字段scope与显式fallback。",
+      "sourcepath": "lib/skill-graph/module-registry-stored-attributes.ts:15",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-stored-attributes.ts:15"
+      ]
+    },
+    {
+      "key": "attribute.set-stored@1",
+      "label": "设置在场或墓地棋子属性",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-rafaam-temporal-distortion.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "board/graveyard非HP属性有限值受控写，保留离场写能力而不授权离场行动。",
+      "sourcepath": "lib/skill-graph/module-registry-stored-attributes.ts:23",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-stored-attributes.ts:23"
+      ]
+    },
+    {
+      "key": "spatial.cell-terrain-in@1",
+      "label": "地格属于允许的地形",
+      "calls": 1,
+      "entries": [
+        "data/skills/shadow-chaos-control.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "tile.props.type在给定types列表中；通用地图字段+membership。",
+      "sourcepath": "lib/skill-graph/module-registry-terrain-facts.ts:4",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-terrain-facts.ts:4"
+      ]
+    },
+    {
+      "key": "choice.first-cell-reference@1",
+      "label": "读取首项选择的地格",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "旧target列表首项cell解码，不能搜索后续cell替代首项。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:7",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:7"
+      ]
+    },
+    {
+      "key": "choice.first-piece-reference@1",
+      "label": "读取首项选择的棋子引用",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "旧target列表首项piece解码，不能搜索后续piece。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:13",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:13"
+      ]
+    },
+    {
+      "key": "event.target-coordinate-cell@1",
+      "label": "读取事件目标坐标",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-minato-anchor-end-turn.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "context.targetX/Y读取成cell，统一context字段及坐标构造。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:19",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:19"
+      ]
+    },
+    {
+      "key": "choice.cell-options@1",
+      "label": "请求选择候选地格",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-minato-anchor-end-turn.json#skillCode"
+      ],
+      "classification": "协议适配必要",
+      "reason": "可选字段精确保留的cell pending信封，协议适配器可统一公开，不强填缺省。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:26",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:26"
+      ]
+    },
+    {
+      "key": "choice.context-piece-or-select@1",
+      "label": "使用已有目标或选择棋子",
+      "calls": 1,
+      "entries": [
+        "data/cards/hashirama-edo-thousand-hands.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "context.target存在则直接使用否则selectTarget，显式字段分支+通用选择；不能每次新建pending。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:45",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:45"
+      ]
+    },
+    {
+      "key": "ref.context-player@1",
+      "label": "上下文直接指定的玩家",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-lucky-coin-gamestart.json#skillCode",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/elune-guidance-trigger.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "context.player对象或playerId读取，统一context/ref命名，保留优先级。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:59",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:59"
+      ]
+    },
+    {
+      "key": "tile.remove-source-records@1",
+      "label": "移除指定来源的地格表现记录",
+      "calls": 1,
+      "entries": [
+        "data/skills/blizzard-damage.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "tileEffects按sourceId过滤；通用读取/filter+受控tile替换，保留缺失时false。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:65",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:65"
+      ]
+    },
+    {
+      "key": "piece.set-stored-flag@1",
+      "label": "设置在场或墓地棋子表现标记",
+      "calls": 1,
+      "entries": [
+        "data/skills/blizzard-damage.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "board/graveyard受限布尔字段写，通用typed stored-piece写可整合。",
+      "sourcepath": "lib/skill-graph/module-registry-context-facts.ts:71",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-context-facts.ts:71"
+      ]
+    },
+    {
+      "key": "spatial.cell-unoccupied-except@1",
+      "label": "检查忽略指定棋子的空地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/hashirama-edo-sage-buddha.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用占位ignore查询，与cell-unoccupied统一参数及ID转换语义。",
+      "sourcepath": "lib/skill-graph/module-registry-sage-totsuka.ts:31",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-sage-totsuka.ts:31"
+      ]
+    },
+    {
+      "key": "skill.reset-cooldowns@1",
+      "label": "重置技能冷却",
+      "calls": 1,
+      "entries": [
+        "data/skills/hashirama-edo-sage-buddha.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "技能状态过滤excluded/currentCooldown>0后归零；图filter/foreach+通用写。",
+      "sourcepath": "lib/skill-graph/module-registry-sage-totsuka.ts:46",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-sage-totsuka.ts:46"
+      ]
+    },
+    {
+      "key": "skill.adjust-active-cooldowns-at-least@1",
+      "label": "设置主动技能最低冷却",
+      "calls": 1,
+      "entries": [
+        "data/skills/itachi-totsuka-blade.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "技能定义不存在或active筛选后max冷却；图组合，缺定义视active必须保持。",
+      "sourcepath": "lib/skill-graph/module-registry-sage-totsuka.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-sage-totsuka.ts:64"
+      ]
+    },
+    {
+      "key": "card.bind-latest-unbound@1",
+      "label": "绑定最新未绑定手牌",
+      "calls": 2,
+      "entries": [
+        "data/skills/hashirama-edo-sage-buddha.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "hand倒序find未绑定cardId后写boundPieceInstanceId；通用集合+受控card写。",
+      "sourcepath": "lib/skill-graph/module-registry-sage-totsuka.ts:80",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-sage-totsuka.ts:80"
+      ]
+    },
+    {
+      "key": "spatial.clip-cells@1",
+      "label": "截取地图内地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/sasuke-amaterasu.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用地图内坐标裁剪查询，认可空间原语；保留输入顺序。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:64"
+      ]
+    },
+    {
+      "key": "spatial.cells-within-range@1",
+      "label": "按距离筛选地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/sasuke-kagutsuchi.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "通用曼哈顿/切比雪夫范围过滤，用户明确认可，不需要展开abs/add。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:75",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:75"
+      ]
+    },
+    {
+      "key": "tile.append-dedup-markers@1",
+      "label": "去重添加地格表现",
+      "calls": 2,
+      "entries": [
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/sasuke-amaterasu.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "按tileType/坐标去重、固定source和表现步数；构造去重策略移图，queue/direct提交时机保留。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:91",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:91"
+      ]
+    },
+    {
+      "key": "extension.append-cell-records@1",
+      "label": "登记地格来源记录",
+      "calls": 2,
+      "entries": [
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/sasuke-amaterasu.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "坐标去重并构造sourcePieceId/owner记录追加extension；通用集合和声明写。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:120",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:120"
+      ]
+    },
+    {
+      "key": "extension.set-owner@1",
+      "label": "设置扩展归属玩家",
+      "calls": 2,
+      "entries": [
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/sasuke-amaterasu.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "overwrite或null才set owner，图if+通用extension写；empty字符串不可当null。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:133",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:133"
+      ]
+    },
+    {
+      "key": "extension.read-cell-records@1",
+      "label": "读取扩展地格记录",
+      "calls": 4,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-move.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode",
+        "data/skills/sasuke-kagutsuchi.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "extension记录过滤整数坐标并投影，通用read/filter/map。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:146",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:146"
+      ]
+    },
+    {
+      "key": "extension.remove-cell-records@1",
+      "label": "移除扩展地格记录",
+      "calls": 1,
+      "entries": [
+        "data/skills/sasuke-kagutsuchi.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cell membership过滤extension和tile联动；图筛选+通用联合提交，保留queue/direct与removed计数。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:158",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:158"
+      ]
+    },
+    {
+      "key": "extension.cell-record-source@1",
+      "label": "读取地格来源棋子",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-stack.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "根据piece坐标find extension首记录的source，字段/collection组合。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:181",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:181"
+      ]
+    },
+    {
+      "key": "event.path-cell-record-hits@1",
+      "label": "统计路径地格命中",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-move.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "每个contact cell首记录命中计数及首有效source；reduce/find，重复路径仍重复计数。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:193",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:193"
+      ]
+    },
+    {
+      "key": "rule.source-player-fallback@1",
+      "label": "读取规则来源玩家",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "ruleOwnerPlayerId/playerId/extension owner truthy选择；context+extension字段组合。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:219",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:219"
+      ]
+    },
+    {
+      "key": "status.read-live-source@1",
+      "label": "读取存活状态来源",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "status首项sourcePieceId后活棋子查询，find/field/query组合。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:232",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:232"
+      ]
+    },
+    {
+      "key": "record.read-text@1",
+      "label": "读取登记文本",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-endturn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "message字段string类型否则fallback，data.field+类型/选择。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:239",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:239"
+      ]
+    },
+    {
+      "key": "collection.live-piece-at@1",
+      "label": "读取现役棋子项",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "当前live数组按index读取身份；公开通用实时查询，不能擅自换预先snapshot改变循环删除行为。",
+      "sourcepath": "lib/skill-graph/module-registry-amaterasu.ts:262",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-amaterasu.ts:262"
+      ]
+    },
+    {
+      "key": "choice.hand-cards-bounded@1",
+      "label": "按动态上限选择手牌",
+      "calls": 1,
+      "entries": [
+        "data/skills/muru-lament.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "手选项协议动态maxSelections版本，统一hand选择参数；保留数量/取消边界。",
+      "sourcepath": "lib/skill-graph/module-registry-lament.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-lament.ts:64"
+      ]
+    },
+    {
+      "key": "query.affectable-pieces-from-source@1",
+      "label": "按来源查询可影响棋子",
+      "calls": 3,
+      "entries": [
+        "data/skills/muru-lament.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "带真实source的canAffectAdventureTarget规则筛选，保留宿主可影响性，公开通用query policy。",
+      "sourcepath": "lib/skill-graph/module-registry-lament.ts:103",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-lament.ts:103"
+      ]
+    },
+    {
+      "key": "spatial.cardinal-cells-ordered@1",
+      "label": "按指定冻结顺序生成正交地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "可参数化顺序的正交相邻坐标构造，用户认可空间原语。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-flame-spirit.ts:49",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-flame-spirit.ts:49"
+      ]
+    },
+    {
+      "key": "extension.records-to-cells@1",
+      "label": "记录投影为地格",
+      "calls": 2,
+      "entries": [
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "records map为x/y地格，无宿主能力；通用map+record。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-flame-spirit.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-flame-spirit.ts:64"
+      ]
+    },
+    {
+      "key": "extension.append-cell-records-ordered@1",
+      "label": "追加封闭地格记录",
+      "calls": 1,
+      "entries": [
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "构造来源/归属后按序追加shishio扩展，无去重；通用map+extension写。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-flame-spirit.ts:74",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-flame-spirit.ts:74"
+      ]
+    },
+    {
+      "key": "effect.damage-pieces-unattributed@1",
+      "label": "以棋子引用造成无技能归属伤害",
+      "calls": 1,
+      "entries": [
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "省略battle/skillId的旧damage facade语义需权威接口保留，不能普通对象写HP。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-flame-spirit.ts:92",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-flame-spirit.ts:92"
+      ]
+    },
+    {
+      "key": "tile.batch-effect-markers@1",
+      "label": "批量提交燃烧表现",
+      "calls": 1,
+      "entries": [
+        "data/skills/shishio-flame-spirit.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cells map为tile records再整体tileBatch；map移图，空批次调用与地图外记录保留。",
+      "sourcepath": "lib/skill-graph/module-registry-shishio-flame-spirit.ts:111",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-shishio-flame-spirit.ts:111"
+      ]
+    },
+    {
+      "key": "projectile.trace-until-blocker@1",
+      "label": "读取阻挡前敌人弹道",
+      "calls": 1,
+      "entries": [
+        "data/skills/ichigo-black-getsuga-tensho.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "trace后按友军/阻挡停止、去重敌人及首cell聚合；通用路径原语+有序集合组合。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:59",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:59"
+      ]
+    },
+    {
+      "key": "effect.damage-many-ordered@1",
+      "label": "批量造成伤害",
+      "calls": 2,
+      "entries": [
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "damageMany权威批次外包results.reduce totalDamage；reduce移图，伤害必须仍一次批量提交。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:93",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:93"
+      ]
+    },
+    {
+      "key": "extension.read-piece-cells@1",
+      "label": "读取棋子扩展地格",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "extension[owner]读后坐标filter/map，通用声明存储读取和集合组合。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:124",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:124"
+      ]
+    },
+    {
+      "key": "extension.set-piece-cells@1",
+      "label": "写入棋子扩展地格",
+      "calls": 1,
+      "entries": [
+        "data/skills/ichigo-black-getsuga-tensho.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "cells过滤整数并加type后按owner存储；map/filter移图，受控extension写。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:138",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:138"
+      ]
+    },
+    {
+      "key": "extension.clear-piece-cells@1",
+      "label": "清理棋子扩展地格",
+      "calls": 6,
+      "entries": [
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/skills/ichigo-black-getsuga-tensho.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "封闭owner存储条目delete，通用声明extension删除，保留不存在false。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:152",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:152"
+      ]
+    },
+    {
+      "key": "extension.remove-empty-piece-store@1",
+      "label": "清理空棋子扩展容器",
+      "calls": 5,
+      "entries": [
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "Object.keys长度为0才删除容器；通用集合/比较+受控delete，避免改存档缺失/空容器差异。",
+      "sourcepath": "lib/skill-graph/module-registry-ichigo.ts:166",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-ichigo.ts:166"
+      ]
+    },
+    {
+      "key": "status.read-piece-reference@1",
+      "label": "读取状态关联棋子",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "首status字段解析现役piece，find/field/query组合；不额外加HP>0。",
+      "sourcepath": "lib/skill-graph/module-registry-kyoka.ts:47",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-kyoka.ts:47"
+      ]
+    },
+    {
+      "key": "content.card-number@1",
+      "label": "读取生成卡牌数值",
+      "calls": 3,
+      "entries": [
+        "data/cards/rafaam-curse-sample.json#code",
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "动态卡damageAmount字段带fallback，通用definition field读取。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:64",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:64"
+      ]
+    },
+    {
+      "key": "content.materialize-curse-template@1",
+      "label": "实例化诅咒卡模板",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-rafaam-curse-ward.json#skillCode"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "专用诅咒模板绑定damage/source是内容策略；通用受信模板实例化应支持显式typed bindings，不能开放源码。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:76",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:76"
+      ]
+    },
+    {
+      "key": "card.current-id@1",
+      "label": "读取当前动态卡牌标识",
+      "calls": 2,
+      "entries": [
+        "data/cards/rafaam-curse-sample.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "当前cardId事实读取，统一context字段。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:91",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:91"
+      ]
+    },
+    {
+      "key": "card.current-type@1",
+      "label": "读取当前卡牌触发类型",
+      "calls": 1,
+      "entries": [
+        "data/cards/rafaam-curse-sample.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "当前card触发type事实读取，统一context字段。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:102",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:102"
+      ]
+    },
+    {
+      "key": "effect.card-damage@1",
+      "label": "结算生成卡牌伤害",
+      "calls": 1,
+      "entries": [
+        "data/cards/rafaam-curse-sample.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "cardDamage保留冻结来源fallback及跳过before事件，是伤害host policy；需通用可命名策略而非图直接伪造事件。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:113",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:113"
+      ]
+    },
+    {
+      "key": "effect.damage-with-killer-typed@1",
+      "label": "以指定归属提交类型伤害",
+      "calls": 1,
+      "entries": [
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "typed伤害+killer归因+inputPolicy权威入口，可统一伤害参数，保持事件拼写。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:128",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:128"
+      ]
+    },
+    {
+      "key": "result.card-action@1",
+      "label": "构造卡牌行动结果",
+      "calls": 5,
+      "entries": [
+        "data/cards/rafaam-curse-sample.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "success/message/keepInHand卡牌返回协议，统一result构造，不拆手牌生命周期。",
+      "sourcepath": "lib/skill-graph/module-registry-rafaam-curse.ts:143",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-rafaam-curse.ts:143"
+      ]
+    },
+    {
+      "key": "ref.player-id-text@1",
+      "label": "读取原始玩家标识文本",
+      "calls": 1,
+      "entries": [
+        "data/skills/grant-lucky-coin.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "原始context.playerId文本读取，统一context字段但不可过早存在/大小写校验。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:53",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:53"
+      ]
+    },
+    {
+      "key": "query.player-case-insensitive@1",
+      "label": "不区分大小写查询玩家",
+      "calls": 1,
+      "entries": [
+        "data/skills/grant-lucky-coin.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "players按lowercase查找并返回受控错误文本；通用文本比较/find，保留null异常结果兼容。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:63",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:63"
+      ]
+    },
+    {
+      "key": "player.display-name@1",
+      "label": "读取玩家显示名",
+      "calls": 1,
+      "entries": [
+        "data/skills/grant-lucky-coin.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "player.name或id的truthy fallback，player.field+选择。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:89",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:89"
+      ]
+    },
+    {
+      "key": "piece.snapshot-serializable@1",
+      "label": "保留棋子数据快照",
+      "calls": 1,
+      "entries": [
+        "data/skills/kiljaedan-demonic-pact.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "序列化快照剔除可执行rule.effect是安全/持久化边界；通用instance snapshot policy而非开放对象复制。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:103",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:103"
+      ]
+    },
+    {
+      "key": "piece.detach-active@1",
+      "label": "从当前棋盘移除棋子",
+      "calls": 1,
+      "entries": [
+        "data/skills/kiljaedan-demonic-pact.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "脱离现役集合生命周期及flowState清理策略，不能用列表filter替代。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:131",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:131"
+      ]
+    },
+    {
+      "key": "extension.store-piece@1",
+      "label": "登记储存棋子",
+      "calls": 1,
+      "entries": [
+        "data/skills/kiljaedan-demonic-pact.json#code"
+      ],
+      "classification": "必须组合迁移",
+      "reason": "owner规范化、scoped写与legacy-if-null存储策略；通用typed extension写并保留原存档路径。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:146",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:146"
+      ]
+    },
+    {
+      "key": "card.hand-add-controlled@1",
+      "label": "受控加入手牌",
+      "calls": 1,
+      "entries": [
+        "data/skills/grant-lucky-coin.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "手卡写异常到success/error的旧结果协议；真实cards.add边界保留，可统一受控结果包装。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:167",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:167"
+      ]
+    },
+    {
+      "key": "card.hand-add-player-id-text@1",
+      "label": "按玩家标识文本加入手牌",
+      "calls": 1,
+      "entries": [
+        "data/skills/kiljaedan-demonic-pact.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "原始playerId交给手牌生命周期并保留null失败；通用手牌接口可整合输入策略。",
+      "sourcepath": "lib/skill-graph/module-registry-passive-setup.ts:181",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry-passive-setup.ts:181"
+      ]
+    },
+    {
+      "key": "query.piece@1",
+      "label": "验证棋子引用",
+      "calls": 361,
+      "entries": [
+        "data/cards/hashirama-edo-nature-heal.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/holy-heal.json#code",
+        "data/cards/holy-smite.json#code",
+        "data/cards/watcher-calm.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-aizen-black-coffin-end.json#skillCode",
+        "data/rules/rule-aizen-kyoka-expire.json#skillCode",
+        "data/rules/rule-aizen-kyoka-rewrite.json#skillCode",
+        "data/rules/rule-akaza-damage-mark.json#skillCode",
+        "data/rules/rule-akaza-fighting-spirit.json#skillCode",
+        "data/rules/rule-arthas-icebound-retaliate.json#skillCode",
+        "data/rules/rule-arthas-icebound.json#skillCode",
+        "data/rules/rule-arthas-lich-covenant.json#skillCode",
+        "data/rules/rule-arthas-slow-restore.json#skillCode",
+        "data/rules/rule-blackwidow-toxin-player.json#skillCode",
+        "data/rules/rule-chidori-immobile.json#skillCode",
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-damage-buff.json#skillCode",
+        "data/rules/rule-divine-shield.json#skillCode",
+        "data/rules/rule-el-primo-injury-counter.json#skillCode",
+        "data/rules/rule-el-primo-meteor-belt.json#skillCode",
+        "data/rules/rule-elune-guidance.json#skillCode",
+        "data/rules/rule-elune-protection-player.json#skillCode",
+        "data/rules/rule-elune-protection.json#skillCode",
+        "data/rules/rule-grimmjow-destruction-instinct.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-grimmjow-resurreccion.json#skillCode",
+        "data/rules/rule-hashirama-edo-regen.json#skillCode",
+        "data/rules/rule-hidan-dying-immune.json#skillCode",
+        "data/rules/rule-hidan-undying-tick.json#skillCode",
+        "data/rules/rule-hidan-undying.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/rules/rule-illidan-demon-strike.json#skillCode",
+        "data/rules/rule-itachi-tsukuyomi.json#skillCode",
+        "data/rules/rule-kenshin-tenken-boost.json#skillCode",
+        "data/rules/rule-kenshin-tenken.json#skillCode",
+        "data/rules/rule-mangekyo-friendly-death.json#skillCode",
+        "data/rules/rule-max-phase-recast-expire.json#skillCode",
+        "data/rules/rule-minato-anchor-end-turn.json#skillCode",
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-momentum-gain.json#skillCode",
+        "data/rules/rule-mortis-damage-counter.json#skillCode",
+        "data/rules/rule-muzan-damage-reduction.json#skillCode",
+        "data/rules/rule-muzan-regeneration-damage.json#skillCode",
+        "data/rules/rule-muzan-regeneration-end.json#skillCode",
+        "data/rules/rule-naruto-clone-died.json#skillCode",
+        "data/rules/rule-naruto-clone-immobile.json#skillCode",
+        "data/rules/rule-naruto-clone-one-hit.json#skillCode",
+        "data/rules/rule-naruto-sage-block-skill.json#skillCode",
+        "data/rules/rule-naruto-sage-immobile.json#skillCode",
+        "data/rules/rule-naruto-sage-immunity.json#skillCode",
+        "data/rules/rule-naruto-sage-tick.json#skillCode",
+        "data/rules/rule-obito-grudge-reset.json#skillCode",
+        "data/rules/rule-obito-grudge.json#skillCode",
+        "data/rules/rule-obito-kamui-block.json#skillCode",
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/rules/rule-reap.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-damage.json#skillCode",
+        "data/rules/rule-sasuke-amaterasu-move.json#skillCode",
+        "data/rules/rule-shadow-chaos-spear-restore.json#skillCode",
+        "data/rules/rule-shelly-bandage.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode",
+        "data/rules/rule-shishio-combustion.json#skillCode",
+        "data/rules/rule-shishio-cooldown-once.json#skillCode",
+        "data/rules/rule-shishio-execute-option.json#skillCode",
+        "data/rules/rule-shishio-infinite-blade-recast.json#skillCode",
+        "data/rules/rule-shishio-kill-track.json#skillCode",
+        "data/rules/rule-shishio-no-heal.json#skillCode",
+        "data/rules/rule-shishio-silence-burst.json#skillCode",
+        "data/rules/rule-silenced-block.json#skillCode",
+        "data/rules/rule-sonic-free-move.json#skillCode",
+        "data/rules/rule-tails-armor-recovery.json#skillCode",
+        "data/rules/rule-tails-flight-immune-target.json#skillCode",
+        "data/rules/rule-tails-flight-immune.json#skillCode",
+        "data/rules/rule-tails-flight-inoperable-skill.json#skillCode",
+        "data/rules/rule-tails-flight-inoperable.json#skillCode",
+        "data/rules/rule-tails-flight-resolve.json#skillCode",
+        "data/rules/rule-tirion-divine-glory.json#skillCode",
+        "data/rules/rule-tirion-divine-shield-start.json#skillCode",
+        "data/rules/rule-turalyon-lightforged-march.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-dealt.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-taken.json#skillCode",
+        "data/rules/rule-ulquiorra-resurreccion.json#skillCode",
+        "data/rules/rule-velen-death-cleanup.json#skillCode",
+        "data/rules/rule-velen-delayed-effects.json#skillCode",
+        "data/rules/rule-velen-fate-target.json#skillCode",
+        "data/rules/rule-venom-corrosion-immobile.json#skillCode",
+        "data/rules/rule-watcher-form.json#skillCode",
+        "data/rules/rule-watcher-rage-dealt.json#skillCode",
+        "data/rules/rule-watcher-rage-taken.json#skillCode",
+        "data/rules/rule-watcher-shield.json#skillCode",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/alfonso-freeze.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/anti-heal-block.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/arthas-howling-blast.json#code",
+        "data/skills/arthas-icebound-fortitude.json#code",
+        "data/skills/arthas-lich-covenant.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/blood-echo-trigger.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/death-blossom.json#code",
+        "data/skills/divine-blessing.json#code",
+        "data/skills/divine-shield-defense.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/el-primo-meteor-belt.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/elune-blessing.json#code",
+        "data/skills/elune-guidance-trigger.json#code",
+        "data/skills/elune-guidance.json#code",
+        "data/skills/elune-protection-trigger.json#code",
+        "data/skills/elune-protection.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/freeze-prevent.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hardy-block-trigger.json#code",
+        "data/skills/hardy-block.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/hidan-blood-oath.json#code",
+        "data/skills/hidan-sacrifice.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/holy-shield-defense.json#code",
+        "data/skills/ichigo-bankai-tensa-zangetsu.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/illidan-metamorphosis.json#code",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/itachi-tsukuyomi.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-demonic-pact.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/kiljaedan-soul-drain.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/light-of-the-light.json#code",
+        "data/skills/max-full-speed.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/muzan-blood-whip.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/nano-boost-damage.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/naruto-rasengan.json#code",
+        "data/skills/naruto-sage-mode.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/obito-kamui.json#code",
+        "data/skills/obito-space-time.json#code",
+        "data/skills/pulse-pistol-move.json#code",
+        "data/skills/pulse-pistol.json#code",
+        "data/skills/rafaam-curse-amplify.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/reap-heal.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sasuke-amaterasu.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code",
+        "data/skills/sasuke-susanoo.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/shield-of-light.json#code",
+        "data/skills/shishio-flame-spirit.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sleep-dart.json#code",
+        "data/skills/sleep-prevent.json#code",
+        "data/skills/sleep-remove.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/sonic-super-form.json#code",
+        "data/skills/tails-mechanical-support.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/tirion-holy-recall.json#code",
+        "data/skills/turalyon-expedition-order.json#code",
+        "data/skills/turalyon-grand-crusade.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/velen-fate-shelter.json#code",
+        "data/skills/velen-holy-prophecy.json#code",
+        "data/skills/velen-thousand-futures-ultimate.json#code",
+        "data/skills/venom-claw-rend.json#code",
+        "data/skills/venom-host-transfer.json#code",
+        "data/skills/venom-symbiote-drag.json#code",
+        "data/skills/watcher-ultimate.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "不透明piece引用解析/存在校验，公开基础查询而非内容helper。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:286",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:286"
+      ]
+    },
+    {
+      "key": "query.player@1",
+      "label": "验证玩家引用",
+      "calls": 28,
+      "entries": [
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/holy-charge.json#code",
+        "data/cards/holy-heal.json#code",
+        "data/cards/holy-smite.json#code",
+        "data/cards/lucky-coin.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-colt-big-stride.json#skillCode",
+        "data/rules/rule-elune-guidance.json#skillCode",
+        "data/rules/rule-elune-protection-player.json#skillCode",
+        "data/rules/rule-elune-protection.json#skillCode",
+        "data/rules/rule-lucky-coin-gamestart.json#skillCode",
+        "data/rules/rule-rafaam-curse-end-turn.json#skillCode",
+        "data/rules/rule-rafaam-curse-ward.json#skillCode",
+        "data/rules/rule-soul-fracture-player.json#skillCode",
+        "data/rules/rule-tails-flight-resolve.json#skillCode",
+        "data/skills/blizzard-damage.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/elune-blessing.json#code",
+        "data/skills/elune-guidance-trigger.json#code",
+        "data/skills/grant-lucky-coin.json#code",
+        "data/skills/muru-lament.json#code",
+        "data/skills/rafaam-curse-amplify.json#code",
+        "data/skills/tails-armor-assembly.json#code"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "不透明player引用解析/存在校验，公开基础查询。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:296",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:296"
+      ]
+    },
+    {
+      "key": "choice.target-piece@1",
+      "label": "选择棋子目标",
+      "calls": 64,
+      "entries": [
+        "data/cards/armor-attack-defense.json#code",
+        "data/cards/armor-attack-heal.json#code",
+        "data/cards/armor-attack-speed.json#code",
+        "data/cards/armor-defense-heal.json#code",
+        "data/cards/armor-defense-speed.json#code",
+        "data/cards/armor-heal-speed.json#code",
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/soul-fragment.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/arthas-lich-covenant.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hidan-blood-oath.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/itachi-tsukuyomi.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/light-of-the-light.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/naruto-rasengan.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/obito-space-time.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shield-of-light.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/tails-mechanical-support.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/velen-fate-shelter.json#code",
+        "data/skills/venom-claw-rend.json#code",
+        "data/skills/venom-host-transfer.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "通用棋子选择pending/取消/候选校验协议，已认可选择原语。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:524",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:524"
+      ]
+    },
+    {
+      "key": "choice.target-cell@1",
+      "label": "选择地格目标",
+      "calls": 39,
+      "entries": [
+        "data/cards/demon-summon-5.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/sasuke-amaterasu.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/sleep-dart.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "通用地格选择pending/取消/候选校验协议，已认可选择原语。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:551",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:551"
+      ]
+    },
+    {
+      "key": "choice.is-pending@1",
+      "label": "检查选择是否挂起",
+      "calls": 4,
+      "entries": [
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/minato-spiral-barrage.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "目标选择pending标志协议访问，适合统一typed选择结果接口。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:572",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:572"
+      ]
+    },
+    {
+      "key": "choice.piece@1",
+      "label": "读取已选棋子",
+      "calls": 65,
+      "entries": [
+        "data/cards/armor-attack-defense.json#code",
+        "data/cards/armor-attack-heal.json#code",
+        "data/cards/armor-attack-speed.json#code",
+        "data/cards/armor-defense-heal.json#code",
+        "data/cards/armor-defense-speed.json#code",
+        "data/cards/armor-heal-speed.json#code",
+        "data/cards/demon-summon-1.json#code",
+        "data/cards/demon-summon-2.json#code",
+        "data/cards/demon-summon-3.json#code",
+        "data/cards/demon-summon-4.json#code",
+        "data/cards/demon-summon-5.json#code",
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/soul-fragment.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/aizen-kyoka-suiguetsu.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/arthas-frostmourne.json#code",
+        "data/skills/arthas-lich-covenant.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/edgar-fisticuffs.json#code",
+        "data/skills/el-primo-punch.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/grimmjow-gran-rey-cero.json#code",
+        "data/skills/grimmjow-panther-claw.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hidan-blood-oath.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/itachi-amaterasu.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/itachi-tsukuyomi.json#code",
+        "data/skills/kenshin-amakakeru.json#code",
+        "data/skills/kenshin-ryusosen.json#code",
+        "data/skills/kenshin-ryutsuisen.json#code",
+        "data/skills/kiljaedan-fel-fire.json#code",
+        "data/skills/light-extraction.json#code",
+        "data/skills/light-of-the-light.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/nano-boost.json#code",
+        "data/skills/naruto-rasengan.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/obito-space-time.json#code",
+        "data/skills/rafaam-temporal-distortion.json#code",
+        "data/skills/sasuke-kagutsuchi.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shield-of-light.json#code",
+        "data/skills/shishio-infinite-blade.json#code",
+        "data/skills/sonic-homing-attack.json#code",
+        "data/skills/tails-mechanical-support.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/velen-fate-shelter.json#code",
+        "data/skills/venom-claw-rend.json#code",
+        "data/skills/venom-host-transfer.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "完成的选择对象到piece引用解码，需宿主引用验证。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:579",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:579"
+      ]
+    },
+    {
+      "key": "choice.cell@1",
+      "label": "读取已选地格",
+      "calls": 47,
+      "entries": [
+        "data/cards/demon-summon-5.json#code",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/akaza-annihilation.json#code",
+        "data/skills/akaza-flash-step.json#code",
+        "data/skills/alfonso-kick.json#code",
+        "data/skills/alfonso-water-dash.json#code",
+        "data/skills/biotic-grenade.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blackwidow-lethal-toxin.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/blizzard.json#code",
+        "data/skills/colt-bullet-storm.json#code",
+        "data/skills/colt-piercing.json#code",
+        "data/skills/colt-revolver.json#code",
+        "data/skills/earthshatter.json#code",
+        "data/skills/edgar-pogo-jump.json#code",
+        "data/skills/el-primo-elbow.json#code",
+        "data/skills/hashirama-edo-sage-buddha.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/holy-light-descend.json#code",
+        "data/skills/ichigo-black-getsuga-tensho.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/illidan-blade-dash.json#code",
+        "data/skills/max-phase-shifter.json#code",
+        "data/skills/max-speed-shot.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/mortis-bat-support.json#code",
+        "data/skills/mortis-shovel-charge.json#code",
+        "data/skills/muzan-demon-body.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/rocket-punch.json#code",
+        "data/skills/sasuke-amaterasu.json#code",
+        "data/skills/sasuke-chidori.json#code",
+        "data/skills/sasuke-indra-arrow.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-control.json#code",
+        "data/skills/shadow-ride-sweep.json#code",
+        "data/skills/shadow-step.json#code",
+        "data/skills/shelly-dash.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/shelly-super-shell.json#code",
+        "data/skills/sleep-dart.json#code",
+        "data/skills/sonic-spin-dash.json#code",
+        "data/skills/tails-twin-flight.json#code",
+        "data/skills/venom-symbiote-drag.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "完成的选择对象到cell解码，协议适配边界。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:590",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:590"
+      ]
+    },
+    {
+      "key": "effect.damage@1",
+      "label": "造成伤害",
+      "calls": 39,
+      "entries": [
+        "data/cards/hashirama-edo-thousand-hands.json#code",
+        "data/cards/watcher-rage.json#code",
+        "data/rules/rule-colt-zone-endturn.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-momentum-consume.json#skillCode",
+        "data/rules/rule-shishio-burn-endturn.json#skillCode",
+        "data/rules/rule-shishio-burn-move.json#skillCode",
+        "data/rules/rule-shishio-infinite-blade-recast.json#skillCode",
+        "data/skills/aizen-black-coffin.json#code",
+        "data/skills/akaza-disorder.json#code",
+        "data/skills/arthas-howling-blast.json#code",
+        "data/skills/ashbringer.json#code",
+        "data/skills/blackwidow-deadly-gaze.json#code",
+        "data/skills/blackwidow-lethal-strike.json#code",
+        "data/skills/blessed-hammer.json#code",
+        "data/skills/fel-blessing.json#code",
+        "data/skills/frostbolt.json#code",
+        "data/skills/hand-cannon.json#code",
+        "data/skills/hashirama-edo-wood-dragon.json#code",
+        "data/skills/hashirama-edo-wood-spike.json#code",
+        "data/skills/hellfire-shotgun.json#code",
+        "data/skills/ichigo-getsuga-tensho.json#code",
+        "data/skills/ichigo-zangetsu.json#code",
+        "data/skills/illidan-demon-strike.json#code",
+        "data/skills/illidan-eye-beam.json#code",
+        "data/skills/itachi-totsuka-blade.json#code",
+        "data/skills/minato-rasengan.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/pulse-pistol-move.json#code",
+        "data/skills/pulse-pistol.json#code",
+        "data/skills/shadow-bolt.json#code",
+        "data/skills/shadow-chaos-spear.json#code",
+        "data/skills/shelly-shotgun.json#code",
+        "data/skills/ulquiorra-black-cero.json#code",
+        "data/skills/ulquiorra-cero.json#code",
+        "data/skills/venom-claw-rend.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "DamageBatch/queue伤害权威提交，事件/死亡/归因必须保持。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:600",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:600"
+      ]
+    },
+    {
+      "key": "effect.queue-heal@1",
+      "label": "排队治疗",
+      "calls": 3,
+      "entries": [
+        "data/rules/rule-reap.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-dealt.json#skillCode",
+        "data/rules/rule-ulquiorra-damage-taken.json#skillCode"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "获准healQueue追加请求，延迟治疗时机不能提前。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:633",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:633"
+      ]
+    },
+    {
+      "key": "effect.teleport@1",
+      "label": "权威位移",
+      "calls": 10,
+      "entries": [
+        "data/rules/rule-grimmjow-hunt-after-move.json#skillCode",
+        "data/rules/rule-grimmjow-hunt-after-skill.json#skillCode",
+        "data/rules/rule-ichigo-black-getsuga-teleport.json#skillCode",
+        "data/skills/aizen-shunpo.json#code",
+        "data/skills/blink.json#code",
+        "data/skills/minato-kunai-formula.json#code",
+        "data/skills/minato-spiral-barrage.json#code",
+        "data/skills/obito-ally-teleport.json#code",
+        "data/skills/shadow-step-teleport.json#code",
+        "data/skills/shelly-dash.json#code"
+      ],
+      "classification": "合理权威宿主原语",
+      "reason": "统一位置提交器，移动触发/合法性/回滚属宿主。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:646",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:646"
+      ]
+    },
+    {
+      "key": "event.damage@1",
+      "label": "事件伤害",
+      "calls": 2,
+      "entries": [
+        "data/rules/rule-naruto-clone-one-hit.json#skillCode",
+        "data/rules/rule-reap.json#skillCode"
+      ],
+      "classification": "通用读取但缺公开命名整合",
+      "reason": "事件damage字段读取，统一event/context field命名。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:776",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:776"
+      ]
+    },
+    {
+      "key": "result.message@1",
+      "label": "返回消息",
+      "calls": 43,
+      "entries": [
+        "data/cards/lucky-coin.json#code",
+        "data/rules/rule-aizen-black-coffin-move.json#skillCode",
+        "data/rules/rule-blood-oath-tick.json#skillCode",
+        "data/rules/rule-naruto-clone-died.json#skillCode",
+        "data/rules/rule-naruto-clone-endturn-charge.json#skillCode",
+        "data/rules/rule-naruto-clone-immobile.json#skillCode",
+        "data/rules/rule-naruto-clone-one-hit.json#skillCode",
+        "data/rules/rule-reap.json#skillCode",
+        "data/rules/rule-tails-flight-reservation-block.json#skillCode",
+        "data/rules/rule-tails-flight-resolve.json#skillCode",
+        "data/skills/akaza-fighting-spirit.json#code",
+        "data/skills/blackwidow-toxin-damage.json#code",
+        "data/skills/blood-echo.json#code",
+        "data/skills/colt-big-stride.json#code",
+        "data/skills/grimmjow-destruction-instinct.json#code",
+        "data/skills/grimmjow-hunting-instinct.json#code",
+        "data/skills/grimmjow-resurreccion.json#code",
+        "data/skills/hashirama-edo-regen.json#code",
+        "data/skills/hidan-undying.json#code",
+        "data/skills/muzan-flesh-regeneration.json#code",
+        "data/skills/muzan-parasitism.json#code",
+        "data/skills/naruto-vanguard.json#code",
+        "data/skills/obito-grudge.json#code",
+        "data/skills/rafaam-curse-ward.json#code",
+        "data/skills/reap.json#code",
+        "data/skills/shelly-bandage.json#code",
+        "data/skills/shishio-combustion-passive.json#code",
+        "data/skills/soul-fracture.json#code",
+        "data/skills/ulquiorra-high-speed-regeneration.json#code",
+        "data/skills/ulquiorra-resurreccion.json#code",
+        "data/skills/venom-corrosion.json#code"
+      ],
+      "classification": "协议适配必要",
+      "reason": "success/message旧结果信封，可统一公开结果构造器。",
+      "sourcepath": "lib/skill-graph/module-registry.ts:797",
+      "sourcepaths": [
+        "lib/skill-graph/module-registry.ts:797"
+      ]
+    }
+  ]
+}

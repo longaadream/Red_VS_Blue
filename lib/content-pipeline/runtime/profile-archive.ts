@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
@@ -14,6 +14,7 @@ import {
 } from '../core/resolver'
 import type { ContentPackSourceV1 } from '../core/source'
 import type { ContentValidationPolicyV1 } from '../core/validator'
+import { renameProfileDirectoryWithWindowsRetryV1 } from './profile-rename'
 import { readTrustedScriptPublishersV1 } from './script-publishers'
 import {
   createBundledBasePackInputV1,
@@ -279,7 +280,7 @@ function persistPackage(
       { encoding: 'utf8', flag: 'wx' },
     )
     mkdirSync(packagesDir, { recursive: true })
-    renameSync(temporary, destination)
+    renameProfileDirectoryWithWindowsRetryV1(temporary, destination)
   } catch (error) {
     if (existsSync(destination)) {
       assertStoredPackage(destination, packageHash, source, policy)

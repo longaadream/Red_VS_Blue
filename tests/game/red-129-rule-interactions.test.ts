@@ -292,7 +292,7 @@ describe('RED-129 波风水门回合结束锚点', () => {
     return { state, minato }
   }
 
-  it('opens a mandatory atomic target pending and commits one anchor after selection', () => {
+  it('opens the baseline cancellable atomic target pending and commits one anchor after selection', () => {
     const { state } = minatoEndTurnState()
     const beforeHash = hashBattleState(state)
     const pending = runBattleAction(state, {
@@ -303,7 +303,7 @@ describe('RED-129 波风水门回合结束锚点', () => {
     expect(pending.pendingTargetSelection).toMatchObject({
       playerId: 'player-red',
       source: { type: 'rule', id: 'rule-minato-anchor-end-turn', pieceId: 'minato' },
-      canCancel: false,
+      canCancel: true,
     })
     expect(pending.turn).toMatchObject({ currentPlayerId: 'player-red', phase: 'action' })
     expect(pending.extensions?.minatoAnchors || []).toEqual([])
@@ -684,7 +684,8 @@ describe('RED-129 拉法姆规则与资源', () => {
     const blue = blueTurn.players.find(player => player.playerId === 'player-blue')!
     const curse = blue.hand[0]
     const cardDef = (blueTurn as any).customCards[curse.cardId]
-    expect(cardDef).toMatchObject({ damageAmount: 6, sourcePieceId: 'curse-rafaam' })
+    expect(cardDef).toMatchObject({ damageAmount: 6, extension: { sourcePlayerId: 'player-red' } })
+    expect(cardDef).not.toHaveProperty('sourcePieceId')
 
     const first = runBattleAction(blueTurn, {
       type: 'endTurn',

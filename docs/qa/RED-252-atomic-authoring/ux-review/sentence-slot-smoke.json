@@ -1,0 +1,142 @@
+{
+  "task": "RED-252 atomic authoring sentence slots",
+  "role": "independent real Electron verification",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-slot-smoke-UPSYhQ\\rvb-content-299983da",
+  "evidence": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\ux-review",
+  "checks": [
+    {
+      "name": "damage sentence uses natural Chinese and amount is atomic",
+      "ok": true,
+      "detail": {
+        "projection": "编辑模块对【当前目标 · 棋子引用】造成【5】点【普通】伤害，来源为【持有者 · 棋子引用】→ 结果→ 是否成功→ 实际伤害",
+        "focused": {
+          "className": "sentence-inline-editor sentence-statement-editor sentence-slot-only-editor",
+          "text": "编辑输入：数量完成数量 · 数值请选择数据来源常量＋ 组合表达式下一项：伤害类型",
+          "moduleSelect": false,
+          "inputs": [
+            "amount"
+          ],
+          "parameters": [],
+          "slotEditor": "input:amount",
+          "chooser": false
+        },
+        "chooser": {
+          "className": "sentence-inline-editor sentence-statement-editor sentence-slot-only-editor",
+          "text": "编辑输入：数量完成数量 · 数值请选择数据来源常量＋ 组合表达式下一项：伤害类型为“amount”组合表达式只显示纯模块；选择后会在当前语句之前生成一个有类型的输出引用。技能威力倍率 → value当前回合编号 → value棋子状态数量 → value获取集合长度 → 数量获取集合项 → 集合项取较小值 → value取较大值 → value读取状态实例数值 → value读取事件数值 → value按条件选择数值 → value棋子距离 → distance读取棋子属性 → value加法 → value减法 → value乘法 → value除法 → value取余 → value乘方 → value向下取整 → value绝对值 → value取消",
+          "moduleSelect": false,
+          "inputs": [
+            "amount"
+          ],
+          "parameters": [],
+          "slotEditor": "input:amount",
+          "chooser": true
+        },
+        "composed": {
+          "kind": "output",
+          "node": "sentence-expression-1",
+          "port": "value"
+        }
+      }
+    },
+    {
+      "name": "record field and named return slots write canonical AST keys",
+      "ok": true,
+      "detail": {
+        "hp": {
+          "kind": "output",
+          "node": "sentence-expression-1",
+          "port": "value"
+        },
+        "retained": {
+          "kind": "literal",
+          "value": "保留字段"
+        },
+        "values": {
+          "result": {
+            "kind": "output",
+            "node": "sentence-expression-2",
+            "port": "value"
+          }
+        },
+        "field": "hp"
+      }
+    },
+    {
+      "name": "extension dependencies gate later controls and retain incompatible values",
+      "ok": true,
+      "detail": {
+        "write": {
+          "parameters": {
+            "namespace": "content",
+            "name": "flag",
+            "path": "stats.hp",
+            "valueType": "boolean"
+          },
+          "value": {
+            "kind": "literal",
+            "value": 7
+          }
+        },
+        "mismatch": "待重填：当前是数值，此处需要布尔值"
+      }
+    },
+    {
+      "name": "collection local input, defer graph/payload, return.value and more fields remain editable",
+      "ok": true,
+      "detail": {
+        "collection": {
+          "local": {
+            "kind": "output",
+            "node": "sentence-expression-1",
+            "port": "text"
+          }
+        },
+        "defer": {
+          "graph": "alternate@1",
+          "payload": {
+            "kind": "literal",
+            "value": "updated-payload"
+          }
+        },
+        "return": {
+          "kind": "literal",
+          "value": "updated-return"
+        },
+        "config": {
+          "present": true,
+          "summary": "流程声明、端口与 schema",
+          "schemas": true,
+          "declarations": true
+        }
+      }
+    },
+    {
+      "name": "changed graph survives file serialization and remount",
+      "ok": true,
+      "detail": {
+        "body": [
+          "sentence-expression-1",
+          "collection-main",
+          "defer-main",
+          "return-value"
+        ],
+        "file": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-sentence-slot-smoke-UPSYhQ\\rvb-content-299983da\\data\\skills\\sentence-slot-smoke.json"
+      }
+    }
+  ],
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\ux-review\\natural-damage-amount-slot.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-atomic-authoring\\ux-review\\natural-damage-amount-chooser.png"
+  ],
+  "catalog": {
+    "count": 607,
+    "required": [
+      "author.effect.damage",
+      "extension.read-player",
+      "extension.write-player",
+      "math.add"
+    ]
+  },
+  "ok": true,
+  "failureCount": 0
+}

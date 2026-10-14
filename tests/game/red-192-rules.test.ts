@@ -21,6 +21,9 @@ function fixture() {
 function applyStatus(state: any, status: any) {
   const skill = { ...json('skills', 'naruto-sage-mode'), id: 'test-status',
     code: `function executeSkill() { return { success: addStatusEffectById(sourcePiece.instanceId, ${JSON.stringify(status)}) }; }` }
+  // This fixture intentionally replaces the executable; retaining the
+  // original author graph would correctly reject that mismatched document.
+  delete skill.gameplayModules
   return executeSkillFunction(skill, { piece: state.pieces[0], battle: state, skill, target: null, targetPosition: null }, state)
 }
 
@@ -53,6 +56,8 @@ describe('RED-192 rule dictionary', () => {
     state.players[0].rules = [loadRuleById('rule-soul-fracture-player')]
     const skill = { ...json('skills', 'fireball'), id: 'two-core-deaths', actionPointCost: 1, targeting: { steps: [] },
       code: "function executeSkill() { dealDamage(sourcePiece, battle.pieces.filter(function(piece) { return piece.ownerPlayerId !== sourcePiece.ownerPlayerId; }), 99, 'true', battle, 'two-core-deaths'); return { success: true }; }" }
+    // This fixture supplies its own executable, not Fireball's generated graph.
+    delete skill.gameplayModules
     caster.skills = [{ skillId: skill.id, currentCooldown: 0 }]
     state.skillsById[skill.id] = skill
     const result = runBattleAction(state, { type: 'useBasicSkill', playerId: 'player-red', pieceId: caster.instanceId, skillId: skill.id }, { rootSeed: 192 }).state

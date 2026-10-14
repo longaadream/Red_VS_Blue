@@ -1,0 +1,1946 @@
+{
+  "schemaVersion": 1,
+  "baseSha": "00df31f8bd35b34200d507fd83853bf5ac99ba94",
+  "policy": "Importable is not migrated or behavior-verified. No content is changed by this command. Nested pending source remains a separate coverage obligation.",
+  "counts": {
+    "compiled": 276,
+    "declarative-or-linked": 26
+  },
+  "results": [
+    {
+      "id": "cards/demon-summon-1",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/demon-summon-2",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/demon-summon-3",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/demon-summon-4",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/demon-summon-5",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/hashirama-edo-nature-heal",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/hashirama-edo-thousand-hands",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/holy-charge",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/holy-heal",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/holy-smite",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/lucky-coin",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/rafaam-curse-sample",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/sample-reactive-card",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/soul-fragment",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/watcher-calm",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "cards/watcher-rage",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "rules/rule-aizen-black-coffin-end",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-aizen-black-coffin-move",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-aizen-kyoka-expire",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-aizen-kyoka-rewrite",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-akaza-damage-mark",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-akaza-fighting-spirit",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-anti-heal-block",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-arthas-icebound",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-arthas-icebound-retaliate",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-arthas-lich-covenant",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-arthas-slow-restore",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-blackwidow-toxin-player",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-blizzard-active",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-blood-echo",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-blood-oath-tick",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-chidori-immobile",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-colt-big-stride",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-colt-zone-endturn",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-damage-buff",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-divine-shield",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-el-primo-injury-counter",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-el-primo-meteor-belt",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-elune-guidance",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-elune-protection",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-elune-protection-player",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-freeze-prevent-move",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-freeze-prevent-skill",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-grimmjow-destruction-instinct",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-grimmjow-hunt-after-move",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-grimmjow-hunt-after-skill",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-grimmjow-resurreccion",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-hardy-block",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-hashirama-edo-regen",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-hidan-blood-oath-reflect",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-hidan-dying-immune",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-hidan-undying",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-hidan-undying-tick",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-ichigo-black-getsuga-teleport",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-illidan-demon-strike",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-initial-draw",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-itachi-tsukuyomi",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-kenshin-tenken",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-kenshin-tenken-boost",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-kiljaedan-gamestart",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-lucky-coin-start",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-mangekyo-friendly-death",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-max-phase-recast-expire",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-minato-anchor-end-turn",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-minato-flying-raijin-trigger",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-momentum-consume",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-momentum-gain",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-mortis-damage-counter",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-muzan-damage-reduction",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-muzan-regeneration-damage",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-muzan-regeneration-end",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-nano-boost-damage",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-naruto-clone-died",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-clone-endturn-charge",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-clone-immobile",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-clone-one-hit",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-sage-block-skill",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-sage-immobile",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-sage-immunity",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-naruto-sage-tick",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-obito-grudge",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-obito-grudge-reset",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-obito-kamui-block",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-pulse-pistol",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-pulse-pistol-move",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-rafaam-curse-end-turn",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-rafaam-curse-ward",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-rafaam-temporal-distortion",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-reap",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-recall-endturn",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-recall-move",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-recall-skill",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-sasuke-amaterasu-damage",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-sasuke-amaterasu-endturn",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-sasuke-amaterasu-move",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-sasuke-amaterasu-stack",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shadow-chaos-spear-restore",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shadow-step",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-shelly-bandage",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-burn-endturn",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-burn-move",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-combustion",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-cooldown-once",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-execute-option",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-infinite-blade-recast",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-kill-track",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-no-heal",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-shishio-silence-burst",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-silenced-block",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-sleep-prevent-move",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-sleep-prevent-skill",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-sleep-remove-on-damage",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-sonic-free-move",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-soul-fracture",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-soul-fracture-player",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-spiritual-pressure",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "rules/rule-tails-armor-recovery",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-immune",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-immune-target",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-inoperable",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-inoperable-skill",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-reservation-block",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tails-flight-resolve",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tirion-divine-glory",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-tirion-divine-shield-start",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-turalyon-lightforged-march",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-ulquiorra-damage-dealt",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-ulquiorra-damage-taken",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-ulquiorra-resurreccion",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-velen-death-cleanup",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-velen-delayed-effects",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-velen-fate-target",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-venom-corrosion-immobile",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-watcher-form",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-watcher-rage-dealt",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-watcher-rage-taken",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "rules/rule-watcher-shield",
+      "status": "compiled",
+      "field": "skillCode"
+    },
+    {
+      "id": "skills/aizen-black-coffin",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/aizen-kyoka-suiguetsu",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/aizen-shunpo",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/akaza-annihilation",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/akaza-disorder",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/akaza-fighting-spirit",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/akaza-flash-step",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/alfonso-freeze",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/alfonso-kick",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/alfonso-water-dash",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/anti-heal-block",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/arthas-frostmourne",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/arthas-icebound-fortitude",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/arthas-lich-covenant",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ashbringer",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/biotic-grenade",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blackwidow-deadly-gaze",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blackwidow-lethal-strike",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blackwidow-lethal-toxin",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blessed-hammer",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blink",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blizzard",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blizzard-damage",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blood-echo",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/blood-echo-trigger",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/colt-big-stride",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/colt-bullet-storm",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/colt-piercing",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/colt-revolver",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/death-blossom",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/divine-blessing",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/divine-shield-defense",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/earthshatter",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/edgar-fisticuffs",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/edgar-pogo-jump",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/el-primo-elbow",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/el-primo-meteor-belt",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/el-primo-punch",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/elune-blessing",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/elune-guidance",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/elune-protection",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/fel-blessing",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/fireball",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/freeze-prevent",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/frostbolt",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/grant-lucky-coin",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/grimmjow-destruction-instinct",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/grimmjow-hunting-instinct",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/grimmjow-panther-claw",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/grimmjow-resurreccion",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hardy-block",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hardy-block-trigger",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hashirama-edo-regen",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hashirama-edo-sage-buddha",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hashirama-edo-wood-dragon",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hashirama-edo-wood-spike",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hellfire-shotgun",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hidan-blood-oath",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hidan-sacrifice",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/hidan-undying",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/holy-light-descend",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ichigo-bankai-tensa-zangetsu",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ichigo-black-getsuga-tensho",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ichigo-getsuga-tensho",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ichigo-zangetsu",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/illidan-blade-dash",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/illidan-demon-strike",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/illidan-eye-beam",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/illidan-metamorphosis",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/initial-draw",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/itachi-amaterasu",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/itachi-totsuka-blade",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/itachi-tsukuyomi",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kenshin-amakakeru",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kenshin-ryusosen",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kenshin-ryutsuisen",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kenshin-tenken-passive",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/kiljaedan-demonic-pact",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kiljaedan-fel-fire",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/kiljaedan-soul-drain",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/light-extraction",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/light-of-the-light",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/max-full-speed",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/max-phase-shifter",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/max-speed-shot",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/minato-flying-raijin-passive",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/minato-kunai-formula",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/minato-rasengan",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/minato-spiral-barrage",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/mortis-bat-support",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/mortis-night-construct",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/mortis-shovel-charge",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/muru-lament",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/muzan-blood-whip",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/muzan-demon-body",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/muzan-flesh-regeneration",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/muzan-parasitism",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/nano-boost",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/nano-boost-damage",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/naruto-rasengan",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/naruto-sage-mode",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/naruto-shadow-clone",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/naruto-vanguard",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/obito-ally-teleport",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/obito-grudge",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/obito-space-time",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/passive-injury-charge-discount",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/pulse-pistol",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/pulse-pistol-move",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/rafaam-curse-amplify",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/rafaam-curse-ward",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/rafaam-temporal-distortion",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/reap",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/recall",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/recall-endturn-trigger",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/recall-move-trigger",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/recall-skill-trigger",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/rocket-punch",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sasuke-amaterasu",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sasuke-chidori",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sasuke-indra-arrow",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sasuke-kagutsuchi",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sasuke-susanoo",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-bolt",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-chaos-control",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-chaos-spear",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-ride-sweep",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-step",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shadow-step-teleport",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shelly-bandage",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shelly-dash",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shelly-shotgun",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shelly-super-shell",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shield-of-light",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shishio-combustion-passive",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shishio-flame-spirit",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/shishio-infinite-blade",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sleep-dart",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sleep-prevent",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sleep-remove",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sonic-free-move-passive",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/sonic-homing-attack",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sonic-spin-dash",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/sonic-super-form",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/soul-fracture",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/tails-armor-assembly",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/tails-mechanical-support",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/tails-twin-flight",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/tirion-divine-glory",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/tirion-holy-recall",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/turalyon-expedition-order",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/turalyon-grand-crusade",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/turalyon-lightforged-march",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ulquiorra-black-cero",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ulquiorra-cero",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ulquiorra-high-speed-regeneration",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/ulquiorra-resurreccion",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/velen-fate-shelter",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/velen-holy-prophecy",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/velen-thousand-futures-ultimate",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/venom-claw-rend",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/venom-host-transfer",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/venom-symbiote-drag",
+      "status": "compiled",
+      "field": "code"
+    },
+    {
+      "id": "skills/watcher-form",
+      "status": "declarative-or-linked",
+      "reason": "No inline primary code; referenced content must be checked separately."
+    },
+    {
+      "id": "skills/watcher-ultimate",
+      "status": "compiled",
+      "field": "code"
+    }
+  ],
+  "additionalCounts": {
+    "compiled": 84
+  },
+  "additionalEntries": [
+    {
+      "id": "skills/akaza-annihilation",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/akaza-disorder",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/akaza-flash-step",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/arthas-frostmourne",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/arthas-icebound-fortitude",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/arthas-lich-covenant",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/ashbringer",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/biotic-grenade",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/blackwidow-deadly-gaze",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/blackwidow-lethal-strike",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/blackwidow-lethal-toxin",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/blessed-hammer",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/blizzard",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/death-blossom",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/divine-blessing",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/earthshatter",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/edgar-fisticuffs",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/edgar-pogo-jump",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/elune-blessing",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/fel-blessing",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/fireball",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/frostbolt",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hardy-block",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hashirama-edo-sage-buddha",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hashirama-edo-wood-dragon",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hashirama-edo-wood-spike",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hellfire-shotgun",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hidan-blood-oath",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/hidan-sacrifice",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/holy-light-descend",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/ichigo-bankai-tensa-zangetsu",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/ichigo-black-getsuga-tensho",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/ichigo-getsuga-tensho",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/ichigo-zangetsu",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/illidan-blade-dash",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/illidan-demon-strike",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/illidan-eye-beam",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/illidan-metamorphosis",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/itachi-amaterasu",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/itachi-totsuka-blade",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/itachi-tsukuyomi",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/kenshin-amakakeru",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/kenshin-ryusosen",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/kenshin-ryutsuisen",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/kiljaedan-fel-fire",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/kiljaedan-soul-drain",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/light-extraction",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/light-of-the-light",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/minato-rasengan",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/muru-lament",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/muzan-blood-whip",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/muzan-demon-body",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/nano-boost",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/naruto-rasengan",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/naruto-sage-mode",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/naruto-shadow-clone",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/obito-ally-teleport",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/obito-space-time",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/rafaam-curse-amplify",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/rafaam-temporal-distortion",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/rocket-punch",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sasuke-amaterasu",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sasuke-chidori",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sasuke-indra-arrow",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sasuke-kagutsuchi",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sasuke-susanoo",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shadow-bolt",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shadow-step",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shelly-shotgun",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shelly-super-shell",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shield-of-light",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shishio-flame-spirit",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/shishio-infinite-blade",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/sleep-dart",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/tirion-holy-recall",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/turalyon-expedition-order",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/turalyon-grand-crusade",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/velen-fate-shelter",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/velen-holy-prophecy",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/velen-thousand-futures-ultimate",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/venom-claw-rend",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/venom-host-transfer",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/venom-symbiote-drag",
+      "field": "previewCode",
+      "status": "compiled"
+    },
+    {
+      "id": "skills/watcher-ultimate",
+      "field": "previewCode",
+      "status": "compiled"
+    }
+  ]
+}

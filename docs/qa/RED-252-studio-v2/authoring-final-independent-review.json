@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "issue": "RED-252",
+  "reviewedAt": "2026-10-12T05:36:12.170Z",
+  "reviewer": "independent review subagent",
+  "method": "Read existing raw Vitest JSON reports; independently normalize separators and strip directory prefix through /tests/; compare failed assertions by relative file plus fullName; recompute SHA-256 from raw report bytes. No tests rerun.",
+  "reports": {
+    "baseline": {
+      "total": 1938,
+      "passed": 1888,
+      "failed": 50,
+      "sha256": "67fc41caa524962522298b89cf7445173905d6cfa1d0c1e32f402b0c702ca5b3"
+    },
+    "final": {
+      "total": 3486,
+      "passed": 3439,
+      "failed": 47,
+      "sha256": "4ffcba26f6408030d37d65620db4508938911a0bc996d6a93a398de3527b93cc"
+    }
+  },
+  "comparison": {
+    "added": 0,
+    "existing": 47,
+    "disappeared": 3,
+    "checks": {
+      "baselineHash": true,
+      "finalHash": true,
+      "baselineCounts": true,
+      "finalCounts": true,
+      "added": true,
+      "existing": true,
+      "disappeared": true,
+      "uniqueBaselineFailures": true,
+      "uniqueFinalFailures": true,
+      "baselineAssertions": true,
+      "finalAssertions": true
+    },
+    "verified": true,
+    "disappearedTests": [
+      {
+        "file": "game/battle-state-hash.test.ts",
+        "name": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles"
+      },
+      {
+        "file": "game/flight-landing-contact.test.ts",
+        "name": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)"
+      },
+      {
+        "file": "game/skillcode-static-audit.test.ts",
+        "name": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable"
+      }
+    ]
+  },
+  "codeReview": {
+    "materialFindingsOutstanding": [],
+    "lazyProjection": "Removed: battle-storage.ts has no working-tree diff; createLazySkillDefinitions absent from skills.ts.",
+    "cloneBoundary": "Reviewed ordinary JSON data semantics, full skills preservation, independent clones, property order, negative zero, repeated references, prototype-key safety and single-pass fallback. Arbitrary Proxy objects remain outside the proven equivalence boundary.",
+    "privateSerializedCache": "Previously reported mutation isolation, text fingerprint and prototype/accessor findings closed."
+  },
+  "uiEvidence": {
+    "path": "docs/qa/RED-252-studio-v2/sentence-authoring-completion.json",
+    "sha256": "d99c54b341242170d50df18d1e90d59e5612136ca6d0bfaadd557421eb232c54",
+    "ok": true,
+    "multiEntry": {
+      "route": "sentence-editor",
+      "bothInvalid": {
+        "codeCompiler": null,
+        "previewCompiler": null,
+        "codeType": "string",
+        "previewType": "string"
+      },
+      "reopened": {
+        "codeCompiler": "rvb-gameplay-module-compiler/v2",
+        "previewCompiler": "rvb-gameplay-module-compiler/v2",
+        "codeType": "boolean",
+        "previewType": "boolean"
+      }
+    },
+    "saveBlockedUntilAllEntriesValid": true,
+    "legacyArtifactReconciled": true,
+    "blankCardSurface": "card",
+    "screenshotExists": true,
+    "verification": "Inspected saved real Electron evidence; not independently rerun during this final report review."
+  },
+  "limitations": [
+    "Final suite is not green: 47 failing assertions match baseline failure identities. Identity overlap does not prove identical failure causes.",
+    "Report comparison verifies stored report contents and hashes, not original execution provenance.",
+    "No manual product acceptance, merge or publication approval is declared."
+  ]
+}

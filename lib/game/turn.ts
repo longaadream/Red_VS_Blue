@@ -1,5 +1,7 @@
 import { assertContentAvailable, battleContentMode, type ModeScopedContent } from './content-availability'
 import { writePiecePosition, withPositionWriteGuard } from './position-write-guard'
+import { normalizePendingResult } from './pending-result'
+import { cloneBattleStateJson } from './clone-battle-json'
 import { areMatchAllies } from './match-teams'
 import { applySkillChoiceSequence, type SkillChoiceInput } from './skill-choice-sequence'
 import { adventureBoundary, adventureDeploymentCells, refreshAdventureActionPoints, isAdventureProgramMove } from './adventure-boundary'
@@ -37,9 +39,14 @@ import { statusEventSink, expirePlayerStatuses, addStatusWithEvents, addPlayerSt
 import { changePiecePositions, type PiecePositionChange } from './position-change'
 import { settlePositionContacts } from './tile-contact'
 import type { PositionChangeKind } from './spatial'
+import { createGameplayModuleDiagnosticHost, installGameplayModuleDiagnosticHost, isGameplayModuleControlSignal } from './gameplay-module-diagnostics'
 import {
   DEPLOYMENT_FIRST_MOVE_FREE_STATUS,
+  ensurePieceSkillInstanceIds,
+  findPieceSkillInstance,
   type PieceInstance,
+  type PieceSkill,
+  type PieceStatusIdentityLedger,
   type PieceStats,
   type PieceStatusTag,
 } from "./piece"
@@ -77,6 +84,173 @@ import {
 } from "./rule-runtime"
 
 const getActiveTriggerSystem = () => getRuleExecutionTriggerSystem(globalTriggerSystem)
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- pending contexts are serialized extensible rule data. */
+type PendingSkillSource = {
+  type: 'skill' | 'card' | 'rule' | 'pending'
+  id: string
+  pieceId?: string
+  skillId?: string
+  skillInstanceId?: string
+  skillPieceId?: string
+}
+
+type PendingSkillResolution = {
+  piece: PieceInstance
+  skill: PieceSkill
+  skillId: string
+  skillInstanceId: string
+}
+
+function skillDescriptorForPending(
+  skillId: string,
+  definition: Partial<SkillDefinition> | undefined,
+): Record<string, unknown> {
+  return {
+    id: skillId,
+    name: definition?.name,
+    type: definition?.type,
+    powerMultiplier: definition?.powerMultiplier,
+    targeting: definition?.targeting,
+  }
+}
+
+function pendingSkillReference(pending: {
+  source?: PendingSkillSource
+  triggerContext?: any
+  continuationContext?: any
+}): { required: boolean; pieceId?: string; skillId?: string; skillInstanceId?: string } {
+  const source = pending.source
+  const contexts = [pending.triggerContext, pending.continuationContext].filter(Boolean)
+  const skillContext = contexts.find(context => (
+    typeof context?.skillInstanceId === 'string'
+    || context?.skillInstance
+    || ((context?.type === 'beforeSkillUse' || context?.type === 'afterSkillUsed')
+      && typeof context?.skillId === 'string')
+  ))
+  const required = source?.type === 'skill'
+    || typeof source?.skillInstanceId === 'string'
+    || !!skillContext
+  if (!required) return { required: false }
+  const skillId = source?.skillId
+    || (source?.type === 'skill' ? source.id : undefined)
+    || skillContext?.skillId
+    || skillContext?.skill?.id
+  const pieceId = source?.type === 'skill'
+    ? source.pieceId || skillContext?.sourcePiece?.instanceId
+    : skillContext?.sourcePiece?.instanceId || source?.skillPieceId || source?.pieceId
+  return {
+    required: true,
+    pieceId: pieceId || skillContext?.piece?.instanceId,
+    skillId,
+    skillInstanceId: source?.skillInstanceId || skillContext?.skillInstanceId || skillContext?.skillInstance?.instanceId,
+  }
+}
+
+/**
+ * Rebind a serialized pending context to the canonical skill object in the
+ * cloned battle state. A missing stable identity is only recoverable when the
+ * old save has exactly one matching definition; duplicate IDs remain invalid
+ * rather than silently selecting a different installed instance.
+ */
+function resolvePendingSkillContext(
+  battle: BattleState,
+  pending: {
+    source?: PendingSkillSource
+    triggerContext?: any
+    continuationContext?: any
+  },
+): PendingSkillResolution | null | undefined {
+  const reference = pendingSkillReference(pending)
+  if (!reference.required) return undefined
+  if (!reference.pieceId || !reference.skillId) return null
+
+  const piece = battle.pieces.find(candidate => candidate.instanceId === reference.pieceId)
+  if (!piece) return null
+  ensurePieceSkillInstanceIds(piece)
+
+  const matches = piece.skills.filter(skill => skill?.skillId === reference.skillId)
+  const skill = reference.skillInstanceId
+    ? findPieceSkillInstance(piece, reference.skillInstanceId, reference.skillId)
+    : matches.length === 1 ? matches[0] : undefined
+  if (!skill || matches.length === 0) return null
+  if (!reference.skillInstanceId && matches.length !== 1) return null
+
+  const source = pending.source
+  if (source) {
+    if (source.type === 'skill' && source.id !== skill.skillId) return null
+    if (source.type === 'skill') source.pieceId = piece.instanceId
+    source.skillPieceId = piece.instanceId
+    source.skillId = skill.skillId
+    source.skillInstanceId = skill.instanceId
+  }
+
+  const definition = battle.skillsById?.[skill.skillId]
+  const descriptor = skillDescriptorForPending(skill.skillId, definition)
+  for (const context of [pending.triggerContext, pending.continuationContext]) {
+    if (!context) continue
+    const isSkillEvent = context.type === 'beforeSkillUse' || context.type === 'afterSkillUsed'
+      || typeof context.skillInstanceId === 'string'
+      || !!context.skillInstance
+    if (!isSkillEvent) continue
+    context.sourcePiece = piece
+    context.skillId = skill.skillId
+    context.skillInstance = skill
+    context.skillInstanceId = skill.instanceId
+    context.skill = context.skill || descriptor
+  }
+
+  return {
+    piece,
+    skill,
+    skillId: skill.skillId,
+    skillInstanceId: skill.instanceId!,
+  }
+}
+
+function stampPendingSkillContext(context: any): void {
+  if (!context || typeof context !== 'object') return
+  const sourcePiece = context.sourcePiece
+  const skill = context.skillInstance
+  if (!sourcePiece || !skill || !Array.isArray(sourcePiece.skills)) return
+  ensurePieceSkillInstanceIds(sourcePiece)
+  if (typeof skill.instanceId !== 'string' || !sourcePiece.skills.includes(skill)) return
+  context.skillInstanceId = skill.instanceId
+  context.skillId = context.skillId || skill.skillId
+}
+
+function buildPendingSkillSource(
+  context: any,
+  currentRuleId: string | undefined,
+  currentRuleSourceId: string | undefined,
+  explicitSource: PendingSkillSource | undefined,
+): PendingSkillSource {
+  stampPendingSkillContext(context)
+  const skillId = typeof context?.skillId === 'string' ? context.skillId : undefined
+  const skillInstanceId = typeof context?.skillInstanceId === 'string'
+    ? context.skillInstanceId
+    : undefined
+  const inferredType: PendingSkillSource['type'] = currentRuleId
+    ? 'rule'
+    : skillId && context?.sourcePiece?.instanceId
+      ? 'skill'
+      : 'pending'
+  const source: PendingSkillSource = {
+    ...(explicitSource || {
+      type: inferredType,
+      id: currentRuleId || (skillId && inferredType === 'skill' ? skillId : 'pending-target'),
+    }),
+    ...(currentRuleId ? { type: 'rule' as const, id: currentRuleId } : {}),
+    pieceId: currentRuleSourceId
+      || explicitSource?.pieceId
+      || (inferredType === 'skill' ? context?.sourcePiece?.instanceId : undefined),
+  }
+  if (skillId) source.skillId = skillId
+  if (skillInstanceId) source.skillInstanceId = skillInstanceId
+  if (skillInstanceId && context?.sourcePiece?.instanceId) source.skillPieceId = context.sourcePiece.instanceId
+  return source
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 import {
   SUSPENDABLE_ACTION_TRANSACTION_PROTOCOL_VERSION,
   SuspendableActionRuntime,
@@ -271,7 +445,7 @@ export function safeCloneBattleState(state: BattleState): BattleState {
   )
 
   // JSON 序列化/反序列化：自动剥离所有函数（编译缓存、effect 等），不需要临时删除
-  const cloned = JSON.parse(JSON.stringify(state)) as BattleState
+  const cloned = cloneBattleStateJson(state) as BattleState
 
   // 恢复 effect 函数到克隆对象
   const restoreRuleFns = (clonedList: any[], fnMap: RuleFnMap) => {
@@ -322,36 +496,15 @@ export interface PlayerTurnMeta {
   /** 最大行动点 */
   maxActionPoints: number
   /** 当前手牌（最多 10 张） */
-  hand: {
-    cardId: string
-    instanceId: string
-    ownerPlayerId: string
-    actionPointCost?: number
-    baseActionPointCost?: number
-    temporaryCostReductionTurnNumber?: number
-    contentState?: Record<string, unknown>
-    presentation?: {
-      variant?: string
-      badge?: string
-      description?: string
-    }
-    effectModifiers?: Array<{
-      effect: 'damage' | 'heal' | 'statusIntensity'
-      operation: 'add' | 'multiply'
-      value: number
-      statusType?: string
-    }>
-    name?: string
-    description?: string
-    icon?: string
-    type?: string
-  }[]
+  hand: import('./battle-types').CardInstance[]
   /** 弃牌堆（只记 cardId） */
   discardPile: string[]
   /** 玩家级别规则（挂在玩家身上而非棋子上的被动触发器） */
   rules?: any[]
   /** 玩家级别状态标签（如时空扭曲等阵营buff） */
   statusTags?: any[]
+  /** Persistent identity history for player-owned status records. */
+  statusIdentityLedger?: PieceStatusIdentityLedger
   /** 玩家级别技能（如暴风雪等持续效果技能） */
   skills?: { skillId: string; currentCooldown?: number }[]
 }
@@ -614,6 +767,15 @@ export class BattleRuleError extends Error {
     this.code = code
     this.name = "BattleRuleError"
   }
+}
+
+// Only authority-created skill refusals can finish a resumed transaction.
+// Do not accept a content-thrown Error with the same name/message/code.
+const blockedSkillAttempts = new WeakSet<object>()
+function blockedSkillAttempt(message: string): BattleRuleError {
+  const error = new BattleRuleError(message)
+  blockedSkillAttempts.add(error)
+  return error
 }
 
 function getPlayerMeta(state: BattleState, playerId: PlayerId): PlayerTurnMeta {
@@ -1263,6 +1425,7 @@ function buildSkillExecutionContext(
   ]
   return {
     piece,
+    skillInstance: piece.skills.find(skill => skill.skillId === skillDef.id),
     target: t1.info,
     targetPosition: t1.pos,
     targets,
@@ -1560,6 +1723,7 @@ function applyBattleActionInternal(
     currentContext: any,
     seed: PendingSeed = {},
   ): boolean => {
+    result = normalizePendingResult(result)!
     if (!result.needsOptionSelection && !result.needsTargetSelection) return false
     if (result.needsTargetSelection && Array.isArray(result.targetCandidates)) {
       const minimum = Number.isSafeInteger(result.minSelections)
@@ -1575,6 +1739,14 @@ function applyBattleActionInternal(
       pendingRuleSourceId: currentRuleSourceId,
     }
     const continuationContext = seed.continuationContext || currentContext
+    stampPendingSkillContext(triggerContext)
+    stampPendingSkillContext(continuationContext)
+    const source = buildPendingSkillSource(
+      triggerContext,
+      currentRuleId,
+      currentRuleSourceId,
+      seed.source,
+    )
     const pendingQueue = result.pendingQueue ?? seed.pendingQueue
     const pendingReactiveCards = result.pendingReactiveCards ?? seed.pendingReactiveCards
     const pendingAction = seed.pendingAction
@@ -1585,11 +1757,7 @@ function applyBattleActionInternal(
         playerId: result.playerId || next.turn.currentPlayerId,
         options: result.options || [],
         title: result.title || '请选择',
-        source: {
-          type: currentRuleId ? 'rule' : 'pending',
-          id: currentRuleId || 'pending-option',
-          pieceId: currentRuleSourceId,
-        },
+        source,
         triggerContext,
         continuationContext,
         pendingQueue,
@@ -1611,11 +1779,7 @@ function applyBattleActionInternal(
       targetType: (result.targetType || 'piece') as 'piece' | 'cell' | 'grid',
       range: result.range,
       filter: result.filter,
-      source: {
-        type: currentRuleId ? 'rule' : 'pending',
-        id: currentRuleId || 'pending-target',
-        pieceId: currentRuleSourceId,
-      },
+      source: source as unknown as PendingTargetSelectionSession['source'],
       triggerContext,
       continuationContext,
       pendingQueue,
@@ -1645,7 +1809,7 @@ function applyBattleActionInternal(
       | 'selectionMode' | 'presentation' | 'minSelections' | 'maxSelections'
     >,
     pendingAction: BattleAction,
-    fallbackSource: { type: 'skill' | 'card'; id: string; pieceId?: string },
+    fallbackSource: PendingSkillSource,
     continuationMode: 'skillReleaseOption' | 'cardReleaseOption',
   ): BattleState => {
     const canResolveCancellation = result.canCancel === true
@@ -1663,6 +1827,9 @@ function applyBattleActionInternal(
             type: 'rule',
             id: result.pendingRuleId,
             pieceId: result.pendingRuleSourceId,
+            skillId: fallbackSource.skillId,
+            skillInstanceId: fallbackSource.skillInstanceId,
+            skillPieceId: fallbackSource.skillPieceId || fallbackSource.pieceId,
           }
         : fallbackSource,
       pendingAction: {
@@ -1681,6 +1848,7 @@ function applyBattleActionInternal(
     input: Record<string, unknown>,
     eventBlocked = false,
   ): BattleState => {
+    if (resolvePendingSkillContext(next, pending) === null) return next
     if (!pending.pendingAction) return next
     const resumeAction = { ...pending.pendingAction }
     const mode = resumeAction.__pendingContinuationMode as string | undefined
@@ -1722,6 +1890,7 @@ function applyBattleActionInternal(
     input: Record<string, unknown> = {},
     skipCurrentConsumer = false,
   ): BattleState => {
+    if (resolvePendingSkillContext(next, pending) === null) return next
     const continuationContext = pending.continuationContext || pending.triggerContext || {}
     if (!skipCurrentConsumer && pending.triggerContext) {
       const currentContext = {
@@ -2826,6 +2995,7 @@ function applyBattleActionInternal(
           "Piece not found or does not belong to current player",
         )
       }
+      ensurePieceSkillInstanceIds(piece)
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
@@ -2845,6 +3015,8 @@ function applyBattleActionInternal(
         targetY: action.targetY,
         playerId: action.playerId,
         skillId: action.skillId,
+        skillInstance: piece.skills.find(skill => skill.skillId === action.skillId),
+        skillInstanceId: piece.skills.find(skill => skill.skillId === action.skillId)?.instanceId,
         selectedOption: (action as any).selectedOption,
         reservedCells: getReservedSkillLandingCells(next, action),
         legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
@@ -2861,7 +3033,7 @@ function applyBattleActionInternal(
       }
       // A blocked attempt is feedback only; it must not become an action-log entry.
       if (beforeSkillUseResult.blocked) {
-        throw new BattleRuleError(beforeSkillUseResult.messages.join('；') || '无法行动')
+        throw blockedSkillAttempt(beforeSkillUseResult.messages.join('；') || '无法行动')
       }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -2893,6 +3065,7 @@ function applyBattleActionInternal(
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
+      const executingSkillInstance = piece.skills.find(skill => skill.skillId === finalSkillId)
 
       // 优先使用战局中已加载的技能定义，回退到模块缓存
       // 使用触发器可能修改后的技能ID
@@ -2963,6 +3136,8 @@ function applyBattleActionInternal(
 
       const context = {
         piece: piece,
+        skillInstance: executingSkillInstance,
+        skillInstanceId: executingSkillInstance?.instanceId,
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
@@ -2996,12 +3171,18 @@ function applyBattleActionInternal(
           type: 'afterSkillUsed',
           sourcePiece: piece,
           skillId: finalSkillId,
+          skillInstance: executingSkillInstance,
+          skillInstanceId: executingSkillInstance?.instanceId,
+          skill: skillDescriptorForPending(finalSkillId, skillDef),
           reservedCells: skillUseContext.reservedCells,
         }, {
           continuationContext: {
             type: 'afterSkillUsed',
             sourcePiece: piece,
             skillId: finalSkillId,
+            skillInstance: executingSkillInstance,
+            skillInstanceId: executingSkillInstance?.instanceId,
+            skill: skillDescriptorForPending(finalSkillId, skillDef),
             reservedCells: skillUseContext.reservedCells,
           },
           pendingAction: { ...action, __pendingContinuationMode: 'skillAfterSkillTrigger' },
@@ -3014,7 +3195,10 @@ function applyBattleActionInternal(
         if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
         return setPendingActionOption(
           releaseState, result, action,
-          { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+          {
+            type: 'skill', id: finalSkillId, pieceId: piece.instanceId,
+            skillId: finalSkillId, skillInstanceId: executingSkillInstance?.instanceId,
+          },
           'skillReleaseOption',
         )
       }
@@ -3042,7 +3226,10 @@ function applyBattleActionInternal(
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
-            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            source: {
+              type: 'skill', id: finalSkillId, pieceId: piece.instanceId,
+              skillId: finalSkillId, skillInstanceId: executingSkillInstance?.instanceId,
+            } as unknown as PendingTargetSelectionSession['source'],
             candidates: pendingCandidates,
             fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
@@ -3152,6 +3339,7 @@ function applyBattleActionInternal(
           "Piece not found or does not belong to current player",
         )
       }
+      ensurePieceSkillInstanceIds(piece)
 
       // 触发即将使用技能前的规则（检查冰冻等状态）
       // 使用可修改的上下文对象，触发器可以修改 skillId 来改变使用的技能
@@ -3167,6 +3355,8 @@ function applyBattleActionInternal(
         targetY: action.targetY,
         playerId: action.playerId,
         skillId: action.skillId,
+        skillInstance: piece.skills.find(skill => skill.skillId === action.skillId),
+        skillInstanceId: piece.skills.find(skill => skill.skillId === action.skillId)?.instanceId,
         selectedOption: (action as any).selectedOption,
         reservedCells: getReservedSkillLandingCells(next, action),
         legalPrimaryTargetPieceIds: enumeratePrimaryPieceTargetIds(next, action),
@@ -3184,6 +3374,7 @@ function applyBattleActionInternal(
 
       // 触发器可能修改了技能ID，使用修改后的值
       const finalSkillId = skillUseContext.skillId;
+      const executingSkillInstance = piece.skills.find(skill => skill.skillId === finalSkillId)
 
       const skillDef = getSkillDefinitionOrThrow(next, finalSkillId, piece.instanceId)
 
@@ -3210,7 +3401,7 @@ function applyBattleActionInternal(
 
       // A blocked attempt is feedback only; it must not become an action-log entry.
       if (beforeSkillUseResult.blocked) {
-        throw new BattleRuleError(beforeSkillUseResult.messages.join('；') || '无法行动')
+        throw blockedSkillAttempt(beforeSkillUseResult.messages.join('；') || '无法行动')
       }
       // 检查是否有规则阻止了技能使用
       if (beforeSkillUseResult.success) {
@@ -3296,6 +3487,8 @@ function applyBattleActionInternal(
 
       const context = {
         piece: piece,
+        skillInstance: executingSkillInstance,
+        skillInstanceId: executingSkillInstance?.instanceId,
         target: _t1.info,
         targetPosition: _t1.pos,
         targets,
@@ -3329,12 +3522,18 @@ function applyBattleActionInternal(
           type: 'afterSkillUsed',
           sourcePiece: piece,
           skillId: finalSkillId,
+          skillInstance: executingSkillInstance,
+          skillInstanceId: executingSkillInstance?.instanceId,
+          skill: skillDescriptorForPending(finalSkillId, skillDef),
           reservedCells: skillUseContext.reservedCells,
         }, {
           continuationContext: {
             type: 'afterSkillUsed',
             sourcePiece: piece,
             skillId: finalSkillId,
+            skillInstance: executingSkillInstance,
+            skillInstanceId: executingSkillInstance?.instanceId,
+            skill: skillDescriptorForPending(finalSkillId, skillDef),
             reservedCells: skillUseContext.reservedCells,
           },
           pendingAction: { ...action, __pendingContinuationMode: 'skillAfterSkillTrigger' },
@@ -3347,7 +3546,10 @@ function applyBattleActionInternal(
         if (releaseRuntime && releaseRuntimeSnapshot) releaseRuntime.restore(releaseRuntimeSnapshot)
         return setPendingActionOption(
           releaseState, result, action,
-          { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+          {
+            type: 'skill', id: finalSkillId, pieceId: piece.instanceId,
+            skillId: finalSkillId, skillInstanceId: executingSkillInstance?.instanceId,
+          },
           'skillReleaseOption',
         )
       }
@@ -3375,7 +3577,10 @@ function applyBattleActionInternal(
             filter: pendingTarget.filter || 'all',
             effectCode: pendingTarget.effectCode,
             payload: pendingTarget.payload,
-            source: { type: 'skill', id: finalSkillId, pieceId: piece.instanceId },
+            source: {
+              type: 'skill', id: finalSkillId, pieceId: piece.instanceId,
+              skillId: finalSkillId, skillInstanceId: executingSkillInstance?.instanceId,
+            } as unknown as PendingTargetSelectionSession['source'],
             candidates: pendingCandidates,
             fixedCandidates: Array.isArray(pendingCandidates),
             selectionMode: pendingTarget.selectionMode,
@@ -3567,6 +3772,7 @@ function applyBattleActionInternal(
           selectedOption: action.selectedOption,
         })
       }
+      if (resolvePendingSkillContext(next, pending) === null) return next
       next.pendingOptionSelection = undefined
       return resumePendingInteraction(next, pending, action.playerId, {
         selectedOption: action.selectedOption,
@@ -3594,6 +3800,10 @@ function applyBattleActionInternal(
             }
         return resumeSuspendableActionTransaction(next, pending.transaction, targetInput)
       }
+      if (resolvePendingSkillContext(next, pending) === null) {
+        next.pendingTargetSelection = undefined
+        return next
+      }
       const validatedPendingTarget = submittedTargets[0]
       const x = validatedPendingTarget?.type === 'cell'
         ? validatedPendingTarget.x
@@ -3607,6 +3817,7 @@ function applyBattleActionInternal(
       const targetPiece = targetPieceId
         ? next.pieces.find(p => p.instanceId === targetPieceId && p.currentHp > 0)
         : undefined
+      const pendingSkill = resolvePendingSkillContext(next, pending)
       const resolvedPending = {
         ...pending,
         selectedTargets: [...(pending.selectedTargets || []), ...submittedTargets],
@@ -3654,18 +3865,54 @@ function applyBattleActionInternal(
             targetY: y,
             pending: resolvedPending,
             payload: pending.payload,
+            ...(pendingSkill ? {
+              skill: skillDescriptorForPending(
+                pendingSkill.skillId,
+                next.skillsById?.[pendingSkill.skillId],
+              ),
+              skillInstance: pendingSkill.skill,
+              skillInstanceId: pendingSkill.skillInstanceId,
+            } : {}),
             addStatusEffectById: (pieceId: string, status: PieceStatusTag) => addStatusWithEvents(next, pieceId, status),
             addPlayerStatusEffectById: (playerId: string, status: PieceStatusTag) => addPlayerStatusWithEvents(next, playerId, status),
             changePositions: (changes: PiecePositionChange[], kind: PositionChangeKind) => changePiecePositions(next, changes, kind),
           }
-          result = withPositionWriteGuard(next, () => fn({ ...pendingContext, flow: createSkillCodeFlow(next, {
+          const flowContext = {
+            ...(pending.triggerContext || {}),
             ...pendingContext, type: 'pendingEffect',
+            ...(pendingSkill ? { piece: pendingSkill.piece } : {}),
             rulePiece: next.pieces.find(p => p.instanceId === pending.source?.pieceId),
-            sourcePiece: next.pieces.find(p => p.instanceId === pending.triggerContext?.sourcePiece?.instanceId),
+            sourcePiece: pendingSkill?.piece
+              || next.pieces.find(p => p.instanceId === pending.triggerContext?.sourcePiece?.instanceId),
             triggerPlayerId: pending.triggerContext?.triggerPlayerId ?? pending.triggerContext?.playerId,
-          }, 'pending') })) || { success: true }
+          }
+          const executionContext = {
+            ...pendingContext,
+            flow: createSkillCodeFlow(next, flowContext, 'pending'),
+          }
+          const chain = getActiveEffectChain(next)
+          const runtime = getActiveRuleRuntime()
+          const restoreGameplayModuleDiagnosticHost = installGameplayModuleDiagnosticHost(
+            executionContext,
+            createGameplayModuleDiagnosticHost('pending', {
+              contentId: pending.selectionId || pending.source?.id || 'pending-target',
+              actorPlayerId: action.playerId,
+              ...(Number.isSafeInteger(next.turn?.turnNumber) ? { turn: next.turn.turnNumber } : {}),
+              ...(typeof next.turn?.phase === 'string' ? { phase: next.turn.phase } : {}),
+              ...((chain?.rootSeed ?? runtime?.rootSeed) !== undefined && (chain?.rootSeed ?? runtime?.rootSeed) !== null
+                ? { rootSeed: chain?.rootSeed ?? runtime?.rootSeed }
+                : {}),
+              ...(chain?.actionId ? { actionId: chain.actionId } : {}),
+              ...(chain?.chainId ? { chainId: chain.chainId } : {}),
+            }),
+          )
+          try {
+            result = withPositionWriteGuard(next, () => fn(executionContext)) || { success: true }
+          } finally {
+            restoreGameplayModuleDiagnosticHost()
+          }
         } catch (execErr) {
-          if (isEffectChainPendingSignal(execErr)) throw execErr
+          if (isGameplayModuleControlSignal(execErr)) throw execErr
           throw new BattleRuleError('[STAGE6] effectCode execution error: ' + (execErr instanceof Error ? execErr.message : String(execErr)))
         }
       }
@@ -3675,6 +3922,7 @@ function applyBattleActionInternal(
       }
       appendTriggerMessages(next, result, action.playerId)
       if (setPendingInteraction(next, result, pending.triggerContext || {}, {
+        source: pending.source,
         continuationContext: pending.continuationContext,
         pendingQueue: pending.pendingQueue,
           pendingReactiveCards: pending.pendingReactiveCards,
@@ -3725,6 +3973,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         cardId: cardInstance.cardId,
         cardInstanceId: cardInstance.instanceId,
+        cardInstance,
       }
       const beforeCardPlayResult = continuation.skipBeforeCardPlay
         ? { success: true, messages: [], blocked: false } as TriggerResult
@@ -3817,6 +4066,7 @@ function applyBattleActionInternal(
         playerId: action.playerId,
         cardId: cardInstance.cardId,
         cardInstanceId: cardInstance.instanceId,
+        cardInstance: paidCardInstance,
       }
       const afterCardPlayResult = getActiveTriggerSystem().checkTriggers(next, afterCardPlayContext)
       assertNoUnhandledInteraction(afterCardPlayResult, 'afterCardPlay')
@@ -3938,6 +4188,7 @@ function setSuspendableTransactionPending(
       source,
       canCancel: pendingError.prompt.canCancel,
       cancelValue: pendingError.prompt.cancelValue,
+      ...(pendingError.prompt.resumeOnCancel ? { resumeOnCancel: true } : {}),
       selectionMode: pendingError.prompt.selectionMode,
       presentation: pendingError.prompt.presentation,
       minSelections: pendingError.prompt.minSelections,
@@ -4209,6 +4460,18 @@ function runSuspendableActionTransaction(
       // by authored catch/finally code.
       authoritativeError = chainSignal
     }
+    if (transaction.answers.length > 0
+      && authoritativeError !== null
+      && (typeof authoritativeError === 'object' || typeof authoritativeError === 'function')
+      && blockedSkillAttempts.has(authoritativeError)) {
+      // The selected before-use reaction refused the root skill. Discard every
+      // provisional write and queued effect, and close the consumed prompt.
+      if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
+      const cancelled = safeCloneBattleState(authorityState)
+      cancelled.pendingOptionSelection = undefined
+      cancelled.pendingTargetSelection = undefined
+      return cancelled
+    }
     if (!isEffectChainPendingSignal(authoritativeError)) throw authoritativeError
     const pendingError = authoritativeError
     activeEffectChain?.acknowledgePending(pendingError)
@@ -4221,9 +4484,11 @@ function runSuspendableActionTransaction(
       if (activeEffectChain && effectChainSnapshot) activeEffectChain.restore(effectChainSnapshot)
       let input: SuspendableInteractionInput
       if (pendingError.prompt.canCancel !== false) {
-        input = pendingError.prompt.kind === 'option' && pendingError.prompt.cancelValue !== undefined
-          ? { selectedOption: pendingError.prompt.cancelValue }
-          : { cancelled: true }
+        input = pendingError.prompt.resumeOnCancel
+          ? { cancelled: true, resumeConsumerOnCancel: true }
+          : pendingError.prompt.kind === 'option' && pendingError.prompt.cancelValue !== undefined
+            ? { selectedOption: pendingError.prompt.cancelValue }
+            : { cancelled: true }
       } else {
         if (!replayRuleRuntime) {
           throw new BattleRuleError(

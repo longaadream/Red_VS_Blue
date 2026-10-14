@@ -90,6 +90,8 @@ export interface PlayerTurnMeta {
   rules?: any[]
   /** 玩家级别状态标签（如时空扭曲等阵营buff） */
   statusTags?: any[]
+  /** Persistent identity history for player-owned status records. */
+  statusIdentityLedger?: import('./piece').PieceStatusIdentityLedger
 }
 
 export interface PerTurnActionFlags {

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/author-expression-core.js"></script>
   <script src="js/hand-card-face.js"></script>
   <script src="js/skill-description.js"></script>
   <link rel="stylesheet" href="css/skill-description.css" />
@@ -1977,6 +1978,12 @@
     const TUTORIAL_MODE = params.get('mode') === 'tutorial'
     const PRACTICE_MODE = params.get('mode') === 'practice'
     const ADVENTURE_MODE = params.get('mode') === 'adventure'
+    const TRAINING_DEFAULT_ROOT_SEED = 594
+    const TRAINING_QUERY_ROOT_SEED = (() => {
+      const value = Number(params.get('rootSeed'))
+      return Number.isSafeInteger(value) && value >= 0 ? value >>> 0 : TRAINING_DEFAULT_ROOT_SEED
+    })()
+    const TRAINING_AUTO_START = params.get('autoStart') === '1'
     if (ADVENTURE_MODE) document.body.classList.add('adventure-mode')
     const TRAINING_MODE = params.get('mode') === 'training' || TUTORIAL_MODE
     const SPECTATE_MODE = params.get('mode') === 'spectate'
@@ -2040,6 +2047,10 @@
     }
 
     let trainingSetupConfig = null
+    let trainingRootSeed = null
+    let trainingInitialState = null
+    let trainingSetupLog = []
+    let trainingHasUserAction = false
     let tutorialDefinition = null
     let tutorialRuntime = null
     function getTemplateFactionForBattleFaction(faction) {
@@ -2084,8 +2095,12 @@
     function getTrainingSetupConfig() {
       const firstFaction = document.getElementById('trainingFirstFaction')?.value || 'red'
       const secondFaction = document.getElementById('trainingSecondFaction')?.value || 'blue'
+      let requestedFirstPlayer = trainingSetupConfig && trainingSetupConfig.firstPlayerId
+      if (!requestedFirstPlayer && params.get('setup')) {
+        try { requestedFirstPlayer = JSON.parse(params.get('setup')).firstPlayerId } catch { /* setup validation is reported during initialization */ }
+      }
       return {
-        firstPlayerId: 'training-red',
+        firstPlayerId: requestedFirstPlayer === 'training-blue' ? 'training-blue' : 'training-red',
         firstFaction,
         secondFaction,
         firstTemplateIds: getSelectedTrainingPieceIds('trainingFirstPieces'),
@@ -2176,9 +2191,59 @@
         })
       })
     }
+    function cloneTrainingValue(value) {
+      if (value === undefined) return undefined
+      try { return JSON.parse(JSON.stringify(value)) } catch { return null }
+    }
+    function trainingStateHash(state, Engine) {
+      try {
+        if (Engine && typeof Engine.hashBattleState === 'function' && state) return Engine.hashBattleState(state)
+      } catch {}
+      const log = state && state.extensions && state.extensions.debugBattle && state.extensions.debugBattle.actionLog
+      const last = Array.isArray(log) && log.length ? log[log.length - 1] : null
+      return last && typeof last.postStateHash === 'string' ? last.postStateHash : null
+    }
+    function publishTrainingState(state) {
+      if (!TRAINING_MODE) return
+      const current = state || G
+      const metadata = current && current.extensions && current.extensions.debugBattle
+      const Engine = typeof GameEngine !== 'undefined' ? GameEngine : null
+      const rootSeed = trainingRootSeed != null
+        ? trainingRootSeed
+        : (Engine && typeof Engine.getBattleRootSeed === 'function' ? Engine.getBattleRootSeed(current) : null)
+      window.__RVB_TRAINING__ = {
+        rootSeed,
+        setupConfig: cloneTrainingValue(trainingSetupConfig),
+        initialStateHash: trainingStateHash(trainingInitialState, Engine),
+        stateHash: trainingStateHash(current, Engine),
+        actionLog: cloneTrainingValue(metadata && Array.isArray(metadata.actionLog)
+          ? metadata.actionLog.map(function(entry, index) {
+            const commandLog = metadata.commandLog && metadata.commandLog[entry.index == null ? index : entry.index]
+            return Object.assign({}, entry, commandLog ? { command: commandLog } : {})
+          })
+          : []) || [],
+        setupLog: cloneTrainingValue(trainingSetupLog) || [],
+        initialSetupLog: cloneTrainingValue(trainingSetupLog.filter(function(entry) { return entry.initial !== false })) || [],
+      }
+      // The embedded editor observes this marker through the isolated
+      // WebContentsView console channel and requests a fresh read-only trace.
+      // No game state crosses the boundary.
+      try { console.info('__RVB_TRAINING_EVENT__') } catch {}
+    }
     async function trainingApiFetch(method, body) {
       const Engine = await window.RvBGameEngine.ensure()
       const tutorialActive = typeof TUTORIAL_MODE !== 'undefined' && TUTORIAL_MODE
+      // Keep this resolver local because focused runtime tests load this
+      // function in isolation from the surrounding page helpers.
+      const resolveTrainingRootSeed = function(candidate, state) {
+        const value = candidate && Number(candidate.rootSeed)
+        if (Number.isSafeInteger(value) && value >= 0) return value >>> 0
+        if (state && Engine && typeof Engine.getBattleRootSeed === 'function') {
+          const traced = Engine.getBattleRootSeed(state)
+          if (Number.isSafeInteger(traced) && traced >= 0) return traced >>> 0
+        }
+        return typeof TRAINING_QUERY_ROOT_SEED === 'number' ? TRAINING_QUERY_ROOT_SEED : 594
+      }
       if (method === 'POST') {
         if (TUTORIAL_MODE && params.has('lesson')) {
           const profileResponse = await withTimeout(fetch('./__tutorial-profile.json', { cache: 'no-store' }), 15000, '教程本地资源身份')
@@ -2192,17 +2257,30 @@
         }
         const firstPlayerId = body && body.firstPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
         const secondPlayerId = firstPlayerId === 'training-red' ? 'training-blue' : 'training-red'
-        // Alignment filters the piece pool only; red/blue are engine seats.
+        // The setup alignment selects both the roster pool and the visual
+        // engine seat. Player IDs remain the authoritative ownership/turn
+        // identity; this mapping only keeps the training controls and HUD in
+        // agreement about which side was selected.
         const firstAlignment = body && body.firstFaction === 'blue' ? 'blue' : 'red'
         const secondAlignment = body && body.secondFaction === 'red' ? 'red' : 'blue'
-        // First player is always red in the engine, second player is blue.
-        const firstEngineFaction = 'red'
-        const secondEngineFaction = 'blue'
+        const firstEngineFaction = firstAlignment
+        const secondEngineFaction = secondAlignment
         const firstPieces = resolveTrainingInitialPieces(firstAlignment, body && (body.firstTemplateIds || body.firstTemplateId))
         const secondPieces = resolveTrainingInitialPieces(secondAlignment, body && (body.secondTemplateIds || body.secondTemplateId))
         if (!firstPieces.length || !secondPieces.length) {
           throw new Error('训练棋子资源未加载，请返回后重试')
         }
+        // The editor preview protocol serves a frozen candidate identity. The
+        // ordinary browser/server training route has no such endpoint and must
+        // retain the runtime profile fallback used by existing clients.
+        let profileIdentity
+        if (typeof location !== 'undefined' && location.protocol === 'rvb-editor-training:') {
+          const profileResponse = await withTimeout(fetch('./__training-profile.json', { cache: 'no-store' }), 15000, '训练本地资源身份')
+          if (!profileResponse.ok) throw new Error('训练本地资源身份尚未就绪，请重新打开训练营')
+          if (typeof Engine.parseGameProfileIdentityV1 !== 'function') throw new Error('训练引擎缺少资源身份校验')
+          profileIdentity = Engine.parseGameProfileIdentityV1(await profileResponse.json())
+        }
+        const rootSeed = resolveTrainingRootSeed(body, null)
         let state = await Engine.createInitialBattleForPlayers(
           ['training-red', 'training-blue'],
           [],
@@ -2211,7 +2289,7 @@
             { playerId: secondPlayerId, pieces: secondPieces, faction: secondEngineFaction },
           ],
           body && body.mapId,
-          { firstPlayerId }
+          { firstPlayerId, rootSeed, ...(profileIdentity ? { profileIdentity } : {}) }
         )
         if (!state) throw new Error('Failed to create training battle state')
         state.pieces.forEach(function(piece) { piece.isCore = true })
@@ -2230,9 +2308,11 @@
       if (method === 'PUT') {
         if (!body || !body.action || !body.battleState) throw new Error('Missing action or battleState')
         const cloned = Engine.safeCloneBattleState(body.battleState)
-        const next = Engine.recordBattlePresentation(cloned, () => tutorialActive && tutorialDefinition
-          ? Engine.runBattleAction(cloned, body.action, { rootSeed: tutorialDefinition.rootSeed }).state
-          : Engine.applyBattleAction(cloned, body.action), state => state)
+        if (typeof Engine.runBattleAction !== 'function') throw new Error('训练权威动作接口未加载')
+        const rootSeed = tutorialActive && tutorialDefinition && Number.isSafeInteger(tutorialDefinition.rootSeed)
+          ? tutorialDefinition.rootSeed >>> 0
+          : resolveTrainingRootSeed(body, cloned)
+        const next = Engine.recordBattlePresentation(cloned, () => Engine.runBattleAction(cloned, body.action, { rootSeed }).state, state => state)
         // runBattleAction deliberately strips the presentation-only skill cache
         // from its authoritative result; the browser needs it again for the
         // next target preview and for rendering skill details.
@@ -2240,6 +2320,7 @@
         next.pieces = next.pieces.filter(function(piece, index, self) {
           return index === self.findIndex(function(p) { return p.instanceId === piece.instanceId })
         })
+        if (typeof publishTrainingState === 'function') publishTrainingState(next)
         return next
       }
       if (method === 'PATCH') {
@@ -2253,10 +2334,12 @@
               chargePoints: Math.max(0, Math.min(20, body.chargePoints)),
             })
           })
+          if (typeof publishTrainingState === 'function') publishTrainingState(next)
           return next
         }
         if (body.type === 'removePiece') {
           next.pieces = next.pieces.filter(function(p) { return p.instanceId !== body.instanceId })
+          if (typeof publishTrainingState === 'function') publishTrainingState(next)
           return next
         }
         if (body.type === 'resetCooldowns') {
@@ -2270,6 +2353,7 @@
               })
             })
           })
+          if (typeof publishTrainingState === 'function') publishTrainingState(next)
           return next
         }
         if (body.type === 'addPiece') {
@@ -2280,8 +2364,9 @@
           const ownerPlayerId = body.ownerPlayerId === 'training-blue' ? 'training-blue' : 'training-red'
           const ownerFaction = getTrainingPlayerFaction(ownerPlayerId)
           next.pieces.push(createTrainingPieceFromTemplate(
-            Engine, tpl, ownerPlayerId, ownerFaction, body.x, body.y,
+            Engine, tpl, ownerPlayerId, ownerFaction, body.x, body.y, body.instanceId,
           ))
+          if (typeof publishTrainingState === 'function') publishTrainingState(next)
           return next
         }
         throw new Error('Unknown operation type: ' + body.type)
@@ -2289,7 +2374,7 @@
       throw new Error('Unsupported training method: ' + method)
     }
 
-    function createTrainingPieceFromTemplate(Engine, template, ownerPlayerId, faction, x, y) {
+    function createTrainingPieceFromTemplate(Engine, template, ownerPlayerId, faction, x, y, requestedInstanceId) {
       const stats = template.stats || {}
       const statusTags = (template.initialStatusTags || []).map(function(tag) {
         return Object.assign({}, tag, {
@@ -2304,7 +2389,9 @@
         .map(function(ruleId) { return Engine.loadRuleById ? Engine.loadRuleById(ruleId, true) : null })
         .filter(Boolean)
       return {
-        instanceId: ownerPlayerId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+        instanceId: typeof requestedInstanceId === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,255}$/.test(requestedInstanceId)
+          ? requestedInstanceId
+          : ownerPlayerId + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
         templateId: template.id,
         name: template.name,
         ownerPlayerId: ownerPlayerId,
@@ -2591,10 +2678,11 @@
         if (pendingSkill && pendingSkill.localChoiceDraft && pendingSkill.preparation
           && pendingSkill.preparation.kind === 'needOption') {
           const prep = pendingSkill.preparation
-          showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
-            localSkillDraft: true,
-            localSkillId: pendingSkill.skillId,
-          }))
+          if (prep.presentation === 'hand') renderLocalSkillPreparation(pendingSkill)
+          else showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
+              localSkillDraft: true,
+              localSkillId: pendingSkill.skillId,
+            }))
         }
       }
       return !!(pendingSkill || pendingCardAction)
@@ -3585,7 +3673,7 @@
     }
     function pieceDispStats(p) {
       const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G,p.instanceId)
-      const overlay = Object.fromEntries(['attack','defense','moveRange'].filter(key=>display[key]!==undefined).map(key=>[key,display[key]]))
+      const overlay = Object.fromEntries(['attack','defense','moveRange','shield'].filter(key=>display[key]!==undefined).map(key=>[key,display[key]]))
       if (p.masterPieceId && G && G.pieces) {
         const master = G.pieces.find(m => m.instanceId === p.masterPieceId && m.currentHp > 0)
         if (master) {
@@ -3654,6 +3742,14 @@
       }
       // Status implementation hooks are represented by the shield status itself.
       return displayed.filter(function (skill) { return !['divine-shield-defense', 'holy-shield-defense'].includes(skillIdOf(skill)) })
+    }
+    function skillDescriptionContext(piece, skillDef, skillInstance) {
+      return {
+        piece: piece,
+        skill: skillDef,
+        skillInstance: skillInstance,
+        snapshot: G,
+      }
     }
     function skillDefOf(skillId) {
       if (!skillId) return {}
@@ -4033,13 +4129,26 @@
       }
       const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
-      document.getElementById('cdIcon').textContent = String(def.name || cardId || '牌').slice(0, 1)
-      document.getElementById('cdName').textContent = def.name || cardId
+      const descriptionContext = {
+        card: cardInstance,
+        handCard: cardInstance,
+        snapshot: G,
+      }
+      const renderedName = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+        ? RvBSkillDescription.interpolate(def.name || cardId || '牌', descriptionContext)
+        : (def.name || cardId)
+      document.getElementById('cdIcon').textContent = String(renderedName).slice(0, 1)
+      document.getElementById('cdName').textContent = renderedName
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
         `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
       const fullDescription = cardDisplayDescription(cardInstance, def)
-      document.getElementById('cdDesc').textContent = ADVENTURE_MODE && window.adventureCardDetail ? window.adventureCardDetail(cardId, fullDescription) : fullDescription
+      const renderedDescription = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+        ? RvBSkillDescription.interpolate(fullDescription, descriptionContext)
+        : fullDescription
+      document.getElementById('cdDesc').textContent = ADVENTURE_MODE && window.adventureCardDetail
+        ? window.adventureCardDetail(cardId, renderedDescription)
+        : renderedDescription
 
       const isPassiveCard = def.type === 'passive'
       const meta = []
@@ -4105,8 +4214,28 @@
       else if (typeof battleActionVignette.skip === 'function') battleActionVignette.skip()
     }
 
+    function getHandOptionSelection() {
+      if (!G) return null
+      if (G.pendingOptionSelection || G.pendingTargetSelection) return G.pendingOptionSelection || null
+      if (typeof pendingSkill === 'undefined' || !isLocalSkillDraft(pendingSkill)) return null
+      if (typeof SPECTATE_MODE !== 'undefined' && SPECTATE_MODE) return null
+      if (!G.turn || String(G.turn.currentPlayerId).toLowerCase() !== String(myPlayerId).toLowerCase()) return null
+      const prep = pendingSkill.preparation
+      if (!prep || prep.kind !== 'needOption' || prep.presentation !== 'hand') return null
+      const max = prep.maxSelections ?? prep.max ?? 1
+      return Object.assign({}, prep, {
+        localSkillDraft: true,
+        selectionId: prep.selectionId || prep.promptKey || ('local-hand:' + pendingSkill.skillId + ':' + localSkillChoices(pendingSkill).length),
+        selectionMode: prep.selectionMode || (max > 1 ? 'multi' : 'single'),
+        minSelections: prep.minSelections ?? prep.min ?? 1,
+        maxSelections: max,
+      })
+    }
+
     function isPendingHandSelection(pending) {
-      return !!(pending && pendingOptionSelectionForMe()
+      return !!(pending && (pending.localSkillDraft
+          ? getHandOptionSelection()?.selectionId === pending.selectionId
+          : pendingOptionSelectionForMe())
         && pending.presentation === 'hand'
         && (pending.selectionMode === 'single' || pending.selectionMode === 'multi'))
     }
@@ -4135,7 +4264,7 @@
     function renderPendingHandSelectionControls() {
       const controls = document.getElementById('handMultiSelectControls')
       if (!controls) return
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       const active = isPendingHandSelection(pending)
       controls.hidden = !active
       if (controls.style) controls.style.display = active ? 'flex' : 'none'
@@ -4161,7 +4290,7 @@
     }
 
     function togglePendingHandOption(cardInstanceId) {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending)) return
       syncPendingHandSelection(pending)
       const candidates = pendingHandCandidateValues(pending)
@@ -4186,7 +4315,7 @@
     }
 
     async function confirmPendingHandOptionSelection() {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending) || pendingHandOptionSelection.submitting) return
       syncPendingHandSelection(pending)
       const isSingle = pending.selectionMode === 'single'
@@ -4202,6 +4331,10 @@
       renderHand()
       renderActionBar()
       try {
+        if (pending.localSkillDraft) {
+          await advanceLocalSkillOption(isSingle ? selectedValues[0] : selectedValues)
+          return
+        }
         await doAction({
           type: 'pendingOptionSelect',
           playerId: pending.playerId || myPlayerId,
@@ -4210,7 +4343,7 @@
           stateRevision: pending.stateRevision,
         })
       } finally {
-        const current = G && G.pendingOptionSelection
+        const current = getHandOptionSelection()
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
         else syncPendingHandSelection(null)
         renderHand()
@@ -4219,11 +4352,15 @@
     }
 
     async function cancelPendingHandOptionSelection() {
-      const pending = G && G.pendingOptionSelection
+      const pending = getHandOptionSelection()
       if (!isPendingHandSelection(pending) || pending.canCancel === false || pendingHandOptionSelection.submitting) return
       pendingHandOptionSelection.submitting = true
       renderPendingHandSelectionControls()
       try {
+        if (pending.localSkillDraft) {
+          cancelTargetSelection()
+          return
+        }
         await doAction({
           type: 'cancelPendingSelection',
           playerId: pending.playerId || myPlayerId,
@@ -4231,7 +4368,7 @@
           stateRevision: pending.stateRevision,
         })
       } finally {
-        const current = G && G.pendingOptionSelection
+        const current = getHandOptionSelection()
         if (current && current.selectionId === pending.selectionId) pendingHandOptionSelection.submitting = false
         else syncPendingHandSelection(null)
         renderHand()
@@ -4423,7 +4560,8 @@
         return
       }
       badge.hidden = false
-      const isCore = piece && piece.isCore === true
+      const display = typeof BattleSkillPresentation === 'undefined' ? {} : BattleSkillPresentation.display(G, piece.instanceId)
+      const isCore = (display.isCore !== undefined ? display.isCore : piece.isCore) === true
       badge.textContent = isCore ? '核心棋子' : '非核心棋子'
       badge.className = 'pi-identity ' + (isCore ? 'core' : 'non-core')
       badge.title = isCore
@@ -4443,22 +4581,46 @@
 
       // Tags (display* aware)
       const statusPresentation = window.BattleStatusPresentation
+      const statusContextFor = function (status) {
+        const ownerId = status && status.ownerPlayerId || piece.ownerPlayerId
+        const ownerPlayer = G && Array.isArray(G.players)
+          ? G.players.find(function (candidate) {
+            return String(candidate && candidate.playerId || '').toLowerCase() === String(ownerId || '').toLowerCase()
+          })
+          : null
+        return {
+          currentStatus: status,
+          status: status,
+          piece: piece,
+          currentPiece: piece,
+          player: ownerPlayer,
+          currentPlayer: ownerPlayer,
+          snapshot: G,
+        }
+      }
       const tags = pieceDispTags(piece).filter(t => {
         if (!t || t.visible === false) return false
-        const meta = statusPresentation ? statusPresentation.resolve(t) : null
+        const meta = statusPresentation ? statusPresentation.resolve(t, statusContextFor(t)) : null
         return !meta || meta.visibility !== 'hidden'
       })
       const tagsHtml = tags.length
         ? `<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-list">${tags.map(t => {
             const meta = statusPresentation
-              ? statusPresentation.resolve(t)
+              ? statusPresentation.resolve(t, statusContextFor(t))
               : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
-            const detail = statusPresentation ? statusPresentation.detailText(t) : ''
+            const statusContext = statusContextFor(t)
+            const detail = statusPresentation ? statusPresentation.detailText(t, statusContext) : ''
             const label = statusPresentation && statusPresentation.labelForStatus
               ? statusPresentation.labelForStatus(t)
               : (meta.label || t.name || t.label || t.type || t.id || '\u672a\u77e5\u72b6\u6001')
-            const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'
-            const description = t.description || meta.description || ''
+            const iconPath = t && typeof t === 'object' && typeof t.iconPath === 'string' && t.iconPath.trim()
+              ? t.iconPath.trim()
+              : meta.assetPath || 'images/effect-icons/fallback.svg'
+            const description = statusPresentation
+              ? meta.description || ''
+              : (typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+                  ? RvBSkillDescription.interpolate(t.description || meta.description || '', statusContext)
+                  : t.description || meta.description || '')
             return `<div class="pi-status-row" data-status-id="${escHtml(t.id || t.type || '')}">
               <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}"><img class="pi-status-icon-image" src="${escHtml(iconPath)}" alt="" aria-hidden="true"></span>
               <span class="pi-status-copy"><span class="pi-status-name">${escHtml(label)}</span>
@@ -4534,7 +4696,7 @@
             <span class="pi-skill-name">${escHtml(skName)}</span>
             <span class="pi-skill-badge">${typeLabel}</span>
           </div>
-          <div class="pi-skill-desc">${RvBSkillDescription.render(desc, keywords)}</div>
+          <div class="pi-skill-desc">${RvBSkillDescription.render(desc, keywords, skillDescriptionContext(piece, skd, sk))}</div>
           ${keywords.length ? `<div class="keyword-badges pi-keywords">${keywords.map(name => keywordBadgeHtml(name, 'piece', activePieceKeyword)).join('')}</div>` : ''}
           ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
         </div>`
@@ -5200,6 +5362,24 @@
           })
           return
         }
+        if (!TUTORIAL_MODE && TRAINING_AUTO_START) {
+          try {
+            const encodedSetup = params.get('setup')
+            const setup = encodedSetup ? JSON.parse(encodedSetup) : null
+            if (setup && typeof setup === 'object' && !Array.isArray(setup)) {
+              const encodedSetupLog = params.get('setupLog')
+              if (encodedSetupLog) {
+                try { setup.setupLog = JSON.parse(encodedSetupLog) } catch { setup.setupLog = [] }
+              }
+              trainingSetupConfig = setup
+              refreshTrainingSetupPieces()
+              await initTraining(undefined, trainingSetupConfig)
+              return
+            }
+          } catch (error) {
+            console.warn('[training] retry setup is invalid; showing setup screen', error)
+          }
+        }
         showTrainingSetup()
         return
       }
@@ -5380,10 +5560,22 @@
       if (btnPlace) btnPlace.style.background = '#2d1a4e'
       try {
         const config = setupConfig || trainingSetupConfig || getTrainingSetupConfig()
-        trainingSetupConfig = config
+        const replaySetupLog = Array.isArray(config.setupLog) ? config.setupLog : []
+        const battleConfig = Object.assign({}, config)
+        delete battleConfig.setupLog
+        trainingSetupConfig = battleConfig
+        trainingRootSeed = TUTORIAL_MODE && tutorialDefinition && Number.isSafeInteger(tutorialDefinition.rootSeed)
+          ? tutorialDefinition.rootSeed >>> 0
+          : TRAINING_QUERY_ROOT_SEED
+        trainingInitialState = null
+        trainingSetupLog = []
+        trainingHasUserAction = false
         trainingBattlePresentationChains = []
         latestBattlePresentationEvents = []
-        G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined }, config))
+        G = await trainingApiFetch('POST', Object.assign({ mapId: mapId || undefined, rootSeed: trainingRootSeed }, battleConfig))
+        const Engine = await window.RvBGameEngine.ensure()
+        trainingInitialState = Engine.safeCloneBattleState ? Engine.safeCloneBattleState(G) : cloneTrainingValue(G)
+        publishTrainingState(G)
         myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
         if (TUTORIAL_MODE && !params.has('lesson')) await runTutorialOpening()
         // Auto-advance past start phase so training enters action phase immediately
@@ -5391,13 +5583,39 @@
           try {
             const Engine = await window.RvBGameEngine.ensure()
             const beforeBegin = G
-            const beginAction = withClientActionId({ type: 'beginPhase', playerId: G.turn.currentPlayerId })
+            // This automatic setup transition is replayed on apply-and-retry.
+            // Keep its identity stable so the authoritative initial-scene hash
+            // does not depend on wall-clock time between the two runs.
+            const beginAction = withClientActionId({
+              type: 'beginPhase',
+              playerId: G.turn.currentPlayerId,
+              clientActionId: G.turn.currentPlayerId + '-training-initial-begin',
+            })
             G = await trainingApiFetch('PUT', { action: beginAction, battleState: G })
             appendTrainingPresentationEvents(Engine, beginAction, beforeBegin, G)
+            publishTrainingState(G)
           } catch (error) {
             console.error('[training] failed to enter action phase', error)
           }
         }
+        // Scenario PATCHes are replayed at the same point as the original
+        // editor session: after the automatic start phase, before user moves.
+        for (const entry of replaySetupLog) {
+          const input = entry && entry.input && typeof entry.input === 'object' ? entry.input : null
+          if (!input || !input.type) continue
+          const beforeSetup = G
+          const nextSetup = await trainingApiFetch('PATCH', Object.assign({}, input, { battleState: G }))
+          trainingSetupLog.push({
+            initial: true,
+            type: input.type,
+            input: cloneTrainingValue(input),
+            beforeHash: trainingStateHash(beforeSetup, Engine),
+            afterHash: trainingStateHash(nextSetup, Engine),
+          })
+          G = nextSetup
+        }
+        trainingInitialState = Engine.safeCloneBattleState ? Engine.safeCloneBattleState(G) : cloneTrainingValue(G)
+        publishTrainingState(G)
         myPlayerId = TUTORIAL_MODE ? tutorialDefinition.player.playerId : G.turn.currentPlayerId
         refreshTrainingPresentationEvents(window.GameEngine)
         myFaction = getTrainingPlayerFaction(myPlayerId)
@@ -5409,6 +5627,7 @@
         refreshPlaceTemplates()
         render()
         addLog(TUTORIAL_MODE ? '社团跑团开始 - Red VS Blue' : '训练营开始 - ' + trainingPlayerLabel(myPlayerId), 'turn')
+        publishTrainingState(G)
         const btn = document.getElementById('btnSwitchPov')
         if (btn) btn.textContent = '切换视角 ' + trainingPlayerLabel(myPlayerId)
         if (TUTORIAL_MODE) mountTutorialRuntime()
@@ -5425,11 +5644,30 @@
       try {
         const oldG = G
         G = await trainingApiFetch('PATCH', Object.assign({}, body, { battleState: G }))
+        const Engine = typeof GameEngine !== 'undefined' ? GameEngine : null
+        const setupInput = cloneTrainingValue(body)
+        if (body && body.type === 'addPiece' && setupInput && G && Array.isArray(G.pieces)) {
+          const added = G.pieces.find(function(piece) {
+            return oldG && Array.isArray(oldG.pieces) && !oldG.pieces.some(function(previous) { return previous.instanceId === piece.instanceId })
+              && piece.templateId === body.templateId && piece.ownerPlayerId === body.ownerPlayerId
+              && piece.x === body.x && piece.y === body.y
+          })
+          if (added && typeof added.instanceId === 'string') setupInput.instanceId = added.instanceId
+        }
+        trainingSetupLog.push({
+          initial: !trainingHasUserAction,
+          type: body && body.type,
+          input: setupInput,
+          beforeHash: trainingStateHash(oldG, Engine),
+          afterHash: trainingStateHash(G, Engine),
+        })
+        if (!trainingHasUserAction) trainingInitialState = Engine && Engine.safeCloneBattleState ? Engine.safeCloneBattleState(G) : cloneTrainingValue(G)
         const interactionFeedback = reconcileBattleInteractionState(oldG, G)
         // A successful placement completes this tool interaction. Otherwise the
         // history dock remains forcibly collapsed by placement mode.
         if (body.type === 'addPiece' && placingMode) togglePlaceMode()
         render()
+        publishTrainingState(G)
         if (interactionFeedback) setStatusMsg(interactionFeedback)
         return true
       } catch (e) { addLog('失败：' + e.message, 'err'); return false }
@@ -6511,6 +6749,16 @@
       _updatePendingSkillTargets()
       if (skill.preparation && skill.preparation.kind === 'needOption') {
         const prep = skill.preparation
+        if (prep.presentation === 'hand') {
+          flushPresentationBeforePendingSelection()
+          const overlay = document.getElementById('optionPickerOverlay')
+          if (overlay) overlay.classList.remove('show')
+          pendingOptionAction = null
+          _pickerOptions = []
+          syncPendingHandSelection(getHandOptionSelection())
+          renderHand(); renderActionBar(); renderTargetOverlay()
+          return
+        }
         showOptionPicker(prep.title || '请选择', prep.options || [], Object.assign({}, prep, {
           localSkillDraft: true,
           localSkillId: skill.skillId,
@@ -7188,6 +7436,7 @@
         viewerId: myPlayerId,
         playerNames: playerNames,
         training: TRAINING_MODE,
+        trainingFirstPlayerId: TRAINING_MODE && trainingSetupConfig ? trainingSetupConfig.firstPlayerId : null,
         spectating: SPECTATE_MODE,
         selectedPieceId: selectedPieceId,
         skillsById: skillsById,
@@ -7250,7 +7499,7 @@
           })
         }
       } else {
-        syncPendingHandSelection(null)
+        syncPendingHandSelection(getHandOptionSelection())
         _pendingChoiceShown = null
         if (pendingOptionAction && pendingOptionAction.type === 'pendingOptionSelect') {
           pendingOptionAction = null
@@ -7729,6 +7978,25 @@
       // Keep the opposite-edge skill dock in sync with the current selection.
       const contextPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(contextPiece)
+      refreshOpenPieceInfo()
+      refreshOpenCardDetail()
+    }
+
+    function refreshOpenPieceInfo() {
+      const modal = document.getElementById('pieceInfoModal')
+      if (!modal || modal.style.display !== 'flex' || !currentPieceInfoId) return
+      if (currentPieceInfoSource === 'board') {
+        const piece = G.pieces.find(function (candidate) { return candidate.instanceId === currentPieceInfoId })
+        if (piece) renderPieceInfoRecord(piece, true)
+      } else if (currentPieceInfoSource === 'deployment') {
+        showDeploymentPieceInfo(currentPieceInfoId, null, true)
+      }
+    }
+
+    function refreshOpenCardDetail() {
+      const modal = document.getElementById('cardDetailModal')
+      if (!modal || modal.style.display !== 'flex' || !currentCardDetail) return
+      showCardDetail(currentCardDetail.cardInstanceId, currentCardDetail.cardId, true)
     }
 
     function renderPieceCard(piece, isMe) {
@@ -7751,7 +8019,9 @@
         const label = statusPresentation && statusPresentation.labelForStatus
           ? statusPresentation.labelForStatus(t)
           : (meta.label || t.name || t.label || t.type || t.id || '未知状态')
-        const iconPath = meta.assetPath || 'images/effect-icons/fallback.svg'
+        const iconPath = t && typeof t === 'object' && typeof t.iconPath === 'string' && t.iconPath.trim()
+          ? t.iconPath.trim()
+          : meta.assetPath || 'images/effect-icons/fallback.svg'
         const stacks = t.stacks ? `脳${t.stacks}` : (t.duration ? `${t.duration}T` : '')
         return `<span class="status-tag" title="${escHtml(label)}"><img src="${escHtml(iconPath)}" alt="" aria-hidden="true" style="width:12px;height:12px;vertical-align:-2px;object-fit:contain">${escHtml(label)}${stacks ? ' ' + stacks : ''}</span>`
       }).join('')
@@ -7988,7 +8258,7 @@
       ensureHandCardDisplayMetadata(hand)
       const isMyTurn = G.turn && G.turn.currentPlayerId && G.turn.currentPlayerId.toLowerCase() === myPlayerId
       const ap = myMeta ? myMeta.actionPoints : 0
-      const pendingHandSelection = G.pendingOptionSelection
+      const pendingHandSelection = getHandOptionSelection()
       const isHandSelection = isPendingHandSelection(pendingHandSelection)
       const progressiveBlocked = progressiveDeploymentPending(G) && !isHandSelection
       if (isHandSelection) syncPendingHandSelection(pendingHandSelection)
@@ -8039,7 +8309,9 @@
 
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
-        const cardName = def.name || card.cardId
+        const cardName = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+          ? RvBSkillDescription.interpolate(def.name || card.cardId, { card: card, handCard: card, snapshot: G })
+          : (def.name || card.cardId)
         const cardAriaLabel = isHandSelection
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
@@ -8062,12 +8334,18 @@
       const def = definition || {}
       const cardId = card && card.cardId || def.id || ''
       const shown = ADVENTURE_MODE && window.adventureCardPresentation ? window.adventureCardPresentation(card, def) : card
-      return HandCardFace.render(shown, def, { artSrc: cardArtSource(cardId, def.image) })
+      const descriptionContext = card && card.instanceId
+        ? { card: card, handCard: card, snapshot: G }
+        : undefined
+      return HandCardFace.render(shown, def, {
+        artSrc: cardArtSource(cardId, def.image),
+        descriptionContext: descriptionContext,
+      })
     }
 
     function onCardClick(cardInstanceId, cardId, confirmed = false) {
       if (!G) return
-      if (isPendingHandSelection(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(getHandOptionSelection())) {
         togglePendingHandOption(cardInstanceId)
         return
       }
@@ -9473,7 +9751,7 @@
         setStatusMsg('上一条指令仍在等待权威确认')
         return
       }
-      if (isPendingHandSelection(G.pendingOptionSelection)) {
+      if (isPendingHandSelection(getHandOptionSelection())) {
         await confirmPendingHandOptionSelection()
         return
       }
@@ -9553,6 +9831,7 @@
         setMoveButtonDisabled(true)
         const oldG = G
         const newG = await trainingApiFetch('PUT', { action, battleState: G })
+        trainingHasUserAction = true
         appendTrainingPresentationEvents(Engine, action, oldG, newG)
         if (_use3d && battlePresentation) {
           battlePresentation.animateAction(
@@ -9612,6 +9891,7 @@
         if (tutorialActive && tutorialRuntime) {
           await tutorialRuntime.afterAcceptedAction(action, oldG)
         }
+        publishTrainingState(G)
       } catch (e) {
         let rejectionFeedback = ''
         if (e.needsTargetSelection) {

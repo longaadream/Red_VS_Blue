@@ -1,0 +1,19 @@
+{
+  "passed": false,
+  "error": "Error: UI condition timed out: Boolean(document.querySelector('#statuses-list .studio-status-row'))\n    at until (file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-shell-smoke.mjs:216:9)\n    at async file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/tests/electron/studio-shell-smoke.mjs:331:3",
+  "childStderr": "\r\nDevTools listening on ws://127.0.0.1:58268/devtools/browser/6fc12296-a195-453d-b3ff-d692d4c3ad5b\r\n",
+  "project": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-studio-shell-smoke-CBn6WG\\rvb-content-072ba0e9",
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\piece-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\skill-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\expression-inline.png"
+  ],
+  "renderer": {
+    "url": "file:///C:/Users/lngsc/.codex/worktrees/modular-content-graphs/Red_VS_Blue/electron-editor/ui/index.html",
+    "active": "<body class=\"studio-surface\">\n<aside id=\"sidebar\">\n  <div class=\"brand\"><img class=\"studio-brand-image\" src=\"assets/studio-brand.png\" alt=\"\" aria-hidden=\"true\"><div class=\"brand-copy\"><strong>Red VS Blue</strong><span>内容工作台</span></div></div>\n  <nav id=\"tab-bar\" aria-label=\"编辑器模块\">\n    <button class=\"tab-btn\" data-tab=\"workbench\" data-shell-nav=\"workbench\" data-short=\"任务\"><img class=\"tab-icon\" src=\"assets/icons/workbench.svg\" alt=\"\" aria-hidden=\"true\"><span class=\"tab-label\">创作工作台</span></button>\n    <div class=\"tool-separator\">内容</div>\n    <button class=\"tab-btn\" data-tab=\"pieces\" data-shell-",
+    "status": "",
+    "build": "选择一项操作，结果会显示在这里。",
+    "body": "Red VS Blue\n内容工作台\n创作工作台\n内容\n棋子\n能力组\n卡牌\n规则\n素材\n资源包\n组合效果 · 保存内容\n生成资源包 · 试用验证\n内容工作台\n状态目录\n生成资源包\n保存\n项目\n状态定义\n正在读取状态定义…（getter function · 集合 无 · start:pieces,start:skills,start:cards,start:rules）\n选择状态，查看图标与定义来源"
+  },
+  "failureScreenshot": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v1\\smoke-failure.png"
+}

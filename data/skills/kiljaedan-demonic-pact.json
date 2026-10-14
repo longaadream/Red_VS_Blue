@@ -13,5 +13,745 @@
   "kind": "passive",
   "type": "passive",
   "actionPointCost": 0,
-  "code": "function executeSkill(context) { var kj = context.piece || context.rulePiece; if (!kj) return { success: false, message: '' }; var idx = battle.pieces.findIndex(function(p) { return p.instanceId === kj.instanceId; }); if (idx === -1) return { success: false, message: '' }; battle.pieces.splice(idx, 1); if (!battle.extensions) battle.extensions = {}; var strippedRules = (kj.rules || []).map(function(r) { var rc = {}; for (var k in r) { if (k !== 'effect') rc[k] = r[k]; } return rc; }); var kjCopy = {}; for (var key in kj) { if (key !== 'rules') kjCopy[key] = kj[key]; } kjCopy.rules = strippedRules; var stored; try { stored = JSON.parse(JSON.stringify(kjCopy)); } catch(e) { stored = { instanceId: kj.instanceId, templateId: kj.templateId, ownerPlayerId: kj.ownerPlayerId, name: kj.name, faction: kj.faction, isCore: kj.isCore }; } var ownerKey = String(kj.ownerPlayerId || '').trim().toLowerCase(); if (!ownerKey) return { success: false, message: '基尔加丹缺少所属玩家' }; if (!battle.extensions.kiljaedanPiecesByPlayerId || Array.isArray(battle.extensions.kiljaedanPiecesByPlayerId)) battle.extensions.kiljaedanPiecesByPlayerId = {}; battle.extensions.kiljaedanPiecesByPlayerId[ownerKey] = stored; if (!battle.extensions.kiljaedanPiece) battle.extensions.kiljaedanPiece = stored; addCardToHand('demon-summon-1', kj.ownerPlayerId); return { success: true, message: '基尔加丹隐匿于虚空之中，等待召唤...' }; }"
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"ownerPlayerId\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner--owner\", __gameplayError, \"piece.field\"); _module2 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2) === null)) { _module3 = __gameplayInvalid; } else { var _module3 = (String(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"value\")) ? _module2[\"value\"] : _module2))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"owner\", __gameplayError, \"text.from-value\"); _module3 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module4 = __gameplayInvalid; } else { var _module4 = ((function(id){var piece=flow.query.piece(id),copy={},key,sourceRules=Array.isArray(piece.rules)?piece.rules:[],stripped=[];for(key in piece){if(key!=='rules')copy[key]=piece[key];}for(var index=0;index<sourceRules.length;index+=1){var rule=sourceRules[index],ruleCopy={};if(rule&&typeof rule==='object'){for(key in rule){if(key!=='effect')ruleCopy[key]=rule[key];}}stripped.push(ruleCopy);}copy.rules=stripped;try{return JSON.parse(JSON.stringify(copy));}catch(error){return {instanceId:piece.instanceId,templateId:piece.templateId,ownerPlayerId:piece.ownerPlayerId,name:piece.name,faction:piece.faction,isCore:piece.isCore};}})(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"snapshot\", __gameplayError, \"piece.snapshot-serializable\"); _module4 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module5 = __gameplayInvalid; } else { var _module5 = (flow.lifecycle.detachActive(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"preserve\", \"data-owned\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"detached\", __gameplayError, \"piece.detach-active\"); _module5 = __gameplayInvalid; } try { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"success\")) ? _module5[\"success\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"success\")) ? _module5[\"success\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"success\")) ? _module5[\"success\"] : _module5) === null)) { _module6 = __gameplayInvalid; } else { var _module6 = (!(((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"success\")) ? _module5[\"success\"] : _module5))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"detach-failed\", __gameplayError, \"logic.not\"); _module6 = __gameplayInvalid; } try { var _condition7 = ((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6); if (_condition7 !== __gameplayInvalid && _condition7) { try { if (!((false === __gameplayInvalid) || (\"\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"detach-missing\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"detach-guard\", __gameplayError); _condition7 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module8 = __gameplayInvalid; } else { var _module8 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) !== null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-present\", __gameplayError, \"compare.values\"); _module8 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module9 = __gameplayInvalid; } else { var _module9 = ((function(value, defaultValue){if(value===__gameplayInvalid||defaultValue===__gameplayInvalid)return __gameplayInvalid;var result=value==null?defaultValue:value;return {value:result};})(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3), \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-text\", __gameplayError, \"value.coalesce\"); _module9 = __gameplayInvalid; } try { if ((((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === __gameplayInvalid) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === undefined) || (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9) === null)) { _module10 = __gameplayInvalid; } else { var _module10 = (((_module9 !== null && typeof _module9 === \"object\" && Object.prototype.hasOwnProperty.call(_module9, \"value\")) ? _module9[\"value\"] : _module9).trim()); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-trimmed\", __gameplayError, \"text.trim\"); _module10 = __gameplayInvalid; } try { if ((((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"text\")) ? _module10[\"text\"] : _module10) === __gameplayInvalid) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"text\")) ? _module10[\"text\"] : _module10) === undefined) || (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"text\")) ? _module10[\"text\"] : _module10) === null)) { _module11 = __gameplayInvalid; } else { var _module11 = (((_module10 !== null && typeof _module10 === \"object\" && Object.prototype.hasOwnProperty.call(_module10, \"text\")) ? _module10[\"text\"] : _module10).toLowerCase()); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-normalized\", __gameplayError, \"text.lowercase\"); _module11 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module12 = __gameplayInvalid; } else { var _module12 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) !== \"\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-non-empty\", __gameplayError, \"compare.values\"); _module12 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (\"__proto__\" === __gameplayInvalid) || (\"__proto__\" === undefined) || (\"__proto__\" === null)) { _module13 = __gameplayInvalid; } else { var _module13 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) !== \"__proto__\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-safe-proto\", __gameplayError, \"compare.values\"); _module13 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (\"constructor\" === __gameplayInvalid) || (\"constructor\" === undefined) || (\"constructor\" === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) !== \"constructor\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-safe-constructor\", __gameplayError, \"compare.values\"); _module14 = __gameplayInvalid; } try { if ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (\"prototype\" === __gameplayInvalid) || (\"prototype\" === undefined) || (\"prototype\" === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) !== \"prototype\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-safe-prototype\", __gameplayError, \"compare.values\"); _module15 = __gameplayInvalid; } try { if ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === __gameplayInvalid) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === undefined) || (((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) === null) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === null)) { _module16 = __gameplayInvalid; } else { var _module16 = ((((_module13 !== null && typeof _module13 === \"object\" && Object.prototype.hasOwnProperty.call(_module13, \"value\")) ? _module13[\"value\"] : _module13) && ((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-safe-name\", __gameplayError, \"logic.and\"); _module16 = __gameplayInvalid; } try { if ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === __gameplayInvalid) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === undefined) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) === null) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === __gameplayInvalid) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === undefined) || (((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15) === null)) { _module17 = __gameplayInvalid; } else { var _module17 = ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"value\")) ? _module16[\"value\"] : _module16) && ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-safe-name-all\", __gameplayError, \"logic.and\"); _module17 = __gameplayInvalid; } try { if ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === __gameplayInvalid) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === undefined) || (((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) === null) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) === __gameplayInvalid) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) === undefined) || (((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((((_module8 !== null && typeof _module8 === \"object\" && Object.prototype.hasOwnProperty.call(_module8, \"value\")) ? _module8[\"value\"] : _module8) && ((_module12 !== null && typeof _module12 === \"object\" && Object.prototype.hasOwnProperty.call(_module12, \"value\")) ? _module12[\"value\"] : _module12))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-valid-present\", __gameplayError, \"logic.and\"); _module18 = __gameplayInvalid; } try { if ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === __gameplayInvalid) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === undefined) || (((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === null)) { _module19 = __gameplayInvalid; } else { var _module19 = ((((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18) && ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-valid-name\", __gameplayError, \"logic.and\"); _module19 = __gameplayInvalid; } try { if ((((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === __gameplayInvalid) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === undefined) || (((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) === null) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17) === null)) { _module20 = __gameplayInvalid; } else { var _module20 = ((((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19) && ((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"value\")) ? _module17[\"value\"] : _module17))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-valid\", __gameplayError, \"logic.and\"); _module20 = __gameplayInvalid; } try { var _module21 = ((flow.execution.declare(\"boolean\",[]))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-piece-result\", __gameplayError, \"local.declare\"); _module21 = { \"handle\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { var _condition33 = ((_module20 !== null && typeof _module20 === \"object\" && Object.prototype.hasOwnProperty.call(_module20, \"value\")) ? _module20[\"value\"] : _module20); if (_condition33 !== __gameplayInvalid && _condition33) { try { var _module22 = (({})); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-scoped-empty\", __gameplayError, \"record.empty\"); _module22 = __gameplayInvalid; } try { if ((((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"record\")) ? _module22[\"record\"] : _module22) === __gameplayInvalid) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"record\")) ? _module22[\"record\"] : _module22) === undefined) || (((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"record\")) ? _module22[\"record\"] : _module22) === null)) { _module23 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module23 = (({value:flow.extensionRoot.declareValue(\"battle\",\"battle\",\"\",\"kiljaedanPiecesByPlayerId\",\"record\",[],((_module22 !== null && typeof _module22 === \"object\" && Object.prototype.hasOwnProperty.call(_module22, \"record\")) ? _module22[\"record\"] : _module22)),success:true})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-scoped-declared\", __gameplayError, \"extension.declare-battle\"); _module23 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module23[\"value\"]) === __gameplayInvalid) || ((_module23[\"value\"]) === undefined) || ((_module23[\"value\"]) === null) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === __gameplayInvalid) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === undefined) || (((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === null)) { _module24 = __gameplayInvalid; } else { var _module24 = ((function(record,key,value){var unsafe=function(name){return name===\"__proto__\"||name===\"prototype\"||name===\"constructor\";};var clone=function(item,seen,depth){if(item===__gameplayInvalid||item===undefined||depth>40)return __gameplayInvalid;if(item===null||typeof item!==\"object\"){if(typeof item===\"number\"&&!Number.isFinite(item))return __gameplayInvalid;if(typeof item===\"function\"||typeof item===\"symbol\"||typeof item===\"bigint\")return __gameplayInvalid;return item;}if(seen.indexOf(item)>=0)return __gameplayInvalid;var keys=Reflect.ownKeys(item),result=Array.isArray(item)?[]:{};if(Array.isArray(item)){var prototype=Object.getPrototypeOf(item);if(prototype!==Array.prototype)return __gameplayInvalid;var length=Object.getOwnPropertyDescriptor(item,\"length\");if(!length||length.enumerable||!Number.isSafeInteger(length.value)||length.value<0)return __gameplayInvalid;for(var index=0;index<length.value;index+=1){var descriptor=Object.getOwnPropertyDescriptor(item,String(index));if(!descriptor||!descriptor.enumerable||!(\"value\" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;result.push(copied);}if(keys.length!==length.value+1)return __gameplayInvalid;return result;}var prototype=Object.getPrototypeOf(item);if(prototype!==null&&Object.getPrototypeOf(prototype)!==null)return __gameplayInvalid;for(var keyIndex=0;keyIndex<keys.length;keyIndex+=1){var name=keys[keyIndex];if(typeof name!==\"string\"||unsafe(name))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(item,name);if(!descriptor||!descriptor.enumerable||!(\"value\" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,writable:true,enumerable:true,configurable:true});}return result;};if(record===__gameplayInvalid||value===__gameplayInvalid||typeof key!==\"string\"||!key||unsafe(key))return __gameplayInvalid;var next=clone(record,[],0),child=clone(value,[],0);if(next===__gameplayInvalid||child===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(next,key,{value:child,writable:true,enumerable:true,configurable:true});return {record:next};})((_module23[\"value\"]),((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"text\")) ? _module11[\"text\"] : _module11),((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-scoped-updated\", __gameplayError, \"record.set-key\"); _module24 = __gameplayInvalid; } try { if ((((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"record\")) ? _module24[\"record\"] : _module24) === __gameplayInvalid) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"record\")) ? _module24[\"record\"] : _module24) === undefined) || (((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"record\")) ? _module24[\"record\"] : _module24) === null)) { _module25 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module25 = (({value:flow.extensionRoot.writeValue(\"battle\",\"battle\",\"\",\"kiljaedanPiecesByPlayerId\",\"\",\"record\",[],((_module24 !== null && typeof _module24 === \"object\" && Object.prototype.hasOwnProperty.call(_module24, \"record\")) ? _module24[\"record\"] : _module24)),success:true})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-scoped-write\", __gameplayError, \"extension.write-battle\"); _module25 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === undefined)) { _module26 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module26 = (({value:flow.extensionRoot.declareValue(\"battle\",\"battle\",\"\",\"kiljaedanPiece\",{\"kind\":\"nullable\",\"value\":\"record\"},[],((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4)),success:true})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-global-declared\", __gameplayError, \"extension.declare-battle\"); _module26 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module26[\"value\"]) === __gameplayInvalid) || ((_module26[\"value\"]) === undefined) || (null === __gameplayInvalid) || (null === undefined)) { _module27 = __gameplayInvalid; } else { var _module27 = (((_module26[\"value\"]) === null)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-global-empty\", __gameplayError, \"compare.values\"); _module27 = __gameplayInvalid; } try { var _condition31 = ((_module27 !== null && typeof _module27 === \"object\" && Object.prototype.hasOwnProperty.call(_module27, \"value\")) ? _module27[\"value\"] : _module27); if (_condition31 !== __gameplayInvalid && _condition31) { try { if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4) === undefined)) { _module28 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module28 = (({value:flow.extensionRoot.writeValue(\"battle\",\"battle\",\"\",\"kiljaedanPiece\",\"\",{\"kind\":\"nullable\",\"value\":\"record\"},[],((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"record\")) ? _module4[\"record\"] : _module4)),success:true})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-global-write\", __gameplayError, \"extension.write-battle\"); _module28 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module21[\"handle\"]) === __gameplayInvalid) || ((_module21[\"handle\"]) === undefined) || ((_module21[\"handle\"]) === null) || ((_module28[\"success\"]) === __gameplayInvalid) || ((_module28[\"success\"]) === undefined) || ((_module28[\"success\"]) === null)) { _module29 = __gameplayInvalid; } else { var _module29 = ((flow.execution.write((_module21[\"handle\"]),\"boolean\",[],(_module28[\"success\"])))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-global-result\", __gameplayError, \"local.write\"); _module29 = __gameplayInvalid; } } else if (_condition31 !== __gameplayInvalid) { try { if (((_module21[\"handle\"]) === __gameplayInvalid) || ((_module21[\"handle\"]) === undefined) || ((_module21[\"handle\"]) === null) || (true === __gameplayInvalid) || (true === undefined) || (true === null)) { _module30 = __gameplayInvalid; } else { var _module30 = ((flow.execution.write((_module21[\"handle\"]),\"boolean\",[],true))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-existing-result\", __gameplayError, \"local.write\"); _module30 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-global-if\", __gameplayError); _condition31 = __gameplayInvalid; } } else if (_condition33 !== __gameplayInvalid) { try { if (((_module21[\"handle\"]) === __gameplayInvalid) || ((_module21[\"handle\"]) === undefined) || ((_module21[\"handle\"]) === null) || (false === __gameplayInvalid) || (false === undefined) || (false === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((flow.execution.write((_module21[\"handle\"]),\"boolean\",[],false))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-invalid-owner\", __gameplayError, \"local.write\"); _module32 = __gameplayInvalid; } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-owner-if\", __gameplayError); _condition33 = __gameplayInvalid; } try { if (((_module21[\"handle\"]) === __gameplayInvalid) || ((_module21[\"handle\"]) === undefined) || ((_module21[\"handle\"]) === null)) { _module34 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module34 = ((flow.execution.read((_module21[\"handle\"]),\"boolean\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store--stored-piece-result-read\", __gameplayError, \"local.read\"); _module34 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { if (((_module34[\"value\"]) === __gameplayInvalid) || ((_module34[\"value\"]) === undefined) || ((_module34[\"value\"]) === null)) { _module35 = __gameplayInvalid; } else { var _module35 = (!((_module34[\"value\"]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store-failed\", __gameplayError, \"logic.not\"); _module35 = __gameplayInvalid; } try { var _condition36 = ((_module35 !== null && typeof _module35 === \"object\" && Object.prototype.hasOwnProperty.call(_module35, \"value\")) ? _module35[\"value\"] : _module35); if (_condition36 !== __gameplayInvalid && _condition36) { try { if (!((false === __gameplayInvalid) || (\"基尔加丹缺少所属玩家\" === __gameplayInvalid))) { return { \"success\": false, \"message\": \"基尔加丹缺少所属玩家\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store-rejected\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"store-guard\", __gameplayError); _condition36 = __gameplayInvalid; } try { if ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === __gameplayInvalid) || (((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) === undefined)) { _module37 = __gameplayInvalid; } else { var _module37 = ((((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3) == null ? false : flow.cards.add(((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"text\")) ? _module3[\"text\"] : _module3), \"demon-summon-1\"))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"add-card\", __gameplayError, \"card.hand-add-player-id-text\"); _module37 = __gameplayInvalid; } try { if (!((true === __gameplayInvalid) || (\"基尔加丹隐匿于虚空之中，等待召唤...\" === __gameplayInvalid))) { return { \"success\": true, \"message\": \"基尔加丹隐匿于虚空之中，等待召唤...\" }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"done\", __gameplayError); } }",
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:kiljaedan-demonic-pact",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-kiljaedan-gamestart",
+        "relation": "owned",
+        "source": "pieces/kiljaedan.rules"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-1",
+        "relation": "owned",
+        "source": "skills.kiljaedan-demonic-pact.gameplayModules.entries.code.graph.body[26].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-2",
+        "relation": "owned",
+        "source": "cards.demon-summon-1.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-3",
+        "relation": "owned",
+        "source": "cards.demon-summon-2.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-4",
+        "relation": "owned",
+        "source": "cards.demon-summon-3.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-5",
+        "relation": "owned",
+        "source": "cards.demon-summon-4.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      }
+    ]
+  },
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "triggerSkill",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "owner--owner",
+              "module": "piece.field",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "ownerPlayerId"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "owner",
+              "module": "text.from-value",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "owner--owner",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "valueType": "player"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "snapshot",
+              "module": "piece.snapshot-serializable",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "policy": "strip-rule-effects"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "detached",
+              "module": "piece.detach-active",
+              "version": "1",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "flowStatePolicy": "preserve"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "detach-failed",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "detached",
+                  "port": "success"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "detach-guard",
+              "condition": {
+                "kind": "output",
+                "node": "detach-failed",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "detach-missing",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-present",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              "parameters": {
+                "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-text",
+              "module": "value.coalesce",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "text"
+                },
+                "defaultValue": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {
+                "valueType": "string"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-trimmed",
+              "module": "text.trim",
+              "version": "1",
+              "inputs": {
+                "text": {
+                  "kind": "output",
+                  "node": "store--stored-owner-text",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-normalized",
+              "module": "text.lowercase",
+              "version": "1",
+              "inputs": {
+                "text": {
+                  "kind": "output",
+                  "node": "store--stored-owner-trimmed",
+                  "port": "text"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-non-empty",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-normalized",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": ""
+                }
+              },
+              "parameters": {
+                "valueType": "string",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-safe-proto",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-normalized",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "__proto__"
+                }
+              },
+              "parameters": {
+                "valueType": "string",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-safe-constructor",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-normalized",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "constructor"
+                }
+              },
+              "parameters": {
+                "valueType": "string",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-safe-prototype",
+              "module": "compare.values",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-normalized",
+                  "port": "text"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": "prototype"
+                }
+              },
+              "parameters": {
+                "valueType": "string",
+                "operator": "!="
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-safe-name",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-proto",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-constructor",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-safe-name-all",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-name",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-prototype",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-valid-present",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-present",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "store--stored-owner-non-empty",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-valid-name",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-valid-present",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-name-all",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-owner-valid",
+              "module": "logic.and",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "store--stored-owner-valid-name",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "output",
+                  "node": "store--stored-owner-safe-name-all",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-piece-result",
+              "module": "local.declare",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "valueType": "boolean"
+              }
+            },
+            {
+              "kind": "if",
+              "id": "store--stored-owner-if",
+              "condition": {
+                "kind": "output",
+                "node": "store--stored-owner-valid",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "store--stored-scoped-empty",
+                  "module": "record.empty",
+                  "version": "1",
+                  "inputs": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "store--stored-scoped-declared",
+                  "module": "extension.declare-battle",
+                  "version": "3",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "store--stored-scoped-empty",
+                      "port": "record"
+                    }
+                  },
+                  "parameters": {
+                    "namespace": "",
+                    "name": "kiljaedanPiecesByPlayerId",
+                    "valueType": "record"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "store--stored-scoped-updated",
+                  "module": "record.set-key",
+                  "version": "1",
+                  "inputs": {
+                    "record": {
+                      "kind": "output",
+                      "node": "store--stored-scoped-declared",
+                      "port": "value"
+                    },
+                    "key": {
+                      "kind": "output",
+                      "node": "store--stored-owner-normalized",
+                      "port": "text"
+                    },
+                    "value": {
+                      "kind": "output",
+                      "node": "snapshot",
+                      "port": "record"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "record"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "store--stored-scoped-write",
+                  "module": "extension.write-battle",
+                  "version": "3",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "store--stored-scoped-updated",
+                      "port": "record"
+                    }
+                  },
+                  "parameters": {
+                    "namespace": "",
+                    "name": "kiljaedanPiecesByPlayerId",
+                    "valueType": "record"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "store--stored-global-declared",
+                  "module": "extension.declare-battle",
+                  "version": "3",
+                  "inputs": {
+                    "value": {
+                      "kind": "output",
+                      "node": "snapshot",
+                      "port": "record"
+                    }
+                  },
+                  "parameters": {
+                    "namespace": "",
+                    "name": "kiljaedanPiece",
+                    "valueType": "{\"kind\":\"nullable\",\"value\":\"record\"}"
+                  }
+                },
+                {
+                  "kind": "call",
+                  "id": "store--stored-global-empty",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "store--stored-global-declared",
+                      "port": "value"
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": null
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "{\"kind\":\"nullable\",\"value\":\"record\"}",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "if",
+                  "id": "store--stored-global-if",
+                  "condition": {
+                    "kind": "output",
+                    "node": "store--stored-global-empty",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "store--stored-global-write",
+                      "module": "extension.write-battle",
+                      "version": "3",
+                      "inputs": {
+                        "value": {
+                          "kind": "output",
+                          "node": "snapshot",
+                          "port": "record"
+                        }
+                      },
+                      "parameters": {
+                        "namespace": "",
+                        "name": "kiljaedanPiece",
+                        "valueType": "{\"kind\":\"nullable\",\"value\":\"record\"}"
+                      }
+                    },
+                    {
+                      "kind": "call",
+                      "id": "store--stored-global-result",
+                      "module": "local.write",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "store--stored-piece-result",
+                          "port": "handle"
+                        },
+                        "value": {
+                          "kind": "output",
+                          "node": "store--stored-global-write",
+                          "port": "success"
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "boolean"
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "store--stored-existing-result",
+                      "module": "local.write",
+                      "version": "1",
+                      "inputs": {
+                        "handle": {
+                          "kind": "output",
+                          "node": "store--stored-piece-result",
+                          "port": "handle"
+                        },
+                        "value": {
+                          "kind": "literal",
+                          "value": true
+                        }
+                      },
+                      "parameters": {
+                        "valueType": "boolean"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "store--stored-invalid-owner",
+                  "module": "local.write",
+                  "version": "1",
+                  "inputs": {
+                    "handle": {
+                      "kind": "output",
+                      "node": "store--stored-piece-result",
+                      "port": "handle"
+                    },
+                    "value": {
+                      "kind": "literal",
+                      "value": false
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "boolean"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "store--stored-piece-result-read",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "store--stored-piece-result",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "boolean"
+              }
+            },
+            {
+              "kind": "call",
+              "id": "store-failed",
+              "module": "logic.not",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "store--stored-piece-result-read",
+                  "port": "value"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "if",
+              "id": "store-guard",
+              "condition": {
+                "kind": "output",
+                "node": "store-failed",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "return",
+                  "id": "store-rejected",
+                  "values": {
+                    "success": {
+                      "kind": "literal",
+                      "value": false
+                    },
+                    "message": {
+                      "kind": "literal",
+                      "value": "基尔加丹缺少所属玩家"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "add-card",
+              "module": "card.hand-add-player-id-text",
+              "version": "1",
+              "inputs": {
+                "playerId": {
+                  "kind": "output",
+                  "node": "owner",
+                  "port": "text"
+                }
+              },
+              "parameters": {
+                "cardId": "demon-summon-1"
+              }
+            },
+            {
+              "kind": "return",
+              "id": "done",
+              "values": {
+                "success": {
+                  "kind": "literal",
+                  "value": true
+                },
+                "message": {
+                  "kind": "literal",
+                  "value": "基尔加丹隐匿于虚空之中，等待召唤..."
+                }
+              }
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

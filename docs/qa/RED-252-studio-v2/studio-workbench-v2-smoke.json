@@ -1,0 +1,90 @@
+{
+  "passed": true,
+  "executable": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\node_modules\\electron\\dist\\electron.exe",
+  "projectFixture": "isolated temporary content project with all authoring collections",
+  "allRoutes": [
+    "pieces",
+    "skills",
+    "cards",
+    "rules",
+    "assets",
+    "build"
+  ],
+  "noTopLevelStatus": true,
+  "ruleOnlyPassiveCluster": true,
+  "newPassiveRuleCreated": true,
+  "legacyPassiveSkillLabelVerified": true,
+  "activeClusterMembers": [
+    "skill",
+    "rule",
+    "status",
+    "card"
+  ],
+  "controlStructureEdited": true,
+  "extensionEditedAndDeleted": true,
+  "crossDocumentSaveAllVerified": true,
+  "realPortraitPreview": true,
+  "nestedPureExpressionSavedAndReopened": true,
+  "expressionCopyVerified": true,
+  "standaloneExpressionCopyVerified": true,
+  "selectedExpressionViewport": {
+    "left": 307,
+    "top": 261.890625,
+    "right": 1088,
+    "bottom": 676.796875,
+    "width": 781,
+    "height": 414.90625,
+    "viewportWidth": 1487,
+    "viewportHeight": 1058,
+    "intersectsViewport": true
+  },
+  "clusterGroupMetadataVerified": true,
+  "textParameterBindingVerified": true,
+  "crossDocumentUnknownFieldsPreserved": true,
+  "dirtyBuildBlocked": true,
+  "packageGeneratedFromSavedContent": true,
+  "buildPublished": false,
+  "archive": "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\studio-workbench-v2.rvbpack",
+  "archiveEntries": [
+    "data/cards/manifest.json",
+    "data/cards/studio-card.json",
+    "data/pieces/manifest.json",
+    "data/pieces/studio-piece.json",
+    "data/rules/manifest.json",
+    "data/rules/studio-created-passive.json",
+    "data/rules/studio-rule-only.json",
+    "data/rules/studio-rule.json",
+    "data/skills/manifest.json",
+    "data/skills/naruto-vanguard.json",
+    "data/skills/studio-expression.json",
+    "data/skills/studio-skill.json",
+    "images/portrait-aizen.jpg",
+    "images/status-new.png",
+    "images/status-old.png",
+    "manifest.json"
+  ],
+  "archiveManifest": {
+    "kind": "snapshot",
+    "version": "0.2.252",
+    "capabilities": [
+      "game-data",
+      "raster-assets",
+      "trusted-executable-content"
+    ]
+  },
+  "screenshots": [
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-piece-overview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-skills-cluster-list.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-cluster-members.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-card-owner.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-expression-selected.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-expression-narrow.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-rule-owner.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-asset-preview.png",
+    "C:\\Users\\lngsc\\.codex\\worktrees\\modular-content-graphs\\Red_VS_Blue\\docs\\qa\\RED-252-studio-v2\\v2-package-result.png"
+  ],
+  "runtimeConsoleErrors": [],
+  "runtimeConsoleNoise": [],
+  "runtimeExceptions": [],
+  "protocolLogErrors": []
+}

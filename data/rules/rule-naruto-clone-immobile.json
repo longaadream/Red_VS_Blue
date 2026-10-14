@@ -2,6 +2,498 @@
   "id": "rule-naruto-clone-immobile",
   "name": "影分身定身",
   "description": "影分身无法移动",
-  "trigger": { "type": "beforeMove" },
-  "skillCode": "var clone = context.rulePiece; if (!clone || clone.currentHp <= 0) return { success: false, message: '' }; if (!context.piece || context.piece.instanceId !== clone.instanceId) return { success: false, message: '' }; var tag = clone.statusTags && clone.statusTags.find(function(t) { return t.type === 'naruto-clone'; }); if (!tag) { removeRuleById(clone.instanceId, 'rule-naruto-clone-immobile'); return { success: false, message: '' }; } return { success: true, blocked: true, message: '影分身无法移动' };"
+  "trigger": {
+    "type": "beforeMove"
+  },
+  "skillCode": "var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder-ref\", __gameplayError, \"ref.holder\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === undefined) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)) ? flow.query.piece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"holder\", __gameplayError, \"query.piece\"); _module1 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module2 = __gameplayInvalid; } else { var _module2 = (flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)) ? flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive--reference\", __gameplayError, \"query.piece\"); _module2 = __gameplayInvalid; } try { var _module3 = (flow.query.pieces({originId: undefined, ownerId: undefined, relation: undefined, range: undefined, includeDead: false})); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive--items\", __gameplayError, \"query.pieces\"); _module3 = __gameplayInvalid; } var _loopRoot13 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection4 = __gameplayInvalid; var _items5 = ((_module3 !== null && typeof _module3 === \"object\" && Object.prototype.hasOwnProperty.call(_module3, \"pieces\")) ? _module3[\"pieces\"] : _module3); var _capture10 = ((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2); if (Array.isArray(_items5) && _capture10 !== __gameplayInvalid && _capture10 !== undefined) { if (_items5.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues12 = [];  for (var _index6 = 0; _index6 < _items5.length; _index6 += 1) { __gameplayConsumeIteration(); var _item7 = _items5[_index6]; var _collectionResult8 = __gameplayInvalid; _collectionDone9: { try { if ((_item7 === __gameplayInvalid) || (_item7 === undefined) || (_capture10 === __gameplayInvalid) || (_capture10 === undefined)) { _module11 = __gameplayInvalid; } else { var _module11 = ((_item7 === _capture10)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive--compare\", __gameplayError, \"compare.values\"); _module11 = __gameplayInvalid; } try { if (!((((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) === __gameplayInvalid))) { _collectionResult8 = { \"value\": ((_module11 !== null && typeof _module11 === \"object\" && Object.prototype.hasOwnProperty.call(_module11, \"value\")) ? _module11[\"value\"] : _module11) }; break _collectionDone9; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive--return\", __gameplayError); } } if (_collectionResult8 !== __gameplayInvalid && _collectionResult8 != null && _collectionResult8[\"value\"]) { _collectionValues12.push(_item7); } } var _collection4 = _collectionValues12; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot13) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"alive--matches\", new Error(\"gameplay shared iteration budget exceeded\")); _collection4 = __gameplayInvalid; } else { __gameplayRecordFault(\"alive--matches\", __gameplayError); _collection4 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection4 === __gameplayInvalid) || (_collection4 === undefined) || (_collection4 === null)) { _module14 = __gameplayInvalid; } else { var _module14 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection4)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive--count\", __gameplayError, \"collection.length\"); _module14 = __gameplayInvalid; } try { if ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === __gameplayInvalid) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === undefined) || (((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module15 = __gameplayInvalid; } else { var _module15 = ((((_module14 !== null && typeof _module14 === \"object\" && Object.prototype.hasOwnProperty.call(_module14, \"value\")) ? _module14[\"value\"] : _module14) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive\", __gameplayError, \"compare.greater-than\"); _module15 = __gameplayInvalid; } try { var _condition40 = ((_module15 !== null && typeof _module15 === \"object\" && Object.prototype.hasOwnProperty.call(_module15, \"value\")) ? _module15[\"value\"] : _module15); if (_condition40 !== __gameplayInvalid && _condition40) { try { var _module16 = ((context.piece ? context.piece.instanceId : null)); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"event-ref\", __gameplayError, \"ref.event-piece\"); _module16 = __gameplayInvalid; } try { if ((((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16) === __gameplayInvalid) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16) === undefined) || (((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16)))) { _module17 = __gameplayInvalid; } else { var _module17 = (flow.query.hasPiece(((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16)) ? flow.query.piece(((_module16 !== null && typeof _module16 === \"object\" && Object.prototype.hasOwnProperty.call(_module16, \"piece\")) ? _module16[\"piece\"] : _module16)).instanceId : null); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"event-piece\", __gameplayError, \"query.piece\"); _module17 = __gameplayInvalid; } try { if ((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"piece\")) ? _module17[\"piece\"] : _module17) === __gameplayInvalid) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"piece\")) ? _module17[\"piece\"] : _module17) === undefined) || (((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"piece\")) ? _module17[\"piece\"] : _module17) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null)) { _module18 = __gameplayInvalid; } else { var _module18 = ((((_module17 !== null && typeof _module17 === \"object\" && Object.prototype.hasOwnProperty.call(_module17, \"piece\")) ? _module17[\"piece\"] : _module17) === ((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"same-piece\", __gameplayError, \"compare.values\"); _module18 = __gameplayInvalid; } try { var _condition38 = ((_module18 !== null && typeof _module18 === \"object\" && Object.prototype.hasOwnProperty.call(_module18, \"value\")) ? _module18[\"value\"] : _module18); if (_condition38 !== __gameplayInvalid && _condition38) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module19 = __gameplayInvalid; } else { var _module19 = ({value:((function(value){if(value===__gameplayInvalid)return __gameplayInvalid;if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(typeof item===\"string\"){result.push({_legacyText:item});continue;}if(!item||typeof item!==\"object\")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;})(flow.query.piece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1))[\"statusTags\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag--statusTags\", __gameplayError, \"piece.field\"); _module19 = __gameplayInvalid; } var _loopRoot30 = (__gameplayLoopDepth === 0); __gameplayLoopDepth += 1; try { var _collection20 = __gameplayInvalid; var _items21 = ((_module19 !== null && typeof _module19 === \"object\" && Object.prototype.hasOwnProperty.call(_module19, \"value\")) ? _module19[\"value\"] : _module19); var _capture26 = \"naruto-clone\"; if (Array.isArray(_items21) && _capture26 !== __gameplayInvalid && _capture26 !== undefined) { if (_items21.length > 10000) { throw new Error(\"gameplay collection iteration budget exceeded\"); } var _collectionValues29 = [];  for (var _index22 = 0; _index22 < _items21.length; _index22 += 1) { __gameplayConsumeIteration(); var _item23 = _items21[_index22]; var _collectionResult24 = __gameplayInvalid; _collectionDone25: { try { if ((_item23 === __gameplayInvalid) || (_item23 === undefined) || (_item23 === null)) { _module27 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } else { var _module27 = ((function(record){var result=({value:((function(record){if(record===__gameplayInvalid||record===null||typeof record!==\"object\")return __gameplayInvalid;var value=record[\"type\"];return value===undefined||value===null?null:(typeof value===\"string\"?value:__gameplayInvalid);})(record))});result.exists=record[\"type\"]!==undefined&&record[\"type\"]!==null;return result;})(_item23)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag--field\", __gameplayError, \"data.field\"); _module27 = { \"value\": __gameplayInvalid, \"exists\": __gameplayInvalid }; } try { if (((_module27[\"value\"]) === __gameplayInvalid) || ((_module27[\"value\"]) === undefined) || (_capture26 === __gameplayInvalid) || (_capture26 === undefined)) { _module28 = __gameplayInvalid; } else { var _module28 = (((_module27[\"value\"]) === _capture26)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag--matches\", __gameplayError, \"compare.values\"); _module28 = __gameplayInvalid; } try { if (!((((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"value\")) ? _module28[\"value\"] : _module28) === __gameplayInvalid))) { _collectionResult24 = { \"value\": ((_module28 !== null && typeof _module28 === \"object\" && Object.prototype.hasOwnProperty.call(_module28, \"value\")) ? _module28[\"value\"] : _module28) }; break _collectionDone25; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag--filter-return\", __gameplayError); } } if (_collectionResult24 !== __gameplayInvalid && _collectionResult24 != null && _collectionResult24[\"value\"]) { _collectionValues29.push(_item23); } } var _collection20 = _collectionValues29; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) { if (!_loopRoot30) throw __gameplayError; __gameplayBudget.remaining = 0; __gameplayRecordFault(\"has-tag--filtered\", new Error(\"gameplay shared iteration budget exceeded\")); _collection20 = __gameplayInvalid; } else { __gameplayRecordFault(\"has-tag--filtered\", __gameplayError); _collection20 = __gameplayInvalid; } } finally { __gameplayLoopDepth -= 1; } try { if ((_collection20 === __gameplayInvalid) || (_collection20 === undefined) || (_collection20 === null)) { _module31 = __gameplayInvalid; } else { var _module31 = ((function(items) { if (!Array.isArray(items)) throw new Error(\"collection.length requires a collection\"); return items.length; })(_collection20)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag--count\", __gameplayError, \"collection.length\"); _module31 = __gameplayInvalid; } try { if ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === __gameplayInvalid) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === undefined) || (((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) === null) || (0 === __gameplayInvalid) || (0 === undefined) || (0 === null)) { _module32 = __gameplayInvalid; } else { var _module32 = ((((_module31 !== null && typeof _module31 === \"object\" && Object.prototype.hasOwnProperty.call(_module31, \"value\")) ? _module31[\"value\"] : _module31) > 0)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"has-tag\", __gameplayError, \"compare.greater-than\"); _module32 = __gameplayInvalid; } try { var _condition36 = ((_module32 !== null && typeof _module32 === \"object\" && Object.prototype.hasOwnProperty.call(_module32, \"value\")) ? _module32[\"value\"] : _module32); if (_condition36 !== __gameplayInvalid && _condition36) { try { if ((\"影分身无法移动\" === __gameplayInvalid) || (\"影分身无法移动\" === undefined) || (\"影分身无法移动\" === null)) { _module33 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module33 = (({success: true, blocked: true, message: \"影分身无法移动\"})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"block\", __gameplayError, \"event.block\"); _module33 = { \"success\": __gameplayInvalid, \"blocked\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module33[\"success\"]) === __gameplayInvalid) || ((_module33[\"blocked\"]) === __gameplayInvalid) || ((_module33[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module33[\"success\"]), \"blocked\": (_module33[\"blocked\"]), \"message\": (_module33[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"blocked-return\", __gameplayError); } } else if (_condition36 !== __gameplayInvalid) { try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) === null) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1)))) { _module34 = __gameplayInvalid; } else { var _module34 = (flow.rules.remove(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"piece\")) ? _module1[\"piece\"] : _module1), \"rule-naruto-clone-immobile\", \"piece\")); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"remove-rule\", __gameplayError, \"rule.remove-piece\"); _module34 = __gameplayInvalid; } try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module35 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module35 = ({success: false, message: \"\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"missing-tag-result\", __gameplayError, \"result.message\"); _module35 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module35[\"success\"]) === __gameplayInvalid) || ((_module35[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module35[\"success\"]), \"message\": (_module35[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"missing-tag-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"tag-guard\", __gameplayError); _condition36 = __gameplayInvalid; } } else if (_condition38 !== __gameplayInvalid) { try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module37 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module37 = ({success: false, message: \"\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"wrong-event-piece-result\", __gameplayError, \"result.message\"); _module37 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module37[\"success\"]) === __gameplayInvalid) || ((_module37[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module37[\"success\"]), \"message\": (_module37[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"wrong-event-piece-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"same-guard\", __gameplayError); _condition38 = __gameplayInvalid; } } else if (_condition40 !== __gameplayInvalid) { try { if ((\"\" === __gameplayInvalid) || (\"\" === undefined) || (\"\" === null)) { _module39 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } else { var _module39 = ({success: false, message: \"\"}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"dead-holder-result\", __gameplayError, \"result.message\"); _module39 = { \"success\": __gameplayInvalid, \"message\": __gameplayInvalid }; } try { if (!(((_module39[\"success\"]) === __gameplayInvalid) || ((_module39[\"message\"]) === __gameplayInvalid))) { return { \"success\": (_module39[\"success\"]), \"message\": (_module39[\"message\"]) }; } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"dead-holder-return\", __gameplayError); } } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"alive-branch\", __gameplayError); _condition40 = __gameplayInvalid; }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "skillCode": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "rule",
+          "outputs": [
+            {
+              "name": "success",
+              "type": "boolean"
+            },
+            {
+              "name": "blocked",
+              "type": "boolean",
+              "optional": true
+            },
+            {
+              "name": "message",
+              "type": "string"
+            }
+          ],
+          "body": [
+            {
+              "kind": "call",
+              "id": "holder-ref",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "holder",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder-ref",
+                  "port": "piece"
+                }
+              },
+              "parameters": {}
+            },
+            {
+              "kind": "call",
+              "id": "alive--reference",
+              "module": "query.piece",
+              "version": "1",
+              "inputs": {
+                "pieceId": {
+                  "kind": "output",
+                  "node": "holder",
+                  "port": "piece"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "alive--items",
+              "module": "query.pieces",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "relation": "all",
+                "includeDead": false
+              }
+            },
+            {
+              "kind": "collection",
+              "id": "alive--matches",
+              "method": "filter",
+              "items": {
+                "kind": "output",
+                "node": "alive--items",
+                "port": "pieces"
+              },
+              "inputs": {
+                "target": {
+                  "kind": "output",
+                  "node": "alive--reference",
+                  "port": "piece"
+                }
+              },
+              "body": [
+                {
+                  "kind": "call",
+                  "id": "alive--compare",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "input",
+                      "name": "item"
+                    },
+                    "right": {
+                      "kind": "input",
+                      "name": "target"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "{\"kind\":\"nullable\",\"value\":\"piece\"}",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "return",
+                  "id": "alive--return",
+                  "value": {
+                    "kind": "output",
+                    "node": "alive--compare",
+                    "port": "value"
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "call",
+              "id": "alive--count",
+              "module": "collection.length",
+              "version": "1",
+              "inputs": {
+                "items": {
+                  "kind": "output",
+                  "node": "alive--matches",
+                  "port": "value"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "alive",
+              "module": "compare.greater-than",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "alive--count",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 0
+                }
+              }
+            },
+            {
+              "kind": "if",
+              "id": "alive-branch",
+              "condition": {
+                "kind": "output",
+                "node": "alive",
+                "port": "value"
+              },
+              "then": [
+                {
+                  "kind": "call",
+                  "id": "event-ref",
+                  "module": "ref.event-piece",
+                  "version": "1",
+                  "inputs": {},
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "event-piece",
+                  "module": "query.piece",
+                  "version": "1",
+                  "inputs": {
+                    "pieceId": {
+                      "kind": "output",
+                      "node": "event-ref",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {}
+                },
+                {
+                  "kind": "call",
+                  "id": "same-piece",
+                  "module": "compare.values",
+                  "version": "1",
+                  "inputs": {
+                    "left": {
+                      "kind": "output",
+                      "node": "event-piece",
+                      "port": "piece"
+                    },
+                    "right": {
+                      "kind": "output",
+                      "node": "holder",
+                      "port": "piece"
+                    }
+                  },
+                  "parameters": {
+                    "valueType": "piece",
+                    "operator": "=="
+                  }
+                },
+                {
+                  "kind": "if",
+                  "id": "same-guard",
+                  "condition": {
+                    "kind": "output",
+                    "node": "same-piece",
+                    "port": "value"
+                  },
+                  "then": [
+                    {
+                      "kind": "call",
+                      "id": "has-tag--statusTags",
+                      "module": "piece.field",
+                      "version": "1",
+                      "inputs": {
+                        "piece": {
+                          "kind": "output",
+                          "node": "holder",
+                          "port": "piece"
+                        }
+                      },
+                      "parameters": {
+                        "field": "statusTags"
+                      }
+                    },
+                    {
+                      "kind": "collection",
+                      "id": "has-tag--filtered",
+                      "method": "filter",
+                      "items": {
+                        "kind": "output",
+                        "node": "has-tag--statusTags",
+                        "port": "value"
+                      },
+                      "inputs": {
+                        "expected": {
+                          "kind": "literal",
+                          "value": "naruto-clone"
+                        }
+                      },
+                      "body": [
+                        {
+                          "kind": "call",
+                          "id": "has-tag--field",
+                          "module": "data.field",
+                          "version": "1",
+                          "inputs": {
+                            "record": {
+                              "kind": "input",
+                              "name": "item"
+                            }
+                          },
+                          "parameters": {
+                            "field": "type"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "has-tag--matches",
+                          "module": "compare.values",
+                          "version": "1",
+                          "inputs": {
+                            "left": {
+                              "kind": "output",
+                              "node": "has-tag--field",
+                              "port": "value"
+                            },
+                            "right": {
+                              "kind": "input",
+                              "name": "expected"
+                            }
+                          },
+                          "parameters": {
+                            "valueType": "{\"kind\":\"nullable\",\"value\":\"string\"}",
+                            "operator": "=="
+                          }
+                        },
+                        {
+                          "kind": "return",
+                          "id": "has-tag--filter-return",
+                          "value": {
+                            "kind": "output",
+                            "node": "has-tag--matches",
+                            "port": "value"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-tag--count",
+                      "module": "collection.length",
+                      "version": "1",
+                      "inputs": {
+                        "items": {
+                          "kind": "output",
+                          "node": "has-tag--filtered",
+                          "port": "value"
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "call",
+                      "id": "has-tag",
+                      "module": "compare.greater-than",
+                      "version": "1",
+                      "inputs": {
+                        "left": {
+                          "kind": "output",
+                          "node": "has-tag--count",
+                          "port": "value"
+                        },
+                        "right": {
+                          "kind": "literal",
+                          "value": 0
+                        }
+                      },
+                      "parameters": {}
+                    },
+                    {
+                      "kind": "if",
+                      "id": "tag-guard",
+                      "condition": {
+                        "kind": "output",
+                        "node": "has-tag",
+                        "port": "value"
+                      },
+                      "then": [
+                        {
+                          "kind": "call",
+                          "id": "block",
+                          "module": "event.block",
+                          "version": "1",
+                          "inputs": {
+                            "message": {
+                              "kind": "literal",
+                              "value": "影分身无法移动"
+                            }
+                          },
+                          "parameters": {}
+                        },
+                        {
+                          "kind": "return",
+                          "id": "blocked-return",
+                          "values": {
+                            "success": {
+                              "kind": "output",
+                              "node": "block",
+                              "port": "success"
+                            },
+                            "blocked": {
+                              "kind": "output",
+                              "node": "block",
+                              "port": "blocked"
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "block",
+                              "port": "message"
+                            }
+                          }
+                        }
+                      ],
+                      "else": [
+                        {
+                          "kind": "call",
+                          "id": "remove-rule",
+                          "module": "rule.remove-piece",
+                          "version": "1",
+                          "inputs": {
+                            "target": {
+                              "kind": "output",
+                              "node": "holder",
+                              "port": "piece"
+                            }
+                          },
+                          "parameters": {
+                            "ruleId": "rule-naruto-clone-immobile"
+                          }
+                        },
+                        {
+                          "kind": "call",
+                          "id": "missing-tag-result",
+                          "module": "result.message",
+                          "version": "1",
+                          "inputs": {
+                            "message": {
+                              "kind": "literal",
+                              "value": ""
+                            }
+                          },
+                          "parameters": {
+                            "success": false
+                          }
+                        },
+                        {
+                          "kind": "return",
+                          "id": "missing-tag-return",
+                          "values": {
+                            "success": {
+                              "kind": "output",
+                              "node": "missing-tag-result",
+                              "port": "success"
+                            },
+                            "message": {
+                              "kind": "output",
+                              "node": "missing-tag-result",
+                              "port": "message"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "kind": "call",
+                      "id": "wrong-event-piece-result",
+                      "module": "result.message",
+                      "version": "1",
+                      "inputs": {
+                        "message": {
+                          "kind": "literal",
+                          "value": ""
+                        }
+                      },
+                      "parameters": {
+                        "success": false
+                      }
+                    },
+                    {
+                      "kind": "return",
+                      "id": "wrong-event-piece-return",
+                      "values": {
+                        "success": {
+                          "kind": "output",
+                          "node": "wrong-event-piece-result",
+                          "port": "success"
+                        },
+                        "message": {
+                          "kind": "output",
+                          "node": "wrong-event-piece-result",
+                          "port": "message"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "kind": "call",
+                  "id": "dead-holder-result",
+                  "module": "result.message",
+                  "version": "1",
+                  "inputs": {
+                    "message": {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  },
+                  "parameters": {
+                    "success": false
+                  }
+                },
+                {
+                  "kind": "return",
+                  "id": "dead-holder-return",
+                  "values": {
+                    "success": {
+                      "kind": "output",
+                      "node": "dead-holder-result",
+                      "port": "success"
+                    },
+                    "message": {
+                      "kind": "output",
+                      "node": "dead-holder-result",
+                      "port": "message"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  }
 }

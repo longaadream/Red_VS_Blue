@@ -1,0 +1,20 @@
+
+> my-project@0.1.15 lint
+> eslint . --max-warnings 0
+
+
+C:\Users\lngsc\.codex\worktrees\modular-content-graphs\Red_VS_Blue\temp-flying-effect.js
+  1:1    error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+  1:725  error  'battleState' is defined but never used                                @typescript-eslint/no-unused-vars
+  1:737  error  'ctx' is defined but never used                                        @typescript-eslint/no-unused-vars
+
+C:\Users\lngsc\.codex\worktrees\modular-content-graphs\Red_VS_Blue\temp-flying-graph.js
+  1:36801  error  '_module31' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1:38606  error  '_module32' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1:41293  error  '_module33' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\lngsc\.codex\worktrees\modular-content-graphs\Red_VS_Blue\tests\electron\sentence-flat-ui-smoke.mjs
+  326:16  error  'setLiteralNumber' is defined but never used       @typescript-eslint/no-unused-vars
+  696:11  error  'editedSource' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 8 problems (8 errors, 0 warnings)

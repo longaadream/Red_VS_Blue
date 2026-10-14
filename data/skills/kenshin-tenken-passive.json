@@ -13,5 +13,23 @@
   "cooldownTurns": 0,
   "maxCharges": 0,
   "powerMultiplier": 1.5,
-  "actionPointCost": 0
+  "actionPointCost": 0,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:kenshin-tenken-passive",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-kenshin-tenken",
+        "relation": "owned",
+        "source": "pieces/blue-kenshin.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-kenshin-tenken-boost",
+        "relation": "owned",
+        "source": "pieces/blue-kenshin.rules"
+      }
+    ]
+  }
 }

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "rvb-content-report/v1",
+  "taskId": "RED-252",
+  "operation": "build",
+  "caller": "cli",
+  "channel": "authoring",
+  "status": "PASS",
+  "exitCode": 0,
+  "startedAt": "2026-10-12T04:17:03.027Z",
+  "finishedAt": "2026-10-12T04:17:04.530Z",
+  "command": {
+    "name": "build",
+    "args": [
+      "snapshot",
+      "--source",
+      "<source>",
+      "--output",
+      "<output>"
+    ]
+  },
+  "identity": {
+    "packageHash": "dfdd72c74396e6b4ca2dcbfa48b77bbace9658a9a99e2d2aedf8a7725588240e",
+    "publisherKeyId": null,
+    "signature": "unsigned-dev-only",
+    "capabilities": [
+      "game-data",
+      "pve-content",
+      "raster-assets",
+      "trusted-executable-content"
+    ],
+    "resolvedProfileHash": null,
+    "authorityContentHash": null,
+    "engineAbi": "rvb-engine/v1",
+    "contentAbi": "rvb-content/v1"
+  },
+  "seed": null,
+  "smoke": null,
+  "refusal": null
+}

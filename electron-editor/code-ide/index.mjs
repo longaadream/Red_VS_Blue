@@ -53,7 +53,7 @@ export function mount(container, options) {
   cancel.onclick = () => { imports.hidden = true; pendingFiles = [] }
   imports.append(element('strong', '', '导入预览'), fileChoice, target, preview, apply, cancel)
   const current = () => views.get(activeField)
-  const immutable = () => locked || Boolean(options.getDraft().skillGraph)
+  const immutable = () => locked || Boolean(options.getDraft().skillGraph || options.getDraft().contentGraph || options.getDraft().gameplayModules)
   const report = text => { if (!destroyed) message.textContent = text }
 
   function updateImportPreview() {
@@ -115,7 +115,7 @@ export function mount(container, options) {
   function selectField() {
     activeField = fields.value
     for (const [field, record] of views) record.host.hidden = field !== activeField
-    entry.textContent = hint(options.category, activeField) + (options.getDraft().skillGraph ? ' 当前由流程图生成，代码只读。' : '')
+    entry.textContent = hint(options.category, activeField) + (options.getDraft().skillGraph || options.getDraft().contentGraph || options.getDraft().gameplayModules ? ' 当前由流程图生成，代码只读。' : '')
     current()?.view.requestMeasure()
     updateImportPreview()
     updateStatus()

@@ -251,9 +251,10 @@ describe('RED-165 battle effect icon registry', () => {
     const statuses = viewModel.normalizeStatuses({ statusTags: [
       { id: 'freeze-1', type: 'freeze', name: 'freeze' },
       { id: 'shield-1', type: 'divine-shield', name: 'Divine Shield' },
-      { id: 'custom-1', type: 'future-visible-effect', name: '未来护盾' },
+      { id: 'custom-1', type: 'future-visible-effect', name: '未来护盾', iconPath: 'images/custom/未来护盾.svg' },
     ] })
     expect(statuses.map((status: { label: string }) => status.label)).toEqual(['冰冻', '圣盾', '未来护盾'])
+    expect(statuses[2].iconPath).toBe('images/custom/未来护盾.svg')
   })
 
   it('ships a distinct SVG for every visible status semantic, with documented alias sharing only', () => {

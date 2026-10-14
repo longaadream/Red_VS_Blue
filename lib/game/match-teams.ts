@@ -29,6 +29,18 @@ interface TeamState {
   players: readonly { playerId: string; teamId?: MatchTeam }[]
 }
 
+/**
+ * Stable opaque value for ordinary author comparisons of two faction fields.
+ * Team membership takes precedence over ownership in team matches; when no
+ * team is registered, the normalized owner identity preserves the existing
+ * 1v1/PVE ownership semantics. Prefixes keep the two namespaces distinct.
+ */
+export function getMatchFactionKey(state: TeamState, owner: string): string {
+  const normalized = String(owner).trim().toLowerCase()
+  const player = state.players.find(entry => entry.playerId.toLowerCase() === normalized)
+  return player?.teamId ? `team:${player.teamId}` : `owner:${normalized}`
+}
+
 /** Ownership is unchanged. Team equality is used only for ally/enemy rules. */
 export function areMatchAllies(state: TeamState, first: string, second: string): boolean {
   const a = String(first).trim().toLowerCase()

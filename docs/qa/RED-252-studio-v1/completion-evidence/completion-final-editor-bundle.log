@@ -1,0 +1,8 @@
+
+> my-project@0.1.15 build:content-pipeline:editor-bundle
+> node scripts/rvb.mjs bundle-editor-worker
+
+
+  electron-editor\dist\content-pipeline-worker.cjs  4.2mb
+
+Done in 121ms

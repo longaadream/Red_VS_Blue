@@ -11,5 +11,10 @@
   "relatedRules": [
     "rule-sonic-free-move"
   ],
-  "keywords": []
+  "keywords": [],
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:sonic-free-move-passive",
+    "links": []
+  }
 }

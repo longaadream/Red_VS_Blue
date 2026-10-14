@@ -15,5 +15,17 @@
   "cooldownTurns": 0,
   "actionPointCost": 0,
   "range": "self",
-  "requiresTarget": false
+  "requiresTarget": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:watcher-form",
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-watcher-form",
+        "relation": "owned",
+        "source": "pieces/blue-watcher.rules"
+      }
+    ]
+  }
 }

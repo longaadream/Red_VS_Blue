@@ -1,0 +1,1694 @@
+{
+  "schemaVersion": 1,
+  "issue": "RED-252",
+  "evidence": "Independent comparison of the frozen 082 game-suite failure set against the candidate full game-suite JSON report",
+  "comparisonKey": "normalized relative test file + Vitest assertion fullName",
+  "command": "npx.cmd vitest run tests/game --maxWorkers=1 --reporter=json",
+  "candidateRun": {
+    "reportPath": "docs/qa/RED-252-studio-v2/authoring-full-game-tests.json",
+    "exitCode": 1,
+    "sha256": "106e2a67082acfde67ac7568d7776604dca32c29fc2f46732bf01259ad80604c",
+    "summary": {
+      "totalTestSuites": 563,
+      "passedTestSuites": 476,
+      "failedTestSuites": 87,
+      "pendingTestSuites": 0,
+      "totalTests": 3465,
+      "passedTests": 3370,
+      "failedTests": 95,
+      "pendingTests": 0,
+      "todoTests": 0,
+      "testFilesReported": 246,
+      "failedTestFiles": 41
+    }
+  },
+  "frozenBaseline": {
+    "branch": "main",
+    "baseSha": "082166c6b803b2e838bce5f0f6824c5bbc714dd6",
+    "reportPath": "docs/qa/RED-252-studio-v2/authoring-baseline-game-tests.json",
+    "independentEvidencePath": "docs/qa/RED-252-studio-v2/authoring-baseline-failures.json",
+    "exportPath": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6",
+    "archivePath": "C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6.tar",
+    "command": "npx.cmd vitest run tests/game --maxWorkers=1 --reporter=json",
+    "exitCode": 1,
+    "reportSha256": "67fc41caa524962522298b89cf7445173905d6cfa1d0c1e32f402b0c702ca5b3",
+    "summary": {
+      "totalTestSuites": 422,
+      "passedTestSuites": 368,
+      "failedTestSuites": 54,
+      "pendingTestSuites": 0,
+      "totalTests": 1938,
+      "passedTests": 1888,
+      "failedTests": 50,
+      "pendingTests": 0,
+      "todoTests": 0,
+      "testFilesReported": 178,
+      "failedTestFiles": 26
+    }
+  },
+  "failureComparison": {
+    "baselineFailures": 50,
+    "candidateFailures": 95,
+    "existingFailures": 48,
+    "addedFailures": 47,
+    "disappearedFailures": 2,
+    "failureDelta": 45,
+    "baselineFailedFiles": 26,
+    "candidateFailedFiles": 41,
+    "existingFiles": [
+      {
+        "file": "tests/game/ai-semantics.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/battle-card-metadata-runtime.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/battle-page-contract.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/battle-ui-boundary.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/colyseus-client-reconnect.test.ts",
+        "failed": 8
+      },
+      {
+        "file": "tests/game/colyseus-origin-architecture.test.ts",
+        "failed": 3
+      },
+      {
+        "file": "tests/game/developer-tools-trace.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/ichigo-itachi.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/mangekyo.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/map-catalog.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/pending-presentation-contract.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/player-colyseus-contract.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/projectile-trace.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/red-129-rule-interactions.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/red-129-shishio-browser.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/red-130-balance.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/red-163-dark-characters.test.ts",
+        "failed": 3
+      },
+      {
+        "file": "tests/game/red-183-regressions.test.ts",
+        "failed": 5
+      },
+      {
+        "file": "tests/game/red-192-rules.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/relay-deployment.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/skill-presentation-ui.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/skillcode-static-audit.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/sonic-roster.test.ts",
+        "failed": 5
+      },
+      {
+        "file": "tests/game/turn.test.ts",
+        "failed": 1
+      }
+    ],
+    "addedFiles": [
+      {
+        "file": "tests/game/ai-environment.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/ai-planner.test.ts",
+        "failed": 4
+      },
+      {
+        "file": "tests/game/battle-authority-performance.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/battle-page-contract.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/content-graph-corpus.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/effect-chain-transaction.test.ts",
+        "failed": 3
+      },
+      {
+        "file": "tests/game/free-move-effect.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/ichigo-itachi.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/muzan-active-skills.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/position-contact.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/red218-browser-bundle.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/red218-shadow-sweep.test.ts",
+        "failed": 3
+      },
+      {
+        "file": "tests/game/red227-local-skill-sequence.test.ts",
+        "failed": 7
+      },
+      {
+        "file": "tests/game/red257-momentum-path.test.ts",
+        "failed": 3
+      },
+      {
+        "file": "tests/game/red259-balance-values.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/room-runtime-isolation.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/skill-preview-move.test.ts",
+        "failed": 2
+      },
+      {
+        "file": "tests/game/skill-preview-privacy.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/skillcode-static-audit.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/sonic-roster.test.ts",
+        "failed": 10
+      },
+      {
+        "file": "tests/game/team-effects.test.ts",
+        "failed": 1
+      }
+    ],
+    "disappearedFiles": [
+      {
+        "file": "tests/game/battle-state-hash.test.ts",
+        "failed": 1
+      },
+      {
+        "file": "tests/game/flight-landing-contact.test.ts",
+        "failed": 1
+      }
+    ]
+  },
+  "addedFailures": [
+    {
+      "file": "tests/game/ai-environment.test.ts",
+      "fullName": "versioned headless AI environment enumerates deployment, pending option, and a real rule-produced pending target",
+      "durationMs": 11473.8227,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "versioned headless AI environment"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "The new real-rule pending-target enumeration exceeds the default Vitest timeout: candidate duration is about 11.5s and the failure is a generic STACK_TRACE_ERROR at the test body. This is not an assertion wording mismatch; profile the AI environment path before treating it as a functional failure.",
+        "evidence": [
+          "tests/game/ai-environment.test.ts:395 has no per-test timeout override",
+          "candidate durationMs=11473.8227; failure is Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/ai-planner.test.ts",
+      "fullName": "representative real transition fixtures focuses one goal with three registered actors across authoritative replans",
+      "durationMs": 61728.462899999984,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "representative real transition fixtures"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "All four added planner failures are generic STACK_TRACE_ERROR timeout failures. Candidate durations exceed their declared/default budgets by large margins (about 172.6s vs 120s, 61.7s vs 60s, 37.4s vs 30s, and 10.3s with the default timeout). This is measurable planner performance degradation or severe contention, not a changed assertion.",
+        "evidence": [
+          "tests/game/ai-planner.test.ts declares 120_000ms, 60_000ms, and 30_000ms budgets for the first three failing cases; the movement/retreat case has no override",
+          "candidate durationsMs=172604.2987, 61728.4629, 37351.7958, 10286.8143; all failures are Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/ai-planner.test.ts",
+      "fullName": "representative real transition fixtures plans movement before casting and retreats a critically injured piece from danger",
+      "durationMs": 10286.814299999969,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "representative real transition fixtures"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "All four added planner failures are generic STACK_TRACE_ERROR timeout failures. Candidate durations exceed their declared/default budgets by large margins (about 172.6s vs 120s, 61.7s vs 60s, 37.4s vs 30s, and 10.3s with the default timeout). This is measurable planner performance degradation or severe contention, not a changed assertion.",
+        "evidence": [
+          "tests/game/ai-planner.test.ts declares 120_000ms, 60_000ms, and 30_000ms budgets for the first three failing cases; the movement/retreat case has no override",
+          "candidate durationsMs=172604.2987, 61728.4629, 37351.7958, 10286.8143; all failures are Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/ai-planner.test.ts",
+      "fullName": "representative real transition fixtures selects simple lethal damage and wounded-ally healing through the formal environment",
+      "durationMs": 37351.79580000002,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "representative real transition fixtures"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "All four added planner failures are generic STACK_TRACE_ERROR timeout failures. Candidate durations exceed their declared/default budgets by large margins (about 172.6s vs 120s, 61.7s vs 60s, 37.4s vs 30s, and 10.3s with the default timeout). This is measurable planner performance degradation or severe contention, not a changed assertion.",
+        "evidence": [
+          "tests/game/ai-planner.test.ts declares 120_000ms, 60_000ms, and 30_000ms budgets for the first three failing cases; the movement/retreat case has no override",
+          "candidate durationsMs=172604.2987, 61728.4629, 37351.7958, 10286.8143; all failures are Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/ai-planner.test.ts",
+      "fullName": "roster-independent multi-action AI turn planner completes 200 fixed-seed multi-roster full-turn samples within budgets with zero illegal actions",
+      "durationMs": 172604.29869999998,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "roster-independent multi-action AI turn planner"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "All four added planner failures are generic STACK_TRACE_ERROR timeout failures. Candidate durations exceed their declared/default budgets by large margins (about 172.6s vs 120s, 61.7s vs 60s, 37.4s vs 30s, and 10.3s with the default timeout). This is measurable planner performance degradation or severe contention, not a changed assertion.",
+        "evidence": [
+          "tests/game/ai-planner.test.ts declares 120_000ms, 60_000ms, and 30_000ms budgets for the first three failing cases; the movement/retreat case has no override",
+          "candidate durationsMs=172604.2987, 61728.4629, 37351.7958, 10286.8143; all failures are Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/battle-authority-performance.test.ts",
+      "fullName": "PostgreSQL transition authority performance commits a 100-transition contiguous hash chain without a full-room fallback",
+      "durationMs": 11766.3671,
+      "failure": "AssertionError: expected 143.08560000000034 to be less than 100",
+      "ancestorTitles": [
+        "PostgreSQL transition authority performance"
+      ],
+      "assessment": {
+        "classification": "performance-threshold",
+        "confidence": "high",
+        "rootCause": "The 100-transition authority benchmark completes but its p95 timing is 143.0856ms, exceeding the explicit 100ms threshold. This is a performance failure, not a stale semantic assertion; rerun in isolation and profile the transition path.",
+        "evidence": [
+          "tests/game/battle-authority-performance.test.ts:54 asserts percentile(timings, 0.95) < 100",
+          "candidate assertion: expected 143.08560000000034 to be less than 100"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/battle-page-contract.test.ts",
+      "fullName": "battle page route contract uses the current hand-instance AP cost for card click validation",
+      "durationMs": 3.1549999999999727,
+      "failure": "evalmachine.<anonymous>:10",
+      "ancestorTitles": [
+        "battle page route contract"
+      ],
+      "assessment": {
+        "classification": "fixture-mismatch",
+        "confidence": "high",
+        "rootCause": "The isolated VM fixture for the new AP-cost contract omits getHandOptionSelection, while data/pages/battle.html onCardClick now calls that host function before reaching the hand-instance AP branch. The failure is ReferenceError: getHandOptionSelection is not defined, so this test does not evaluate the AP assertion until the fixture supplies the helper.",
+        "evidence": [
+          "tests/game/battle-page-contract.test.ts:692 fails inside onCardClick",
+          "data/pages/battle.html defines getHandOptionSelection around line 4109 and calls it from onCardClick around line 8107; the test context only supplies isPendingHandSelection"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/content-graph-corpus.test.ts",
+      "fullName": "supported skill corpus through the real host alfonso-kick",
+      "durationMs": 21.051199999999994,
+      "failure": "AssertionError: input 3: expected { …(4) } to deeply equal { result: undefined, …(3) }",
+      "ancestorTitles": [
+        "supported skill corpus through the real host"
+      ],
+      "assessment": {
+        "classification": "content-graph-regression-under-review",
+        "confidence": "medium",
+        "rootCause": "The real host alfonso-kick corpus case returns a value different from the expected result object. This is a graph/runtime or fixture behavior failure requiring module-level inspection; it is not a textual source assertion.",
+        "evidence": [
+          "candidate assertion: input 3 expected { result: undefined, … } to deeply equal { … }"
+        ],
+        "owner": "faultworker"
+      }
+    },
+    {
+      "file": "tests/game/effect-chain-transaction.test.ts",
+      "fullName": "RED-139 authoritative EffectChain transactions classifies a hostile thrown CardCode Proxy as one latched fatal and rolls back payment",
+      "durationMs": 29.76720000000023,
+      "failure": "AssertionError: expected Error: hostile thrown card prototype trap… { determinism: { …(6) } } to be an instance of EffectChainFatalError",
+      "ancestorTitles": [
+        "RED-139 authoritative EffectChain transactions"
+      ],
+      "assessment": {
+        "classification": "effect-chain-regression-under-review",
+        "confidence": "medium",
+        "rootCause": "The added transaction cases fail EffectChainFatalError classification/closed-failure expectations for hostile CardCode and Rule SkillCode paths. This is a runtime error-boundary regression under separate investigation.",
+        "evidence": [
+          "three candidate assertions fail instance-of EffectChainFatalError or closed-failure expectations"
+        ],
+        "owner": "faultworker"
+      }
+    },
+    {
+      "file": "tests/game/effect-chain-transaction.test.ts",
+      "fullName": "RED-139 authoritative EffectChain transactions classifies a hostile thrown Rule SkillCode Proxy as fatal and rolls back the root action",
+      "durationMs": 7.547099999999773,
+      "failure": "AssertionError: expected Error: hostile thrown rule prototype trap… { …(2) } to be an instance of EffectChainFatalError",
+      "ancestorTitles": [
+        "RED-139 authoritative EffectChain transactions"
+      ],
+      "assessment": {
+        "classification": "effect-chain-regression-under-review",
+        "confidence": "medium",
+        "rootCause": "The added transaction cases fail EffectChainFatalError classification/closed-failure expectations for hostile CardCode and Rule SkillCode paths. This is a runtime error-boundary regression under separate investigation.",
+        "evidence": [
+          "three candidate assertions fail instance-of EffectChainFatalError or closed-failure expectations"
+        ],
+        "owner": "faultworker"
+      }
+    },
+    {
+      "file": "tests/game/effect-chain-transaction.test.ts",
+      "fullName": "RED-139 authoritative EffectChain transactions fails a real authored Rule skillCode closed instead of returning a soft failure",
+      "durationMs": 104.70190000000002,
+      "failure": "AssertionError: expected undefined to be an instance of EffectChainFatalError",
+      "ancestorTitles": [
+        "RED-139 authoritative EffectChain transactions"
+      ],
+      "assessment": {
+        "classification": "effect-chain-regression-under-review",
+        "confidence": "medium",
+        "rootCause": "The added transaction cases fail EffectChainFatalError classification/closed-failure expectations for hostile CardCode and Rule SkillCode paths. This is a runtime error-boundary regression under separate investigation.",
+        "evidence": [
+          "three candidate assertions fail instance-of EffectChainFatalError or closed-failure expectations"
+        ],
+        "owner": "faultworker"
+      }
+    },
+    {
+      "file": "tests/game/free-move-effect.test.ts",
+      "fullName": "effect-granted ordinary movement grants momentum for the actual detour path of a free ordinary move",
+      "durationMs": 11.63470000000001,
+      "failure": "AssertionError: expected undefined to be 4 // Object.is equality",
+      "ancestorTitles": [
+        "effect-granted ordinary movement"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "An effect-granted ordinary-move detour does not produce the expected momentum value (undefined instead of 4). The failure is a state/result mismatch, not an old source-text assertion.",
+        "evidence": [
+          "candidate assertion: expected undefined to be 4"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/ichigo-itachi.test.ts",
+      "fullName": "RED-120 Ichigo combat behavior applies landing tile effects without applying effects from cells crossed by the teleport",
+      "durationMs": 764.6472999999996,
+      "failure": "AssertionError: expected [] to deep equally contain ObjectContaining{…}",
+      "ancestorTitles": [
+        "RED-120 Ichigo combat behavior"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The Ichigo landing-tile scenario produces no expected tile-effect record. The failure is behavioral and needs execution-path inspection.",
+        "evidence": [
+          "candidate assertion: expected [] to deep equally contain ObjectContaining{…}"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/muzan-active-skills.test.ts",
+      "fullName": "RED-216 Muzan active skills keeps later Blood Whip targets after the first target reflects lethal damage",
+      "durationMs": 108.08870000000002,
+      "failure": "AssertionError: expected 20 to be 16 // Object.is equality",
+      "ancestorTitles": [
+        "RED-216 Muzan active skills"
+      ],
+      "assessment": {
+        "classification": "v2-graph-source-capture-regression",
+        "confidence": "high",
+        "rootCause": "The migrated Blood Whip graph captures target IDs but passes the live source ID through effect.damage on every foreach iteration. A lethal reflected hit removes Muzan from battle.pieces; subsequent generated iterations fail the source hasPiece guard and skip the later target. The frozen implementation passed a captured caster object to flow.effects.damage, so later targets remained resolvable after source death.",
+        "evidence": [
+          "tests/game/muzan-active-skills.test.ts:92 observes later target HP=20 instead of 16 after first-target reflection",
+          "data/skills/muzan-blood-whip.json code graph uses query.enemies-on-ordered-cells -> foreach -> effect.damage with source output from query.piece; lib/game/flow-runtime.ts effects.damage resolves string sources through current battle.pieces"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/position-contact.test.ts",
+      "fullName": "RED-209 position and contact contract keeps the original move path when a contact reaction teleports the mover",
+      "durationMs": 7.5351,
+      "failure": "AssertionError: expected { instanceId: 'path-mover', …(19) } to match object { x: 4, y: 2, momentum: 4 }",
+      "ancestorTitles": [
+        "RED-209 position and contact contract"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "A contact reaction teleport does not preserve the expected original movement-path state. This is an authoritative position/contact behavior mismatch.",
+        "evidence": [
+          "candidate assertion compares actual piece state with expected x=4,y=2,momentum=4"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red218-browser-bundle.test.ts",
+      "fullName": "RED-218 browser game-engine bundle regressions matches Node for Shadow momentum-7 side fire through cover and beyond four cells",
+      "durationMs": 41.32280000000003,
+      "failure": "Error: Node Shadow action did not request side target",
+      "ancestorTitles": [
+        "RED-218 browser game-engine bundle regressions"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The browser-bundle parity cases fail on executed-detour momentum and on the missing Shadow side target. These are runtime movement/skill behavior mismatches, not stale source wording.",
+        "evidence": [
+          "candidate failures are undefined momentum and Error: Node Shadow action did not request side target"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red218-browser-bundle.test.ts",
+      "fullName": "RED-218 browser game-engine bundle regressions uses the executed detour path for momentum gain in Node and the browser bundle",
+      "durationMs": 271.55060000000003,
+      "failure": "AssertionError: expected undefined to be 4 // Object.is equality",
+      "ancestorTitles": [
+        "RED-218 browser game-engine bundle regressions"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The browser-bundle parity cases fail on executed-detour momentum and on the missing Shadow side target. These are runtime movement/skill behavior mismatches, not stale source wording.",
+        "evidence": [
+          "candidate failures are undefined momentum and Error: Node Shadow action did not request side target"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red218-shadow-sweep.test.ts",
+      "fullName": "RED-218 Shadow ride sweep regressions fires from every dash cell to the board edge and hits a cover occupant before cover blocks",
+      "durationMs": 51.46879999999999,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "RED-218 Shadow ride sweep regressions"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "All three Shadow ride-sweep cases fail to request the perpendicular side-shot cell. This is a skill targeting/runtime regression.",
+        "evidence": [
+          "candidate failure: 骑射横扫未请求侧射地格 for all three cases"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red218-shadow-sweep.test.ts",
+      "fullName": "RED-218 Shadow ride sweep regressions uses the cast momentum for side damage and resumes the pending action once at momentum 5",
+      "durationMs": 19.14020000000005,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "RED-218 Shadow ride sweep regressions"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "All three Shadow ride-sweep cases fail to request the perpendicular side-shot cell. This is a skill targeting/runtime regression.",
+        "evidence": [
+          "candidate failure: 骑射横扫未请求侧射地格 for all three cases"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red218-shadow-sweep.test.ts",
+      "fullName": "RED-218 Shadow ride sweep regressions uses the cast momentum for side damage and resumes the pending action once at momentum 7",
+      "durationMs": 14.204099999999926,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "RED-218 Shadow ride sweep regressions"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "All three Shadow ride-sweep cases fail to request the perpendicular side-shot cell. This is a skill targeting/runtime regression.",
+        "evidence": [
+          "candidate failure: 骑射横扫未请求侧射地格 for all three cases"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence discovers the next owned choice locally without mutating authority or exposing transactions",
+      "durationMs": 63.530899999999974,
+      "failure": "AssertionError: expected { status: 'ready', …(3) } to match object { status: 'needs-input', …(1) }",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence distinguishes equal-shaped prompts at different consumer occurrences",
+      "durationMs": 15.806100000000015,
+      "failure": "TypeError: Cannot read properties of undefined (reading 'transaction')",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence records one accepted command and deduplicates repeat delivery",
+      "durationMs": 29.53239999999994,
+      "failure": "Error: expected local side prompt",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence rejects extra answers and restores the external runtime on failure",
+      "durationMs": 28.1961,
+      "failure": "Error: expected local side prompt",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence rejects stale root credentials before any staged choice changes state or RNG",
+      "durationMs": 22.30340000000001,
+      "failure": "Error: expected local side prompt",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence stops on a different same-source prompt and leaves valid authority credentials for normal continuation",
+      "durationMs": 25.782100000000014,
+      "failure": "Error: Invalid skill choice sequence",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red227-local-skill-sequence.test.ts",
+      "fullName": "RED-227 local skill choice sequence uses an already-public network snapshot without projecting server transaction data",
+      "durationMs": 26.55129999999997,
+      "failure": "AssertionError: expected 'ready' to be 'needs-input' // Object.is equality",
+      "ancestorTitles": [
+        "RED-227 local skill choice sequence"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "The local skill-choice continuation path returns ready or throws instead of exposing/consuming the expected local side prompt and sequence credentials. The failures are control-flow/state mismatches, not source-text assertions.",
+        "evidence": [
+          "seven candidate failures include ready vs needs-input, missing local side prompt, invalid sequence choice, and undefined transaction state"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red257-momentum-path.test.ts",
+      "fullName": "RED-257 executed skill paths shadow-ride-sweep counts the committed path after a before-position redirect (preserve=true)",
+      "durationMs": 15.197799999999972,
+      "failure": "AssertionError: expected { instanceId: 'mover', …(20) } to match object { x: 3, y: 1, momentum: 4 }",
+      "ancestorTitles": [
+        "RED-257 executed skill paths"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "Executed path/momentum cases fail for Sonic and Shadow after position redirects or dash execution. These are runtime movement-result mismatches.",
+        "evidence": [
+          "candidate failures include undefined success and expected Shadow x=3,y=1,momentum=4"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red257-momentum-path.test.ts",
+      "fullName": "RED-257 executed skill paths sonic-spin-dash counts the committed path after a before-position redirect (preserve=false)",
+      "durationMs": 63.953599999999994,
+      "failure": "TypeError: Cannot read properties of undefined (reading 'success')",
+      "ancestorTitles": [
+        "RED-257 executed skill paths"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "Executed path/momentum cases fail for Sonic and Shadow after position redirects or dash execution. These are runtime movement-result mismatches.",
+        "evidence": [
+          "candidate failures include undefined success and expected Shadow x=3,y=1,momentum=4"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red257-momentum-path.test.ts",
+      "fullName": "RED-257 executed skill paths sonic-spin-dash counts the committed path after a before-position redirect (preserve=true)",
+      "durationMs": 18.97470000000004,
+      "failure": "TypeError: Cannot read properties of undefined (reading 'success')",
+      "ancestorTitles": [
+        "RED-257 executed skill paths"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "Executed path/momentum cases fail for Sonic and Shadow after position redirects or dash execution. These are runtime movement-result mismatches.",
+        "evidence": [
+          "candidate failures include undefined success and expected Shadow x=3,y=1,momentum=4"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/red259-balance-values.test.ts",
+      "fullName": "RED-259 holy-light balance values pins the new costs, multiplier text, and Velen skill roster",
+      "durationMs": 7.116299999999967,
+      "failure": "AssertionError: expected 'function executeSkill(context) { var …' to contain 'multiplier: 1.5'",
+      "ancestorTitles": [
+        "RED-259 holy-light balance values"
+      ],
+      "assessment": {
+        "classification": "stale-v2-source-text-assertion",
+        "confidence": "high",
+        "rootCause": "The test searches generated skill code for the legacy source substring multiplier: 1.5. The migrated elune-blessing definition still has powerMultiplier=1.5 and stores the numeric 1.5 as a graph literal, but its compiled code no longer preserves that source formatting. This is an authoring assertion mismatch, not evidence that the balance value changed.",
+        "evidence": [
+          "tests/game/red259-balance-values.test.ts:116 expects code to contain multiplier: 1.5",
+          "data/skills/elune-blessing.json has powerMultiplier=1.5; code is compiler output and gameplayModules.entries.code.graph contains a literal 1.5"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/room-runtime-isolation.test.ts",
+      "fullName": "RED-141 room rule runtime isolation matches two interleaved 100-transition rooms with their solo hashes, RNG cursors, pending state, and limits",
+      "durationMs": 40689.9031,
+      "failure": "Error: STACK_TRACE_ERROR",
+      "ancestorTitles": [
+        "RED-141 room rule runtime isolation"
+      ],
+      "assessment": {
+        "classification": "performance-timeout",
+        "confidence": "high",
+        "rootCause": "The interleaved 100-transition isolation case runs about 40.7s and ends in generic STACK_TRACE_ERROR. It is a timeout/performance failure rather than a reported state assertion; rerun in isolation with profiling.",
+        "evidence": [
+          "tests/game/room-runtime-isolation.test.ts:~530 has no explicit timeout override",
+          "candidate durationMs=40689.9031; failure is Error: STACK_TRACE_ERROR"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/skill-preview-move.test.ts",
+      "fullName": "isolated public ordinary move preview previews enemy Itachi terrain whose canonical cells only contain coordinates",
+      "durationMs": 11.914899999999989,
+      "failure": "AssertionError: expected [] to deeply equal ArrayContaining{…}",
+      "ancestorTitles": [
+        "isolated public ordinary move preview"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "Public ordinary-move preview omits expected visible terrain/path cells in both added scenarios. This is a preview behavior mismatch.",
+        "evidence": [
+          "candidate assertions compare empty preview cells with expected Amaterasu/Itachi terrain cells"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/skill-preview-move.test.ts",
+      "fullName": "isolated public ordinary move preview previews the actual chosen path through visible Amaterasu cells",
+      "durationMs": 9.727300000000014,
+      "failure": "AssertionError: expected [] to deep equally contain ObjectContaining{…}",
+      "ancestorTitles": [
+        "isolated public ordinary move preview"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "Public ordinary-move preview omits expected visible terrain/path cells in both added scenarios. This is a preview behavior mismatch.",
+        "evidence": [
+          "candidate assertions compare empty preview cells with expected Amaterasu/Itachi terrain cells"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/skill-preview-privacy.test.ts",
+      "fullName": "RED-224 engine skill-preview privacy rejects forged generated Armor definitions before card code can run",
+      "durationMs": 18.85259999999994,
+      "failure": "AssertionError: expected 'needs-input' to be 'unavailable' // Object.is equality",
+      "ancestorTitles": [
+        "RED-224 engine skill-preview privacy"
+      ],
+      "assessment": {
+        "classification": "preview-loader-regression",
+        "confidence": "high",
+        "rootCause": "The forged generated Armor card is expected to fail closed, but the preview returns needs-input. In the candidate loader, the static canonical card path is admitted before generatedArmorCard structural verification, so a same-ID forged snapshot can be replaced by canonical metadata and proceed to target preparation. The forged code is not executed, but the privacy contract still fails because the result is not unavailable.",
+        "evidence": [
+          "tests/game/skill-preview-privacy.test.ts:450 expects unavailable but receives needs-input",
+          "lib/game/public-rule-source.ts cardResolver tries loadCardById before generatedArmorCard/sameCardDefinition"
+        ]
+      }
+    },
+    {
+      "file": "tests/game/skillcode-static-audit.test.ts",
+      "fullName": "RED-45 skillCode static compatibility audit classifies compiler wrapper intrinsics as ambient host bindings",
+      "durationMs": 1571.4118999999992,
+      "failure": "AssertionError: expected false to be true // Object.is equality",
+      "ancestorTitles": [
+        "RED-45 skillCode static compatibility audit"
+      ],
+      "assessment": {
+        "classification": "static-audit-regression-under-review",
+        "confidence": "medium",
+        "rootCause": "The static compatibility audit sees a changed executable-field/free-variable inventory and a production card loader returning null. This is a migration/loader regression under separate investigation.",
+        "evidence": [
+          "candidate failures are expected 21 vs 20 and pve-blood-cut.json loader result null"
+        ],
+        "owner": "faultworker"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics fires ride sweep to the board edge along the left perpendicular ray",
+      "durationMs": 13.22869999999989,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics fires ride sweep to the board edge along the right perpendicular ray",
+      "durationMs": 9.226400000000012,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics grants momentum for every cell in an executed detour path",
+      "durationMs": 0.6115999999999531,
+      "failure": "AssertionError: expected undefined to be 4 // Object.is equality",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics grants momentum to shadow after a normal move through the real skill repository",
+      "durationMs": 0.6630999999999858,
+      "failure": "AssertionError: expected undefined to be 2 // Object.is equality",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics grants momentum to sonic after a normal move through the real skill repository",
+      "durationMs": 3.7394999999999072,
+      "failure": "AssertionError: expected undefined to be 2 // Object.is equality",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics grants momentum to tails after a normal move through the real skill repository",
+      "durationMs": 0.5807999999999538,
+      "failure": "AssertionError: expected undefined to be 2 // Object.is equality",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics lets afterSkillUsed consume the pre-teleport momentum after Homing Attack",
+      "durationMs": 469.1674999999999,
+      "failure": "AssertionError: expected [ { type: 'momentum-core', …(2) } ] to deeply equal ArrayContaining{…}",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics pierces pieces but stops the perpendicular ray at cover and walls",
+      "durationMs": 9.020200000000159,
+      "failure": "Error: 骑射横扫未请求侧射地格",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics presents exactly the two perpendicular endpoint cells instead of an option popup",
+      "durationMs": 10.973399999999856,
+      "failure": "Error: Ride sweep did not suspend for its perpendicular direction",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics replays the same path and momentum result for a fixed seed",
+      "durationMs": 127.56089999999995,
+      "failure": "AssertionError: expected { instanceId: 'replay-sonic', …(19) } to match object { momentum: 4 }",
+      "ancestorTitles": [
+        "Sonic roster mechanics"
+      ],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "high",
+        "rootCause": "The added Sonic roster cases fail momentum consumption/award and ride-sweep perpendicular targeting, including terrain/cover behavior. These are runtime movement/targeting regressions under the parent review.",
+        "evidence": [
+          "ten candidate failures include missing momentum values, missing side-shot requests, and pre-teleport momentum mismatch"
+        ],
+        "owner": "parent-review"
+      }
+    },
+    {
+      "file": "tests/game/team-effects.test.ts",
+      "fullName": "two Shishio casters apply each permanent burning tile only once",
+      "durationMs": 10.236099999999965,
+      "failure": "AssertionError: expected 100 to be 50 // Object.is equality",
+      "ancestorTitles": [],
+      "assessment": {
+        "classification": "behavior-regression",
+        "confidence": "medium",
+        "rootCause": "Two Shishio casters cause a permanent burning tile effect to resolve at 100 instead of the expected one-time 50. This is a rule/effect deduplication behavior mismatch.",
+        "evidence": [
+          "candidate assertion: expected 100 to be 50"
+        ]
+      }
+    }
+  ],
+  "existingFailures": [
+    {
+      "file": "tests/game/ai-semantics.test.ts",
+      "fullName": "AI semantic contract audits every current manifest and makes a changed admission manifest fail closed",
+      "baseline": {
+        "durationMs": 190.00260000000003,
+        "failure": "Error: Command failed: C:\\Program Files\\nodejs\\node.exe scripts/audit-ai-semantics.mjs"
+      },
+      "candidate": {
+        "durationMs": 296.21720000000005,
+        "failure": "Error: Command failed: C:\\Program Files\\nodejs\\node.exe scripts/audit-ai-semantics.mjs"
+      }
+    },
+    {
+      "file": "tests/game/battle-card-metadata-runtime.test.ts",
+      "fullName": "LAN battle hand card display metadata marks the page disposed before clearing in-flight card metadata requests",
+      "baseline": {
+        "durationMs": 6.81989999999999,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /battlePageDisposed = true\\s*cardDispl…/"
+      },
+      "candidate": {
+        "durationMs": 5.494900000000001,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /battlePageDisposed = true\\s*cardDispl…/"
+      }
+    },
+    {
+      "file": "tests/game/battle-page-contract.test.ts",
+      "fullName": "battle page route contract keeps one responsive HUD, opposite-edge piece dock, and unsectioned curved hand",
+      "baseline": {
+        "durationMs": 18.613099999999974,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /const targetSubmissionNeedsOverlay = …/"
+      },
+      "candidate": {
+        "durationMs": 14.383999999999958,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /const targetSubmissionNeedsOverlay = …/"
+      }
+    },
+    {
+      "file": "tests/game/battle-ui-boundary.test.ts",
+      "fullName": "battle presentation boundary keeps renderer and DOM responsibilities behind explicit modules",
+      "baseline": {
+        "durationMs": 14.527300000000025,
+        "failure": "AssertionError: expected ';(function () {\\r\\n  \\'use strict\\'\\r…' to match /function _preferredInitialZoom\\b[\\s\\S…/"
+      },
+      "candidate": {
+        "durationMs": 8.3031,
+        "failure": "AssertionError: expected ';(function () {\\r\\n  \\'use strict\\'\\r…' to match /function _preferredInitialZoom\\b[\\s\\S…/"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine allows native resumption after a compatible raster-only update",
+      "baseline": {
+        "durationMs": 1007.1098000000001,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 1007.2547000000002,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine correlates a resync request with the original timed-out action",
+      "baseline": {
+        "durationMs": 1.599100000000135,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 1.7067999999999302,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine ignores a stale Room leave after a replacement join",
+      "baseline": {
+        "durationMs": 1.332400000000007,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'leaveFromServer')"
+      },
+      "candidate": {
+        "durationMs": 1.2805999999995947,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'leaveFromServer')"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine reconnects the existing Colyseus session after page navigation instead of duplicating the player join",
+      "baseline": {
+        "durationMs": 2.49149999999986,
+        "failure": "AssertionError: expected +0 to be 1 // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 2.2489999999997963,
+        "failure": "AssertionError: expected +0 to be 1 // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine releases the authority sync gate on timeout and disconnect",
+      "baseline": {
+        "durationMs": 1.6096999999999753,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 1.477100000000064,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine requests the exact authoritative receipt and gates actions until it arrives",
+      "baseline": {
+        "durationMs": 1.6731999999999516,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'sent')"
+      },
+      "candidate": {
+        "durationMs": 2.1035000000001673,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'sent')"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine surfaces Colyseus Room errors without silently applying an action",
+      "baseline": {
+        "durationMs": 1.7131999999999152,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'fail')"
+      },
+      "candidate": {
+        "durationMs": 1.3748999999997977,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'fail')"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-client-reconnect.test.ts",
+      "fullName": "Colyseus reconnect and authority resync state machine uses native Room reconnection without creating a replacement join",
+      "baseline": {
+        "durationMs": 3.2275999999999385,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 2.600600000000213,
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-origin-architecture.test.ts",
+      "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'http://127.0.0.1:4200'",
+      "baseline": {
+        "durationMs": 6.305999999999983,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      },
+      "candidate": {
+        "durationMs": 5.500699999999995,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-origin-architecture.test.ts",
+      "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'http://192.168.1.20:8080'",
+      "baseline": {
+        "durationMs": 1.5313999999999908,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      },
+      "candidate": {
+        "durationMs": 1.5076999999999998,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      }
+    },
+    {
+      "file": "tests/game/colyseus-origin-architecture.test.ts",
+      "fullName": "public single-port networking contract derives the only Colyseus endpoint from 'https://relay.example:8443'",
+      "baseline": {
+        "durationMs": 1.274000000000001,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      },
+      "candidate": {
+        "durationMs": 1.3648000000000025,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'options')"
+      }
+    },
+    {
+      "file": "tests/game/developer-tools-trace.test.ts",
+      "fullName": "developer tools match trace boundary keeps a multi-command Trace compact while preserving skills and materialized states",
+      "baseline": {
+        "durationMs": 161.52749999999992,
+        "failure": "AssertionError: expected [ Object{ …(9) }, …(51) ] to deep equally contain ObjectContaining{…}"
+      },
+      "candidate": {
+        "durationMs": 527.672,
+        "failure": "AssertionError: expected [ Object{ …(9) }, …(51) ] to deep equally contain ObjectContaining{…}"
+      }
+    },
+    {
+      "file": "tests/game/ichigo-itachi.test.ts",
+      "fullName": "RED-120 character data contract registers Ichigo and Itachi with the approved stats and skill text",
+      "baseline": {
+        "durationMs": 8.444399999999973,
+        "failure": "AssertionError: expected { id: 'ichigo-zangetsu', …(17) } to match object { id: 'ichigo-zangetsu', …(3) }"
+      },
+      "candidate": {
+        "durationMs": 7.836999999999989,
+        "failure": "AssertionError: expected { id: 'ichigo-zangetsu', …(19) } to match object { id: 'ichigo-zangetsu', …(3) }"
+      }
+    },
+    {
+      "file": "tests/game/mangekyo.test.ts",
+      "fullName": "RED-124 Mangekyo data contract defines the keyword once and marks the three Uchiha ultimates with approved base costs",
+      "baseline": {
+        "durationMs": 7.306899999999985,
+        "failure": "AssertionError: expected { id: 'sasuke-susanoo', …(16) } to match object { chargeCost: 2, …(3) }"
+      },
+      "candidate": {
+        "durationMs": 8.55740000000003,
+        "failure": "AssertionError: expected { id: 'sasuke-susanoo', …(18) } to match object { chargeCost: 2, …(3) }"
+      }
+    },
+    {
+      "file": "tests/game/map-catalog.test.ts",
+      "fullName": "RED-119 selectable map catalog loads the authoritative map API and keeps room creation disabled until the catalog succeeds",
+      "baseline": {
+        "durationMs": 21.91810000000001,
+        "failure": "AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string"
+      },
+      "candidate": {
+        "durationMs": 3.007300000000015,
+        "failure": "AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string"
+      }
+    },
+    {
+      "file": "tests/game/pending-presentation-contract.test.ts",
+      "fullName": "pending selection live board settles newly delivered animation only for the choosing viewer=true",
+      "baseline": {
+        "durationMs": 6.818700000000007,
+        "failure": "AssertionError: expected 'a:0' to be null"
+      },
+      "candidate": {
+        "durationMs": 6.05449999999999,
+        "failure": "AssertionError: expected 'a:0' to be null"
+      }
+    },
+    {
+      "file": "tests/game/player-colyseus-contract.test.ts",
+      "fullName": "RED-116 Electron lobby profile bridge pins the local Profile Identity before navigating to the server lobby",
+      "baseline": {
+        "durationMs": 3.181999999999988,
+        "failure": "AssertionError: expected 115 to be less than -1"
+      },
+      "candidate": {
+        "durationMs": 2.254899999999992,
+        "failure": "AssertionError: expected 115 to be less than -1"
+      }
+    },
+    {
+      "file": "tests/game/player-colyseus-contract.test.ts",
+      "fullName": "RED-116 Electron lobby profile bridge resolves the client local runtime through trusted game IPC",
+      "baseline": {
+        "durationMs": 4.813800000000015,
+        "failure": "AssertionError: expected 'async function getLocalGameProfileIde…' to contain 'window.electronAPI.getMode'"
+      },
+      "candidate": {
+        "durationMs": 5.232399999999984,
+        "failure": "AssertionError: expected 'async function getLocalGameProfileIde…' to contain 'window.electronAPI.getMode'"
+      }
+    },
+    {
+      "file": "tests/game/projectile-trace.test.ts",
+      "fullName": "death blossom approved area behavior damages only living enemies in the caster-centered 3×3 area and ignores projectile blockers",
+      "baseline": {
+        "durationMs": 6.358400000000017,
+        "failure": "AssertionError: expected '对自身周围3×3内所有敌人造成2倍伤害。' to be '对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的…' // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 8.1918,
+        "failure": "AssertionError: expected '对自身周围3×3内所有敌人造成2倍伤害。' to be '对以本棋子为中心的3×3范围内所有敌方棋子造成等同于本棋子攻击力200%的…' // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-129-rule-interactions.test.ts",
+      "fullName": "RED-129 波风水门回合结束锚点 opens a mandatory atomic target pending and commits one anchor after selection",
+      "baseline": {
+        "durationMs": 13.101600000000076,
+        "failure": "AssertionError: expected { playerId: 'player-red', …(23) } to match object { playerId: 'player-red', …(2) }"
+      },
+      "candidate": {
+        "durationMs": 149.2711000000004,
+        "failure": "AssertionError: expected { playerId: 'player-red', …(23) } to match object { playerId: 'player-red', …(2) }"
+      }
+    },
+    {
+      "file": "tests/game/red-129-shishio-browser.test.ts",
+      "fullName": "RED-129 tracked-browser pending damage compatibility cancels Black Getsuga teleport while committing its projectile exactly once",
+      "baseline": {
+        "durationMs": 42.661,
+        "failure": "AssertionError: expected Object{ …(3) } to match object { currentCooldown: 1 }"
+      },
+      "candidate": {
+        "durationMs": 146.21660000000008,
+        "failure": "AssertionError: expected Object{ …(3) } to match object { currentCooldown: 1 }"
+      }
+    },
+    {
+      "file": "tests/game/red-129-shishio-browser.test.ts",
+      "fullName": "RED-129 tracked-browser pending damage compatibility resolves Black Getsuga landing hazards through data rules in the frozen bundle",
+      "baseline": {
+        "durationMs": 53.5779,
+        "failure": "AssertionError: expected Object{ …(3) } to match object { currentCooldown: 1 }"
+      },
+      "candidate": {
+        "durationMs": 193.60739999999998,
+        "failure": "AssertionError: expected Object{ instanceId: 'ichigo', …(20) } to match object { x: 3, y: +0, currentHp: 2 }"
+      }
+    },
+    {
+      "file": "tests/game/red-130-balance.test.ts",
+      "fullName": "RED-130 action-point settlement charges 2 AP for Amaterasu Bind",
+      "baseline": {
+        "durationMs": 84.24110000000002,
+        "failure": "AssertionError: expected [ { x: 3, y: +0, …(2) } ] to deeply equal [ { x: 3, y: +0 } ]"
+      },
+      "candidate": {
+        "durationMs": 357.4397,
+        "failure": "AssertionError: expected [ { x: 3, y: +0, …(2) } ] to deeply equal [ { x: 3, y: +0 } ]"
+      }
+    },
+    {
+      "file": "tests/game/red-163-dark-characters.test.ts",
+      "fullName": "RED-163 dark character contract lets the original skill resolve when Kyoka Suigetsu has no legal replacement, then expires at turn end",
+      "baseline": {
+        "durationMs": 8.434000000000083,
+        "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 101.19329999999991,
+        "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-163-dark-characters.test.ts",
+      "fullName": "RED-163 dark character contract registers Aizen, Ulquiorra and Grimmjow with their approved base stats",
+      "baseline": {
+        "durationMs": 9.159099999999967,
+        "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌人行动后若位于自身4格内，可移动至空地格（2）。移动后若与该敌人相邻，攻…' // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 8.285699999999963,
+        "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌人行动后若位于自身4格内，可移动至空地格（2）。移动后若与该敌人相邻，攻…' // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-163-dark-characters.test.ts",
+      "fullName": "RED-163 dark character contract resumes Kyoka Suigetsu pending selection against the replacement exactly once",
+      "baseline": {
+        "durationMs": 121.80449999999996,
+        "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 675.4596,
+        "failure": "AssertionError: expected 8 to be 7 // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "fullName": "RED-183 character rules and selection UI regressions documents the self-cast AP refund on Shield of Light",
+      "baseline": {
+        "durationMs": 5.435000000000002,
+        "failure": "AssertionError: expected '选择友军（7），赋予圣盾。对自身使用时回复1点行动点。' to contain '若目标是本棋子，你恢复1行动点'"
+      },
+      "candidate": {
+        "durationMs": 4.914799999999957,
+        "failure": "AssertionError: expected '选择友军（7），赋予圣盾。对自身使用时回复1点行动点。' to contain '若目标是本棋子，你恢复1行动点'"
+      }
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "fullName": "RED-183 character rules and selection UI regressions keeps selection, encyclopedia, history, tutorial, and related-card UI contracts visible in source",
+      "baseline": {
+        "durationMs": 7.9850999999999885,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to contain '<script src=\"js/deck-presets.js\"></sc…'"
+      },
+      "candidate": {
+        "durationMs": 5.605599999999981,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to contain '<script src=\"js/deck-presets.js\"></sc…'"
+      }
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "fullName": "RED-183 character rules and selection UI regressions keeps Tails Twin Flight immunity and inoperable buffs at two turns",
+      "baseline": {
+        "durationMs": 1.7333999999999605,
+        "failure": "AssertionError: expected '选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记…' to contain '持续2回合'"
+      },
+      "candidate": {
+        "durationMs": 2.553799999999967,
+        "failure": "AssertionError: expected '选择其他友军（4）。在自身7格内选择2个上下左右相邻的空地或掩体，分别标记…' to contain '持续2回合'"
+      }
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "fullName": "RED-183 character rules and selection UI regressions uses Manhattan distance for Naruto candidates and execution",
+      "baseline": {
+        "durationMs": 1.713799999999992,
+        "failure": "AssertionError: expected '选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分…' to be '选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送…' // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 1.6149000000000342,
+        "failure": "AssertionError: expected '选择地格（5），秘密二选一：召唤影分身；传送至该格并在原地留下影分身。影分…' to be '选择本棋子5格内1个空地格，并秘密选择一项：召唤1个影分身；或将本棋子传送…' // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-183-regressions.test.ts",
+      "fullName": "RED-183 character rules and selection UI regressions uses the approved Grimmjow wording and hides the Recall number from its result message",
+      "baseline": {
+        "durationMs": 0.8186000000000035,
+        "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若…' // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 1.240700000000004,
+        "failure": "AssertionError: expected '敌人行动后若位于自身4格内，可移动至地格（2）。移动后若与该敌人相邻，攻击…' to be '敌方棋子行动后，若其位于本棋子4格内，可将本棋子移动至2格内1个空地格。若…' // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/red-192-rules.test.ts",
+      "fullName": "RED-192 rule dictionary preserves Bankai per-battle usage through a real death and revival",
+      "baseline": {
+        "durationMs": 15.431599999999946,
+        "failure": "AssertionError: expected [Function] to throw error including 'per-battle uses' but got 'Not enough charge points for this ski…'"
+      },
+      "candidate": {
+        "durationMs": 139.20950000000005,
+        "failure": "AssertionError: expected [Function] to throw error including 'per-battle uses' but got 'Not enough charge points for this ski…'"
+      }
+    },
+    {
+      "file": "tests/game/relay-deployment.test.ts",
+      "fullName": "relay deployment initialization validates and persists Android room map selection before writes",
+      "baseline": {
+        "durationMs": 5.019399999999905,
+        "failure": "AssertionError: expected [ 'large-hole-arena', …(7) ] to deeply equal [ 'large-hole-arena', …(3) ]"
+      },
+      "candidate": {
+        "durationMs": 4.729600000000573,
+        "failure": "AssertionError: expected [ 'large-hole-arena', …(7) ] to deeply equal [ 'large-hole-arena', …(3) ]"
+      }
+    },
+    {
+      "file": "tests/game/relay-deployment.test.ts",
+      "fullName": "standalone Relay map persistence accepts only the exact four authoritative map IDs",
+      "baseline": {
+        "durationMs": 0.8443999999999505,
+        "failure": "AssertionError: expected [ 'large-hole-arena', …(3) ] to deeply equal [ 'large-hole-arena', …(7) ]"
+      },
+      "candidate": {
+        "durationMs": 1.118000000000393,
+        "failure": "AssertionError: expected [ 'large-hole-arena', …(3) ] to deeply equal [ 'large-hole-arena', …(7) ]"
+      }
+    },
+    {
+      "file": "tests/game/skill-presentation-ui.test.ts",
+      "fullName": "projected skill display in the actual browser consumers plays one sound for each real queue AOE batch while preserving separate hit batches",
+      "baseline": {
+        "durationMs": 7.412900000000008,
+        "failure": "AssertionError: expected [ [ 'damage' ], [ 'damage' ], …(2) ] to deeply equal [ [ 'damage' ], [ 'damage' ] ]"
+      },
+      "candidate": {
+        "durationMs": 6.280799999999999,
+        "failure": "AssertionError: expected [ [ 'damage' ], [ 'damage' ], …(2) ] to deeply equal [ [ 'damage' ], [ 'damage' ] ]"
+      }
+    },
+    {
+      "file": "tests/game/skill-presentation-ui.test.ts",
+      "fullName": "projected skill display in the actual browser consumers the battle controller consumes new cues without modifying the model",
+      "baseline": {
+        "durationMs": 7.058099999999996,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /on\\('disconnect'[\\s\\S]{0,150}beginSki…/"
+      },
+      "candidate": {
+        "durationMs": 6.3936999999999955,
+        "failure": "AssertionError: expected '<!DOCTYPE html>\\r\\n<html lang=\"zh-CN\"…' to match /on\\('disconnect'[\\s\\S]{0,150}beginSki…/"
+      }
+    },
+    {
+      "file": "tests/game/skillcode-static-audit.test.ts",
+      "fullName": "RED-45 data parse and production loader smoke parses every JSON definition and loads every skill, rule, and card",
+      "baseline": {
+        "durationMs": 116.28009999999995,
+        "failure": "AssertionError: data/cards/pve-blood-cut.json: expected null not to be null"
+      },
+      "candidate": {
+        "durationMs": 315.34820000000036,
+        "failure": "AssertionError: data/cards/pve-blood-cut.json: expected null not to be null"
+      }
+    },
+    {
+      "file": "tests/game/skillcode-static-audit.test.ts",
+      "fullName": "RED-45 skillCode static compatibility audit classifies every executable field and every lexical free variable",
+      "baseline": {
+        "durationMs": 616.0835,
+        "failure": "AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(17) ] to have a length of 21 but got 20"
+      },
+      "candidate": {
+        "durationMs": 1944.0011,
+        "failure": "AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(17) ] to have a length of 21 but got 20"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics extends Sonic spin dash target selection to seven cells at three momentum and stops at the selected cell",
+      "baseline": {
+        "durationMs": 2.1012000000000626,
+        "failure": "AssertionError: expected 5 to be 7 // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 2.334899999999834,
+        "failure": "AssertionError: expected 5 to be 7 // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics grants temporary action points and keeps the displayed momentum in sync through Sonic Super Form",
+      "baseline": {
+        "durationMs": 1.950800000000072,
+        "failure": "AssertionError: expected 9 to be 5 // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 8.91379999999981,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'success')"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics only exposes skill keywords that have a glossary explanation",
+      "baseline": {
+        "durationMs": 24.695799999999963,
+        "failure": "AssertionError: expected [ '真实伤害', '禁疗', '冰冻', '睡眠', …(21) ] to include '治疗'"
+      },
+      "candidate": {
+        "durationMs": 66.00459999999998,
+        "failure": "AssertionError: expected [ '真实伤害', '禁疗', '冰冻', '睡眠', …(21) ] to include '治疗'"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics replaces consumed Sonic momentum with the distance gained from spin dash",
+      "baseline": {
+        "durationMs": 2.5979999999999563,
+        "failure": "AssertionError: expected { instanceId: 'sonic', …(20) } to match object { x: 3, y: +0, momentum: 3 }"
+      },
+      "candidate": {
+        "durationMs": 19.29410000000007,
+        "failure": "TypeError: Cannot read properties of undefined (reading 'success')"
+      }
+    },
+    {
+      "file": "tests/game/sonic-roster.test.ts",
+      "fullName": "Sonic roster mechanics uses the requested Sonic and Shadow skill descriptions and Super Form costs",
+      "baseline": {
+        "durationMs": 4.02679999999998,
+        "failure": "AssertionError: expected '选择正方向冲刺最多5格，对路径首个敌人造成1.5倍伤害并停在其前方。动能5…' to be '选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。' // Object.is equality"
+      },
+      "candidate": {
+        "durationMs": 3.5294999999999845,
+        "failure": "AssertionError: expected '选择正方向冲刺最多5格，对路径首个敌人造成1.5倍伤害并停在其前方。动能5…' to be '选择一个地格（5），冲刺至此处并对路径上的敌方单位造成1.5倍伤害。' // Object.is equality"
+      }
+    },
+    {
+      "file": "tests/game/turn.test.ts",
+      "fullName": "interrupted skill release does not pay or execute a skill when the resumed trigger blocks",
+      "baseline": {
+        "durationMs": 12.034700000000043,
+        "failure": "BattleRuleError: blocked"
+      },
+      "candidate": {
+        "durationMs": 6.251900000000035,
+        "failure": "BattleRuleError: blocked"
+      }
+    }
+  ],
+  "disappearedFailures": [
+    {
+      "file": "tests/game/battle-state-hash.test.ts",
+      "fullName": "battle state chunked hash v1 keeps the frozen Unicode vector identical in Node, desktop and Android bundles",
+      "durationMs": 66.8492,
+      "failure": "Error: ENOENT: no such file or directory, open 'C:\\Users\\lngsc\\AppData\\Local\\Temp\\rvb-red252-baseline-20261012-120811-082166c6\\android-client\\www\\js\\game-engine.js'",
+      "ancestorTitles": [
+        "battle state chunked hash v1"
+      ]
+    },
+    {
+      "file": "tests/game/flight-landing-contact.test.ts",
+      "fullName": "RED-209 flight markers do not block entry settles the whole flight using occupancy at expiry (occupant leaves: false)",
+      "durationMs": 16.632599999999968,
+      "failure": "AssertionError: expected { instanceId: 'tails', …(19) } to match object { x: 1, y: 1 }",
+      "ancestorTitles": [
+        "RED-209 flight markers do not block entry"
+      ]
+    }
+  ],
+  "gameplayModuleSubset": {
+    "glob": "tests/game/gameplay-module*",
+    "filesReported": 56,
+    "total": 904,
+    "passed": 904,
+    "failed": 0,
+    "pending": 0,
+    "todo": 0,
+    "failedFiles": [],
+    "interpretation": "Counts use assertion statuses from the candidate JSON only. No global failure is ignored: the candidate full suite remains failed with 95 failed assertions and exitCode 1."
+  },
+  "coverageGaps": [
+    "The candidate report was produced before the parent fixes currently under review; this comparison is a pre-fix snapshot and must be followed by targeted reruns.",
+    "Generic STACK_TRACE_ERROR timeout records do not identify the slow internal call; isolated profiling is required for AI, room-runtime, and authority performance cases.",
+    "Added test names absent from the frozen report cannot be classified by a same-key baseline result; the assessment uses direct source/data evidence and candidate failure messages.",
+    "The gameplay-module* subset is green but does not cover the non-module failures listed above."
+  ],
+  "suggestedNextAction": "Apply the targeted fixes, rerun the affected tests in isolation, then rerun the full tests/game command with the same single-worker JSON reporter and regenerate this comparison. Keep the frozen 082 report and export unchanged."
+}

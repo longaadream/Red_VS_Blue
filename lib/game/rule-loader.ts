@@ -76,6 +76,8 @@ export interface RuleDefinition {
   id: string
   name: string
   description: string
+  iconPath?: string
+  visible?: boolean
   trigger: {
     type: string
     conditions?: any
@@ -128,6 +130,8 @@ export function convertToTriggerRule(ruleDef: RuleDefinition): TriggerRule {
     id: ruleDef.id,
     name: ruleDef.name,
     description: ruleDef.description,
+    ...(typeof ruleDef.iconPath === 'string' ? { iconPath: ruleDef.iconPath } : {}),
+    ...(typeof ruleDef.visible === 'boolean' ? { visible: ruleDef.visible } : {}),
     trigger: ruleDef.trigger,
     effect: (battle, context) => {
       try {

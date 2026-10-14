@@ -5,11 +5,24 @@ import { assertTrustedIpcSender, isFileUrlWithinRoot } from './ipc-trust'
 import { CreativeWorkbench } from './workbench'
 import { ResourceRelease } from './resource-release'
 import { preparePublicationIdentity } from './publication-identity'
-import { openTrainingPreview, closeTrainingPreviews } from './training-preview'
+import {
+  closeEmbeddedTrainingPreview,
+  closeTrainingPreviews,
+  inspectEmbeddedTrainingPreview,
+  openEmbeddedTrainingPreview,
+  openTrainingPreview,
+  retryEmbeddedTrainingPreview,
+  setEmbeddedTrainingPreviewBounds,
+  setEmbeddedTrainingPreviewVisible,
+  type TrainingLaunchOptions,
+} from './training-preview'
 import type { TrainingSnapshot } from './training-resources'
+import { normalizeDraftTrainingRequest } from './training-draft-worker'
+import { listAuthorDrafts, saveAuthorDraft, removeAuthorDraft } from './author-drafts'
 import { readCodeImport } from './code-import'
+import { assertContentGraphArtifact, assertGameplayModuleTransition } from './content-graph-document'
 import { assertSkillGraphArtifact } from './skill-graph'
-import { assertContentProjectRoot, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
+import { assertContentProjectRoot, copyBundledRootImages, createContentProject, openContentProject, readDocumentSnapshot, writeDocumentSnapshot } from './content-project'
 import {
   EditorContentOperationQueueV1,
   normalizeEditorContentOperationRequestV1,
@@ -68,6 +81,7 @@ function ensureAuthoringWorkspace(): string {
       errorOnExist: false,
       force: false,
     })
+    copyBundledRootImages(getProjectRoot(), workspace)
   }
   for (const directory of ['archives', 'keys', 'reports', 'sources']) {
     fs.mkdirSync(path.join(workspace, directory), { recursive: true })
@@ -108,12 +122,12 @@ let win: BrowserWindow | null = null
 function createWindow(): void {
   win = new BrowserWindow({
     show: !process.argv.includes('--editor-smoke-hidden'),
-    width: 1200,
-    height: 780,
+    width: 1440,
+    height: 1024,
     minWidth: 900,
     minHeight: 600,
-    title: 'RED vs BLUE — 数据编辑器',
-    backgroundColor: '#0d0f12',
+    title: 'Red VS Blue — 内容工作台',
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -288,6 +302,11 @@ handleTrusted('project-select', async (_e, mode: 'open' | 'official' | 'blank') 
 })
 
 handleTrusted('read-document', (_e, subdir: string, filename: string) => readDocumentSnapshot(safePath(subdir, filename)))
+handleTrusted('list-author-drafts', (_e, collection: string) => listAuthorDrafts(ensureAuthoringWorkspace(), collection))
+handleTrusted('save-author-draft', (_e, collection: string, id: string, value: unknown, revision: string | null) =>
+  saveAuthorDraft(ensureAuthoringWorkspace(), collection, id, value, revision))
+handleTrusted('remove-author-draft', (_e, collection: string, id: string, revision: string) =>
+  removeAuthorDraft(ensureAuthoringWorkspace(), collection, id, revision))
 handleTrusted('write-document', (_e, subdir: string, filename: string, data: unknown, revision: string) =>
   writeDocumentSnapshot(safePath(subdir, filename, 'write'), data, revision))
 
@@ -325,7 +344,9 @@ handleTrusted('read-file', (_e, subdir: string, filename: string) => {
 
 handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown) => {
   assertSkillGraphArtifact(data)
+  assertContentGraphArtifact(data)
   const file = safePath(subdir, filename, 'write')
+  if (fs.existsSync(file)) assertGameplayModuleTransition(JSON.parse(fs.readFileSync(file, 'utf-8')), data)
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf-8')
   return { ok: true }
 })
@@ -334,6 +355,7 @@ handleTrusted('write-file', (_e, subdir: string, filename: string, data: unknown
 
 handleTrusted('create-file', (_e, subdir: string, id: string, data: unknown) => {
   assertSkillGraphArtifact(data)
+  assertContentGraphArtifact(data)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
     throw new Error('ID 只能包含小写字母、数字和单个连字符')
   }
@@ -515,6 +537,84 @@ handleTrusted('workbench-training', (_event, taskId: string, acceptedHash: strin
     const snapshot = await runContentWorker({ operation: 'prepare-training-preview', workspace, taskId, acceptedHash, appRoot: getProjectRoot(), privateRoot: path.join(app.getPath('userData'), 'training-previews') }) as TrainingSnapshot
     return openTrainingPreview(getProjectRoot(), snapshot, process.argv.includes('--editor-smoke-hidden'))
   })
+})
+
+type EmbeddedTrainingLaunch =
+  | { kind: 'accepted'; taskId: string; acceptedHash: string }
+  | { kind: 'draft'; request: ReturnType<typeof normalizeDraftTrainingRequest> }
+const embeddedTrainingLaunches = new Map<string, EmbeddedTrainingLaunch>()
+
+function trainingLaunchOptions(value: unknown): TrainingLaunchOptions {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as TrainingLaunchOptions
+    : {}
+}
+
+handleTrusted('workbench-training-embedded', (_event, taskId: string, acceptedHash: string, rawOptions: unknown) => {
+  if (!win || win.isDestroyed()) throw new Error('编辑器窗口不可用')
+  const parent = win
+  const workspace = ensureAuthoringWorkspace()
+  return contentOperationQueue.enqueue(async () => {
+    const snapshot = await runContentWorker({ operation: 'prepare-training-preview', workspace, taskId, acceptedHash, appRoot: getProjectRoot(), privateRoot: path.join(app.getPath('userData'), 'training-previews') }) as TrainingSnapshot
+    const result = await openEmbeddedTrainingPreview(parent, getProjectRoot(), snapshot, trainingLaunchOptions(rawOptions))
+    embeddedTrainingLaunches.set(result.previewId, { kind: 'accepted', taskId, acceptedHash })
+    return result
+  })
+})
+
+handleTrusted('skill-trial', (_event, rawRequest: unknown) => {
+  const workspace = ensureAuthoringWorkspace()
+  const request = normalizeDraftTrainingRequest(rawRequest)
+  return contentOperationQueue.enqueue(async () => {
+    const snapshot = await runContentWorker({ operation: 'prepare-draft-training', workspace, request, appRoot: getProjectRoot() }) as TrainingSnapshot
+    return openTrainingPreview(getProjectRoot(), snapshot, process.argv.includes('--editor-smoke-hidden'))
+  })
+})
+
+handleTrusted('skill-trial-embedded', (_event, rawRequest: unknown, rawOptions: unknown) => {
+  if (!win || win.isDestroyed()) throw new Error('编辑器窗口不可用')
+  const parent = win
+  const workspace = ensureAuthoringWorkspace()
+  const request = normalizeDraftTrainingRequest(rawRequest)
+  return contentOperationQueue.enqueue(async () => {
+    const snapshot = await runContentWorker({ operation: 'prepare-draft-training', workspace, request, appRoot: getProjectRoot() }) as TrainingSnapshot
+    const result = await openEmbeddedTrainingPreview(parent, getProjectRoot(), snapshot, trainingLaunchOptions(rawOptions))
+    embeddedTrainingLaunches.set(result.previewId, { kind: 'draft', request })
+    return result
+  })
+})
+
+handleTrusted('training-preview-retry', (_event, previewId: string, rawRequest: unknown) => {
+  if (typeof previewId !== 'string' || !previewId) throw new Error('训练营预览 ID 无效')
+  const launch = embeddedTrainingLaunches.get(previewId)
+  if (!launch) throw new Error('训练营预览已关闭')
+  const workspace = ensureAuthoringWorkspace()
+  return contentOperationQueue.enqueue(async () => {
+    let snapshot: TrainingSnapshot
+    if (launch.kind === 'accepted') {
+      snapshot = await runContentWorker({ operation: 'prepare-training-preview', workspace, taskId: launch.taskId, acceptedHash: launch.acceptedHash, appRoot: getProjectRoot(), privateRoot: path.join(app.getPath('userData'), 'training-previews') }) as TrainingSnapshot
+    } else {
+      const request = rawRequest == null ? launch.request : normalizeDraftTrainingRequest(rawRequest)
+      snapshot = await runContentWorker({ operation: 'prepare-draft-training', workspace, request, appRoot: getProjectRoot() }) as TrainingSnapshot
+      embeddedTrainingLaunches.set(previewId, { kind: 'draft', request })
+    }
+    return retryEmbeddedTrainingPreview(previewId, getProjectRoot(), snapshot)
+  })
+})
+
+handleTrusted('training-preview-set-bounds', (_event, previewId: string, bounds: unknown) => {
+  setEmbeddedTrainingPreviewBounds(previewId, bounds)
+  return { ok: true }
+})
+handleTrusted('training-preview-set-visible', (_event, previewId: string, visible: boolean) => {
+  setEmbeddedTrainingPreviewVisible(previewId, visible === true)
+  return { ok: true }
+})
+handleTrusted('training-preview-inspect', (_event, previewId: string) => inspectEmbeddedTrainingPreview(previewId))
+handleTrusted('training-preview-close', (_event, previewId: string) => {
+  embeddedTrainingLaunches.delete(previewId)
+  closeEmbeddedTrainingPreview(previewId)
+  return { ok: true }
 })
 handleTrusted('workbench-publish', (_event, id: string, acceptedHash: string, notes: string) => {
   const workspace = ensureAuthoringWorkspace()

@@ -1,5 +1,6 @@
 import type { BattleState } from './turn'
 import { areMatchAllies } from './match-teams'
+import { parseAuthoredDisplay, type AuthoredDisplay } from './author-summon-schema'
 
 export const SKILL_PRESENTATION_VERSION = 1
 export type PresentationAudience = 'public' | 'owner' | 'allies' | 'enemies' | 'spectators'
@@ -31,6 +32,7 @@ type Display = { name?: string; templateId?: string; currentHp?: number; maxHp?:
 type RecordBase = { key: string; serial: number; stream: string; ownerPlayerId: string; holderId?: string }
 type PresentationRecord = RecordBase & (
   { kind: 'binding'; spec: DisplayBinding; snapshot: Display } |
+  { kind: 'display'; spec: PresentationOptions & { targetId: string }; snapshot: AuthoredDisplay } |
   { kind: 'indicator'; spec: PresentationIndicator } |
   { kind: 'marker'; spec: PresentationMarker } |
   { kind: 'cue'; spec: PresentationCue; cell: { x: number; y: number } }
@@ -134,6 +136,12 @@ export function createSkillPresentation(battle: BattleState, ownerPlayerId: stri
     return 'p-' + stream + '-' + serial
   }
   return {
+    setDisplay(targetId: string, display: AuthoredDisplay, audience: PresentationAudience = 'public', id = 'display:' + targetId) {
+      const spec = base({ id, audience, targetId }, ['targetId'])
+      if (!alive(battle, text(targetId))) invalid('display target missing')
+      const snapshot = parseAuthoredDisplay(display)
+      return put({ kind: 'display', spec, snapshot } as Omit<PresentationRecord, keyof RecordBase>, id)
+    },
     bind(input: DisplayBinding) {
       const spec = base(input, ['targetId','sourceId','fields','mode','onSourceMissing'])
       const target = alive(battle,text(spec.targetId)), source = alive(battle,text(spec.sourceId))
@@ -196,6 +204,13 @@ export function projectSkillPresentation(state: BattleState, projected: BattleSt
       const display = r.spec.mode === 'snapshot' ? r.snapshot : source ? readDisplay(source,r.spec.fields)
         : r.spec.onSourceMissing === 'snapshot' ? r.snapshot : r.spec.onSourceMissing === 'self' ? readDisplay(target,r.spec.fields) : null
       if (display) bindings.push({id,targetId:target.instanceId,display:copy(display)})
+    } else if (r.kind === 'display') {
+      if (!alive(state, r.spec.targetId)) continue
+      const display: Display = copy(r.snapshot)
+      if (r.snapshot.statusTags) display.statusTags = r.snapshot.statusTags.filter(tag => tag.visible !== false).map(tag => Object.fromEntries(
+        ['type','name','currentDuration','remainingDuration','currentUses','remainingUses','intensity','stacks'].filter(key => Object.hasOwn(tag, key) && tag[key] !== undefined).map(key => [key, tag[key]]),
+      ))
+      bindings.push({ id, targetId: r.spec.targetId, display })
     } else if (r.kind === 'indicator') {
       if (!alive(state,r.spec.targetId)) continue
       const source=r.spec.source && alive(state,r.spec.source.pieceId)

@@ -13,8 +13,19 @@
     "speed": 4
   },
   "skills": [
-    { "skillId": "edgar-fisticuffs", "level": 1 },
-    { "skillId": "edgar-pogo-jump", "level": 1 }
+    {
+      "skillId": "edgar-fisticuffs",
+      "level": 1
+    },
+    {
+      "skillId": "edgar-pogo-jump",
+      "level": 1
+    }
   ],
-  "isDefault": false
+  "isDefault": false,
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "pieces:edgar",
+    "links": []
+  }
 }

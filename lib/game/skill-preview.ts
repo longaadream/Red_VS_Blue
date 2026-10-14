@@ -310,20 +310,21 @@ function applyPublicDisplayBindings(projected: BattleState, viewerId: string): v
   if (presentation) {
     for (const raw of presentation.bindings as unknown[]) {
       if (!isRecord(raw) || typeof raw.targetId !== 'string' || !isRecord(raw.display)) continue
-      bindings.set(raw.targetId, raw.display)
+      bindings.set(raw.targetId, { ...bindings.get(raw.targetId), ...raw.display })
     }
   }
   for (const piece of projected.pieces) {
     const holder = piece as unknown as JsonRecord
-    if (normalized(piece.ownerPlayerId) === viewerId) continue
     const display = bindings.get(piece.instanceId)
+    const owned = normalized(piece.ownerPlayerId) === viewerId
+    if (owned && !display) continue
     if (display) {
       for (const [key, value] of Object.entries(display)) {
-        if (['name', 'templateId', 'currentHp', 'maxHp', 'attack', 'defense', 'moveRange', 'skills', 'statusTags'].includes(key)) {
+        if (['name', 'templateId', 'currentHp', 'maxHp', 'attack', 'defense', 'moveRange', 'shield', 'skills', 'statusTags'].includes(key)) {
           holder[key] = cloneJson(value)
         }
       }
-    } else {
+    } else if (!owned) {
       const legacyFields: Record<string, string> = {
         displayCurrentHp: 'currentHp',
         displayMaxHp: 'maxHp',
@@ -350,7 +351,7 @@ function applyPublicDisplayBindings(projected: BattleState, viewerId: string): v
         else delete holder.initialDefinition
       }
     }
-    for (const key of [
+    if (!owned) for (const key of [
       'masterPieceId', 'displayCurrentHp', 'displayMaxHp', 'displayAttack',
       'displayDefense', 'displayMoveRange', 'displaySkills', 'displayStatusTags',
       'noKillCharge',
@@ -772,6 +773,14 @@ function redactSkill(skill: unknown): unknown {
   const result = { ...skill }
   delete result.code
   delete result.previewCode
+  // Authoring artifacts carry executable structure just like generated code.
+  delete result.contentGraph
+  delete result.contentGraphField
+  delete result.contentGraphCompilerVersion
+  delete result.contentGraphEntries
+  delete result.gameplayModules
+  delete result.cluster
+  delete result.clusterLinks
   delete result.statusTag
   delete result.summonCapability
   delete result.deathParasitism

@@ -85,7 +85,8 @@ describe('RED-130 curse ward coefficient', () => {
     const curse = blue.hand[0]
     const cardDef = state.customCards[curse.cardId]
     expect(rafaam).toMatchObject({ attack: 3, currentHp: 15 })
-    expect(cardDef).toMatchObject({ damageAmount: 6, sourcePieceId: 'rafaam' })
+    expect(cardDef).toMatchObject({ damageAmount: 6, extension: { sourcePlayerId: 'player-red' } })
+    expect(cardDef).not.toHaveProperty('sourcePieceId')
 
     rafaam.attack = 9
     expect(cardDef.damageAmount).toBe(6)
@@ -117,7 +118,7 @@ describe('RED-130 action-point settlement', () => {
     const resolved = runBattleAction(state, action, { rootSeed: ROOT_SEED }).state
     expect(resolved.players[0].actionPoints).toBe(0)
     expect(resolved.pieces.find(piece => piece.instanceId === 'itachi')?.skills[0].currentCooldown).toBe(2)
-    expect(resolved.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0 }])
+    expect(resolved.extensions?.amaterasuCells).toEqual([{ x: 3, y: 0, sourcePieceId: 'itachi', ownerPlayerId: 'player-red' }])
     expect(resolved.pieces.find(piece => piece.instanceId === 'target')?.statusTags)
       .toContainEqual(expect.objectContaining({ type: 'amaterasu-burn', stacks: 1 }))
   })

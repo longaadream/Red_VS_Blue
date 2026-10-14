@@ -111,8 +111,17 @@
         type: type,
         label: displayStatusLabel(item, meta, iconRegistry),
         description: String(item.description || item.message || ''),
+        ...(item.extension && typeof item.extension === 'object' && !Array.isArray(item.extension)
+          ? { extension: item.extension }
+          : {}),
+        ...(item.ownerPlayerId ? { ownerPlayerId: String(item.ownerPlayerId) } : {}),
         iconId: meta ? meta.iconId : 'fallback',
-        iconPath: meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
+        // An authored StatusTag icon is presentation data and takes
+        // precedence over the built-in registry asset. Keep the registry
+        // fallback for legacy status values without a path.
+        iconPath: typeof item.iconPath === 'string' && item.iconPath.trim()
+          ? item.iconPath.trim()
+          : meta ? meta.assetPath : 'images/effect-icons/fallback.svg',
         category: meta ? meta.category : 'unknown',
         tone: meta ? meta.tone : 'neutral',
         color: meta ? meta.color : '#94a3b8',
@@ -164,7 +173,14 @@
       portraitId: String(display.templateId ? ((context.pieceTemplates || {})[display.templateId] || {}).image || display.templateId : template.image || piece.templateId || ''),
       name: String(display.name || piece.name || template.name || piece.templateId || piece.instanceId || '?'),
       ownerPlayerId: ownerPlayerId,
-      faction: piece.faction === 'blue' ? 'blue' : 'red',
+      faction: (display.faction !== undefined ? display.faction : piece.faction) === 'blue' ? 'blue' : 'red',
+      // Display identity never grants control: ownerPlayerId above remains
+      // the authoritative owner used by interaction policies.
+      displayIdentity: {
+        ownerPlayerId: display.ownerPlayerId !== undefined ? display.ownerPlayerId : ownerPlayerId,
+        faction: display.faction !== undefined ? display.faction : piece.faction,
+        isCore: display.isCore !== undefined ? display.isCore : piece.isCore,
+      },
       x: piece.x == null ? null : numberOr(piece.x, 0),
       y: piece.y == null ? null : numberOr(piece.y, 0),
       health: { current: currentHealth, max: maxHealth },
@@ -173,6 +189,7 @@
       statuses: statuses,
       statusSummary: statuses,
       displayStats: {
+        shield: display.shield !== undefined ? display.shield : piece.shield,
         attack: display.attack != null ? display.attack : piece.attack,
         defense: display.defense != null ? display.defense : piece.defense,
         moveRange: display.moveRange != null ? display.moveRange : (piece.moveRange != null ? piece.moveRange : piece.stats && piece.stats.moveRange),
@@ -192,11 +209,14 @@
     }
   }
 
-  function normalizePlayer(player, pieces, currentPlayerId, names, index, training) {
+  function normalizePlayer(player, pieces, currentPlayerId, names, index, training, trainingFirstPlayerId) {
     const id = String(player.playerId || player.id || '')
     const ownedPiece = pieces.find(function (piece) { return piece.ownerPlayerId.toLowerCase() === id.toLowerCase() })
     const nameKey = Object.keys(names || {}).find(function (key) { return key.toLowerCase() === id.toLowerCase() })
     const faction = player.teamId || (ownedPiece ? ownedPiece.faction : (index === 1 ? 'blue' : 'red'))
+    const firstPlayer = training && typeof trainingFirstPlayerId === 'string' && trainingFirstPlayerId.trim() !== ''
+      ? trainingFirstPlayerId.trim().toLowerCase() === id.toLowerCase()
+      : faction === 'red'
     const publicName = String(nameKey ? names[nameKey] || '' : '').trim()
     const snapshotName = String(player.name || '').trim()
     const fallback = faction === 'blue' ? '蓝方玩家' : '红方玩家'
@@ -204,6 +224,7 @@
       id: id,
       name: training ? (faction === 'blue' ? '蓝方' : '红方') : (publicName && publicName.toLowerCase() !== id.toLowerCase() ? publicName : '') || (snapshotName && snapshotName.toLowerCase() !== id.toLowerCase() ? snapshotName : fallback),
       faction: faction,
+      isFirstPlayer: firstPlayer,
       isCurrent: id.toLowerCase() === String(currentPlayerId || '').toLowerCase(),
       resources: {
         action: numberOr(player.actionPoints, 0),
@@ -216,10 +237,24 @@
       buffSummary: ['elune-blessing-buff'].filter(function (id) {
         return player.buffs && player.buffs[id] && numberOr(player.buffs[id].uses, 0) > 0
       }).map(function (id) { return { id: id, uses: numberOr(player.buffs[id].uses, 0) } }),
+      hiddenRuleIds: (player.rules || []).filter(function (rule) {
+        return rule && typeof rule === 'object' && rule.visible === false && rule.id
+      }).map(function (rule) {
+        return String(rule.id)
+      }),
       ruleSummary: (player.rules || []).filter(function (rule) {
         return rule && typeof rule === 'object' && rule.visible !== false && rule.name
       }).map(function (rule) {
-        return { id: String(rule.id || rule.name), label: String(rule.name), description: String(rule.description || '') }
+        return {
+          id: String(rule.id || rule.name),
+          label: String(rule.name),
+          description: String(rule.description || ''),
+          ...(rule.extension && typeof rule.extension === 'object' && !Array.isArray(rule.extension)
+            ? { extension: rule.extension }
+            : {}),
+          iconPath: typeof rule.iconPath === 'string' ? rule.iconPath.trim() : '',
+          ...(typeof rule.visible === 'boolean' ? { visible: rule.visible } : {}),
+        }
       }),
     }
   }
@@ -421,11 +456,15 @@
       : null
     const legal = input.legal || {}
     const players = (snapshot.players || []).map(function (player, index) {
-      return normalizePlayer(player, pieces, turn.currentPlayerId, input.playerNames, index, input.training === true)
+      return normalizePlayer(player, pieces, turn.currentPlayerId, input.playerNames, index, input.training === true, input.trainingFirstPlayerId)
     })
     const viewer = players.find(function (player) { return player.id.toLowerCase() === viewerId.toLowerCase() }) || null
 
     return {
+      // Description renderers need the authoritative snapshot to project the
+      // exact owner extension.  Consumers must pass it through the safe
+      // description context rather than reading private flowState directly.
+      snapshot: snapshot,
       board: {
         id: String(map.id || ''),
         width: numberOr(map.width, 0),

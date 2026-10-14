@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { reportVerificationProgress } from './verification-progress'
+import { renameProfileDirectoryWithWindowsRetryV1 } from './profile-rename'
 import path from 'node:path'
 
 import {
@@ -745,7 +746,7 @@ export class ProfileStoreV1 {
               { encoding: 'utf8', flag: 'wx' },
             )
           }
-          renameSync(temporary, destination)
+          renameProfileDirectoryWithWindowsRetryV1(temporary, destination)
         } finally {
           rmSync(temporary, { recursive: true, force: true })
         }

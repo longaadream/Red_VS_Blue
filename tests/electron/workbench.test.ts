@@ -173,6 +173,28 @@ it('refuses accepting only a reference whose required new object was not selecte
   expect(store.accept(initial.task.id, selection(current, current.changes.map(change => change.path))).changes).toEqual([])
 })
 
+it('keeps audited generated and archived definitions packaged without adding them to discovery', () => {
+  const { root, skill, store } = fixture()
+  for (const [collection, id] of [
+    ['cards', 'armor-attack-defense'], ['cards', 'armor-attack-heal'], ['cards', 'armor-attack-speed'],
+    ['cards', 'armor-defense-heal'], ['cards', 'armor-defense-speed'], ['cards', 'armor-heal-speed'],
+    ['skills', 'grimmjow-gran-rey-cero'],
+  ]) writeFileSync(path.join(root, 'data', collection, id + '.json'), JSON.stringify({ id }))
+  const initial = store.create(input)
+  writeFileSync(skill, JSON.stringify({ id: 'drain', amount: 6 }))
+  const current = store.inspect(initial.task.id)
+  const accepted = store.accept(initial.task.id, selection(current, ['data/skills/drain.json']))
+  expect(accepted.changes).toEqual([])
+  expect(JSON.parse(readFileSync(path.join(root, 'data/cards/manifest.json'), 'utf8'))).toEqual([])
+  expect(JSON.parse(readFileSync(path.join(root, 'data/skills/manifest.json'), 'utf8'))).toEqual(['drain'])
+  expect(existsSync(path.join(root, 'data/cards/armor-attack-defense.json'))).toBe(true)
+
+  writeFileSync(path.join(root, 'data/cards/armor-unknown.json'), '{"id":"armor-unknown"}')
+  const orphan = store.inspect(initial.task.id)
+  expect(() => store.accept(initial.task.id, selection(orphan, ['data/cards/armor-unknown.json']))).toThrow('未登记到 manifest')
+  expect(store.inspect(initial.task.id).acceptedHash).toBe(accepted.acceptedHash)
+})
+
 it('refuses stale accept/revert requests without touching newer external edits', () => {
   const { store, skill } = fixture()
   const initial = store.create(input)

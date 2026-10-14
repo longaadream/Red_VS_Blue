@@ -35,7 +35,7 @@ export function appendTileEffectsBatch<T extends object>(
   effects: readonly T[],
 ): T[] {
   if (!Array.isArray(effects) || effects.length === 0) return []
-  const existing = tileEffects(state)
+  const existing = Array.isArray(state.extensions?.tileEffects) ? state.extensions.tileEffects : []
   const ids = new Set(existing.flatMap(effect => {
     if (!effect || typeof effect !== 'object') return []
     const id = (effect as Record<string, unknown>).id
@@ -50,7 +50,7 @@ export function appendTileEffectsBatch<T extends object>(
     }
   }
   const committed = effects.map(effect => ({ ...effect }))
-  existing.push(...committed)
+  tileEffects(state).push(...committed)
   return committed
 }
 

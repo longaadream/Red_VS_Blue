@@ -152,6 +152,7 @@ function installRenderHand(context: Context) {
   context.HandCardFace = context.window.HandCardFace
   new Script([
     readNamedFunction('progressiveDeploymentPending'),
+    readNamedFunction('getHandOptionSelection'),
     readNamedFunction('isPendingHandSelection'),
     readNamedFunction('pendingHandCandidateValues'),
     readNamedFunction('syncPendingHandSelection'),
@@ -161,6 +162,112 @@ function installRenderHand(context: Context) {
     readNamedFunction('renderHand'),
   ].join('\n')).runInContext(context)
 }
+
+describe('local skill hand selection presentation', () => {
+  function selectionRuntime(selectionMode = 'single') {
+    const advance = vi.fn(async () => undefined)
+    const runtime = createRuntime({
+      pendingSkill: { skillId: 'velen-hand', localChoiceDraft: true, preparation: {
+        kind: 'needOption', presentation: 'hand', selectionMode, selectionId: 'draft-hand',
+        minSelections: 1, maxSelections: selectionMode === 'single' ? 1 : 2,
+        options: ['first-copy', 'second-copy', 'third-copy'].map(value => ({ label: '同名牌', value })),
+      } },
+      SPECTATE_MODE: false, pendingOptionSelectionForMe: () => false,
+      isLocalSkillDraft: (value: { localChoiceDraft?: boolean }) => !!value?.localChoiceDraft,
+      localSkillChoices: () => [], renderActionBar: vi.fn(), setStatusMsg: vi.fn(),
+      advanceLocalSkillOption: advance,
+    })
+    installRenderHand(runtime.context)
+    runtime.context.renderHand = vi.fn()
+    runtime.context.cancelTargetSelection = vi.fn(() => { runtime.context.pendingSkill = null })
+    new Script([
+      readNamedFunction('togglePendingHandOption'), readNamedFunction('onCardClick'),
+      readNamedFunction('confirmPendingHandOptionSelection', true),
+      readNamedFunction('cancelPendingHandOptionSelection', true),
+    ].join('\n')).runInContext(runtime.context)
+    return { ...runtime, advance }
+  }
+
+  it('selects one concrete same-name instance without playing it and confirms the local draft', async () => {
+    const runtime = selectionRuntime()
+    new Script("onCardClick('first-copy', 'holy-smite'); onCardClick('second-copy', 'holy-smite')").runInContext(runtime.context)
+    expect(Array.from(runtime.context.pendingHandOptionSelection.selectedValues)).toEqual(['second-copy'])
+    expect(runtime.submittedActions).toEqual([])
+    await new Script('confirmPendingHandOptionSelection()').runInContext(runtime.context)
+    expect(runtime.advance).toHaveBeenCalledExactlyOnceWith('second-copy')
+    expect(runtime.submittedActions).toEqual([])
+  })
+
+  it('enforces the multi-select limit, retains choices across synchronization, and permits deselection', async () => {
+    const runtime = selectionRuntime('multi')
+    new Script("onCardClick('first-copy'); onCardClick('second-copy'); onCardClick('third-copy'); syncPendingHandSelection(getHandOptionSelection())").runInContext(runtime.context)
+    expect(Array.from(runtime.context.pendingHandOptionSelection.selectedValues)).toEqual(['first-copy', 'second-copy'])
+    new Script("onCardClick('first-copy'); onCardClick('third-copy')").runInContext(runtime.context)
+    await new Script('confirmPendingHandOptionSelection()').runInContext(runtime.context)
+    expect(runtime.advance).toHaveBeenCalledExactlyOnceWith(['second-copy', 'third-copy'])
+    expect(runtime.submittedActions).toEqual([])
+  })
+
+  it('rejects non-candidates and empty confirmation, and cancels without an authority command', async () => {
+    const runtime = selectionRuntime()
+    new Script("onCardClick('not-a-candidate')").runInContext(runtime.context)
+    await new Script('confirmPendingHandOptionSelection()').runInContext(runtime.context)
+    expect(runtime.advance).not.toHaveBeenCalled()
+    await new Script('cancelPendingHandOptionSelection()').runInContext(runtime.context)
+    expect(runtime.context.pendingSkill).toBeNull()
+    expect(runtime.context.pendingHandOptionSelection.selectionId).toBeNull()
+    expect(runtime.submittedActions).toEqual([])
+  })
+
+  it('does not expose a local hand selector to spectators or the other player', () => {
+    const runtime = selectionRuntime()
+    runtime.context.SPECTATE_MODE = true
+    expect(new Script('getHandOptionSelection()').runInContext(runtime.context)).toBeNull()
+    runtime.context.SPECTATE_MODE = false
+    runtime.context.myPlayerId = 'other-player'
+    expect(new Script('getHandOptionSelection()').runInContext(runtime.context)).toBeNull()
+  })
+
+  it.each(['single', 'multi'])('renders %s local hand choices on card instances instead of a text picker', selectionMode => {
+    const skill = {
+      skillId: 'velen-hand-skill', localChoiceDraft: true,
+      preparation: {
+        kind: 'needOption', presentation: 'hand', selectionMode,
+        selectionId: 'local-hand-choice', minSelections: 1, maxSelections: selectionMode === 'multi' ? 3 : 1,
+        options: [{ label: '圣光惩击', value: 'first-copy' }, { label: '圣光惩击', value: 'second-copy' }],
+      },
+    }
+    const showOptionPicker = vi.fn()
+    const runtime = createRuntime({
+      pendingSkill: skill, SPECTATE_MODE: false,
+      G: {
+        players: [{ playerId: 'player-blue', actionPoints: 2, hand: [
+          { cardId: 'holy-smite', instanceId: 'first-copy' },
+          { cardId: 'holy-smite', instanceId: 'second-copy' },
+          { cardId: 'filler', instanceId: 'not-a-candidate' },
+        ] }], turn: { currentPlayerId: 'player-blue' },
+      },
+      cardsById: { 'holy-smite': { name: '圣光惩击' }, filler: { name: '填充牌' } },
+      pendingOptionSelectionForMe: () => false,
+      isLocalSkillDraft: (value: { localChoiceDraft?: boolean }) => !!value?.localChoiceDraft,
+      localSkillChoices: () => [],
+      _updatePendingSkillTargets: vi.fn(),
+      flushPresentationBeforePendingSelection: vi.fn(),
+      renderActionBar: vi.fn(), renderTargetOverlay: vi.fn(), showOptionPicker,
+      document: undefined,
+    })
+    // Keep the real hand renderer and its existing DOM harness.
+    const domRuntime = createRuntime()
+    runtime.context.document = domRuntime.context.document
+    const container = domRuntime.container
+    installRenderHand(runtime.context)
+    new Script(readNamedFunction('renderLocalSkillPreparation')).runInContext(runtime.context)
+    new Script('renderLocalSkillPreparation(pendingSkill)').runInContext(runtime.context)
+    expect(showOptionPicker).not.toHaveBeenCalled()
+    expect(container.innerHTML).toContain('card-choice-selectable')
+    expect(container.innerHTML).toContain('card-choice-disabled')
+  })
+})
 
 describe('LAN battle hand card display metadata', () => {
   it('renders complete local metadata without contacting the authority server', async () => {

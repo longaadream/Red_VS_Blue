@@ -1,0 +1,689 @@
+{
+  "write": true,
+  "documents": 293,
+  "entries": 381,
+  "changedEntries": 118,
+  "rewrittenGraphs": 118,
+  "changed": [
+    {
+      "file": "data/skills/akaza-annihilation.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-disorder.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/akaza-flash-step.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/alfonso-freeze.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/alfonso-water-dash.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-frostmourne.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/arthas-howling-blast.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/ashbringer.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-deadly-gaze.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blackwidow-lethal-strike.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blessed-hammer.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/blizzard-damage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/blizzard.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/death-blossom.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/earthshatter.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/edgar-fisticuffs.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/el-primo-meteor-belt.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/elune-blessing.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/fireball.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/freeze-prevent.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/frostbolt.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-dragon.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hashirama-edo-wood-spike.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/hellfire-shotgun.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/hidan-sacrifice.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-black-getsuga-tensho.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-getsuga-tensho.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/ichigo-zangetsu.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-blade-dash.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-demon-strike.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/illidan-eye-beam.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/initial-draw.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/itachi-totsuka-blade.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-amakakeru.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-ryusosen.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/kenshin-ryutsuisen.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/kiljaedan-fel-fire.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/max-full-speed.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/max-phase-shifter.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/max-speed-shot.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/minato-rasengan.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/minato-spiral-barrage.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muru-lament.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-blood-whip.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/muzan-demon-body.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/naruto-rasengan.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/pulse-pistol-move.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/pulse-pistol.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/rafaam-curse-amplify.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/rocket-punch.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-chidori.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/sasuke-indra-arrow.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shadow-step-teleport.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-shotgun.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shelly-super-shell.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-flame-spirit.json",
+      "entries": [
+        "previewCode",
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/shishio-infinite-blade.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/sleep-prevent.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/sonic-super-form.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-armor-assembly.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-mechanical-support.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/tails-twin-flight.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/turalyon-grand-crusade.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/ulquiorra-black-cero.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-fate-shelter.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-holy-prophecy.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/velen-thousand-futures-ultimate.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-claw-rend.json",
+      "entries": [
+        "previewCode"
+      ]
+    },
+    {
+      "file": "data/skills/venom-host-transfer.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/skills/venom-symbiote-drag.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-black-coffin-end.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-aizen-kyoka-rewrite.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-akaza-damage-mark.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-lich-covenant.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-arthas-slow-restore.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-colt-big-stride.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-colt-zone-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-el-primo-meteor-belt.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-grimmjow-hunt-after-skill.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hashirama-edo-regen.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-undying-tick.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-hidan-undying.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-mangekyo-friendly-death.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-max-phase-recast-expire.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-minato-anchor-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-minato-flying-raijin-trigger.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-momentum-consume.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-damage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-muzan-regeneration-end.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-naruto-clone-one-hit.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-obito-grudge-reset.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-end-turn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-curse-ward.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-rafaam-temporal-distortion.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-reap.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-damage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-endturn.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sasuke-amaterasu-stack.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shadow-chaos-spear-restore.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shelly-bandage.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-shishio-cooldown-once.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-sonic-free-move.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-tails-flight-resolve.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-turalyon-lightforged-march.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-velen-delayed-effects.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/rules/rule-watcher-form.json",
+      "entries": [
+        "skillCode"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-nature-heal.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/hashirama-edo-thousand-hands.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/rafaam-curse-sample.json",
+      "entries": [
+        "code"
+      ]
+    },
+    {
+      "file": "data/cards/watcher-rage.json",
+      "entries": [
+        "code"
+      ]
+    }
+  ],
+  "guards": [],
+  "errors": []
+}

@@ -1,0 +1,1122 @@
+{
+  "id": "content-9900d482-d349-4b35-b88a-8f76879d632e",
+  "name": "火球术 · 从空白",
+  "description": "选择五格内的一名敌人，造成自身攻击力乘以一点五的普通伤害。",
+  "keywords": [],
+  "targetText": "",
+  "effectTags": [],
+  "kind": "active",
+  "type": "normal",
+  "form": null,
+  "cooldownTurns": 3,
+  "maxCharges": 0,
+  "chargeCost": 0,
+  "powerMultiplier": 1,
+  "actionPointCost": 1,
+  "range": "single",
+  "areaSize": 0,
+  "requiresTarget": true,
+  "targeting": null,
+  "showInUI": true,
+  "concealTargetInBattleLog": false,
+  "rollbackPendingTargetOnCancel": false,
+  "statusTag": null,
+  "chargeCostModifiers": [],
+  "code": "function executeSkill(context) { var __gameplayInvalid = {}; var __gameplayHost = (typeof context !== \"undefined\" && context !== null) ? context[\"__gameplayModuleDiagnosticHost\"] : undefined; var __gameplayBudget = { remaining: 10000 }; var __gameplayLoopDepth = 0; var __gameplayBudgetExceeded = {}; var __gameplayIsBudgetControl = function(error) { return error === __gameplayBudgetExceeded; }; var __gameplayConsumeIteration = function() { if (__gameplayBudget.remaining <= 0) throw __gameplayBudgetExceeded; __gameplayBudget.remaining -= 1; }; var __gameplayRecordFault = function(statementId, error, moduleId) { if (!__gameplayHost || typeof __gameplayHost.shouldRethrow !== \"function\" || __gameplayHost.shouldRethrow(error)) throw error; if (typeof __gameplayHost.record !== \"function\") throw error; __gameplayHost.record(statementId, error, moduleId); }; try { var _module0 = ((function(value){var id = value && typeof value === \"object\" ? value.instanceId : value; return flow.values.require(id, \"piece\", []);})(flow.choice.authorTarget({type: \"piece\", range: 5, filter: \"enemy\", canCancel: false}, \"sentence-module-1\"))); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-1\", __gameplayError, \"author.choice.target-piece\"); _module0 = __gameplayInvalid; } try { if ((((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === __gameplayInvalid) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) === null) || (((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0)))) { _module1 = __gameplayInvalid; } else { var _module1 = (flow.execution.declare(\"piece\",[],((_module0 !== null && typeof _module0 === \"object\" && Object.prototype.hasOwnProperty.call(_module0, \"piece\")) ? _module0[\"piece\"] : _module0))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-1_piece_result-1\", __gameplayError, \"local.declare\"); _module1 = __gameplayInvalid; } try { var _module2 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-1_1\", __gameplayError, \"ref.holder\"); _module2 = __gameplayInvalid; } try { if ((((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"handle\")) ? _module1[\"handle\"] : _module1) === __gameplayInvalid) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"handle\")) ? _module1[\"handle\"] : _module1) === undefined) || (((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"handle\")) ? _module1[\"handle\"] : _module1) === null)) { _module3 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } else { var _module3 = ((flow.execution.read(((_module1 !== null && typeof _module1 === \"object\" && Object.prototype.hasOwnProperty.call(_module1, \"handle\")) ? _module1[\"handle\"] : _module1),\"piece\",[]))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-2_1\", __gameplayError, \"local.read\"); _module3 = { \"value\": __gameplayInvalid, \"success\": __gameplayInvalid }; } try { var _module4 = (flow.refs.holder()); } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_1\", __gameplayError, \"ref.holder\"); _module4 = __gameplayInvalid; } try { if ((((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === __gameplayInvalid) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === undefined) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) === null) || (((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4) != null && (typeof flow === \"undefined\" || flow === null || !flow.query || typeof flow.query.hasPiece !== \"function\" || typeof flow.query.piece !== \"function\" || !flow.query.hasPiece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)) || !flow.query.piece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)) || !(flow.query.piece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4)).currentHp > 0)))) { _module5 = __gameplayInvalid; } else { var _module5 = ({value:((function(value){if(value===__gameplayInvalid||value===undefined)return __gameplayInvalid;if(value===null||typeof value!==\"object\")return value;return JSON.parse(JSON.stringify(value));})(flow.query.piece(((_module4 !== null && typeof _module4 === \"object\" && Object.prototype.hasOwnProperty.call(_module4, \"piece\")) ? _module4[\"piece\"] : _module4))[\"attack\"]))}); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_2\", __gameplayError, \"piece.field\"); _module5 = __gameplayInvalid; } try { if ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === __gameplayInvalid) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === undefined) || (((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) === null) || (1.5 === __gameplayInvalid) || (1.5 === undefined) || (1.5 === null)) { _module6 = __gameplayInvalid; } else { var _module6 = ((((_module5 !== null && typeof _module5 === \"object\" && Object.prototype.hasOwnProperty.call(_module5, \"value\")) ? _module5[\"value\"] : _module5) * 1.5)); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_3\", __gameplayError, \"math.multiply\"); _module6 = __gameplayInvalid; } try { if ((((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === __gameplayInvalid) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === undefined) || (((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6) === null)) { _module7 = __gameplayInvalid; } else { var _module7 = (Math.floor(((_module6 !== null && typeof _module6 === \"object\" && Object.prototype.hasOwnProperty.call(_module6, \"value\")) ? _module6[\"value\"] : _module6))); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"expr-3_4\", __gameplayError, \"math.floor\"); _module7 = __gameplayInvalid; } try { if ((((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === __gameplayInvalid) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === undefined) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) === null) || (((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece(((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2))) || ((_module3[\"value\"]) === __gameplayInvalid) || ((_module3[\"value\"]) === undefined) || ((_module3[\"value\"]) === null) || ((_module3[\"value\"]) != null && typeof flow !== \"undefined\" && flow !== null && flow.query && typeof flow.query.hasPiece === \"function\" && !flow.query.hasPiece((_module3[\"value\"]))) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === __gameplayInvalid) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === undefined) || (((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7) === null)) { _module8 = __gameplayInvalid; } else { var _module8 = (({result:flow.effects.apply(\"damage\",((_module2 !== null && typeof _module2 === \"object\" && Object.prototype.hasOwnProperty.call(_module2, \"piece\")) ? _module2[\"piece\"] : _module2),\"piece\",(_module3[\"value\"]),((_module7 !== null && typeof _module7 === \"object\" && Object.prototype.hasOwnProperty.call(_module7, \"value\")) ? _module7[\"value\"] : _module7),\"normal\",flow.clusters.attribution(flow.clusters.current().group))})); } } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"sentence-module-2\", __gameplayError, \"author.effect.damage\"); _module8 = __gameplayInvalid; } try { return; } catch (__gameplayError) { if (__gameplayIsBudgetControl(__gameplayError)) throw __gameplayError; __gameplayRecordFault(\"return-1\", __gameplayError); } }",
+  "gameplayModules": {
+    "version": "rvb-gameplay-module-document/v1",
+    "entries": {
+      "code": {
+        "graph": {
+          "version": "rvb-gameplay-modules/v1",
+          "surface": "skill",
+          "inputs": [],
+          "inputBindings": {},
+          "outputs": [],
+          "body": [
+            {
+              "kind": "call",
+              "id": "sentence-module-1",
+              "module": "author.choice.target-piece",
+              "version": "1",
+              "inputs": {},
+              "parameters": {
+                "range": 5,
+                "filter": "enemy",
+                "canCancel": false
+              },
+              "layout": {
+                "resultVariables": {
+                  "piece": {
+                    "name": "target",
+                    "declarationId": "sentence-module-1_piece_result-1",
+                    "valueType": "piece"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "sentence-module-1_piece_result-1",
+              "module": "local.declare",
+              "version": "2",
+              "parameters": {
+                "name": "target",
+                "valueType": "piece"
+              },
+              "inputs": {
+                "initial": {
+                  "kind": "output",
+                  "node": "sentence-module-1",
+                  "port": "piece"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-1_1",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "source",
+                  "source": "当前棋子"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-2_1",
+              "module": "local.read",
+              "version": "1",
+              "inputs": {
+                "handle": {
+                  "kind": "output",
+                  "node": "sentence-module-1_piece_result-1",
+                  "port": "handle"
+                }
+              },
+              "parameters": {
+                "valueType": "piece"
+              },
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "target",
+                  "source": "target"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-3_1",
+              "module": "ref.holder",
+              "version": "1",
+              "inputs": {},
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "amount",
+                  "source": "当前棋子.攻击力 * 1.5"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-3_2",
+              "module": "piece.field",
+              "version": "2",
+              "inputs": {
+                "piece": {
+                  "kind": "output",
+                  "node": "expr-3_1",
+                  "port": "piece"
+                }
+              },
+              "parameters": {
+                "field": "attack"
+              },
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "amount",
+                  "source": "当前棋子.攻击力 * 1.5"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-3_3",
+              "module": "math.multiply",
+              "version": "1",
+              "inputs": {
+                "left": {
+                  "kind": "output",
+                  "node": "expr-3_2",
+                  "port": "value"
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 1.5
+                }
+              },
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "amount",
+                  "source": "当前棋子.攻击力 * 1.5"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "expr-3_4",
+              "module": "math.floor",
+              "version": "1",
+              "inputs": {
+                "value": {
+                  "kind": "output",
+                  "node": "expr-3_3",
+                  "port": "value"
+                }
+              },
+              "parameters": {},
+              "layout": {
+                "authorExpression": {
+                  "owner": "sentence-module-2",
+                  "input": "amount",
+                  "source": "当前棋子.攻击力 * 1.5"
+                }
+              }
+            },
+            {
+              "kind": "call",
+              "id": "sentence-module-2",
+              "module": "author.effect.damage",
+              "version": "3",
+              "inputs": {
+                "source": {
+                  "kind": "output",
+                  "node": "expr-1_1",
+                  "port": "piece"
+                },
+                "target": {
+                  "kind": "output",
+                  "node": "expr-2_1",
+                  "port": "value"
+                },
+                "amount": {
+                  "kind": "output",
+                  "node": "expr-3_4",
+                  "port": "value"
+                }
+              },
+              "parameters": {
+                "sourceType": "piece",
+                "targetType": "piece",
+                "amountType": "number",
+                "resultType": "record",
+                "damageType": "normal",
+                "legacyNormalSpelling": "physical",
+                "attribution": "current"
+              },
+              "layout": {
+                "authorExpressions": {
+                  "source": {
+                    "source": "当前棋子",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-1_1",
+                      "port": "piece"
+                    },
+                    "nodes": [
+                      "expr-1_1"
+                    ]
+                  },
+                  "target": {
+                    "source": "target",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-2_1",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-2_1"
+                    ]
+                  },
+                  "amount": {
+                    "source": "当前棋子.攻击力 * 1.5",
+                    "value": {
+                      "kind": "output",
+                      "node": "expr-3_4",
+                      "port": "value"
+                    },
+                    "nodes": [
+                      "expr-3_1",
+                      "expr-3_2",
+                      "expr-3_3",
+                      "expr-3_4"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "id": "return-1"
+            }
+          ],
+          "composites": [],
+          "schemas": [
+            {
+              "id": "author.piece-skill",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "skillId",
+                  "type": "string",
+                  "label": "技能引用"
+                },
+                {
+                  "name": "instanceId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "技能实例"
+                },
+                {
+                  "name": "level",
+                  "type": "number",
+                  "optional": true,
+                  "label": "等级"
+                },
+                {
+                  "name": "currentCooldown",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前冷却"
+                },
+                {
+                  "name": "usesRemaining",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余次数"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "技能扩展"
+                },
+                {
+                  "name": "abilityGroupIds",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "能力组"
+                },
+                {
+                  "name": "authorExtensionDeclarations",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展声明"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-status",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "label": "状态定义引用"
+                },
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "状态类型"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "instanceId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "状态实例"
+                },
+                {
+                  "name": "intensity",
+                  "type": "number",
+                  "optional": true,
+                  "label": "强度"
+                },
+                {
+                  "name": "stacks",
+                  "type": "number",
+                  "optional": true,
+                  "label": "层数"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "optional": true,
+                  "label": "数值"
+                },
+                {
+                  "name": "currentDuration",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前持续"
+                },
+                {
+                  "name": "remainingDuration",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余持续"
+                },
+                {
+                  "name": "currentUses",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前次数"
+                },
+                {
+                  "name": "remainingUses",
+                  "type": "number",
+                  "optional": true,
+                  "label": "剩余次数"
+                },
+                {
+                  "name": "visible",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "可见"
+                },
+                {
+                  "name": "stacking",
+                  "type": "string",
+                  "optional": true,
+                  "label": "叠加方式"
+                },
+                {
+                  "name": "lifetime",
+                  "type": "string",
+                  "optional": true,
+                  "label": "生命周期"
+                },
+                {
+                  "name": "appliedTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "施加回合"
+                },
+                {
+                  "name": "expiresAfterTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "过期回合",
+                  "nullable": true
+                },
+                {
+                  "name": "lastDurationTickTurn",
+                  "type": "number",
+                  "optional": true,
+                  "label": "上次持续更新回合"
+                },
+                {
+                  "name": "relatedRules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "关联规则"
+                },
+                {
+                  "name": "statusAliases",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "状态别名"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "状态扩展"
+                },
+                {
+                  "name": "authorExtensionDeclarations",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展声明"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-rule",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "id",
+                  "type": "string",
+                  "label": "规则引用"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-buff",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "增益类型"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "label": "增益数值"
+                },
+                {
+                  "name": "duration",
+                  "type": "number",
+                  "label": "持续时间"
+                },
+                {
+                  "name": "source",
+                  "type": "string",
+                  "label": "来源"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-debuff",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "label": "减益类型"
+                },
+                {
+                  "name": "value",
+                  "type": "number",
+                  "label": "减益数值"
+                },
+                {
+                  "name": "duration",
+                  "type": "number",
+                  "label": "持续时间"
+                },
+                {
+                  "name": "source",
+                  "type": "string",
+                  "label": "来源"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-identity",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "label": "名称"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "label": "阵营"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-snapshot-fields",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "技能"
+                },
+                {
+                  "name": "displaySkills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "显示技能"
+                },
+                {
+                  "name": "buffs",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-buff@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "增益"
+                },
+                {
+                  "name": "debuffs",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-debuff@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "减益"
+                },
+                {
+                  "name": "shield",
+                  "type": "number",
+                  "optional": true,
+                  "label": "护盾"
+                },
+                {
+                  "name": "ruleTags",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "规则标签"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "状态"
+                },
+                {
+                  "name": "rules",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-rule@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "规则"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-flow-state",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "schemaVersion",
+                  "type": "number",
+                  "label": "版本"
+                },
+                {
+                  "name": "scope",
+                  "type": "string",
+                  "label": "所属范围"
+                },
+                {
+                  "name": "entityId",
+                  "type": "string",
+                  "label": "所属实例"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "namespace",
+                  "type": "string",
+                  "label": "变量分组"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "label": "变量名"
+                },
+                {
+                  "name": "value",
+                  "type": "json",
+                  "label": "存储内容"
+                },
+                {
+                  "name": "lifetime",
+                  "type": "string",
+                  "label": "保留时长"
+                },
+                {
+                  "name": "projectionVisibility",
+                  "type": "string",
+                  "label": "可见范围"
+                }
+              ],
+              "additionalFields": "json"
+            },
+            {
+              "id": "author.piece-instance",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "schemaVersion",
+                  "type": "number",
+                  "label": "版本"
+                },
+                {
+                  "name": "kind",
+                  "type": "string",
+                  "label": "类型"
+                },
+                {
+                  "name": "sourcePieceId",
+                  "type": "string",
+                  "label": "来源实例"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "identity",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-identity@1"
+                  },
+                  "label": "身份"
+                },
+                {
+                  "name": "fields",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-snapshot-fields@1"
+                  },
+                  "label": "字段副本"
+                },
+                {
+                  "name": "flowState",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-flow-state@1"
+                    }
+                  },
+                  "label": "流程状态"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "shield",
+                  "type": "number",
+                  "optional": true,
+                  "label": "护盾"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "技能"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "状态"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display-audiences",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "public",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "公开"
+                },
+                {
+                  "name": "owner",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "allies",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "友方"
+                },
+                {
+                  "name": "enemies",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "敌方"
+                },
+                {
+                  "name": "spectators",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display@1"
+                  },
+                  "optional": true,
+                  "label": "观战者"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-display-plan",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "audiences",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-display-audiences@1"
+                  },
+                  "label": "可见对象"
+                }
+              ]
+            },
+            {
+              "id": "author.piece-template",
+              "version": "1",
+              "fields": [
+                {
+                  "name": "baseSnapshot",
+                  "type": {
+                    "kind": "record",
+                    "schema": "author.piece-instance@1"
+                  },
+                  "optional": true,
+                  "label": "基础副本"
+                },
+                {
+                  "name": "templateId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "模板引用"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true,
+                  "label": "名称"
+                },
+                {
+                  "name": "maxHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "最大生命"
+                },
+                {
+                  "name": "currentHp",
+                  "type": "number",
+                  "optional": true,
+                  "label": "当前生命"
+                },
+                {
+                  "name": "attack",
+                  "type": "number",
+                  "optional": true,
+                  "label": "攻击力"
+                },
+                {
+                  "name": "defense",
+                  "type": "number",
+                  "optional": true,
+                  "label": "防御力"
+                },
+                {
+                  "name": "moveRange",
+                  "type": "number",
+                  "optional": true,
+                  "label": "移动力"
+                },
+                {
+                  "name": "ownerPlayerId",
+                  "type": "string",
+                  "optional": true,
+                  "label": "所属玩家"
+                },
+                {
+                  "name": "faction",
+                  "type": "string",
+                  "optional": true,
+                  "label": "阵营"
+                },
+                {
+                  "name": "isCore",
+                  "type": "boolean",
+                  "optional": true,
+                  "label": "核心棋子"
+                },
+                {
+                  "name": "skills",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-skill@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "初始技能"
+                },
+                {
+                  "name": "rules",
+                  "type": {
+                    "kind": "list",
+                    "element": "string"
+                  },
+                  "optional": true,
+                  "label": "初始规则"
+                },
+                {
+                  "name": "statusTags",
+                  "type": {
+                    "kind": "list",
+                    "element": {
+                      "kind": "record",
+                      "schema": "author.piece-status@1"
+                    }
+                  },
+                  "optional": true,
+                  "label": "初始状态"
+                },
+                {
+                  "name": "extension",
+                  "type": "record",
+                  "optional": true,
+                  "label": "扩展"
+                }
+              ]
+            }
+          ],
+          "continuations": []
+        },
+        "compilerVersion": "rvb-gameplay-module-compiler/v3"
+      }
+    }
+  },
+  "cluster": {
+    "version": "rvb-skill-cluster/v1",
+    "id": "skills:content-9900d482-d349-4b35-b88a-8f76879d632e",
+    "links": []
+  },
+  "targetType": "piece",
+  "filter": "enemy"
+}

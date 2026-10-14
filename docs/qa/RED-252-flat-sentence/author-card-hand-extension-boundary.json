@@ -1,0 +1,7 @@
+{
+  "moduleId": "sentence-module-6",
+  "offered": true,
+  "accepted": false,
+  "applyEnabled": false,
+  "diagnostic": "当前图需要修复后才能保存：missing parameter \"entityKind\" (graph.body[16].parameters)"
+}

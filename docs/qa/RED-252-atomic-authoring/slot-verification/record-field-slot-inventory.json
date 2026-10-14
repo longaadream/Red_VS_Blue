@@ -1,0 +1,14 @@
+[
+  {
+    "slot": "record-create:property:field:hp",
+    "name": "field:hp",
+    "kind": "property",
+    "text": "3"
+  },
+  {
+    "slot": "record-create:property:field:label",
+    "name": "field:label",
+    "kind": "property",
+    "text": "保留字段"
+  }
+]
