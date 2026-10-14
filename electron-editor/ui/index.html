@@ -14,6 +14,7 @@
 <script src="sentence-templates.js"></script>
 <script src="authoring-syntax.js"></script>
 <script src="authoring-expression.js"></script>
+<script src="description-editor.js"></script>
 <script src="object-editor.js"></script>
 <script src="author-diagnostics.js"></script>
 <script src="sentence-editor.js"></script>
@@ -27,6 +28,7 @@
 <link rel="stylesheet" href="content-graph.css">
 <link rel="stylesheet" href="gameplay-module-editor.css">
 <link rel="stylesheet" href="sentence-editor.css">
+<link rel="stylesheet" href="description-editor.css">
 <link rel="stylesheet" href="skill-cluster-editor.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -631,11 +633,25 @@ window.__editorDraftSessions = DRAFT_SESSIONS
 let ACTIVE_EDITOR_SESSION = null
 
 function draftSessionKey(subdir, id) { return `${subdir}:${id}` }
+function editorStateHasUnappliedEdits(state) {
+  return Array.isArray(state?.expressions) && state.expressions.length > 0
+    || Array.isArray(state?.authorStatementDrafts) && state.authorStatementDrafts.length > 0
+    || Array.isArray(state?.resultVariableDrafts) && state.resultVariableDrafts.length > 0
+}
 function sessionHasUnappliedEdits(session) {
-  return Object.values(session?.editorState || {}).some(state => Array.isArray(state?.expressions) && state.expressions.length > 0)
+  return Object.values(session?.editorState || {}).some(editorStateHasUnappliedEdits)
 }
 function sessionFingerprint(session) {
-  return JSON.stringify([session.serialized, Object.entries(session.editorState || {}).filter(([, state]) => state?.expressions?.length).map(([key, state]) => [key, state.expressions])])
+  return JSON.stringify([
+    session.serialized,
+    Object.entries(session.editorState || {})
+      .filter(([, state]) => editorStateHasUnappliedEdits(state))
+      .map(([key, state]) => [key, {
+        expressions: Array.isArray(state?.expressions) ? state.expressions : [],
+        authorStatementDrafts: Array.isArray(state?.authorStatementDrafts) ? state.authorStatementDrafts : [],
+        resultVariableDrafts: Array.isArray(state?.resultVariableDrafts) ? state.resultVariableDrafts : [],
+      }]),
+  ])
 }
 function sessionIsDirty(session) {
   if (!session) return false
@@ -813,6 +829,7 @@ function fieldMarkup(field, value) {
     const current = value == null || value === '' ? '<option value="" selected>未设置</option>' : Object.hasOwn(choices, value) ? '' : `<option value="${esc(value)}" selected>已有自定义值（保留）</option>`
     return `<div class="field-group"><label>${esc(label)}</label><select data-field-path="${esc(path)}">${current}${options}</select></div>`
   }
+  if (type === 'textarea' && path === 'description') return `<div class="field-group description-editor-field" data-description-editor><label>${esc(label)}</label><textarea data-field-path="${esc(path)}" data-description-input rows="3">${esc(value ?? '')}</textarea><div class="description-editor-actions"><button class="description-expression-open" data-description-expression-open type="button">插入表达式</button><span class="description-expression-help">可插入 {表达式}，只检查语法</span></div><div class="description-expression-panel" data-description-expression-panel hidden><div class="description-expression-input" data-description-expression-input></div><div class="description-expression-state"><span class="description-expression-status" data-description-expression-status></span><span class="description-expression-type" data-description-expression-type></span></div><div class="description-expression-actions"><button class="description-expression-close" data-description-expression-close type="button">取消</button><button class="description-expression-apply" data-description-expression-apply type="button" disabled>插入到描述</button></div></div></div>`
   if (type === 'textarea') return `<div class="field-group"><label>${esc(label)}</label><textarea data-field-path="${esc(path)}" rows="3">${esc(value ?? '')}</textarea></div>`
   if (type === 'checkbox') return `<div class="field-group"><label class="field-check"><input data-field-path="${esc(path)}" data-value-type="boolean" type="checkbox" ${value === true ? 'checked' : ''}/><span>${esc(label)}</span></label><small class="field-help">勾选后，这条规则的名称、说明和图标会显示在局内玩家状态栏；隐藏只影响展示，不影响规则执行。</small></div>`
   if (type === 'boolean') return `<div class="field-group"><label>${esc(label)}</label><select data-field-path="${esc(path)}" data-value-type="boolean"><option value="true" ${value === true ? 'selected' : ''}>是</option><option value="false" ${value === false ? 'selected' : ''}>否</option></select></div>`
@@ -838,6 +855,8 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     if (ACTIVE_EDITOR_SESSION?.key === candidate.key) ACTIVE_EDITOR_SESSION = null
   }
   const cached = DRAFT_SESSIONS.get(key)
+  detailEl.descriptionEditors?.forEach(editor => editor.destroy?.())
+  detailEl.descriptionEditors = []
   detailEl.codeIDE?.destroy()
   detailEl.contentGraphEditor?.destroy()
   detailEl.gameplayModuleEditor?.destroy()
@@ -914,7 +933,7 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
    <article class="editor-frame">
      <header class="editor-header"><div class="editor-title"><h2 data-document-title>${esc(draft.cluster?.name || draft.name || item.id)}</h2><div class="file-id" hidden>${esc(item.filename)}</div>${clusterReturn ? `<button class="cluster-return-button" data-cluster-return type="button">${esc(clusterReturn.label || '返回关联能力')}</button>` : ''}</div><span class="dirty-state" role="status" aria-live="polite">${isNew ? '待创建' : '已保存'}</span></header>
      <!-- data-editor-mode="json" is emitted by the functional advanced editor menu below. -->
-     <nav class="editor-tabs" aria-label="编辑模式">${panes.filter(mode => ['cluster','fields'].includes(mode)).map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${mode === 'cluster' ? (subdir === 'pieces' ? '技能' : '效果') : '属性'}</button>`).join('')}<details class="studio-advanced-menu" hidden><summary>诊断</summary><div>${panes.filter(mode => !['cluster','fields'].includes(mode)).map(mode => `<button class="editor-mode" data-editor-mode="${mode}">${({graph:'旧格式兼容诊断',code:'执行代码',json:'完整数据'})[mode]}</button>`).join('')}</div></details></nav>
+    <nav class="editor-tabs" aria-label="编辑模式">${panes.filter(mode => ['cluster','fields'].includes(mode)).map((mode,index) => `<button class="editor-mode ${index === 0 ? 'active' : ''}" data-editor-mode="${mode}">${mode === 'cluster' ? (subdir === 'pieces' ? '能力组' : '效果') : '属性'}</button>`).join('')}<details class="studio-advanced-menu" hidden><summary>诊断</summary><div>${panes.filter(mode => !['cluster','fields'].includes(mode)).map(mode => `<button class="editor-mode" data-editor-mode="${mode}">${({graph:'旧格式兼容诊断',code:'执行代码',json:'完整数据'})[mode]}</button>`).join('')}</div></details></nav>
      ${['skills','pieces','cards','rules'].includes(subdir) ? '<section class="editor-pane active" data-editor-pane="cluster"><div data-skill-cluster></div></section>' : ''}
      <section class="editor-pane${panes[0] === 'fields' ? ' active' : ''}" data-editor-pane="fields"><div class="editor-help">基础属性会同步到当前草稿。状态声明与效果语句可在能力组中分别编辑。</div><div data-visual-fields></div><div class="form-section grid2">${config.fields.map(field => fieldMarkup(field, getPath(draft, field[0]))).join('')}</div></section>
     ${['skills','rules','cards'].includes(subdir) ? '<section class="editor-pane" data-editor-pane="graph"><div data-content-graph></div>' + (['skills','rules'].includes(subdir) ? '<div data-source-flow></div>' : '') + (subdir === 'skills' ? '<details data-typed-graph><summary>类型化节点编程（原版）</summary><div data-skill-graph></div></details>' : '') + '</section>' : ''}
@@ -1166,6 +1185,11 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       core: window.ContentGraphCore,
       root: { collection: subdir, id: item.id },
       getDraft: () => draft,
+      getPieceAbilityGroups: subdir === 'pieces' ? (catalog, currentDraft) => {
+        const builder = window.ContentGraphCore?.buildPieceAbilityGroups
+        if (typeof builder !== 'function') return null
+        return builder(catalog || catalogWithDrafts(), currentDraft?.id || item.id)
+      } : undefined,
       onChange: syncDraft,
       readAsset: relativePath => api.readAsset(relativePath),
       listAssets: () => api.listAssets(),
@@ -1275,8 +1299,8 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     if (!result.error) draft = clone(result.value)
     errorEl.textContent = jsonError ? window.SkillSentenceEditor?.localizeDiagnostic?.(jsonError) || jsonError : ''
     jsonEl.classList.toggle('invalid', Boolean(result.error))
-    saveButton.disabled = Boolean(result.error || result.graphError || sessionHasUnappliedEdits(session))
     const unchanged = jsonEl.value === JSON.stringify(saved, null, 2)
+    saveButton.disabled = Boolean(result.error || result.graphError || sessionHasUnappliedEdits(session) || (!pendingCreate && unchanged))
     session.serialized = serialized
     const draftStored = session.draftRevision && session.persistedFingerprint === sessionFingerprint(session)
     setStatus(draftStored ? '草稿已保存 · 尚未应用' : result.error ? '内容格式需要修正' : result.graphError ? '效果语句需要修正' : (pendingCreate ? '待创建' : (unchanged ? '已保存' : '未保存')), draftStored ? 'draft-saved' : result.error || result.graphError ? 'invalid' : (pendingCreate || !unchanged ? 'dirty' : 'valid'))
@@ -1330,6 +1354,12 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
     setPath(draft, input.dataset.fieldPath, value)
     syncDraft(draft)
   })
+  detailEl.descriptionEditors = [...detailEl.querySelectorAll('[data-description-editor]')].map(container => window.DescriptionEditor?.mount(container, {
+    subdir,
+    surface: ({ skills:'skill', cards:'card', rules:'rule', pieces:'pending' })[subdir] || 'pending',
+    core: window.ContentGraphCore,
+    getDraft: () => draft,
+  })).filter(Boolean)
   session.moveHistory = direction => {
     const from = direction === 'undo' ? undoStack : redoStack
     const to = direction === 'undo' ? redoStack : undoStack
@@ -1419,7 +1449,16 @@ function renderDocumentEditor({ subdir, item, data, dataMap, items, listControll
       listController.select(item.id); setStatus('已保存', 'valid'); if (!workspaceSaving) toast(`${item.name} 已保存`)
       return true
     } catch (error) { toast('保存失败：' + error.message, 'error'); setStatus('保存失败', 'invalid'); return false }
-    finally { delete detailEl.dataset.saving; controls.forEach(([node, disabled]) => { node.disabled = disabled }); codeIDE?.setLocked(false); saveButton.disabled = false; saveButton.textContent = pendingCreate ? '创建内容' : '保存内容'; if (!pendingCreate) detailEl.querySelector('[data-open-external]').disabled = false; syncStudioHeader() }
+    finally {
+      delete detailEl.dataset.saving
+      controls.forEach(([node, disabled]) => { node.disabled = disabled })
+      codeIDE?.setLocked(false)
+      const unchanged = jsonEl.value === JSON.stringify(saved, null, 2)
+      saveButton.disabled = Boolean(jsonError || sessionHasUnappliedEdits(session) || (!pendingCreate && unchanged))
+      saveButton.textContent = pendingCreate ? '创建内容' : '保存内容'
+      if (!pendingCreate) detailEl.querySelector('[data-open-external]').disabled = false
+      syncStudioHeader()
+    }
   }
   session.save = () => saveButton.onclick()
   for (const selector of ['[data-content-graph]', '[data-source-flow]', '[data-typed-graph]']) {

@@ -572,6 +572,13 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:naruto-sage-mode",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-naruto-clone-endturn-charge",
+        "relation": "owned",
+        "source": "pieces/blue-naruto.rules"
+      }
+    ]
   }
 }

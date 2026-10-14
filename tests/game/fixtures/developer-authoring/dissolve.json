@@ -1,7 +1,8 @@
 {
-  "id": "content-2a453948-9687-4cfd-bd1f-ba320e60ab65",
+  "id": "content-fd1cc64b-43ad-480b-8424-378d87a43517",
   "name": "受伤后消散 · 从空白",
   "description": "受到伤害后消灭自身。",
+  "visible": false,
   "priority": 0,
   "trigger": {
     "type": "afterDamageTaken"

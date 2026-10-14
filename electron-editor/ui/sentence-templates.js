@@ -874,6 +874,47 @@
   }
 
   const templateMetadata = Object.freeze(Object.fromEntries(Object.keys(metadata).map(id => [id, getTemplate(id)])))
+
+  // The blank-graph author palette intentionally has a very small vocabulary.
+  // Reads and calculations still have templates above because they are valid
+  // expression values, but they are not executable-looking top-level steps.
+  // The two synthetic entries are handled by sentence-editor.js and lower to
+  // registered calls before they are persisted; keeping their metadata here
+  // lets the picker and lightweight tests share one source of truth without
+  // adding a gameplay-module descriptor or schema field.
+  const authorStatementCatalog = Object.freeze([
+    Object.freeze({
+      id: 'local.declare',
+      kind: 'local-declaration',
+      label: '新建变量',
+      description: '在本次执行中新建一个局部变量。',
+      registered: true,
+    }),
+    Object.freeze({
+      id: 'author.extension.declare',
+      kind: 'extension-declaration',
+      label: '声明扩展变量',
+      description: '在对象的扩展中新建一个带类型的变量。',
+      registered: false,
+    }),
+    Object.freeze({
+      id: 'author.assignment',
+      kind: 'assignment',
+      label: '赋值',
+      description: '把表达式结果写入局部变量、可写字段或扩展变量。',
+      registered: false,
+    }),
+  ])
+
+  const expressionOnlyModulePrefixes = Object.freeze([
+    'math.', 'compare.', 'logic.', 'attribute.read', 'piece.field', 'player.field',
+    'event.field', 'local.read', 'extension.read-', 'map.get', 'record.get',
+  ])
+  function isExpressionOnlyModule(id) {
+    const value = String(id || '')
+    return expressionOnlyModulePrefixes.some(prefix => value === prefix || value.startsWith(prefix))
+  }
+
   const api = {
     describeCall,
     describeStatement,
@@ -882,6 +923,9 @@
     derivedParameterValues,
     isRedundantResultMessage,
     isSlotAvailable,
+    isExpressionOnlyModule,
+    authorStatements: authorStatementCatalog,
+    authorStatementCatalog,
     templates: templateMetadata,
     TEMPLATES: templateMetadata,
   }

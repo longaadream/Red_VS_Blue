@@ -287,13 +287,15 @@ async function readDraft(root = '#skills-detail') {
 }
 
 async function saveCurrent() {
-  await evaluate("(()=>{const button=document.querySelector('#skills-detail [data-sentence-save]')||document.querySelector('#skills-detail [data-save-json]');if(!button)throw new Error('missing save action');button.click()})()")
+  await evaluate("(()=>{const button=document.querySelector('#skills-detail [data-save-json]')||document.querySelector('#skills-detail [data-sentence-save]');if(!button)throw new Error('missing save action');button.click()})()")
+  await delay(200)
   try {
     await until("document.querySelector('#skills-detail [data-footer-state]')?.textContent==='已保存' || document.querySelector('#skills-detail .dirty-state')?.textContent==='已保存'", 'save completion')
   } catch (error) {
     const diagnostic = await evaluate("document.querySelector('#skills-detail [data-json-error]')?.textContent || document.querySelector('#skills-detail .dirty-state.invalid')?.textContent || ''")
+    const toast = await evaluate("[...document.querySelectorAll('#toast .toast-item, .toast-item')].map(node=>node.textContent||'').join(' | ')")
     const entryState = await evaluate("(()=>{const text=document.querySelector('#skills-detail [data-json-source]')?.value||'';try{const value=JSON.parse(text);const entry=value.gameplayModules?.entries?.code;let compile='';try{window.ContentGraphCore.compileGameplayModuleGraph(entry?.graph,window.ContentGraphCore.GAMEPLAY_MODULE_REGISTRY)}catch(error){compile=error?.message||String(error)}return JSON.stringify({entries:Object.fromEntries(Object.entries(value.gameplayModules?.entries||{}).map(([key,item])=>[key,{compilerVersion:item?.compilerVersion,graphSurface:item?.graph?.surface,graphVersion:item?.graph?.version,bodyLength:item?.graph?.body?.length}])),compile,schema10:entry?.graph?.schemas?.[10]||null})}catch{return ''}})()")
-    throw new Error(`${error.message}; graph diagnostic: ${diagnostic}; entries: ${entryState}`)
+    throw new Error(`${error.message}; graph diagnostic: ${diagnostic}; toast: ${toast}; entries: ${entryState}`)
   }
   await delay(100)
 }
@@ -346,6 +348,23 @@ async function applyAuthorExpression(name, source, root = '#skills-detail') {
   await delay(120)
 }
 
+async function applyAuthorStatementField(root, field, value) {
+  const editorSelector = `${root} .sentence-author-statement-editor[data-sentence-author-statement] [data-sentence-author-field=${selector(field)}] .ei-editor`
+  await until(`Boolean(document.querySelector(${selector(editorSelector)}))`, `author statement field ${field}`)
+  await evaluate(`(()=>{
+    const editor=document.querySelector(${selector(editorSelector)})
+    if(!editor)throw new Error('missing author statement field: '+${selector(field)})
+    editor.focus()
+    editor.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true,data:''}))
+    editor.textContent=${selector(value)}
+    editor.dispatchEvent(new CompositionEvent('compositionupdate',{bubbles:true,data:${selector(value)}}))
+    editor.dispatchEvent(new InputEvent('input',{bubbles:true,data:${selector(value)},inputType:'insertCompositionText',isComposing:true}))
+    editor.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:${selector(value)}}))
+    editor.dispatchEvent(new InputEvent('input',{bubbles:true,data:${selector(value)},inputType:'insertText',isComposing:false}))
+  })()`)
+  await delay(120)
+}
+
 async function addModule(root, moduleId, version) {
   await click(`${root} [data-sentence-add-effect]`)
   await until(`Boolean(document.querySelector(${selector(`${root} [data-sentence-popover=module]`)}))`, `${moduleId} module picker`)
@@ -382,8 +401,61 @@ async function addModule(root, moduleId, version) {
 async function applySlotExpression(root, statementId, name, source) {
   const slot = `${statementId}:input:${name}`
   await click(`${root} [data-sentence-slot-editor=${selector(slot)}]`)
-  await until(`Boolean(document.querySelector(${selector(`${root} [data-sentence-author-expression=${JSON.stringify(name)}] .ei-editor`)}))`, `${name} expression editor`)
+  const directExpression = `${root} [data-sentence-direct-expression=${selector(name)}]`
+  const expressionEditor = `${root} [data-sentence-author-expression=${selector(name)}] .ei-editor`
+  await until(`Boolean(document.querySelector(${selector(directExpression)})) || Boolean(document.querySelector(${selector(expressionEditor)}))`, `${name} expression action`)
+  if (await evaluate(`Boolean(document.querySelector(${selector(directExpression)}))`)) await click(directExpression, `${name} direct expression`)
+  await until(`Boolean(document.querySelector(${selector(expressionEditor)}))`, `${name} expression editor`)
   await applyAuthorExpression(name, source, root)
+}
+
+async function applyModuleInputExpression(root, statementId, name, source) {
+  const row = `${root} [data-sentence-module-editor=${selector(statementId)}]`
+  const panel = `${root} [data-sentence-inline-editor=${selector(statementId)}]`
+  await click(row, `${name} module editor`)
+  await until(`Boolean(document.querySelector(${selector(panel)}))`, `${name} module inspector`)
+  const field = `${panel} [data-sentence-module-input=${selector(name)}]`
+  await until(`Boolean(document.querySelector(${selector(field)}))`, `${name} optional input`)
+  await evaluate(`(()=>{const field=document.querySelector(${selector(field)});const details=field?.closest('details');if(details&&!details.open)details.querySelector('summary')?.click()})()`)
+  const directExpression = `${field} [data-sentence-direct-expression=${selector(name)}]`
+  const expressionEditor = `${root} [data-sentence-author-expression=${selector(name)}] .ei-editor`
+  if (await evaluate(`Boolean(document.querySelector(${selector(directExpression)}))`)) await click(directExpression, `${name} module input expression`)
+  await until(`Boolean(document.querySelector(${selector(expressionEditor)}))`, `${name} module input expression editor`)
+  await applyAuthorExpression(name, source, root)
+}
+
+async function setModuleParameter(root, statementId, name, value) {
+  const panel = `${root} [data-sentence-inline-editor=${selector(statementId)}]`
+  if (!await evaluate(`Boolean(document.querySelector(${selector(panel)}))`)) {
+    await click(`${root} [data-sentence-module-editor=${selector(statementId)}]`, `${name} module editor`)
+    await until(`Boolean(document.querySelector(${selector(panel)}))`, `${name} module inspector`)
+  }
+  const field = `${panel} [data-sentence-module-parameter=${JSON.stringify(name)}]`
+  await until(`Boolean(document.querySelector(${selector(field)}))`, `${name} module parameter`)
+  await evaluate(`(()=>{const field=document.querySelector(${selector(field)});const details=field.closest('details');if(details&&!details.open)details.querySelector('summary')?.click();const select=field.querySelector('[data-sentence-literal-enum],select');const input=field.querySelector('input:not([type="checkbox"]),textarea');if(select){const raw=${selector(String(value))};const option=[...select.options].find(item=>item.value===raw||item.textContent.trim()===raw);if(!option)throw new Error('missing module parameter option '+${selector(name)});select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));return}if(!input)throw new Error('missing module parameter input '+${selector(name)});input.value=${selector(String(value))};input.dispatchEvent(new Event('change',{bubbles:true}))})()`)
+  await delay(140)
+}
+
+async function saveSentenceOutput(root, statementId, outputName, variableName) {
+  const rowSelector = `${root} [data-sentence-node=${selector(statementId)}]`
+  await until(`Boolean(document.querySelector(${selector(rowSelector)}))`, `result row ${outputName}`)
+  const result = await evaluate(`(()=>{
+    const row=document.querySelector(${selector(rowSelector)})
+    const key=${selector(`${statementId}:${outputName}`)}
+    const byKey=(name)=>[...row?.querySelectorAll(name)||[]].find(item=>item.dataset.sentenceSaveResult===key||item.dataset.sentenceResultVariableName===key||item.dataset.sentenceResultVariableApply===key)
+    const save=byKey('[data-sentence-save-result]')
+    if(!save)return {ok:false,reason:'RESULT_SAVE_CONTROL_MISSING'}
+    save.click()
+    const input=byKey('[data-sentence-result-variable-name]')
+    const apply=byKey('[data-sentence-result-variable-apply]')
+    if(!input||!apply)return {ok:false,reason:'RESULT_VARIABLE_EDITOR_MISSING'}
+    input.value=${selector(variableName)}
+    input.dispatchEvent(new Event('input',{bubbles:true}))
+    apply.click()
+    return {ok:true,value:input.value}
+  })()`)
+  assert.equal(result?.ok, true, `result ${outputName} must be named ${variableName}`)
+  await delay(120)
 }
 
 function decodeTypeParameter(value) {
@@ -508,6 +580,7 @@ try {
     assert.ok(firstAuthored.some(statement => statement.module === 'math.add'))
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(slot.selector)}]`)
+    if (await evaluate("Boolean(document.querySelector('#skills-detail [data-sentence-direct-expression=\"amount\"]'))")) await click('#skills-detail [data-sentence-direct-expression="amount"]', 'reopened amount direct expression')
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-author-expression="amount"]'))`, 'reopened amount expression editor')
     await applyAuthorExpression('amount', 'amount_value * (attack_value + 12)')
     edited = await readDraft()
@@ -563,6 +636,8 @@ try {
     assert.equal(graph.body.find(statement => statement.id === choiceId)?.version, '3', 'the real picker must expose choice v3')
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${choiceId}:input:options`)}]`)
+    await until(`Boolean(document.querySelector('#skills-detail [data-sentence-direct-expression="options"]'))`, 'choice v3 options direct expression action')
+    await click('#skills-detail [data-sentence-direct-expression="options"]', 'choice v3 options direct expression')
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-author-expression="options"] .ei-editor'))`, 'choice v3 options expression editor')
     await applyAuthorExpression('options', '映射({"红", "蓝"}, {1, 2})')
     draft = await readDraft()
@@ -616,6 +691,7 @@ try {
     const codeBlockId = codeBlock.id
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${codeBlockId}:input:block`)}]`)
+    await click('#skills-detail [data-sentence-direct-expression="block"]', 'code block definition expression')
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}]'))`, 'code block definition form')
     assert.equal(await evaluate(`Boolean(document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}] [data-sentence-code-block-id]'))`), true, 'code block form must expose a typed identifier field')
     assert.equal(await evaluate(`Boolean(document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}] [data-sentence-code-block-argument-type]'))`), true, 'code block form must expose argument type controls')
@@ -631,6 +707,7 @@ try {
     assert.equal(decodeTypeParameter(selected.parameters.blockType).kind, 'record')
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${codeBlockId}:input:args`)}]`)
+    await click('#skills-detail [data-sentence-direct-expression="args"]', 'code block arguments expression')
     await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=\"args\"] .ei-editor'))", 'code block arguments expression editor')
     await applyAuthorExpression('args', '{"target": "piece-1"}')
     await click(`#skills-detail [data-sentence-module-editor=${JSON.stringify(codeBlockId)}]`)
@@ -645,16 +722,41 @@ try {
     const bodyRoot = `#skills-detail [data-code-block-body-normal-editor=${JSON.stringify(codeBlockId)}]`
     await click(`${bodyRoot} [data-sentence-add-effect]`)
     await until(`Boolean(document.querySelector(${JSON.stringify(`${bodyRoot} [data-sentence-popover=module]`)}))`, 'code block body module picker')
-    await until(`Boolean(document.querySelector(${JSON.stringify(`${bodyRoot} [data-sentence-module="math.add"]`)}))`, 'code block body math module')
-    await click(`${bodyRoot} [data-sentence-module="math.add"]`)
+    await until(`Boolean(document.querySelector(${JSON.stringify(`${bodyRoot} [data-sentence-module="local.declare"]`)}))`, 'code block body variable module')
+    await click(`${bodyRoot} [data-sentence-module="local.declare"]`)
     await delay(160)
     draft = await readDraft()
     graph = draft.gameplayModules.entries.code.graph
     selected = graph.body.find(statement => statement.id === codeBlockId)
     const bodyAfterModule = selected.layout?.authorExpressions?.block?.data?.graph?.body || []
-    const mathAddAfterPicker = bodyAfterModule.find(statement => statement.module === 'math.add')
+    const bodyVariable = bodyAfterModule.find(statement => statement.module === 'local.declare')
+    assert.ok(bodyVariable, 'normal body editor must insert a declared variable before composing its initial value')
+    await applyModuleInputExpression(bodyRoot, bodyVariable.id, 'initial', '3 + 4')
+    await delay(160)
+    draft = await readDraft()
+    graph = draft.gameplayModules.entries.code.graph
+    selected = graph.body.find(statement => statement.id === codeBlockId)
+    const bodyAfterExpression = selected.layout?.authorExpressions?.block?.data?.graph?.body || []
+    const mathAddAfterPicker = bodyAfterExpression.find(statement => statement.module === 'math.add')
     assert.ok(mathAddAfterPicker, 'normal body editor must write a registered typed module into the block definition metadata')
-    assert.ok(bodyAfterModule.some(statement => statement.kind === 'return'), 'normal body editor keeps the typed return statement')
+    assert.ok(bodyAfterExpression.some(statement => statement.kind === 'return'), 'normal body editor keeps the typed return statement')
+
+    // Reapplying an unchanged nested expression must replace its generated
+    // outer graph data instead of appending another serialized body chain.
+    const initialBodyStatementCount = bodyAfterExpression.length
+    const initialOuterBodyCount = graph.body.length
+    const initialOuterGraphSize = JSON.stringify(graph).length
+    for (let repeat = 0; repeat < 2; repeat += 1) {
+      await applySlotExpression(bodyRoot, bodyVariable.id, 'initial', '3 + 4')
+      await delay(160)
+      draft = await readDraft()
+      graph = draft.gameplayModules.entries.code.graph
+      selected = graph.body.find(statement => statement.id === codeBlockId)
+      const repeatedBody = selected.layout?.authorExpressions?.block?.data?.graph?.body || []
+      assert.equal(repeatedBody.length, initialBodyStatementCount, 'repeated code block body edit must preserve statement count')
+      assert.equal(graph.body.length, initialOuterBodyCount, 'repeated code block body edit must not append outer statements')
+      assert.equal(JSON.stringify(graph).length, initialOuterGraphSize, 'repeated code block body edit must not grow the graph')
+    }
 
     // The structural controls are the ordinary editor controls too.  Add an
     // if and a foreach so the smoke catches a regression where code blocks
@@ -669,21 +771,23 @@ try {
     assert.ok(bodyAfterStructures.some(statement => statement.kind === 'if'), 'normal body editor must support if statements')
     assert.ok(bodyAfterStructures.some(statement => statement.kind === 'foreach'), 'normal body editor must support foreach statements')
 
-    // Reopen the nested statement inspector and edit its typed number input.
+    // Reopen the declaration's typed expression.  Pure math calls are shown
+    // inside that expression rather than as standalone executable rows.
     const mathAddId = bodyAfterStructures.find(statement => statement.module === 'math.add')?.id
     assert.ok(mathAddId, 'math.add body statement has an id')
-    await click(`${bodyRoot} [data-sentence-module-editor=${JSON.stringify(mathAddId)}]`)
-    await until(`Boolean(document.querySelector(${JSON.stringify(`${bodyRoot} [data-sentence-inline-editor=${mathAddId}] [data-sentence-author-expression="left"] .ei-editor`)}))`, 'code block nested number expression')
-    await applyAuthorExpression('left', '3', bodyRoot)
+    const bodyVariableAfterStructures = bodyAfterStructures.find(statement => statement.module === 'local.declare')
+    assert.ok(bodyVariableAfterStructures, 'local declaration remains the owner of the nested expression')
+    await applySlotExpression(bodyRoot, bodyVariableAfterStructures.id, 'initial', '3 + 4')
     await delay(160)
     draft = await readDraft()
     graph = draft.gameplayModules.entries.code.graph
     selected = graph.body.find(statement => statement.id === codeBlockId)
     const bodyAfterInput = selected.layout?.authorExpressions?.block?.data?.graph?.body || []
-    const mathAddAfterInput = bodyAfterInput.find(statement => statement.id === mathAddId)
+    const mathAddAfterInput = bodyAfterInput.find(statement => statement.module === 'math.add')
     assert.equal(mathAddAfterInput?.inputs?.left?.value, 3, 'nested typed literal should be persisted')
 
     await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${codeBlockId}:input:block`)}]`)
+    await click('#skills-detail [data-sentence-direct-expression="block"]', 'code block definition edit expression')
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}]'))`, 'code block edit definition form')
     await evaluate(`(()=>{const root=document.querySelector('#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}]');const id=root?.querySelector('[data-sentence-code-block-id]');if(!id)throw new Error('missing code block id field');id.value='ui-block-edited';id.dispatchEvent(new Event('change',{bubbles:true}))})()`)
     await click(`#skills-detail [data-sentence-code-block-definition=${JSON.stringify(codeBlockId)}] [data-sentence-code-block-create]`)
@@ -727,9 +831,6 @@ try {
     assert.equal(draft.id, cardId)
     assert.equal(draft.gameplayModules.entries.code.graph.surface, 'card')
     const inserted = []
-    const currentCardId = await addModule('#cards-detail', 'ref.current-card', '1')
-    inserted.push(currentCardId)
-
     const choiceId = await addModule('#cards-detail', 'author.choice.option', '3')
     await applySlotExpression('#cards-detail', choiceId, 'options', '映射({"攻击", "防御"}, {1, 2})')
     draft = await readDraft('#cards-detail')
@@ -740,57 +841,95 @@ try {
     assert.equal(decodeTypeParameter(choice.parameters.valueType), 'number')
 
     const targetId = await addModule('#cards-detail', 'author.choice.target-piece', '1')
+    await saveSentenceOutput('#cards-detail', targetId, 'piece', 'target')
 
     const damageId = await addModule('#cards-detail', 'author.effect.damage', '2')
     await applySlotExpression('#cards-detail', damageId, 'source', '当前棋子')
-    await applySlotExpression('#cards-detail', damageId, 'target', '目标')
+    await applySlotExpression('#cards-detail', damageId, 'target', 'target')
     await applySlotExpression('#cards-detail', damageId, 'amount', '1')
 
     const healId = await addModule('#cards-detail', 'author.effect.heal', '2')
     await applySlotExpression('#cards-detail', healId, 'source', '当前棋子')
-    await applySlotExpression('#cards-detail', healId, 'target', '目标')
+    await applySlotExpression('#cards-detail', healId, 'target', 'target')
     await applySlotExpression('#cards-detail', healId, 'amount', '2')
-
-    // The ordinary unified extension module must accept the concrete current
-    // hand instance.  The editor infers the hidden entityKind from this typed
-    // reference; authors only fill the entity, name, type and initial value.
-    const extensionId = await addModule('#cards-detail', 'extension.declare-instance', '1')
-    const slot = `${extensionId}:input:entity`
-    await click(`#cards-detail [data-sentence-slot-editor=${selector(slot)}]`)
-    await until(`Boolean(document.querySelector(${selector(`#cards-detail [data-sentence-author-expression="entity"] .ei-editor`)}))`, 'current hand extension editor')
-    await applyAuthorExpression('entity', '当前手牌', '#cards-detail')
-    await click(`#cards-detail [data-sentence-module-editor=${selector(extensionId)}]`)
-    await until(`Boolean(document.querySelector('#cards-detail [data-sentence-inline-editor=${selector(extensionId)}]'))`, 'instance extension inspector')
-    await evaluate(`(()=>{const field=document.querySelector('#cards-detail [data-sentence-inline-editor=${selector(extensionId)}] [data-sentence-module-parameter="name"] input');if(!field)throw new Error('instance extension name field missing');field.value='armor';field.dispatchEvent(new Event('change',{bubbles:true}))})()`)
-    await delay(120)
-    await applySlotExpression('#cards-detail', extensionId, 'value', '1')
     draft = await readDraft('#cards-detail')
     graph = draft.gameplayModules.entries.code.graph
-    const handStatement = graph.body.find(statement => statement.id === extensionId)
-    const handExtension = {
-      moduleId: extensionId,
-      accepted: true,
-      entityKind: handStatement?.parameters?.entityKind,
-      entity: handStatement?.inputs?.entity,
-      name: handStatement?.parameters?.name,
-      valueType: handStatement?.parameters?.valueType,
-    }
-    await click(`#cards-detail [data-sentence-slot-editor=${selector(slot)}]`)
-    await until(`Boolean(document.querySelector(${selector(`#cards-detail [data-sentence-author-expression="entity"] .ei-editor`)}))`, 'reopen current hand expression editor')
-    const handTypeLabel = await evaluate(`document.querySelector('#cards-detail [data-sentence-author-expression="entity"] .sentence-author-expression-type')?.textContent || ''`)
-    assert.equal(handTypeLabel, '手牌实例', handTypeLabel)
-    await click('#cards-detail [data-sentence-apply-expression="entity"]')
-    handExtension.typeLabel = handTypeLabel
-    const handEntitySource = graph.body.find(statement => statement.id === handExtension.entity?.node)
-    assert.equal(handExtension.entityKind, 'card', JSON.stringify(handExtension))
-    assert.equal(handExtension.entity?.kind, 'output', JSON.stringify(handExtension))
-    assert.equal(handExtension.entity?.port, 'card', JSON.stringify(handExtension))
-    assert.equal(handEntitySource?.module, 'ref.current-card', JSON.stringify({ handExtension, handEntitySource }))
-    fs.writeFileSync(path.join(evidence, 'author-card-hand-extension.json'), JSON.stringify(handExtension, null, 2) + '\n')
+    const namedTarget = graph.body.find(statement => statement.id === targetId)
+    const authoredDamage = graph.body.find(statement => statement.id === damageId)
+    const authoredHeal = graph.body.find(statement => statement.id === healId)
+    assert.equal(namedTarget?.layout?.resultVariables?.piece?.name, 'target', 'card target choice must expose the saved target binding')
+    const targetDeclaration = graph.body.find(statement => statement.module === 'local.declare' && statement.parameters?.name === 'target')
+    assert.deepEqual(targetDeclaration?.inputs?.initial, { kind: 'output', node: targetId, port: 'piece' }, 'card target binding must be initialized from the choice output')
+    assert.equal(authoredDamage?.layout?.authorExpressions?.target?.source, 'target', 'card damage must use the explicit target binding')
+    assert.equal(authoredHeal?.layout?.authorExpressions?.target?.source, 'target', 'card heal must use the explicit target binding')
+
+    // Save the current hand instance in a real local declaration first. Pure
+    // references are composed inside input fields, so the blank card starts
+    // this binding through the visible local.declare form.
+    const currentHandId = await addModule('#cards-detail', 'local.declare', '2')
+    await setModuleParameter('#cards-detail', currentHandId, 'valueType', 'record')
+    await setModuleParameter('#cards-detail', currentHandId, 'name', '手牌变量')
+    await applyModuleInputExpression('#cards-detail', currentHandId, 'initial', '当前手牌')
+    draft = await readDraft('#cards-detail')
+    graph = draft.gameplayModules.entries.code.graph
+    const currentHand = graph.body.find(statement => statement.id === currentHandId)
+    const handBinding = graph.body.find(statement => statement.module === 'local.declare' && statement.parameters?.name === '手牌变量')
+    assert.equal(currentHand?.module, 'local.declare', JSON.stringify({ currentHand, handBinding }))
+    assert.equal(currentHand?.parameters?.valueType, 'record', JSON.stringify(currentHand))
+    assert.deepEqual(currentHand?.inputs?.initial?.kind, 'output', JSON.stringify(currentHand))
+    const currentHandSource = graph.body.find(statement => statement.id === currentHand?.inputs?.initial?.node)
+    assert.equal(currentHandSource?.module, 'ref.current-card', JSON.stringify({ currentHand, currentHandSource }))
+
+    await click('#cards-detail [data-sentence-add-effect]')
+    await until("Boolean(document.querySelector('#cards-detail [data-sentence-module=\"author.extension.declare\"]'))", 'unified card extension declaration')
+    await click('#cards-detail [data-sentence-module="author.extension.declare"]', 'unified card extension declaration')
+    await until("Boolean(document.querySelector('#cards-detail .sentence-author-statement-editor[data-sentence-author-statement]'))", 'card extension declaration editor')
+    const declarationPanel = '#cards-detail .sentence-author-statement-editor[data-sentence-author-statement]'
+    await applyAuthorStatementField('#cards-detail', 'ownerSource', '手牌变量')
+    await applyAuthorStatementField('#cards-detail', 'name', '护甲')
+    await applyAuthorStatementField('#cards-detail', 'initialSource', '1')
+    await click(`${declarationPanel} [data-sentence-author-apply]`, 'apply unified card extension declaration')
+    await until(`(()=>{
+      const source=JSON.parse(document.querySelector('#cards-detail [data-json-source]').value||'{}')
+      return Boolean(source.gameplayModules?.entries?.code?.graph?.body?.some(item=>item?.layout?.authorStatement?.kind==='extension-declaration'&&item.layout.authorStatement.name==='护甲'))
+    })()`, 'card extension declaration lowering')
+    draft = await readDraft('#cards-detail')
+    graph = draft.gameplayModules.entries.code.graph
+    const handExtension = graph.body.find(statement => statement.layout?.authorStatement?.kind === 'extension-declaration' && statement.layout.authorStatement.name === '护甲')
+    assert.equal(handExtension?.module, 'extension.declare-instance', JSON.stringify(handExtension))
+    assert.equal(handExtension?.parameters?.entityKind, 'card', JSON.stringify(handExtension))
+    assert.equal(handExtension?.parameters?.name, '护甲', JSON.stringify(handExtension))
+    assert.equal(handExtension?.layout?.authorStatement?.ownerSource, '手牌变量', JSON.stringify(handExtension))
+    const handEntitySource = graph.body.find(statement => statement.id === handExtension?.inputs?.entity?.node)
+    assert.deepEqual(handEntitySource?.inputs?.handle, { kind: 'output', node: handBinding?.id, port: 'handle' }, JSON.stringify({ handExtension, handEntitySource, handBinding }))
+    fs.writeFileSync(path.join(evidence, 'author-card-hand-extension.json'), JSON.stringify({ currentHandId, handBinding, handExtension }, null, 2) + '\n')
     screenshots.push(await screenshot('author-card-hand-extension.png'))
+
+    await click('#cards-detail [data-sentence-add-effect]')
+    await until("Boolean(document.querySelector('#cards-detail [data-sentence-module=\"author.assignment\"]'))", 'unified card assignment')
+    await click('#cards-detail [data-sentence-module="author.assignment"]', 'unified card assignment')
+    await until("Boolean(document.querySelector('#cards-detail .sentence-author-statement-editor[data-sentence-author-statement]'))", 'card assignment editor')
+    const assignmentPanel = '#cards-detail .sentence-author-statement-editor[data-sentence-author-statement]'
+    await applyAuthorStatementField('#cards-detail', 'targetSource', '手牌变量.extension.护甲')
+    await applyAuthorStatementField('#cards-detail', 'valueSource', '2')
+    await click(`${assignmentPanel} [data-sentence-author-apply]`, 'apply unified card assignment')
+    await until(`(()=>{
+      const source=JSON.parse(document.querySelector('#cards-detail [data-json-source]').value||'{}')
+      return Boolean(source.gameplayModules?.entries?.code?.graph?.body?.some(item=>item?.layout?.authorStatement?.kind==='assignment'&&item.layout.authorStatement.targetSource==='手牌变量.extension.护甲'))
+    })()`, 'card assignment lowering')
+    draft = await readDraft('#cards-detail')
+    graph = draft.gameplayModules.entries.code.graph
+    const handAssignment = graph.body.find(statement => statement.layout?.authorStatement?.kind === 'assignment' && statement.layout.authorStatement.targetSource === '手牌变量.extension.护甲')
+    assert.equal(handAssignment?.module, 'extension.write-instance', JSON.stringify(handAssignment))
+    assert.equal(handAssignment?.parameters?.entityKind, 'card', JSON.stringify(handAssignment))
+    assert.equal(handAssignment?.parameters?.name, '护甲', JSON.stringify(handAssignment))
+    assert.deepEqual(handAssignment?.inputs?.value, { kind: 'literal', value: 2 }, JSON.stringify(handAssignment))
+    const assignmentEntitySource = graph.body.find(statement => statement.id === handAssignment?.inputs?.entity?.node)
+    assert.deepEqual(assignmentEntitySource?.inputs?.handle, { kind: 'output', node: handBinding?.id, port: 'handle' }, JSON.stringify({ handAssignment, assignmentEntitySource, handBinding }))
 
     const codeBlockId = await addModule('#cards-detail', 'code-block.invoke', '1')
     await click(`#cards-detail [data-sentence-slot-editor=${selector(`${codeBlockId}:input:block`)}]`)
+    await click('#cards-detail [data-sentence-direct-expression="block"]', 'card code block definition expression')
     await until(`Boolean(document.querySelector('#cards-detail [data-sentence-code-block-definition=${selector(codeBlockId)}]'))`, 'card code block definition form')
     const definition = `#cards-detail [data-sentence-code-block-definition=${selector(codeBlockId)}]`
     await evaluate(`(()=>{const root=document.querySelector(${selector(definition)});const id=root?.querySelector('[data-sentence-code-block-id]');if(!id)throw new Error('card code block id field missing');id.value='ui-armor-block';id.dispatchEvent(new Event('change',{bubbles:true}))})()`)
@@ -800,6 +939,7 @@ try {
     // Keeping creation and signature extension as two ordinary form actions
     // also mirrors how authors incrementally evolve a block in the workbench.
     await click(`#cards-detail [data-sentence-slot-editor=${selector(`${codeBlockId}:input:block`)}]`)
+    await click('#cards-detail [data-sentence-direct-expression="block"]', 'card code block definition edit expression')
     await until(`Boolean(document.querySelector(${selector(definition)}))`, 'card code block edit definition form')
     await evaluate(`(()=>{const root=document.querySelector(${selector(definition)});root.querySelector('[data-sentence-code-block-add-output]')?.click();const outputs=[...root.querySelectorAll('[data-sentence-code-block-output]')];const second=outputs.at(-1)?.querySelector('[data-sentence-code-block-output-name]');if(!second)throw new Error('card code block second return field missing');second.value='detail';second.dispatchEvent(new Event('change',{bubbles:true}))})()`)
     await click(`${definition} [data-sentence-code-block-create]`)
@@ -816,13 +956,16 @@ try {
     assert.equal(cardCodeBlock.module, 'code-block.invoke')
     assert.ok(Array.isArray(blockGraph?.outputs) && blockGraph.outputs.length >= 2, 'code block must expose multiple return values')
     assert.ok(blockGraph.body.some(statement => statement.kind === 'while'), 'code block body must expose while through the normal editor')
-    inserted.push(choiceId, targetId, damageId, healId, codeBlockId)
+    inserted.push(choiceId, targetId, damageId, healId, currentHandId, handExtension?.id, handAssignment?.id, codeBlockId)
     await saveEditor('#cards-detail')
     const persisted = JSON.parse(fs.readFileSync(path.join(project, 'data', 'cards', `${cardId}.json`), 'utf8'))
     const exportedGraph = persisted.gameplayModules.entries.code.graph
     assert.equal(exportedGraph.surface, 'card')
     assert.ok(exportedGraph.body.some(statement => statement.id === damageId))
     assert.ok(exportedGraph.body.some(statement => statement.id === healId))
+    assert.ok(exportedGraph.body.some(statement => statement.module === 'local.declare' && statement.parameters?.name === '手牌变量'))
+    assert.ok(exportedGraph.body.some(statement => statement.module === 'extension.declare-instance' && statement.parameters?.name === '护甲'))
+    assert.ok(exportedGraph.body.some(statement => statement.module === 'extension.write-instance' && statement.parameters?.name === '护甲'))
     const compiled = await evaluate(`(()=>{const value=JSON.parse(document.querySelector('#cards-detail [data-json-source]').value);const graph=window.ContentGraphCore.getGameplayModuleGraph(value,'code');const result=window.ContentGraphCore.compileGameplayModuleGraph(graph,window.ContentGraphCore.GAMEPLAY_MODULE_REGISTRY);return {surface:result.surface,codeLength:result.code.length,bodyLength:graph.body.length,blockOutputs:graph.body.find(statement=>statement.id===${selector(codeBlockId)})?.layout?.authorExpressions?.block?.data?.graph?.outputs?.length||0}})()`)
     assert.equal(compiled.surface, 'card')
     assert.ok(compiled.codeLength > 0)
@@ -833,25 +976,42 @@ try {
     assert.ok(reopenedGraph.body.some(statement => statement.id === choiceId))
     assert.ok(reopenedGraph.body.some(statement => statement.id === codeBlockId))
     screenshots.push(await screenshot('author-card-armor-assembly.png'))
-    return { cardId, inserted, handExtension, compiled, persistedBodyLength: exportedGraph.body.length, reopened: true }
+    return { cardId, inserted, handBinding, handExtension, handAssignment, compiled, persistedBodyLength: exportedGraph.body.length, reopened: true }
   })
 
   await check('Current skill references, module categories and status icon entry remain reachable', async () => {
     await openSkill('flat-sentence-module-version-smoke', { reuseCurrent: true })
     await click('#skills-detail [data-sentence-add-effect]')
     await until("Boolean(document.querySelector('#skills-detail [data-sentence-popover=module]'))", 'current skill module picker')
+    // Pure references are intentionally composed inside expression fields and
+    // are not top-level palette entries. Exercise the author-facing
+    // assignment form so 当前技能 resolves through the explicit reference
+    // path while the low-level write stays compiler-owned.
+    await until("Boolean(document.querySelector('#skills-detail [data-sentence-module=\"author.assignment\"]'))", 'current skill assignment entry')
+    await click('#skills-detail [data-sentence-module="author.assignment"]', 'current skill assignment')
+    await until("Boolean(document.querySelector('#skills-detail .sentence-author-statement-editor[data-sentence-author-statement]'))", 'current skill assignment editor')
+    const currentSkillAssignmentPanel = '#skills-detail .sentence-author-statement-editor[data-sentence-author-statement]'
+    await applyAuthorStatementField('#skills-detail', 'targetSource', '当前技能.冷却')
+    await applyAuthorStatementField('#skills-detail', 'valueSource', '1')
+    await click(`${currentSkillAssignmentPanel} [data-sentence-author-apply]`, 'apply current skill assignment')
+    await until(`(()=>{
+      const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+      return Boolean(source.gameplayModules?.entries?.code?.graph?.body?.some(item=>item?.module==='author.skill-instance.write'&&item?.layout?.authorStatement?.targetSource==='当前技能.冷却'))
+    })()`, 'current skill assignment lowering')
+    await click('#skills-detail [data-sentence-add-effect]')
+    await until("Boolean(document.querySelector('#skills-detail [data-sentence-popover=module]'))", 'current skill module picker after assignment')
     const picker = await evaluate(`(()=>{
       const root=document.querySelector('#skills-detail [data-sentence-popover=module]')
-      const current=[...root.querySelectorAll('[data-sentence-module]')].find(item=>item.dataset.sentenceModule==='ref.current-skill')
       const categories=[...root.querySelectorAll('[data-sentence-module-category]')].map(item=>({id:item.dataset.sentenceModuleCategory,disabled:item.disabled,pressed:item.getAttribute('aria-pressed')}))
-      return {currentSkill:Boolean(current),currentSkillText:current?.textContent||'',categories}
+      const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+      const current=source.gameplayModules?.entries?.code?.graph?.body?.find(item=>item?.module==='ref.current-skill')
+      return {currentSkill:Boolean(current),currentSkillText:current?.module||'',categories}
     })()`)
     fs.writeFileSync(path.join(evidence, 'current-skill-category-picker-state.json'), JSON.stringify(picker, null, 2) + '\n')
     assert.equal(picker.currentSkill, true, JSON.stringify(picker))
     assert.ok(picker.categories.some(item => item.id === 'data' && !item.disabled), JSON.stringify(picker))
-    await click('#skills-detail [data-sentence-popover=module] [data-sentence-module-category="data"]')
-    await until("Boolean(document.querySelector('#skills-detail [data-sentence-popover=module] [data-sentence-module=\"ref.current-skill\"]'))", 'current skill data category')
-    await click('#skills-detail [data-sentence-popover=module] .sentence-popover-close')
+    await evaluate("document.querySelector('#skills-detail [data-sentence-popover=module] .sentence-popover-close')?.click()")
+    await delay(80)
 
     const statusTab = await evaluate(`(()=>{const tab=document.querySelector('#skills-detail [data-skill-cluster-member-tab="status"]');return {present:Boolean(tab),disabled:Boolean(tab?.disabled),label:tab?.textContent||''}})()`)
     assert.equal(statusTab.present, true, JSON.stringify(statusTab))
@@ -868,14 +1028,32 @@ try {
     return { picker, statusTab, status }
   })
 
-  await check('The module picker writes generic piece field v2 while legacy field and comparison references survive', async () => {
+  await check('The unified expression editor preserves faction comparison and legacy graph versions', async () => {
     await openSkill('flat-sentence-module-version-smoke', { reuseCurrent: true })
     const seeded = await readDraft()
     const seededGraph = seeded.gameplayModules.entries.code.graph
     const seededComposite = seededGraph.composites.find(item => item.id === 'legacy-field-fixture')
     const seededLegacy = seededComposite?.body?.find(statement => statement.module === 'attribute.text')
+    const seededSourceField = seededGraph.body.find(statement => statement.id === 'source-faction')
+    const seededTargetField = seededGraph.body.find(statement => statement.id === 'target-faction')
+    const seededComparison = seededGraph.body.find(statement => statement.id === 'same-faction')
     assert.equal(seededLegacy?.version, '1')
     assert.equal(seededLegacy?.parameters?.attribute, 'name')
+    assert.equal(seededSourceField?.module, 'piece.field')
+    assert.equal(seededSourceField?.version, '2')
+    assert.deepEqual(seededSourceField?.parameters, { field: 'faction' })
+    assert.deepEqual(seededSourceField?.inputs?.piece, output('source', 'piece'))
+    assert.equal(seededTargetField?.module, 'piece.field')
+    assert.equal(seededTargetField?.version, '2')
+    assert.deepEqual(seededTargetField?.parameters, { field: 'faction' })
+    assert.deepEqual(seededTargetField?.inputs?.piece, output('target', 'piece'))
+    assert.equal(seededComparison?.module, 'compare.values')
+    assert.equal(seededComparison?.version, '1')
+    assert.deepEqual(seededComparison?.parameters, { valueType: 'string', operator: '==' })
+    assert.deepEqual(seededComparison?.inputs, {
+      left: output('source-faction', 'value'),
+      right: output('target-faction', 'value'),
+    })
 
     await click('#skills-detail [data-sentence-add-effect]')
     await until("Boolean(document.querySelector('#skills-detail [data-sentence-popover=module]'))", 'module picker')
@@ -887,62 +1065,68 @@ try {
         fieldOptions:options.filter(item=>item.dataset.sentenceModule==='piece.field').map(item=>({id:item.dataset.sentenceModule,text:item.textContent||'',title:item.title||''})),
         relationOptions:options.filter(item=>item.dataset.sentenceModule==='query.same-relation').map(item=>({id:item.dataset.sentenceModule,text:item.textContent||''})),
         alliedOptions:options.filter(item=>item.dataset.sentenceModule==='compare.allied-players').map(item=>({id:item.dataset.sentenceModule,text:item.textContent||''})),
+        authorOptions:options.filter(item=>['local.declare','author.extension.declare','author.assignment'].includes(item.dataset.sentenceModule)).map(item=>item.dataset.sentenceModule),
       }
     })()`)
     fs.writeFileSync(path.join(evidence, 'module-version-picker-state.json'), JSON.stringify(pickerState, null, 2) + '\n')
     assert.equal(pickerState.textOptions.length, 0, JSON.stringify(pickerState))
-    assert.ok(pickerState.fieldOptions.some(item => /存活/.test(item.title)), JSON.stringify(pickerState))
+    assert.equal(pickerState.fieldOptions.length, 0, JSON.stringify(pickerState))
     assert.equal(pickerState.relationOptions.length, 0, JSON.stringify(pickerState))
     assert.equal(pickerState.alliedOptions.length, 0, JSON.stringify(pickerState))
-    await evaluate(`(()=>{const options=[...document.querySelectorAll('#skills-detail [data-sentence-popover=module] [data-sentence-module="piece.field"]')];const item=options.find(node=>/存活/.test(node.title||''));if(!item)throw new Error('missing piece.field@2 picker option');item.scrollIntoView({block:'center',inline:'nearest'});item.click()})()`)
+    assert.ok(pickerState.authorOptions.includes('author.assignment'), JSON.stringify(pickerState))
+    assert.ok(pickerState.authorOptions.includes('author.extension.declare'), JSON.stringify(pickerState))
+    await evaluate("document.querySelector('#skills-detail [data-sentence-popover=module] .sentence-popover-close')?.click()")
+    await delay(80)
 
+    // Pure field reads are composed from the shared expression editor. Apply
+    // the readable member expression on the left side of the existing
+    // comparison; the right side intentionally remains the legacy target
+    // reference so old `ref.target` graph data is exercised on reopen.
+    await applySlotExpression('#skills-detail', 'same-faction', 'left', '当前棋子.阵营')
     const selected = await readDraft()
     const selectedGraph = selected.gameplayModules.entries.code.graph
-    // The official Fireball also contains atomic field reads after migration.
-    // Identify the newly inserted row by identity, not by assuming only the
-    // two fixture fields existed before opening the picker.
-    const seededFieldIds = new Set(seededGraph.body.filter(statement => statement.module === 'piece.field').map(statement => statement.id))
-    const selectedV2 = selectedGraph.body.find(statement => statement.module === 'piece.field' && !seededFieldIds.has(statement.id))
-    assert.equal(selectedV2?.version, '2', 'the visible standard picker option must insert piece.field@2')
-    assert.ok(selectedV2, 'the picker must create a generic field read before its field is edited')
-    // Generic insertion deliberately leaves ambiguous references unset. Pick
-    // this parameter through the same shared expression slot the author uses
-    // elsewhere in the flat sentence editor.
-    await click(`#skills-detail [data-sentence-slot-editor=${JSON.stringify(`${selectedV2.id}:input:piece`)}]`)
-    await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=piece] .ei-editor'))", 'piece expression editor')
-    await applyAuthorExpression('piece', 'source_piece')
-    await click(`#skills-detail [data-sentence-module-editor=${JSON.stringify(selectedV2.id)}]`)
-    await until(`Boolean(document.querySelector('#skills-detail [data-sentence-inline-editor=${JSON.stringify(selectedV2.id)}]'))`, 'piece field inspector')
-    await setEnumParameter(selectedV2.id, 'field', 'faction')
-
-    const selectedWithField = await readDraft()
-    const selectedFieldGraph = selectedWithField.gameplayModules.entries.code.graph
-    const selectedField = selectedFieldGraph.body.find(statement => statement.id === selectedV2.id)
-    const selectedComparison = selectedFieldGraph.body.find(statement => statement.id === 'same-faction')
-    assert.equal(selectedField?.version, '2')
-    assert.deepEqual(selectedField?.parameters, { field: 'faction' })
-    assert.deepEqual(selectedField?.inputs?.piece, { kind: 'output', node: 'source', port: 'piece' })
+    const selectedComparison = selectedGraph.body.find(statement => statement.id === 'same-faction')
+    const selectedLeft = selectedComparison?.inputs?.left?.node
+      ? findGraphStatement(selectedGraph, selectedComparison.inputs.left.node)
+      : null
+    const selectedRight = selectedComparison?.inputs?.right?.node
+      ? findGraphStatement(selectedGraph, selectedComparison.inputs.right.node)
+      : null
+    assert.equal(selectedLeft?.module, 'piece.field')
+    assert.equal(selectedLeft?.version, '2')
+    assert.deepEqual(selectedLeft?.parameters, { field: 'faction' })
+    assert.equal(selectedLeft?.inputs?.piece?.kind, 'output')
     assert.equal(selectedComparison?.module, 'compare.values')
     assert.deepEqual(selectedComparison?.parameters, { valueType: 'string', operator: '==' })
-    assert.deepEqual(selectedComparison?.inputs, {
-      left: output('source-faction', 'value'),
-      right: output('target-faction', 'value'),
-    })
-    assert.equal(selectedFieldGraph.composites.find(item => item.id === 'legacy-field-fixture')?.body?.find(statement => statement.module === 'attribute.text')?.version, '1')
+    assert.equal(selectedComparison?.layout?.authorExpressions?.left?.source, '当前棋子.阵营')
+    assert.equal(selectedRight?.module, 'piece.field')
+    assert.equal(selectedRight?.version, '2')
+    assert.deepEqual(selectedRight?.parameters, { field: 'faction' })
+    assert.deepEqual(selectedRight?.inputs?.piece, output('target', 'piece'))
+    assert.equal(selectedGraph.composites.find(item => item.id === 'legacy-field-fixture')?.body?.find(statement => statement.module === 'attribute.text')?.version, '1')
 
+    const comparisonDisplay = await evaluate(`document.querySelector(${selector('#skills-detail [data-sentence-node="same-faction"]')})?.textContent || ''`)
+    assert.match(comparisonDisplay, /当前棋子\.阵营\s*等于\s*当前目标\.阵营/, comparisonDisplay)
     screenshots.push(await screenshot('module-version-picker.png'))
     await saveCurrent()
     const persisted = JSON.parse(fs.readFileSync(path.join(project, 'data', 'skills', 'flat-sentence-module-version-smoke.json'), 'utf8'))
     const persistedGraph = persisted.gameplayModules.entries.code.graph
-    const persistedV2 = persistedGraph.body.find(statement => statement.id === selectedV2.id)
+    const persistedComparison = persistedGraph.body.find(statement => statement.id === 'same-faction')
+    const persistedV2 = persistedComparison?.inputs?.left?.node
+      ? findGraphStatement(persistedGraph, persistedComparison.inputs.left.node)
+      : null
+    const persistedRight = persistedComparison?.inputs?.right?.node
+      ? findGraphStatement(persistedGraph, persistedComparison.inputs.right.node)
+      : null
     const persistedLegacy = persistedGraph.composites.find(item => item.id === 'legacy-field-fixture')?.body?.find(statement => statement.module === 'attribute.text')
     assert.equal(persistedV2?.version, '2')
     assert.equal(persistedV2?.module, 'piece.field')
     assert.deepEqual(persistedV2?.parameters, { field: 'faction' })
-    assert.deepEqual(persistedGraph.body.find(statement => statement.id === 'same-faction')?.inputs, {
-      left: output('source-faction', 'value'),
-      right: output('target-faction', 'value'),
-    })
+    assert.equal(persistedComparison?.module, 'compare.values')
+    assert.equal(persistedComparison?.layout?.authorExpressions?.left?.source, '当前棋子.阵营')
+    assert.equal(persistedRight?.module, 'piece.field')
+    assert.equal(persistedRight?.version, '2')
+    assert.deepEqual(persistedRight?.inputs?.piece, output('target', 'piece'))
     assert.equal(persistedLegacy?.version, '1')
     assert.equal(persistedLegacy?.parameters?.attribute, 'name')
     assert.deepEqual(persisted.editorFlatSentenceUnknown, moduleVersionSmoke.editorFlatSentenceUnknown)
@@ -950,26 +1134,34 @@ try {
     await openSkill('flat-sentence-module-version-smoke')
     const reopened = await readDraft()
     const reopenedGraph = reopened.gameplayModules.entries.code.graph
-    const reopenedV2 = reopenedGraph.body.find(statement => statement.id === selectedV2.id)
+    const reopenedComparison = reopenedGraph.body.find(statement => statement.id === 'same-faction')
+    const reopenedV2 = reopenedComparison?.inputs?.left?.node
+      ? findGraphStatement(reopenedGraph, reopenedComparison.inputs.left.node)
+      : null
+    const reopenedRight = reopenedComparison?.inputs?.right?.node
+      ? findGraphStatement(reopenedGraph, reopenedComparison.inputs.right.node)
+      : null
     const reopenedLegacy = reopenedGraph.composites.find(item => item.id === 'legacy-field-fixture')?.body?.find(statement => statement.module === 'attribute.text')
-    assert.equal(reopenedV2?.module, 'piece.field', 'saved generic picker selection must survive reopen')
-    assert.equal(reopenedV2?.version, '2', 'saved v2 picker selection must survive reopen')
-    assert.deepEqual(reopenedV2?.parameters, { field: 'faction' }, 'saved field selection must survive reopen')
-    assert.deepEqual(reopenedGraph.body.find(statement => statement.id === 'same-faction')?.inputs, {
-      left: output('source-faction', 'value'),
-      right: output('target-faction', 'value'),
-    }, 'comparison references must survive reopen')
+    assert.equal(reopenedV2?.module, 'piece.field', 'saved unified member expression must survive reopen')
+    assert.equal(reopenedV2?.version, '2', 'saved v2 field read must survive reopen')
+    assert.deepEqual(reopenedV2?.parameters, { field: 'faction' }, 'saved faction field must survive reopen')
+    assert.equal(reopenedComparison?.module, 'compare.values', 'ordinary comparison must survive reopen')
+    assert.equal(reopenedComparison?.layout?.authorExpressions?.left?.source, '当前棋子.阵营', 'unified expression metadata must survive reopen')
+    assert.equal(reopenedRight?.module, 'piece.field', 'legacy target field read must survive reopen')
+    assert.equal(reopenedRight?.version, '2', 'legacy target field version must survive reopen')
+    assert.deepEqual(reopenedRight?.inputs?.piece, output('target', 'piece'), 'legacy target reference must survive reopen')
     assert.equal(reopenedLegacy?.version, '1', 'saved legacy v1 node must retain its stored version')
     assert.equal(reopenedLegacy?.parameters?.attribute, 'name', 'legacy field parameters must retain their stored value')
     assert.deepEqual(reopened.editorFlatSentenceUnknown, moduleVersionSmoke.editorFlatSentenceUnknown)
-    const comparisonDisplay = await evaluate(`document.querySelector(${selector('#skills-detail [data-sentence-node="same-faction"]')})?.textContent || ''`)
-    assert.match(comparisonDisplay, /当前棋子\.阵营\s*==\s*当前目标\.阵营/, comparisonDisplay)
+    const reopenedComparisonDisplay = await evaluate(`document.querySelector(${selector('#skills-detail [data-sentence-node="same-faction"]')})?.textContent || ''`)
+    assert.match(reopenedComparisonDisplay, /当前棋子\.阵营\s*等于\s*当前目标\.阵营/, reopenedComparisonDisplay)
+    screenshots.push(await screenshot('module-version-expression.png'))
     return {
       pickerState,
-      selected: { id: selectedV2?.id, version: selectedField?.version, field: selectedField?.parameters?.field },
+      selected: { id: selectedLeft?.id, version: selectedLeft?.version, field: selectedLeft?.parameters?.field, comparison: selectedComparison?.module },
       persisted: { selectedModule: persistedV2?.module, selectedVersion: persistedV2?.version, selectedField: persistedV2?.parameters?.field, legacyVersion: persistedLegacy?.version },
       reopened: { selectedModule: reopenedV2?.module, selectedVersion: reopenedV2?.version, selectedField: reopenedV2?.parameters?.field, legacyVersion: reopenedLegacy?.version },
-      comparisonDisplay,
+      comparisonDisplay: reopenedComparisonDisplay,
     }
   })
 
@@ -1022,6 +1214,7 @@ try {
     try {
       await evaluate(`(()=>{const host=window.__red252LexicalFixture.host;const slot=host.querySelector('[data-sentence-slot-editor="damage:input:amount"]');if(!slot)throw new Error('missing branch damage amount slot');slot.click()})()`)
       await until("Boolean(window.__red252LexicalFixture.host.querySelector('[data-sentence-inspector] [data-sentence-inline-editor=\"damage\"]'))", 'branch damage amount editor')
+      await evaluate(`(()=>{const button=window.__red252LexicalFixture.host.querySelector('[data-sentence-direct-expression="amount"]');if(button)button.click()})()`)
       await until("Boolean(window.__red252LexicalFixture.host.querySelector('[data-sentence-author-expression=\"amount\"] .ei-editor'))", 'branch damage amount expression editor')
       await applyAuthorExpression('amount', 'amount_value + 2', '#red252-lexical-scope-fixture')
       const result = await evaluate(`(()=>{
@@ -1155,6 +1348,7 @@ try {
     assert.equal(state.rows.includes('records-loop'), true, JSON.stringify(state.rows))
     assert.match(state.loopText, /读取.*扩展映射/, state.loopText)
     await click('#skills-detail [data-sentence-slot-editor="records-loop:input:items"]')
+    await click('#skills-detail [data-sentence-direct-expression="items"]', 'recall map direct expression')
     await until(`Boolean(document.querySelector('#skills-detail [data-sentence-author-expression="items"] .ei-editor'))`, 'recall map expression editor')
     const expression = await evaluate("document.querySelector('#skills-detail [data-sentence-author-expression=items] .ei-editor')?.textContent || ''")
     const typeLabel = await evaluate("document.querySelector('#skills-detail [data-sentence-author-expression=items] .sentence-author-expression-type')?.textContent || ''")

@@ -30,8 +30,17 @@ describe('author expression lexical suggestions', () => {
   })
   it('does not expand every root until that receiver is entered', () => {
     expect(suggestions('').some(item => item.value === '当前棋子.生命值')).toBe(false)
+    expect(suggestions('').some(item => item.value === '目标')).toBe(false)
     expect(suggestions('当前棋子。')).toContainEqual({ label: '当前棋子.生命值', value: '当前棋子.生命值', kind: '数值' })
     expect(suggestions('全局.').map(item => item.value)).toEqual(['全局.turnNumber', '全局.currentPlayerId', '全局.extension'])
+  })
+  it('suggests an explicitly bound target without inventing a root target', () => {
+    const context = {
+      surface: 'skill' as const,
+      bindings: { target: { value: { kind: 'input' as const, name: 'selectedTarget' }, type: 'piece' as const } },
+    }
+    expect(completeAuthorExpression('', context)).toContainEqual({ label: 'target', value: 'target', kind: '棋子' })
+    expect(completeAuthorExpression('', context).filter(item => item.value === 'target')).toHaveLength(1)
   })
   it('offers concrete current-skill fields and piece ability groups', () => {
     expect(suggestions('当前技能.')).toContainEqual({ label: '当前技能.冷却', value: '当前技能.冷却', kind: '数值' })

@@ -118,7 +118,14 @@ describe('semantic Velen skill migrations', () => {
     const selectedSetup = () => setupWithHand(clone(cards), { selectedOption: 'smite', setOption: true })
     const expected = runSkill('velen-holy-prophecy', false, selectedSetup)
     const actual = runSkill('velen-holy-prophecy', true, selectedSetup)
-    expect(actual).toEqual(expected)
+    // The frozen legacy fixture intentionally predates owner-rule installation;
+    // the canonical graph now installs the delayed listener when a prophecy is
+    // created so copied skills work after Velen leaves play.
+    expect(actual.result).toEqual(expected.result)
+    expect(actual.state.players[0].rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'rule-velen-delayed-effects' }),
+    ]))
+    expect(expected.state.players[0].rules).toEqual([])
     expect(actual.result).toEqual({ success: true, message: '维伦留下了圣光预言' })
     expect(actual.state.players[0].hand[0].contentState).toEqual({ velenHolyProphecy: { sourcePieceId: 'velen', createdTurnNumber: 4 } })
 

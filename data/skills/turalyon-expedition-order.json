@@ -41,7 +41,11 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:turalyon-expedition-order",
-    "links": []
+    "links": [
+      { "collection": "cards", "id": "holy-smite", "relation": "shared", "source": "skills.turalyon-expedition-order.gameplayModules.entries.code.graph.body[30].then[0].parameters.cardId" },
+      { "collection": "cards", "id": "holy-heal", "relation": "shared", "source": "skills.turalyon-expedition-order.gameplayModules.entries.code.graph.body[30].else[0].then[0].parameters.cardId" },
+      { "collection": "cards", "id": "holy-charge", "relation": "shared", "source": "skills.turalyon-expedition-order.gameplayModules.entries.code.graph.body[30].else[0].else[0].then[0].parameters.cardId" }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

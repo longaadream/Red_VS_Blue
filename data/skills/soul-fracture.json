@@ -71,6 +71,12 @@
         "id": "rule-soul-fracture-player",
         "relation": "owned",
         "source": "pieces/guldan.playerRules"
+      },
+      {
+        "collection": "cards",
+        "id": "soul-fragment",
+        "relation": "owned",
+        "source": "rules.rule-soul-fracture-player.gameplayModules.entries.skillCode.graph.body[7].parameters.cardId"
       }
     ]
   }

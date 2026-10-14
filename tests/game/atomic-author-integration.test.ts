@@ -27,8 +27,21 @@ const fixture = JSON.parse(readFileSync('tests/game/fixtures/RED-252-legacy-cont
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
 function generatedEntry(id: string, graph: any, field: 'code' | 'skillCode' = 'code'): JsonRecord {
-  const source = fixture[id]
-  if (!source) throw new Error(`missing frozen fixture entry ${id}`)
+  // The frozen fixture is intentionally graph-less legacy content.  Use the
+  // production document as the migration input so an existing static
+  // targeting declaration has its prior graph available for one-to-one
+  // binding validation.  The fixture remains the source for legacy rules and
+  // dependencies below; do not synthesize a graph into that fixture.
+  if (!fixture[id]) throw new Error(`missing frozen fixture entry ${id}`)
+  const filename = join('data', `${id}.json`)
+  const source = JSON.parse(readFileSync(filename, 'utf8')) as JsonRecord
+  const entries = source.gameplayModules?.entries
+  const prior = entries && typeof entries === 'object' && !Array.isArray(entries)
+    ? (entries as JsonRecord)[field]
+    : undefined
+  if (!prior || typeof prior !== 'object' || Array.isArray(prior) || !('graph' in prior)) {
+    throw new Error(`production author sample ${id}.${field} is missing its prior graph entry`)
+  }
   return applyGameplayModuleGraph(clone(source), graph, field) as JsonRecord
 }
 

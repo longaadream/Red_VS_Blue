@@ -685,6 +685,9 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:light-extraction",
-    "links": []
+    "links": [
+      { "collection": "cards", "id": "holy-smite", "relation": "shared", "source": "skills.light-extraction.gameplayModules.entries.code.graph.body[18].parameters.cardId" },
+      { "collection": "cards", "id": "holy-heal", "relation": "shared", "source": "skills.light-extraction.gameplayModules.entries.code.graph.body[19].parameters.cardId" }
+    ]
   }
 }

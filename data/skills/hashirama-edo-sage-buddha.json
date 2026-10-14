@@ -1314,6 +1314,9 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:hashirama-edo-sage-buddha",
-    "links": []
+    "links": [
+      { "collection": "cards", "id": "hashirama-edo-thousand-hands", "relation": "owned", "source": "skills.hashirama-edo-sage-buddha.gameplayModules.entries.code.graph.body[7].then[1].then[1].then[18].body[1].inputs.right.value" },
+      { "collection": "cards", "id": "hashirama-edo-nature-heal", "relation": "owned", "source": "skills.hashirama-edo-sage-buddha.gameplayModules.entries.code.graph.body[7].then[1].then[1].then[25].body[1].inputs.right.value" }
+    ]
   }
 }

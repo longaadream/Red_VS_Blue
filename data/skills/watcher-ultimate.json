@@ -740,6 +740,9 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:watcher-ultimate",
-    "links": []
+    "links": [
+      { "collection": "cards", "id": "watcher-calm", "relation": "owned", "source": "skills.watcher-ultimate.gameplayModules.entries.code.graph.body[5].body[2].then[0].parameters.cardId" },
+      { "collection": "cards", "id": "watcher-rage", "relation": "owned", "source": "skills.watcher-ultimate.gameplayModules.entries.code.graph.body[5].body[2].else[0].parameters.cardId" }
+    ]
   }
 }

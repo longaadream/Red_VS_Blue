@@ -993,6 +993,110 @@
       return section
     }
 
+    function pieceAbilityProjection(rootItem) {
+      const draft = record(options.getDraft?.()) ? options.getDraft() : rootItem?.definition || {}
+      const catalog = typeof options.getCatalog === 'function' ? options.getCatalog() : options.catalog
+      if (typeof options.getPieceAbilityGroups === 'function') {
+        try {
+          const result = options.getPieceAbilityGroups(catalog, draft, { root })
+          if (result && Array.isArray(result.groups)) return result
+        } catch (error) {
+          return { groups: [], diagnostics: [{ severity: 'error', message: error instanceof Error ? error.message : String(error) }] }
+        }
+      }
+      const core = coreFor(options)
+      if (typeof core?.buildPieceAbilityGroups === 'function') {
+        try {
+          const result = core.buildPieceAbilityGroups(catalog || { skills: {}, rules: {}, pieces: {}, cards: {} }, draft?.id || root.id)
+          if (result && Array.isArray(result.groups)) return result
+        } catch (error) {
+          return { groups: [], diagnostics: [{ severity: 'error', message: error instanceof Error ? error.message : String(error) }] }
+        }
+      }
+      return null
+    }
+
+    function renderPieceAbilityGroups(projection) {
+      const section = node('section', undefined, 'skill-cluster-piece-ability-groups')
+      const heading = node('div', undefined, 'skill-cluster-section-heading')
+      heading.append(node('h3', '完整能力组'), node('span', '每项技能及未归属规则各自成组', 'skill-cluster-muted'))
+      section.append(heading)
+      if (projection?.excluded?.reason === 'pve-only') {
+        section.append(node('p', '冒险内容不进入普通棋子的能力组目录。', 'skill-cluster-muted'))
+        return section
+      }
+      const groups = Array.isArray(projection?.groups) ? projection.groups : []
+      if (!groups.length) {
+        section.append(node('p', '当前棋子没有可展示的完整能力组。', 'skill-cluster-muted'))
+        return section
+      }
+      const list = node('div', undefined, 'skill-cluster-piece-ability-list')
+      for (const group of groups) {
+        const cluster = group?.cluster
+        const kind = group?.kind === 'rule' ? 'rule' : 'skill'
+        const groupRootMember = cluster ? rootMember(cluster) : null
+        const definition = groupRootMember?.definition || {}
+        const title = definition.name || (kind === 'rule' ? `未命名规则 · ${group?.root?.id || ''}` : `未命名技能 · ${group?.root?.id || ''}`)
+        const card = node('article', undefined, 'skill-cluster-piece-ability-card')
+        card.dataset.skillClusterAbilityGroup = String(group?.id || '')
+        if (group?.unassigned) card.classList.add('is-unassigned')
+        const top = node('div', undefined, 'skill-cluster-piece-ability-top')
+        top.append(node('strong', title))
+        top.append(node('span', group?.unassigned ? '未归属规则组' : kind === 'rule' ? '被动规则组' : cluster?.kind === 'active' ? '主动技能组' : '被动技能组', `skill-cluster-kind-badge ${cluster?.kind === 'active' ? 'active' : 'passive'}`))
+        card.append(top)
+        const directRules = Array.isArray(group?.directRuleIds) ? group.directRuleIds : []
+        const linkedMembers = cluster?.members || {}
+        const counts = node('div', undefined, 'skill-cluster-piece-ability-counts')
+        for (const [key, label] of [['skills', '技能'], ['rules', '规则'], ['statuses', '状态'], ['cards', '卡牌']]) {
+          counts.append(node('span', `${label} ${Array.isArray(linkedMembers[key]) ? linkedMembers[key].length : 0}`, 'skill-cluster-linked-card-count'))
+        }
+        card.append(counts)
+        const directRuleNames = directRules.map(id => {
+          const member = (Array.isArray(linkedMembers.rules) ? linkedMembers.rules : []).find(item => item.id === id)
+          return member?.definition?.name || id
+        })
+        if (directRuleNames.length) {
+          const directRuleLine = node('p', `直接规则：${directRuleNames.join('、')}`, 'skill-cluster-piece-ability-rules')
+          directRuleLine.title = directRules.join('、')
+          card.append(directRuleLine)
+        }
+        const members = Array.isArray(linkedMembers.all) ? linkedMembers.all : []
+        if (members.length) {
+          const memberList = node('div', undefined, 'skill-cluster-piece-ability-members')
+          for (const member of members) {
+            const row = node('div', undefined, 'skill-cluster-piece-ability-member')
+            row.dataset.skillClusterAbilityMember = `${member.kind || 'member'}:${member.id || ''}`
+            const copy = node('div', undefined, 'skill-cluster-piece-ability-member-copy')
+            copy.append(node('strong', member.definition?.name || `未命名${kindLabels[member.kind] || '成员'}`))
+            const label = member.kind === 'skill' ? skillMemberLabel(member) : kindLabels[member.kind] || '关联成员'
+            copy.append(node('span', label, 'skill-cluster-piece-ability-member-kind'))
+            row.append(copy)
+            if (member.source) {
+              const edit = action('编辑', event => {
+                event?.stopPropagation?.()
+                navigate(member)
+              }, 'skill-cluster-action secondary')
+              edit.dataset.skillClusterAbilityMemberEdit = `${member.kind || 'member'}:${member.id || ''}`
+              row.append(edit)
+            }
+            memberList.append(row)
+          }
+          card.append(memberList)
+        }
+        const actions = node('div', undefined, 'skill-cluster-linked-card-actions')
+        if (groupRootMember) actions.append(action('在工作台打开', event => { event?.stopPropagation?.(); navigate(groupRootMember) }, 'skill-cluster-action'))
+        else actions.append(node('span', '缺少明确根来源', 'skill-cluster-muted'))
+        card.append(actions)
+        list.append(card)
+      }
+      section.append(list)
+      if (Array.isArray(projection?.diagnostics) && projection.diagnostics.some(item => item.severity === 'error')) {
+        const diagnostics = node('p', '部分成员来源无法解析；未归属规则仍保留为独立组。', 'skill-cluster-muted')
+        section.append(diagnostics)
+      }
+      return section
+    }
+
     function catalogLinkTargets() {
       const catalog = typeof options.getCatalog === 'function' ? options.getCatalog() : options.catalog
       const targets = []
@@ -1149,7 +1253,12 @@
 
     function renderPieceOverview(view, cluster, rootItem) {
       const draft = record(options.getDraft?.()) ? options.getDraft() : rootItem?.definition || {}
-      if (!activeMemberKind || activeMemberKind === 'overview') view.append(renderPieceStats(draft), renderClusterCards(cluster))
+      if (!activeMemberKind || activeMemberKind === 'overview') {
+        const projection = pieceAbilityProjection(rootItem)
+        if (projection) view.append(renderPieceAbilityGroups(projection))
+        else view.append(renderClusterCards(cluster))
+        view.append(renderPieceStats(draft))
+      }
       // The shell's context panel already renders the piece image and basic
       // preview. Keep Cluster membership and definition editing in this one
       // workspace rather than rendering a second, narrower preview column.

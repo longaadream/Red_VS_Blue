@@ -36,7 +36,14 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:colt-bullet-storm",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-colt-zone-endturn",
+        "relation": "shared",
+        "source": "pieces/colt.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

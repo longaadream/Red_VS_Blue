@@ -72,6 +72,7 @@ var ContentGraphCore = (() => {
         GameplayTargetBindingError: () => GameplayTargetBindingError,
         MODULE_COMPILER_VERSION: () => MODULE_COMPILER_VERSION,
         MODULE_GRAPH_VERSION: () => MODULE_GRAPH_VERSION,
+        PIECE_ABILITY_GROUPS_PROJECTION_VERSION: () => PIECE_ABILITY_GROUPS_PROJECTION_VERSION,
         SKILL_CLUSTER_DEFINITION_VERSION: () => SKILL_CLUSTER_DEFINITION_VERSION,
         SKILL_CLUSTER_REPLACE_MEMBER: () => SKILL_CLUSTER_REPLACE_MEMBER,
         SKILL_CLUSTER_VERSION: () => SKILL_CLUSTER_VERSION,
@@ -86,6 +87,7 @@ var ContentGraphCore = (() => {
         authorFunctionSpecs: () => authorFunctionSpecs,
         authorRecordFieldDisplayName: () => authorRecordFieldDisplayName,
         authorTypeLabel: () => authorTypeLabel,
+        buildPieceAbilityGroups: () => buildPieceAbilityGroups,
         buildSkillCluster: () => buildSkillCluster,
         buildSkillClusterCatalog: () => buildSkillClusterCatalog,
         cloneSkillClusterDefinition: () => cloneSkillClusterDefinition,
@@ -103,8 +105,11 @@ var ContentGraphCore = (() => {
         getGameplayModuleCatalog: () => getGameplayModuleCatalog,
         getGameplayModuleGraph: () => getGameplayModuleGraph,
         getGameplayModuleTextSources: () => getGameplayModuleTextSources,
+        lowerAuthorAssignment: () => lowerAuthorAssignment,
         lowerAuthorExpression: () => lowerAuthorExpression,
+        lowerAuthorExtensionDeclaration: () => lowerAuthorExtensionDeclaration,
         parseAuthorExpression: () => parseAuthorExpression,
+        projectPieceAbilityGroups: () => projectPieceAbilityGroups,
         renderGameplayModuleText: () => renderGameplayModuleText,
         resolveAuthorRecordField: () => resolveAuthorRecordField,
         synchronizeGameplayTargetBinding: () => synchronizeGameplayTargetBinding,
@@ -252,8 +257,8 @@ var ContentGraphCore = (() => {
       function canonical(value) {
         if (value === null || typeof value !== "object") return JSON.stringify(value);
         if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-        const record3 = value;
-        return "{" + Object.keys(record3).sort().map((key) => JSON.stringify(key) + ":" + canonical(record3[key])).join(",") + "}";
+        const record4 = value;
+        return "{" + Object.keys(record4).sort().map((key) => JSON.stringify(key) + ":" + canonical(record4[key])).join(",") + "}";
       }
       function equal(left, right) {
         return canonical(left) === canonical(right);
@@ -389,8 +394,8 @@ var ContentGraphCore = (() => {
       function fail22(message, path, code) {
         throw new CompilerFailure(message, path, code);
       }
-      function own3(record3, key) {
-        return Object.prototype.hasOwnProperty.call(record3, key);
+      function own3(record4, key) {
+        return Object.prototype.hasOwnProperty.call(record4, key);
       }
       function isObject2(value) {
         if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -410,9 +415,9 @@ var ContentGraphCore = (() => {
         }
         return value;
       }
-      function allowed(record3, keys, path) {
+      function allowed(record4, keys, path) {
         const set = new Set(keys);
-        for (const key of Object.keys(record3)) if (!set.has(key)) fail22('unknown field "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
+        for (const key of Object.keys(record4)) if (!set.has(key)) fail22('unknown field "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNKNOWN_FIELD");
       }
       function nonempty(value, path) {
         if (typeof value !== "string" || value.trim().length === 0) fail22("must be a non-empty string", path, "GAMEPLAY_MODULE_INVALID_NAME");
@@ -462,18 +467,18 @@ var ContentGraphCore = (() => {
           }
           return;
         }
-        const record3 = plain(value, path);
-        for (const key of Object.keys(record3)) {
+        const record4 = plain(value, path);
+        for (const key of Object.keys(record4)) {
           if (key === "__proto__" || key === "prototype" || key === "constructor") fail22('unsafe object key "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_UNSAFE_VALUE");
-          json(record3[key], path + "." + key, budget);
+          json(record4[key], path + "." + key, budget);
         }
       }
       function clone(value) {
         if (value === null || typeof value !== "object") return value;
         if (Array.isArray(value)) return value.map(clone);
         const result = /* @__PURE__ */ Object.create(null);
-        const record3 = value;
-        for (const key of Object.keys(record3)) result[key] = clone(record3[key]);
+        const record4 = value;
+        for (const key of Object.keys(record4)) result[key] = clone(record4[key]);
         return result;
       }
       function rejectUnschematizedRecord(value, path) {
@@ -527,33 +532,33 @@ var ContentGraphCore = (() => {
           if (!trustedGeneric && (value === "unknown" || value === "any")) fail22("universal value types are not allowed", path, "GAMEPLAY_MODULE_INVALID_TYPE");
           return value;
         }
-        const record3 = plain(value, path);
-        if (record3.kind === "list" || record3.kind === "set") {
-          allowed(record3, ["kind", "element"], path);
-          if (!own3(record3, "element")) fail22("list type requires element", path, "GAMEPLAY_MODULE_INVALID_TYPE");
-          return { kind: record3.kind, element: typeValue(record3.element, path + ".element", trustedGeneric) };
+        const record4 = plain(value, path);
+        if (record4.kind === "list" || record4.kind === "set") {
+          allowed(record4, ["kind", "element"], path);
+          if (!own3(record4, "element")) fail22("list type requires element", path, "GAMEPLAY_MODULE_INVALID_TYPE");
+          return { kind: record4.kind, element: typeValue(record4.element, path + ".element", trustedGeneric) };
         }
-        if (record3.kind === "map") {
-          allowed(record3, ["kind", "key", "value"], path);
-          return { kind: "map", key: typeValue(record3.key, path + ".key", trustedGeneric), value: typeValue(record3.value, path + ".value", trustedGeneric) };
+        if (record4.kind === "map") {
+          allowed(record4, ["kind", "key", "value"], path);
+          return { kind: "map", key: typeValue(record4.key, path + ".key", trustedGeneric), value: typeValue(record4.value, path + ".value", trustedGeneric) };
         }
-        if (record3.kind === "nullable") {
-          allowed(record3, ["kind", "value"], path);
-          if (!own3(record3, "value")) fail22("nullable type requires value", path, "GAMEPLAY_MODULE_INVALID_TYPE");
-          return { kind: "nullable", value: typeValue(record3.value, path + ".value", trustedGeneric) };
+        if (record4.kind === "nullable") {
+          allowed(record4, ["kind", "value"], path);
+          if (!own3(record4, "value")) fail22("nullable type requires value", path, "GAMEPLAY_MODULE_INVALID_TYPE");
+          return { kind: "nullable", value: typeValue(record4.value, path + ".value", trustedGeneric) };
         }
-        if (record3.kind === "record") {
-          allowed(record3, ["kind", "schema"], path);
-          return { kind: "record", schema: nonempty(record3.schema, path + ".schema") };
+        if (record4.kind === "record") {
+          allowed(record4, ["kind", "schema"], path);
+          return { kind: "record", schema: nonempty(record4.schema, path + ".schema") };
         }
         fail22("unsupported value type descriptor", path, "GAMEPLAY_MODULE_INVALID_TYPE");
       }
       function port(value, path, trustedGeneric = false) {
-        const record3 = plain(value, path);
-        allowed(record3, ["name", "type", "optional", "nullable", "label", "description"], path);
-        const result = { name: safeName(record3.name, path + ".name"), type: typeValue(record3.type, path + ".type", trustedGeneric) };
-        for (const key of ["optional", "nullable"]) if (record3[key] !== void 0) result[key] = bool(record3[key], path + "." + key);
-        for (const key of ["label", "description"]) if (record3[key] !== void 0) result[key] = nonempty(record3[key], path + "." + key);
+        const record4 = plain(value, path);
+        allowed(record4, ["name", "type", "optional", "nullable", "label", "description"], path);
+        const result = { name: safeName(record4.name, path + ".name"), type: typeValue(record4.type, path + ".type", trustedGeneric) };
+        for (const key of ["optional", "nullable"]) if (record4[key] !== void 0) result[key] = bool(record4[key], path + "." + key);
+        for (const key of ["label", "description"]) if (record4[key] !== void 0) result[key] = nonempty(record4[key], path + "." + key);
         return result;
       }
       function ports(value, path, trustedGeneric = false) {
@@ -568,31 +573,31 @@ var ContentGraphCore = (() => {
         return result;
       }
       function parameter(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["name", "type", "optional", "nullable", "label", "description", "default", "enum", "minimum", "maximum"], path);
+        const record4 = plain(value, path);
+        allowed(record4, ["name", "type", "optional", "nullable", "label", "description", "default", "enum", "minimum", "maximum"], path);
         const base = /* @__PURE__ */ Object.create(null);
-        for (const key of ["name", "type", "optional", "nullable", "label", "description"]) if (own3(record3, key)) base[key] = record3[key];
+        for (const key of ["name", "type", "optional", "nullable", "label", "description"]) if (own3(record4, key)) base[key] = record4[key];
         const result = { ...port(base, path) };
-        if (own3(record3, "default")) {
+        if (own3(record4, "default")) {
           const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-          json(record3.default, path + ".default", budget);
-          rejectUnschematizedRecord(record3.default, path + ".default");
-          result.default = clone(record3.default);
+          json(record4.default, path + ".default", budget);
+          rejectUnschematizedRecord(record4.default, path + ".default");
+          result.default = clone(record4.default);
         }
-        if (record3.enum !== void 0) {
-          if (!Array.isArray(record3.enum)) fail22("enum must be an array", path + ".enum", "GAMEPLAY_MODULE_INVALID_PARAMETER");
+        if (record4.enum !== void 0) {
+          if (!Array.isArray(record4.enum)) fail22("enum must be an array", path + ".enum", "GAMEPLAY_MODULE_INVALID_PARAMETER");
           const values = [];
-          for (let i = 0; i < record3.enum.length; i += 1) {
+          for (let i = 0; i < record4.enum.length; i += 1) {
             const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-            json(record3.enum[i], path + ".enum[" + i + "]", budget);
-            rejectUnschematizedRecord(record3.enum[i], path + ".enum[" + i + "]");
-            values.push(clone(record3.enum[i]));
+            json(record4.enum[i], path + ".enum[" + i + "]", budget);
+            rejectUnschematizedRecord(record4.enum[i], path + ".enum[" + i + "]");
+            values.push(clone(record4.enum[i]));
           }
           result.enum = values;
         }
-        for (const key of ["minimum", "maximum"]) if (own3(record3, key)) {
-          if (typeof record3[key] !== "number" || !Number.isFinite(record3[key])) fail22(key + " must be a finite number", path + "." + key, "GAMEPLAY_MODULE_INVALID_PARAMETER");
-          result[key] = record3[key];
+        for (const key of ["minimum", "maximum"]) if (own3(record4, key)) {
+          if (typeof record4[key] !== "number" || !Number.isFinite(record4[key])) fail22(key + " must be a finite number", path + "." + key, "GAMEPLAY_MODULE_INVALID_PARAMETER");
+          result[key] = record4[key];
         }
         const declaration2 = result;
         if (own3(result, "default")) {
@@ -662,11 +667,11 @@ var ContentGraphCore = (() => {
       }
       function outputParameterTypeBindings(value, outputs, declarations, path) {
         if (value === void 0) return void 0;
-        const record3 = plain(value, path);
+        const record4 = plain(value, path);
         const outputMap = mapPorts(outputs);
         const parameterMap = mapParams(declarations);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const [outputName, rawBinding] of Object.entries(record3)) {
+        for (const [outputName, rawBinding] of Object.entries(record4)) {
           const bindingPath = path + "." + outputName;
           const binding = plain(rawBinding, bindingPath);
           allowed(binding, ["parameter", "types"], bindingPath);
@@ -689,48 +694,48 @@ var ContentGraphCore = (() => {
       }
       function layout(value, path) {
         if (value === void 0) return void 0;
-        const record3 = plain(value, path);
+        const record4 = plain(value, path);
         const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-        json(record3, path, budget);
+        json(record4, path, budget);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const key of Object.keys(record3)) result[key] = clone(record3[key]);
+        for (const key of Object.keys(record4)) result[key] = clone(record4[key]);
         return result;
       }
       function valueRef(value, path, allowStructuredLiteral = false) {
-        const record3 = plain(value, path);
-        const kind = nonempty(record3.kind, path + ".kind");
+        const record4 = plain(value, path);
+        const kind = nonempty(record4.kind, path + ".kind");
         if (kind === "literal") {
-          allowed(record3, ["kind", "value"], path);
-          if (!own3(record3, "value")) fail22("literal requires value", path, "GAMEPLAY_MODULE_INVALID_VALUE");
+          allowed(record4, ["kind", "value"], path);
+          if (!own3(record4, "value")) fail22("literal requires value", path, "GAMEPLAY_MODULE_INVALID_VALUE");
           const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-          json(record3.value, path + ".value", budget);
-          if (!allowStructuredLiteral) rejectUnschematizedRecord(record3.value, path + ".value");
-          return { kind: "literal", value: clone(record3.value) };
+          json(record4.value, path + ".value", budget);
+          if (!allowStructuredLiteral) rejectUnschematizedRecord(record4.value, path + ".value");
+          return { kind: "literal", value: clone(record4.value) };
         }
         if (kind === "input") {
-          allowed(record3, ["kind", "name"], path);
-          return { kind: "input", name: nonempty(record3.name, path + ".name") };
+          allowed(record4, ["kind", "name"], path);
+          return { kind: "input", name: nonempty(record4.name, path + ".name") };
         }
         if (kind === "output") {
-          allowed(record3, ["kind", "node", "port"], path);
-          return { kind: "output", node: nonempty(record3.node, path + ".node"), port: nonempty(record3.port, path + ".port") };
+          allowed(record4, ["kind", "node", "port"], path);
+          return { kind: "output", node: nonempty(record4.node, path + ".node"), port: nonempty(record4.port, path + ".port") };
         }
         fail22('unsupported value kind "' + kind + '"', path, "GAMEPLAY_MODULE_UNSAFE_VALUE");
       }
       function valueMap(value, path, allowStructuredLiteral = false) {
-        const record3 = plain(value, path);
+        const record4 = plain(value, path);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const key of Object.keys(record3)) result[key] = valueRef(record3[key], path + "." + key, allowStructuredLiteral);
+        for (const key of Object.keys(record4)) result[key] = valueRef(record4[key], path + "." + key, allowStructuredLiteral);
         return result;
       }
       function literalMap(value, path) {
-        const record3 = plain(value, path);
+        const record4 = plain(value, path);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const key of Object.keys(record3)) {
+        for (const key of Object.keys(record4)) {
           const budget = { bytes: 0, limit: limitsDefault.maxLiteralBytes };
-          json(record3[key], path + "." + key, budget);
-          rejectUnschematizedRecord(record3[key], path + "." + key);
-          result[key] = clone(record3[key]);
+          json(record4[key], path + "." + key, budget);
+          rejectUnschematizedRecord(record4[key], path + "." + key);
+          result[key] = clone(record4[key]);
         }
         return result;
       }
@@ -739,149 +744,149 @@ var ContentGraphCore = (() => {
         return valueMap(value, path, true);
       }
       function collectionStatement(value, path) {
-        const record3 = plain(value, path);
-        const rawKind = nonempty(record3.kind, path + ".kind");
-        const method = rawKind === "collection" ? nonempty(record3.method, path + ".method") : rawKind.slice("collection.".length);
+        const record4 = plain(value, path);
+        const rawKind = nonempty(record4.kind, path + ".kind");
+        const method = rawKind === "collection" ? nonempty(record4.method, path + ".method") : rawKind.slice("collection.".length);
         if (method !== "map" && method !== "filter" && method !== "reduce" && method !== "find") fail22('unsupported collection method "' + method + '"', path + ".method", "GAMEPLAY_MODULE_UNSUPPORTED_STATEMENT");
         const allowedFields = ["kind", "method", "id", "items", "inputs", "item", "index", "accumulator", "initial", "body"];
-        allowed(record3, allowedFields, path);
-        if (rawKind !== "collection" && (own3(record3, "method") || method !== "reduce" && (own3(record3, "accumulator") || own3(record3, "initial")))) fail22("collection discriminator conflicts with method fields", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
-        if (method !== "reduce" && (own3(record3, "accumulator") || own3(record3, "initial"))) fail22("map/filter collections cannot declare accumulator or initial", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
-        if (!Array.isArray(record3.body)) fail22("collection.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+        allowed(record4, allowedFields, path);
+        if (rawKind !== "collection" && (own3(record4, "method") || method !== "reduce" && (own3(record4, "accumulator") || own3(record4, "initial")))) fail22("collection discriminator conflicts with method fields", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+        if (method !== "reduce" && (own3(record4, "accumulator") || own3(record4, "initial"))) fail22("map/filter collections cannot declare accumulator or initial", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+        if (!Array.isArray(record4.body)) fail22("collection.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
         const node = {
           kind: "collection",
-          id: nonempty(record3.id, path + ".id"),
+          id: nonempty(record4.id, path + ".id"),
           method,
-          items: valueRef(record3.items, path + ".items"),
-          inputs: record3.inputs === void 0 ? {} : valueMap(record3.inputs, path + ".inputs"),
-          body: statements(record3.body, path + ".body")
+          items: valueRef(record4.items, path + ".items"),
+          inputs: record4.inputs === void 0 ? {} : valueMap(record4.inputs, path + ".inputs"),
+          body: statements(record4.body, path + ".body")
         };
-        if (record3.item !== void 0) node.item = safeName(record3.item, path + ".item");
-        if (record3.index !== void 0) node.index = safeName(record3.index, path + ".index");
-        if (record3.accumulator !== void 0) node.accumulator = safeName(record3.accumulator, path + ".accumulator");
-        if (record3.initial !== void 0) node.initial = valueRef(record3.initial, path + ".initial");
+        if (record4.item !== void 0) node.item = safeName(record4.item, path + ".item");
+        if (record4.index !== void 0) node.index = safeName(record4.index, path + ".index");
+        if (record4.accumulator !== void 0) node.accumulator = safeName(record4.accumulator, path + ".accumulator");
+        if (record4.initial !== void 0) node.initial = valueRef(record4.initial, path + ".initial");
         return node;
       }
       function whileCondition(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["inputs", "body"], path);
-        if (!Array.isArray(record3.body)) fail22("while.condition.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+        const record4 = plain(value, path);
+        allowed(record4, ["inputs", "body"], path);
+        if (!Array.isArray(record4.body)) fail22("while.condition.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
         return {
-          inputs: record3.inputs === void 0 ? {} : valueMap(record3.inputs, path + ".inputs"),
-          body: statements(record3.body, path + ".body")
+          inputs: record4.inputs === void 0 ? {} : valueMap(record4.inputs, path + ".inputs"),
+          body: statements(record4.body, path + ".body")
         };
       }
       function whileStatement(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["kind", "id", "condition", "index", "budget", "body", "layout"], path);
-        if (!Array.isArray(record3.body)) fail22("while.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
-        if (!Number.isSafeInteger(record3.budget) || record3.budget <= 0) fail22("while.budget must be a positive safe integer", path + ".budget", "GAMEPLAY_MODULE_INVALID_VALUE");
+        const record4 = plain(value, path);
+        allowed(record4, ["kind", "id", "condition", "index", "budget", "body", "layout"], path);
+        if (!Array.isArray(record4.body)) fail22("while.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+        if (!Number.isSafeInteger(record4.budget) || record4.budget <= 0) fail22("while.budget must be a positive safe integer", path + ".budget", "GAMEPLAY_MODULE_INVALID_VALUE");
         const node = {
           kind: "while",
-          id: nonempty(record3.id, path + ".id"),
-          condition: whileCondition(record3.condition, path + ".condition"),
-          budget: record3.budget,
-          body: statements(record3.body, path + ".body")
+          id: nonempty(record4.id, path + ".id"),
+          condition: whileCondition(record4.condition, path + ".condition"),
+          budget: record4.budget,
+          body: statements(record4.body, path + ".body")
         };
-        if (record3.index !== void 0) node.index = safeName(record3.index, path + ".index");
-        const nodeLayout = layout(record3.layout, path + ".layout");
+        if (record4.index !== void 0) node.index = safeName(record4.index, path + ".index");
+        const nodeLayout = layout(record4.layout, path + ".layout");
         if (nodeLayout !== void 0) node.layout = nodeLayout;
         return node;
       }
       function statement(value, path) {
-        const record3 = plain(value, path);
-        const kind = nonempty(record3.kind, path + ".kind");
+        const record4 = plain(value, path);
+        const kind = nonempty(record4.kind, path + ".kind");
         if (kind === "call") {
-          allowed(record3, ["kind", "id", "module", "version", "inputs", "parameters", "layout"], path);
-          const node = { kind, id: nonempty(record3.id, path + ".id"), module: nonempty(record3.module, path + ".module"), version: nonempty(record3.version, path + ".version"), inputs: record3.inputs === void 0 ? {} : valueMap(record3.inputs, path + ".inputs"), parameters: record3.parameters === void 0 ? {} : literalMap(record3.parameters, path + ".parameters") };
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          allowed(record4, ["kind", "id", "module", "version", "inputs", "parameters", "layout"], path);
+          const node = { kind, id: nonempty(record4.id, path + ".id"), module: nonempty(record4.module, path + ".module"), version: nonempty(record4.version, path + ".version"), inputs: record4.inputs === void 0 ? {} : valueMap(record4.inputs, path + ".inputs"), parameters: record4.parameters === void 0 ? {} : literalMap(record4.parameters, path + ".parameters") };
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "if") {
-          allowed(record3, ["kind", "id", "condition", "then", "else", "layout"], path);
-          if (!Array.isArray(record3.then)) fail22("if.then must be an array", path + ".then", "GAMEPLAY_MODULE_SHAPE");
-          if (record3.else !== void 0 && !Array.isArray(record3.else)) fail22("if.else must be an array", path + ".else", "GAMEPLAY_MODULE_SHAPE");
-          const node = { kind, id: nonempty(record3.id, path + ".id"), condition: valueRef(record3.condition, path + ".condition"), then: statements(record3.then, path + ".then") };
-          if (record3.else !== void 0) node.else = statements(record3.else, path + ".else");
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          allowed(record4, ["kind", "id", "condition", "then", "else", "layout"], path);
+          if (!Array.isArray(record4.then)) fail22("if.then must be an array", path + ".then", "GAMEPLAY_MODULE_SHAPE");
+          if (record4.else !== void 0 && !Array.isArray(record4.else)) fail22("if.else must be an array", path + ".else", "GAMEPLAY_MODULE_SHAPE");
+          const node = { kind, id: nonempty(record4.id, path + ".id"), condition: valueRef(record4.condition, path + ".condition"), then: statements(record4.then, path + ".then") };
+          if (record4.else !== void 0) node.else = statements(record4.else, path + ".else");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "foreach") {
-          allowed(record3, ["kind", "id", "items", "item", "index", "body", "presentation", "layout"], path);
-          if (!Array.isArray(record3.body)) fail22("foreach.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
-          const node = { kind, id: nonempty(record3.id, path + ".id"), items: valueRef(record3.items, path + ".items"), body: statements(record3.body, path + ".body") };
-          if (record3.item !== void 0) node.item = nonempty(record3.item, path + ".item");
-          if (record3.index !== void 0) node.index = nonempty(record3.index, path + ".index");
-          if (record3.presentation !== void 0) {
-            if (!["statusAdded", "statusRemoved", "tileEffectAdded", "tileEffectRemoved"].includes(String(record3.presentation))) fail22("unknown presentation batch kind", path + ".presentation", "GAMEPLAY_MODULE_INVALID_VALUE");
-            node.presentation = record3.presentation;
+          allowed(record4, ["kind", "id", "items", "item", "index", "body", "presentation", "layout"], path);
+          if (!Array.isArray(record4.body)) fail22("foreach.body must be an array", path + ".body", "GAMEPLAY_MODULE_SHAPE");
+          const node = { kind, id: nonempty(record4.id, path + ".id"), items: valueRef(record4.items, path + ".items"), body: statements(record4.body, path + ".body") };
+          if (record4.item !== void 0) node.item = nonempty(record4.item, path + ".item");
+          if (record4.index !== void 0) node.index = nonempty(record4.index, path + ".index");
+          if (record4.presentation !== void 0) {
+            if (!["statusAdded", "statusRemoved", "tileEffectAdded", "tileEffectRemoved"].includes(String(record4.presentation))) fail22("unknown presentation batch kind", path + ".presentation", "GAMEPLAY_MODULE_INVALID_VALUE");
+            node.presentation = record4.presentation;
           }
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "while") return whileStatement(value, path);
         if (kind === "record.create") {
-          allowed(record3, ["kind", "id", "schema", "fields", "layout"], path);
+          allowed(record4, ["kind", "id", "schema", "fields", "layout"], path);
           const node = {
             kind,
-            id: safeName(record3.id, path + ".id"),
-            schema: nonempty(record3.schema, path + ".schema"),
-            fields: recordFields(record3.fields, path + ".fields")
+            id: safeName(record4.id, path + ".id"),
+            schema: nonempty(record4.schema, path + ".schema"),
+            fields: recordFields(record4.fields, path + ".fields")
           };
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "record.get") {
-          allowed(record3, ["kind", "id", "record", "field", "layout"], path);
+          allowed(record4, ["kind", "id", "record", "field", "layout"], path);
           const node = {
             kind,
-            id: safeName(record3.id, path + ".id"),
-            record: valueRef(record3.record, path + ".record"),
-            field: safeName(record3.field, path + ".field")
+            id: safeName(record4.id, path + ".id"),
+            record: valueRef(record4.record, path + ".record"),
+            field: safeName(record4.field, path + ".field")
           };
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "record.with") {
-          allowed(record3, ["kind", "id", "record", "fields", "layout"], path);
+          allowed(record4, ["kind", "id", "record", "fields", "layout"], path);
           const node = {
             kind,
-            id: safeName(record3.id, path + ".id"),
-            record: valueRef(record3.record, path + ".record"),
-            fields: recordFields(record3.fields, path + ".fields")
+            id: safeName(record4.id, path + ".id"),
+            record: valueRef(record4.record, path + ".record"),
+            fields: recordFields(record4.fields, path + ".fields")
           };
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
         if (kind === "collection" || kind === "collection.map" || kind === "collection.filter" || kind === "collection.find" || kind === "collection.reduce") return collectionStatement(value, path);
         if (kind === "defer-choice") {
-          allowed(record3, ["kind", "id", "graph", "payload", "player", "title", "targetType", "range", "filter", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"], path);
-          if (own3(record3, "min") && own3(record3, "minSelections")) fail22("defer-choice cannot contain both min and minSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
-          if (own3(record3, "max") && own3(record3, "maxSelections")) fail22("defer-choice cannot contain both max and maxSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+          allowed(record4, ["kind", "id", "graph", "payload", "player", "title", "targetType", "range", "filter", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"], path);
+          if (own3(record4, "min") && own3(record4, "minSelections")) fail22("defer-choice cannot contain both min and minSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
+          if (own3(record4, "max") && own3(record4, "maxSelections")) fail22("defer-choice cannot contain both max and maxSelections", path, "GAMEPLAY_MODULE_INVALID_STATEMENT");
           const node = {
             kind,
-            id: safeName(record3.id, path + ".id"),
-            graph: nonempty(record3.graph, path + ".graph"),
-            payload: valueRef(record3.payload, path + ".payload")
+            id: safeName(record4.id, path + ".id"),
+            graph: nonempty(record4.graph, path + ".graph"),
+            payload: valueRef(record4.payload, path + ".payload")
           };
           for (const key of ["player", "title", "targetType", "range", "filter", "candidates", "selectionMode", "min", "max", "minSelections", "maxSelections", "canCancel", "resumeOnCancel", "message"]) {
-            if (record3[key] !== void 0) node[key] = valueRef(record3[key], path + "." + key);
+            if (record4[key] !== void 0) node[key] = valueRef(record4[key], path + "." + key);
           }
           return node;
         }
         if (kind === "return") {
-          allowed(record3, ["kind", "id", "values", "value", "layout"], path);
-          if (own3(record3, "values") && own3(record3, "value")) fail22("return cannot contain both values and value", path, "GAMEPLAY_MODULE_INVALID_RETURN");
-          const node = { kind, id: nonempty(record3.id, path + ".id") };
-          if (own3(record3, "values")) node.values = valueMap(record3.values, path + ".values");
-          if (own3(record3, "value")) node.value = valueRef(record3.value, path + ".value");
-          const nodeLayout = layout(record3.layout, path + ".layout");
+          allowed(record4, ["kind", "id", "values", "value", "layout"], path);
+          if (own3(record4, "values") && own3(record4, "value")) fail22("return cannot contain both values and value", path, "GAMEPLAY_MODULE_INVALID_RETURN");
+          const node = { kind, id: nonempty(record4.id, path + ".id") };
+          if (own3(record4, "values")) node.values = valueMap(record4.values, path + ".values");
+          if (own3(record4, "value")) node.value = valueRef(record4.value, path + ".value");
+          const nodeLayout = layout(record4.layout, path + ".layout");
           if (nodeLayout !== void 0) node.layout = nodeLayout;
           return node;
         }
@@ -903,16 +908,16 @@ var ContentGraphCore = (() => {
         return result;
       }
       function composite(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["id", "version", "label", "description", "inputs", "outputs", "parameters", "allowedSurfaces", "body", "layout"], path);
-        const result = { id: nonempty(record3.id, path + ".id"), version: nonempty(record3.version, path + ".version"), inputs: ports(record3.inputs, path + ".inputs"), outputs: ports(record3.outputs, path + ".outputs"), body: statements(record3.body, path + ".body") };
-        if (record3.label !== void 0) result.label = nonempty(record3.label, path + ".label");
-        if (record3.description !== void 0) result.description = nonempty(record3.description, path + ".description");
-        const params = parameters(record3.parameters, path + ".parameters");
+        const record4 = plain(value, path);
+        allowed(record4, ["id", "version", "label", "description", "inputs", "outputs", "parameters", "allowedSurfaces", "body", "layout"], path);
+        const result = { id: nonempty(record4.id, path + ".id"), version: nonempty(record4.version, path + ".version"), inputs: ports(record4.inputs, path + ".inputs"), outputs: ports(record4.outputs, path + ".outputs"), body: statements(record4.body, path + ".body") };
+        if (record4.label !== void 0) result.label = nonempty(record4.label, path + ".label");
+        if (record4.description !== void 0) result.description = nonempty(record4.description, path + ".description");
+        const params = parameters(record4.parameters, path + ".parameters");
         if (params.length) result.parameters = params;
         if (params.length) fail22("composite parameters are not supported; use typed inputs", path + ".parameters", "GAMEPLAY_MODULE_UNSUPPORTED_PARAMETER");
-        if (record3.allowedSurfaces !== void 0) result.allowedSurfaces = allowedSurfaces(record3.allowedSurfaces, path + ".allowedSurfaces");
-        const nodeLayout = layout(record3.layout, path + ".layout");
+        if (record4.allowedSurfaces !== void 0) result.allowedSurfaces = allowedSurfaces(record4.allowedSurfaces, path + ".allowedSurfaces");
+        const nodeLayout = layout(record4.layout, path + ".layout");
         if (nodeLayout !== void 0) result.layout = nodeLayout;
         return result;
       }
@@ -951,15 +956,15 @@ var ContentGraphCore = (() => {
         player: "player"
       };
       function schema(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["id", "version", "fields", "additionalFields"], path);
-        if (!own3(record3, "fields")) fail22("record schema requires fields", path + ".fields", "GAMEPLAY_MODULE_SHAPE");
+        const record4 = plain(value, path);
+        allowed(record4, ["id", "version", "fields", "additionalFields"], path);
+        if (!own3(record4, "fields")) fail22("record schema requires fields", path + ".fields", "GAMEPLAY_MODULE_SHAPE");
         const result = {
-          id: safeName(record3.id, path + ".id"),
-          version: nonempty(record3.version, path + ".version"),
-          fields: ports(record3.fields, path + ".fields")
+          id: safeName(record4.id, path + ".id"),
+          version: nonempty(record4.version, path + ".version"),
+          fields: ports(record4.fields, path + ".fields")
         };
-        if (own3(record3, "additionalFields")) result.additionalFields = typeValue(record3.additionalFields, path + ".additionalFields");
+        if (own3(record4, "additionalFields")) result.additionalFields = typeValue(record4.additionalFields, path + ".additionalFields");
         return result;
       }
       function schemaList(value, path) {
@@ -986,11 +991,11 @@ var ContentGraphCore = (() => {
       function hostBindings(value, surface, path) {
         if (value === void 0) return {};
         if (surface !== "pending") fail22("hostBindings are only available on pending graphs", path, "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
-        const record3 = plain(value, path);
+        const record4 = plain(value, path);
         const result = /* @__PURE__ */ Object.create(null);
-        for (const key of Object.keys(record3)) {
+        for (const key of Object.keys(record4)) {
           if (!pendingHostNames.has(key)) fail22('unsupported pending host binding "' + key + '"', path + "." + key, "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
-          result[key] = hostBindingType(record3[key], key, path + "." + key);
+          result[key] = hostBindingType(record4[key], key, path + "." + key);
         }
         const payload = result.payload;
         if (payload !== void 0 && (typeof payload !== "object" || payload.kind !== "record")) fail22("pending payload host binding must be a typed record", path + ".payload", "GAMEPLAY_MODULE_INVALID_HOST_BINDING");
@@ -1007,41 +1012,41 @@ var ContentGraphCore = (() => {
         const result = [];
         const seen = /* @__PURE__ */ new Set();
         entries.forEach((entry, index) => {
-          const record3 = plain(entry, path + "[" + index + "]");
-          allowed(record3, ["id", "version", "graph", "payloadType", "payload"], path + "[" + index + "]");
-          const id = safeName(record3.id, path + "[" + index + "].id");
-          const version = nonempty(record3.version, path + "[" + index + "].version");
+          const record4 = plain(entry, path + "[" + index + "]");
+          allowed(record4, ["id", "version", "graph", "payloadType", "payload"], path + "[" + index + "]");
+          const id = safeName(record4.id, path + "[" + index + "].id");
+          const version = nonempty(record4.version, path + "[" + index + "].version");
           const key = moduleKey(id, version);
           if (seen.has(key)) fail22('duplicate continuation "' + id + "@" + version + '"', path, "GAMEPLAY_MODULE_DUPLICATE_CONTINUATION");
           seen.add(key);
-          if (!own3(record3, "graph")) fail22("continuation requires a pending graph", path + "[" + index + "].graph", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
-          const payloadTypeValue = record3.payloadType ?? record3.payload;
-          if (record3.payloadType !== void 0 && record3.payload !== void 0) fail22("continuation cannot contain both payloadType and payload", path + "[" + index + "]", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
-          const child = parseGraph(record3.graph, { active: /* @__PURE__ */ new Set([...context13.active]) }, path + "[" + index + "].graph");
+          if (!own3(record4, "graph")) fail22("continuation requires a pending graph", path + "[" + index + "].graph", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
+          const payloadTypeValue = record4.payloadType ?? record4.payload;
+          if (record4.payloadType !== void 0 && record4.payload !== void 0) fail22("continuation cannot contain both payloadType and payload", path + "[" + index + "]", "GAMEPLAY_MODULE_INVALID_CONTINUATION");
+          const child = parseGraph(record4.graph, { active: /* @__PURE__ */ new Set([...context13.active]) }, path + "[" + index + "].graph");
           if (child.surface !== "pending") fail22("continuation graph must use the pending surface", path + "[" + index + "].graph.surface", "GAMEPLAY_MODULE_SURFACE_FORBIDDEN");
           result.push({ id, version, graph: child, payloadType: payloadTypeValue === void 0 ? void 0 : typeValue(payloadTypeValue, path + "[" + index + "].payloadType") });
         });
         return result;
       }
       function parseGraph(value, context13 = { active: /* @__PURE__ */ new Set() }, rootPath = "graph") {
-        const record3 = plain(value, rootPath);
+        const record4 = plain(value, rootPath);
         if (context13.active.has(value)) fail22("continuation graph cycle detected", rootPath, "GAMEPLAY_MODULE_CONTINUATION_CYCLE");
         const active3 = new Set(context13.active);
         active3.add(value);
-        allowed(record3, ["version", "surface", "inputs", "inputBindings", "outputs", "body", "composites", "schemas", "hostBindings", "continuations", "layout"], rootPath);
-        if (record3.version !== GAMEPLAY_MODULE_GRAPH_VERSION) fail22('unsupported graph version "' + String(record3.version) + '"', rootPath + ".version", "GAMEPLAY_MODULE_VERSION_MISMATCH");
-        const surface = nonempty(record3.surface, rootPath + ".surface");
+        allowed(record4, ["version", "surface", "inputs", "inputBindings", "outputs", "body", "composites", "schemas", "hostBindings", "continuations", "layout"], rootPath);
+        if (record4.version !== GAMEPLAY_MODULE_GRAPH_VERSION) fail22('unsupported graph version "' + String(record4.version) + '"', rootPath + ".version", "GAMEPLAY_MODULE_VERSION_MISMATCH");
+        const surface = nonempty(record4.surface, rootPath + ".surface");
         if (!surfaceSet2.has(surface)) fail22('unsupported surface "' + surface + '"', rootPath + ".surface", "GAMEPLAY_MODULE_INVALID_SURFACE");
-        if (!Array.isArray(record3.body)) fail22("graph.body must be an array", rootPath + ".body", "GAMEPLAY_MODULE_SHAPE");
-        const graphLayout = layout(record3.layout, rootPath + ".layout");
-        const inputPorts = ports(record3.inputs, rootPath + ".inputs");
-        const inputBindings = record3.inputBindings === void 0 ? {} : literalMap(record3.inputBindings, rootPath + ".inputBindings");
-        const outputPorts = ports(record3.outputs, rootPath + ".outputs");
-        const body = statements(record3.body, rootPath + ".body");
-        const composites = record3.composites === void 0 ? [] : !Array.isArray(record3.composites) ? fail22("graph.composites must be an array", rootPath + ".composites", "GAMEPLAY_MODULE_SHAPE") : record3.composites.map((entry, index) => composite(entry, rootPath + ".composites[" + index + "]"));
-        const schemas = schemaList(record3.schemas, rootPath + ".schemas");
-        const bindings = hostBindings(record3.hostBindings, surface, rootPath + ".hostBindings");
-        const continuationValues = continuationList(record3.continuations, { active: active3 }, rootPath + ".continuations");
+        if (!Array.isArray(record4.body)) fail22("graph.body must be an array", rootPath + ".body", "GAMEPLAY_MODULE_SHAPE");
+        const graphLayout = layout(record4.layout, rootPath + ".layout");
+        const inputPorts = ports(record4.inputs, rootPath + ".inputs");
+        const inputBindings = record4.inputBindings === void 0 ? {} : literalMap(record4.inputBindings, rootPath + ".inputBindings");
+        const outputPorts = ports(record4.outputs, rootPath + ".outputs");
+        const body = statements(record4.body, rootPath + ".body");
+        const composites = record4.composites === void 0 ? [] : !Array.isArray(record4.composites) ? fail22("graph.composites must be an array", rootPath + ".composites", "GAMEPLAY_MODULE_SHAPE") : record4.composites.map((entry, index) => composite(entry, rootPath + ".composites[" + index + "]"));
+        const schemas = schemaList(record4.schemas, rootPath + ".schemas");
+        const bindings = hostBindings(record4.hostBindings, surface, rootPath + ".hostBindings");
+        const continuationValues = continuationList(record4.continuations, { active: active3 }, rootPath + ".continuations");
         const hostInputPorts = [];
         if (surface === "pending") for (const [name, type] of Object.entries(bindings)) hostInputPorts.push({ name, type });
         const normalizedInputs = inputPorts.length ? inputPorts : hostInputPorts;
@@ -1307,44 +1312,44 @@ var ContentGraphCore = (() => {
         return map;
       }
       function validateEffects(value, path) {
-        const record3 = plain(value, path);
-        allowed(record3, ["previewSafe", "pure", "writes", "reads", "random", "pending", "events", "description"], path);
+        const record4 = plain(value, path);
+        allowed(record4, ["previewSafe", "pure", "writes", "reads", "random", "pending", "events", "description"], path);
         const result = {};
-        for (const key of ["previewSafe", "pure", "random", "pending"]) if (record3[key] !== void 0) result[key] = bool(record3[key], path + "." + key);
-        for (const key of ["writes", "reads", "events"]) if (record3[key] !== void 0) {
-          if (!Array.isArray(record3[key])) fail22(key + " must be an array", path + "." + key, "GAMEPLAY_MODULE_INVALID_EFFECTS");
-          result[key] = record3[key].map((entry, index) => nonempty(entry, path + "." + key + "[" + index + "]"));
+        for (const key of ["previewSafe", "pure", "random", "pending"]) if (record4[key] !== void 0) result[key] = bool(record4[key], path + "." + key);
+        for (const key of ["writes", "reads", "events"]) if (record4[key] !== void 0) {
+          if (!Array.isArray(record4[key])) fail22(key + " must be an array", path + "." + key, "GAMEPLAY_MODULE_INVALID_EFFECTS");
+          result[key] = record4[key].map((entry, index) => nonempty(entry, path + "." + key + "[" + index + "]"));
         }
-        if (record3.description !== void 0) result.description = nonempty(record3.description, path + ".description");
+        if (record4.description !== void 0) result.description = nonempty(record4.description, path + ".description");
         return result;
       }
       function descriptor(value, id, version) {
         if (!isObject2(value)) fail22("registry returned an invalid descriptor", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-        const record3 = value;
-        for (const key of ["id", "version", "label", "inputs", "outputs", "allowedSurfaces", "effects", "lower"]) if (!own3(record3, key)) fail22("registry descriptor is missing " + key, "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-        allowed(record3, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "recordSchemas", "outputTypeBindings", "outputSchemaBindings", "inputSchemaBindings", "outputValueTypeBindings", "inputValueTypeBindings", "outputParameterTypeBindings", "parameters", "inspectReferences", "livingReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
-        const actualId = nonempty(record3.id, "registry." + id + ".id");
-        const actualVersion = nonempty(record3.version, "registry." + id + ".version");
+        const record4 = value;
+        for (const key of ["id", "version", "label", "inputs", "outputs", "allowedSurfaces", "effects", "lower"]) if (!own3(record4, key)) fail22("registry descriptor is missing " + key, "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
+        allowed(record4, ["id", "version", "label", "description", "uiDescription", "inputs", "outputs", "recordSchemas", "outputTypeBindings", "outputSchemaBindings", "inputSchemaBindings", "outputValueTypeBindings", "inputValueTypeBindings", "outputParameterTypeBindings", "parameters", "inspectReferences", "livingReferences", "allowedSurfaces", "effects", "ui", "lower"], "registry." + id);
+        const actualId = nonempty(record4.id, "registry." + id + ".id");
+        const actualVersion = nonempty(record4.version, "registry." + id + ".version");
         if (actualId !== id || actualVersion !== version) fail22("registry descriptor does not match requested module", "registry." + id, "GAMEPLAY_MODULE_REGISTRY_INVALID");
-        const inputPorts = ports(record3.inputs, "registry." + id + ".inputs", true);
-        const result = { id: actualId, version: actualVersion, label: nonempty(record3.label, "registry." + id + ".label"), inputs: inputPorts, outputs: ports(record3.outputs, "registry." + id + ".outputs", true), allowedSurfaces: allowedSurfaces(record3.allowedSurfaces, "registry." + id + ".allowedSurfaces"), effects: validateEffects(record3.effects, "registry." + id + ".effects"), lower: record3.lower };
-        const descriptorSchemas = schemaList(record3.recordSchemas, "registry." + id + ".recordSchemas");
+        const inputPorts = ports(record4.inputs, "registry." + id + ".inputs", true);
+        const result = { id: actualId, version: actualVersion, label: nonempty(record4.label, "registry." + id + ".label"), inputs: inputPorts, outputs: ports(record4.outputs, "registry." + id + ".outputs", true), allowedSurfaces: allowedSurfaces(record4.allowedSurfaces, "registry." + id + ".allowedSurfaces"), effects: validateEffects(record4.effects, "registry." + id + ".effects"), lower: record4.lower };
+        const descriptorSchemas = schemaList(record4.recordSchemas, "registry." + id + ".recordSchemas");
         if (descriptorSchemas.length) result.recordSchemas = descriptorSchemas;
         for (const input45 of inputPorts) if (input45.type === "any" || input45.type === "unknown") fail22("universal input types are not allowed", "registry." + id + ".inputs", "GAMEPLAY_MODULE_INVALID_TYPE");
-        for (const output of result.outputs) if ((output.type === "any" || output.type === "unknown") && !isObject2(record3.outputTypeBindings) && !isObject2(record3.outputParameterTypeBindings)) fail22("unbound universal output types are not allowed", "registry." + id + ".outputs", "GAMEPLAY_MODULE_INVALID_TYPE");
-        if (record3.description !== void 0) result.description = nonempty(record3.description, "registry." + id + ".description");
-        if (record3.uiDescription !== void 0) result.uiDescription = nonempty(record3.uiDescription, "registry." + id + ".uiDescription");
-        const params = parameters(record3.parameters, "registry." + id + ".parameters");
+        for (const output of result.outputs) if ((output.type === "any" || output.type === "unknown") && !isObject2(record4.outputTypeBindings) && !isObject2(record4.outputParameterTypeBindings)) fail22("unbound universal output types are not allowed", "registry." + id + ".outputs", "GAMEPLAY_MODULE_INVALID_TYPE");
+        if (record4.description !== void 0) result.description = nonempty(record4.description, "registry." + id + ".description");
+        if (record4.uiDescription !== void 0) result.uiDescription = nonempty(record4.uiDescription, "registry." + id + ".uiDescription");
+        const params = parameters(record4.parameters, "registry." + id + ".parameters");
         if (params.length) result.parameters = params;
-        const inspected = inspectReferences(record3.inspectReferences, inputPorts, "registry." + id + ".inspectReferences", record3.inputValueTypeBindings, params);
+        const inspected = inspectReferences(record4.inspectReferences, inputPorts, "registry." + id + ".inspectReferences", record4.inputValueTypeBindings, params);
         if (inspected !== void 0) result.inspectReferences = inspected;
-        const living = livingReferences(record3.livingReferences, inputPorts, "registry." + id + ".livingReferences");
+        const living = livingReferences(record4.livingReferences, inputPorts, "registry." + id + ".livingReferences");
         if (living !== void 0) {
           if (inspected?.some((name) => living.includes(name))) fail22("an input cannot be listed in both livingReferences and inspectReferences", "registry." + id + ".livingReferences", "GAMEPLAY_MODULE_CONFLICTING_REFERENCE_METADATA");
           result.livingReferences = living;
         }
-        if (record3.outputTypeBindings !== void 0) {
-          const bindings = plain(record3.outputTypeBindings, "registry." + id + ".outputTypeBindings");
+        if (record4.outputTypeBindings !== void 0) {
+          const bindings = plain(record4.outputTypeBindings, "registry." + id + ".outputTypeBindings");
           const normalized = /* @__PURE__ */ Object.create(null);
           for (const [output, rawBinding] of Object.entries(bindings)) {
             const path = "registry." + id + ".outputTypeBindings." + output;
@@ -1357,10 +1362,10 @@ var ContentGraphCore = (() => {
           }
           result.outputTypeBindings = normalized;
         }
-        for (const output of result.outputs) if ((output.type === "any" || output.type === "unknown") && !result.outputTypeBindings?.[output.name] && !(record3.outputParameterTypeBindings && isObject2(record3.outputParameterTypeBindings) && own3(record3.outputParameterTypeBindings, output.name))) fail22("unbound universal output types are not allowed", "registry." + id + ".outputs", "GAMEPLAY_MODULE_INVALID_TYPE");
-        if (record3.ui !== void 0) result.ui = plain(record3.ui, "registry." + id + ".ui");
-        for (const kind of ["outputSchemaBindings", "inputSchemaBindings"]) if (record3[kind] !== void 0) {
-          const bindings = plain(record3[kind], "registry." + id + "." + kind);
+        for (const output of result.outputs) if ((output.type === "any" || output.type === "unknown") && !result.outputTypeBindings?.[output.name] && !(record4.outputParameterTypeBindings && isObject2(record4.outputParameterTypeBindings) && own3(record4.outputParameterTypeBindings, output.name))) fail22("unbound universal output types are not allowed", "registry." + id + ".outputs", "GAMEPLAY_MODULE_INVALID_TYPE");
+        if (record4.ui !== void 0) result.ui = plain(record4.ui, "registry." + id + ".ui");
+        for (const kind of ["outputSchemaBindings", "inputSchemaBindings"]) if (record4[kind] !== void 0) {
+          const bindings = plain(record4[kind], "registry." + id + "." + kind);
           const normalized = /* @__PURE__ */ Object.create(null);
           for (const [name, raw] of Object.entries(bindings)) {
             const path = "registry." + id + "." + kind + "." + name;
@@ -1373,9 +1378,9 @@ var ContentGraphCore = (() => {
           }
           result[kind] = normalized;
         }
-        if (typeof record3.lower !== "function") fail22("registry descriptor lower must be a function", "registry." + id + ".lower", "GAMEPLAY_MODULE_REGISTRY_INVALID");
-        for (const kind of ["outputValueTypeBindings", "inputValueTypeBindings"]) if (record3[kind] !== void 0) {
-          const bindings = plain(record3[kind], "registry." + id + "." + kind);
+        if (typeof record4.lower !== "function") fail22("registry descriptor lower must be a function", "registry." + id + ".lower", "GAMEPLAY_MODULE_REGISTRY_INVALID");
+        for (const kind of ["outputValueTypeBindings", "inputValueTypeBindings"]) if (record4[kind] !== void 0) {
+          const bindings = plain(record4[kind], "registry." + id + "." + kind);
           const normalized = /* @__PURE__ */ Object.create(null);
           for (const [name, raw] of Object.entries(bindings)) {
             const path = "registry." + id + "." + kind + "." + name;
@@ -1389,7 +1394,7 @@ var ContentGraphCore = (() => {
           }
           result[kind] = normalized;
         }
-        const fieldBindings = outputParameterTypeBindings(record3.outputParameterTypeBindings, result.outputs, params, "registry." + id + ".outputParameterTypeBindings");
+        const fieldBindings = outputParameterTypeBindings(record4.outputParameterTypeBindings, result.outputs, params, "registry." + id + ".outputParameterTypeBindings");
         if (fieldBindings !== void 0) result.outputParameterTypeBindings = fieldBindings;
         return result;
       }
@@ -1782,8 +1787,8 @@ var ContentGraphCore = (() => {
               const schemaBinding = resolved.kind === "native" ? resolved.descriptor.outputSchemaBindings?.[output.name] : void 0;
               if (schemaBinding) {
                 resolveRecordSchema(resolver, String(params[schemaBinding.parameter]), nodePath + ".parameters." + schemaBinding.parameter);
-                const record3 = { kind: "record", schema: String(params[schemaBinding.parameter]) };
-                type = schemaBinding.list ? { kind: "list", element: record3 } : record3;
+                const record4 = { kind: "record", schema: String(params[schemaBinding.parameter]) };
+                type = schemaBinding.list ? { kind: "list", element: record4 } : record4;
               }
               if (binding) {
                 const supplied = node.inputs?.[binding.input];
@@ -6762,16 +6767,16 @@ var ContentGraphCore = (() => {
           effects: write3(["status"], ["status-applied"]),
           lower: (ctx) => {
             const target = input13(ctx, "target");
-            const record3 = input13(ctx, "record");
+            const record4 = input13(ctx, "record");
             if (ctx.surface === "card" && ctx.parameters.inputPolicy === "host") {
               return `(function(target, record) {
           if (!target) return false;
           addStatusEffectById(target, record);
           return true;
-        })(${target}, ${record3})`;
+        })(${target}, ${record4})`;
             }
             const policy = ctx.parameters.inputPolicy === "host" ? "host" : "flow";
-            return `${runtime3(ctx)}.status.add(${target}, ${record3}, 'piece', ${ctx.emitLiteral(policy)})`;
+            return `${runtime3(ctx)}.status.add(${target}, ${record4}, 'piece', ${ctx.emitLiteral(policy)})`;
           }
         }),
         define14({
@@ -12657,7 +12662,7 @@ var ContentGraphCore = (() => {
         return value;
       };
       var outputValue = (expression2) => `{value:(${expression2})}`;
-      var withFieldExistence = (expression2, record3, field3) => `(function(record){var result=(${expression2});result.exists=record[${field3}]!==undefined&&record[${field3}]!==null;return result;})(${record3})`;
+      var withFieldExistence = (expression2, record4, field3) => `(function(record){var result=(${expression2});result.exists=record[${field3}]!==undefined&&record[${field3}]!==null;return result;})(${record4})`;
       var pure24 = (reads) => ({ pure: true, previewSafe: false, reads });
       var define36 = (value) => ({
         version: "1",
@@ -12867,10 +12872,10 @@ var ContentGraphCore = (() => {
       var RESULT_LIST_FIELDS = /* @__PURE__ */ new Set(["results"]);
       function resultFieldLowering(ctx) {
         const selected = field(ctx);
-        const record3 = input36(ctx, "record");
+        const record4 = input36(ctx, "record");
         const fieldExpression = ctx.emitLiteral(selected);
         const value = RESULT_STRING_FIELDS.has(selected) ? `return value===undefined||value===null?null:(typeof value==="string"?value:__gameplayInvalid);` : RESULT_BOOLEAN_FIELDS.has(selected) ? `return value===__gameplayInvalid?__gameplayInvalid:Boolean(value);` : RESULT_LIST_FIELDS.has(selected) ? `if(value===undefined)return [];if(!Array.isArray(value))return __gameplayInvalid;var result=[];for(var index=0;index<value.length;index+=1){var item=value[index];if(!item||typeof item!=="object")return __gameplayInvalid;result.push(JSON.parse(JSON.stringify(item)));}return result;` : `return value===undefined||value===null?0:(typeof value==="number"&&Number.isFinite(value)?value:__gameplayInvalid);`;
-        return outputValue(`(function(record){if(record===__gameplayInvalid||record===null||typeof record!=="object")return __gameplayInvalid;var value=record[${fieldExpression}];${value}})(${record3})`);
+        return outputValue(`(function(record){if(record===__gameplayInvalid||record===null||typeof record!=="object")return __gameplayInvalid;var value=record[${fieldExpression}];${value}})(${record4})`);
       }
       var FIELD_GAMEPLAY_MODULES = Object.freeze([
         define36({
@@ -13219,7 +13224,7 @@ var ContentGraphCore = (() => {
         if (typeof selected !== "string" || !Object.hasOwn(OPTIONAL_DATA_FIELD_TYPES, selected)) {
           throw new Error(`module ${ctx.moduleId}: unsupported field`);
         }
-        const record3 = input37(ctx, "record");
+        const record4 = input37(ctx, "record");
         const field3 = ctx.emitLiteral(selected);
         const type = OPTIONAL_DATA_FIELD_TYPES[selected];
         let read7;
@@ -13240,7 +13245,7 @@ var ContentGraphCore = (() => {
         } else {
           throw new Error(`module ${ctx.moduleId}: unsupported field type`);
         }
-        return `(function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!=="object"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,${field3});var value=(function(record){var value=record[${field3}];if(value===undefined||value===null)return null;${read7}})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(${record3})`;
+        return `(function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!=="object"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,${field3});var value=(function(record){var value=record[${field3}];if(value===undefined||value===null)return null;${read7}})(record);if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(${record4})`;
       }
       var OPTIONAL_FIELD_GAMEPLAY_MODULES = Object.freeze([
         {
@@ -13317,9 +13322,9 @@ var ContentGraphCore = (() => {
         effects: { pure: true, previewSafe: false, reads: ["event"] },
         lower: (ctx) => {
           const key = ctx.parameters.field;
-          const record3 = ctx.inputs.record;
+          const record4 = ctx.inputs.record;
           if (!Object.hasOwn(fields2, key)) throw new Error("Unknown observation field");
-          const value = key === "type" ? `String((${record3}&&${record3}.type)||'')` : key === "distance" ? `Number((${record3}&&${record3}.distance)||0)` : key === "blocksProjectile" ? `Boolean(${record3}&&${record3}.blocksProjectile)` : key === "piece" ? `(${record3}&&${record3}.piece?${record3}.piece.instanceId:null)` : `Number(${record3}[${ctx.emitLiteral(key)}])`;
+          const value = key === "type" ? `String((${record4}&&${record4}.type)||'')` : key === "distance" ? `Number((${record4}&&${record4}.distance)||0)` : key === "blocksProjectile" ? `Boolean(${record4}&&${record4}.blocksProjectile)` : key === "piece" ? `(${record4}&&${record4}.piece?${record4}.piece.instanceId:null)` : `Number(${record4}[${ctx.emitLiteral(key)}])`;
           return `({value:${value}})`;
         },
         ui: { category: "data", authoring: "standard" }
@@ -13652,8 +13657,8 @@ var ContentGraphCore = (() => {
       }
       function previewRecordFieldLowering(ctx) {
         const selected = selectedField3(ctx, PREVIEW_RECORD_FIELD_TYPES);
-        const record3 = input38(ctx, "record");
-        return `(function(value){if(value===null||value===undefined)return null;var result=value[${ctx.emitLiteral(selected)}];return result===undefined?null:result;})(${record3})`;
+        const record4 = input38(ctx, "record");
+        return `(function(value){if(value===null||value===undefined)return null;var result=value[${ctx.emitLiteral(selected)}];return result===undefined?null:result;})(${record4})`;
       }
       function battleTurnFieldLowering(ctx) {
         const selected = selectedField3(ctx, BATTLE_FIELD_TYPES);
@@ -13779,9 +13784,9 @@ var ContentGraphCore = (() => {
           try {
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-              const record3 = parsed;
-              if (record3.kind === "nullable" && typeof record3.value === "string" && scalarTypeNames.includes(record3.value)) {
-                return { base: record3.value, nullable: true };
+              const record4 = parsed;
+              if (record4.kind === "nullable" && typeof record4.value === "string" && scalarTypeNames.includes(record4.value)) {
+                return { base: record4.value, nullable: true };
               }
             }
           } catch {
@@ -13795,10 +13800,10 @@ var ContentGraphCore = (() => {
           throw new Error(`module ${ctx.moduleId}: field must be a safe record key`);
         }
         const selected = selectedValueType(ctx);
-        const record3 = input39(ctx, "record");
+        const record4 = input39(ctx, "record");
         const key = ctx.emitLiteral(field3);
         const validation = selected.base === "number" ? 'if (typeof value !== "number" || !Number.isFinite(value)) return __gameplayInvalid;' : selected.base === "boolean" ? 'if (typeof value !== "boolean") return __gameplayInvalid;' : 'if (typeof value !== "string") return __gameplayInvalid;';
-        return `(function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!=="object"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,${key});var value=record[${key}];if(value===undefined||value===null)return {value:null,defined:defined};${validation}return {value:value,defined:defined};})(${record3})`;
+        return `(function(record){if(record===__gameplayInvalid)return __gameplayInvalid;if(record==null)return {value:null,defined:false};if(typeof record!=="object"||Array.isArray(record))return __gameplayInvalid;var defined=Object.prototype.hasOwnProperty.call(record,${key});var value=record[${key}];if(value===undefined||value===null)return {value:null,defined:defined};${validation}return {value:value,defined:defined};})(${record4})`;
       }
       function pieceOptionalFieldLowering(ctx) {
         const field3 = ctx.parameters.field;
@@ -13956,10 +13961,10 @@ var ContentGraphCore = (() => {
         allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending", "preview"],
         effects: { pure: true, previewSafe: true },
         lower: (ctx) => {
-          const record3 = ctx.inputs.record;
+          const record4 = ctx.inputs.record;
           const key = ctx.inputs.key;
           const value = ctx.inputs.value;
-          return `(function(record,key,value){var unsafe=function(name){return name==="__proto__"||name==="prototype"||name==="constructor";};var clone=function(item,seen,depth){if(item===__gameplayInvalid||item===undefined||depth>40)return __gameplayInvalid;if(item===null||typeof item!=="object"){if(typeof item==="number"&&!Number.isFinite(item))return __gameplayInvalid;if(typeof item==="function"||typeof item==="symbol"||typeof item==="bigint")return __gameplayInvalid;return item;}if(seen.indexOf(item)>=0)return __gameplayInvalid;var keys=Reflect.ownKeys(item),result=Array.isArray(item)?[]:{};if(Array.isArray(item)){var prototype=Object.getPrototypeOf(item);if(prototype!==Array.prototype)return __gameplayInvalid;var length=Object.getOwnPropertyDescriptor(item,"length");if(!length||length.enumerable||!Number.isSafeInteger(length.value)||length.value<0)return __gameplayInvalid;for(var index=0;index<length.value;index+=1){var descriptor=Object.getOwnPropertyDescriptor(item,String(index));if(!descriptor||!descriptor.enumerable||!("value" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;result.push(copied);}if(keys.length!==length.value+1)return __gameplayInvalid;return result;}var prototype=Object.getPrototypeOf(item);if(prototype!==null&&Object.getPrototypeOf(prototype)!==null)return __gameplayInvalid;for(var keyIndex=0;keyIndex<keys.length;keyIndex+=1){var name=keys[keyIndex];if(typeof name!=="string"||unsafe(name))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(item,name);if(!descriptor||!descriptor.enumerable||!("value" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,writable:true,enumerable:true,configurable:true});}return result;};if(record===__gameplayInvalid||value===__gameplayInvalid||typeof key!=="string"||!key||unsafe(key))return __gameplayInvalid;var next=clone(record,[],0),child=clone(value,[],0);if(next===__gameplayInvalid||child===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(next,key,{value:child,writable:true,enumerable:true,configurable:true});return {record:next};})(${record3},${key},${value})`;
+          return `(function(record,key,value){var unsafe=function(name){return name==="__proto__"||name==="prototype"||name==="constructor";};var clone=function(item,seen,depth){if(item===__gameplayInvalid||item===undefined||depth>40)return __gameplayInvalid;if(item===null||typeof item!=="object"){if(typeof item==="number"&&!Number.isFinite(item))return __gameplayInvalid;if(typeof item==="function"||typeof item==="symbol"||typeof item==="bigint")return __gameplayInvalid;return item;}if(seen.indexOf(item)>=0)return __gameplayInvalid;var keys=Reflect.ownKeys(item),result=Array.isArray(item)?[]:{};if(Array.isArray(item)){var prototype=Object.getPrototypeOf(item);if(prototype!==Array.prototype)return __gameplayInvalid;var length=Object.getOwnPropertyDescriptor(item,"length");if(!length||length.enumerable||!Number.isSafeInteger(length.value)||length.value<0)return __gameplayInvalid;for(var index=0;index<length.value;index+=1){var descriptor=Object.getOwnPropertyDescriptor(item,String(index));if(!descriptor||!descriptor.enumerable||!("value" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;result.push(copied);}if(keys.length!==length.value+1)return __gameplayInvalid;return result;}var prototype=Object.getPrototypeOf(item);if(prototype!==null&&Object.getPrototypeOf(prototype)!==null)return __gameplayInvalid;for(var keyIndex=0;keyIndex<keys.length;keyIndex+=1){var name=keys[keyIndex];if(typeof name!=="string"||unsafe(name))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(item,name);if(!descriptor||!descriptor.enumerable||!("value" in descriptor))return __gameplayInvalid;var copied=clone(descriptor.value,seen.concat([item]),depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,writable:true,enumerable:true,configurable:true});}return result;};if(record===__gameplayInvalid||value===__gameplayInvalid||typeof key!=="string"||!key||unsafe(key))return __gameplayInvalid;var next=clone(record,[],0),child=clone(value,[],0);if(next===__gameplayInvalid||child===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(next,key,{value:child,writable:true,enumerable:true,configurable:true});return {record:next};})(${record4},${key},${value})`;
         },
         ui: { category: "data", authoring: "standard" }
       }, {
@@ -14026,12 +14031,12 @@ var ContentGraphCore = (() => {
         return value;
       }
       function lowerReadKey(ctx) {
-        const record3 = input40(ctx, "record");
+        const record4 = input40(ctx, "record");
         const type = JSON.stringify(selectedType(ctx));
         const dynamicKey = hasInput(ctx, "key");
         const key = dynamicKey ? input40(ctx, "key") : keyParameter(ctx);
         const keyGuard = dynamicKey ? 'if(typeof key!=="string"||key.length===0||key==="__proto__"||key==="prototype"||key==="constructor")return __gameplayInvalid;' : "";
-        return `(function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;${keyGuard}if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!=="object")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,"constructor");if(!constructor||!hasOwn.call(constructor,"value")||typeof constructor.value!=="function")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,"name");return !!name&&hasOwn.call(name,"value")&&name.value==="Object";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,"value"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,"value")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind==="string"||kind==="boolean")return true;if(kind==="number")return Number.isFinite(value);if(kind!=="object")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!=="string"){arrayValid=false;break;}if(arrayKey==="length"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name==="__proto__"||name==="prototype"||name==="constructor"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected==="object"){if(expected.kind==="nullable")return value===null||valid(value,expected.value,depth);if(expected.kind==="list"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!=="string"){listValid=false;break;}if(listKey==="length")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind==="record")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected==="string"||expected==="piece"||expected==="player")return typeof value==="string";if(expected==="number")return typeof value==="number"&&Number.isFinite(value);if(expected==="boolean")return typeof value==="boolean";if(expected==="cell"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,"x"),yDescriptor=Object.getOwnPropertyDescriptor(value,"y");return !!xDescriptor&&hasOwn.call(xDescriptor,"value")&&!!yDescriptor&&hasOwn.call(yDescriptor,"value")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected==="choice")return plain(value)&&validRecord(value,depth);if(expected==="record")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!=="object")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,"value"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,"value"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})(${record3},${key},${type})`;
+        return `(function(record,key,type){try{var maxDepth=64,maxNodes=16384,hasOwn=Object.prototype.hasOwnProperty;if(record===__gameplayInvalid)return __gameplayInvalid;${keyGuard}if(record==null)return {value:null,defined:false};var plain=function(value){if(value===null||typeof value!=="object")return false;var prototype;try{prototype=Object.getPrototypeOf(value);}catch(error){return false;}if(prototype===null)return true;var parent;try{parent=Object.getPrototypeOf(prototype);}catch(error){return false;}if(parent!==null)return false;var constructor=Object.getOwnPropertyDescriptor(prototype,"constructor");if(!constructor||!hasOwn.call(constructor,"value")||typeof constructor.value!=="function")return false;var name=Object.getOwnPropertyDescriptor(constructor.value,"name");return !!name&&hasOwn.call(name,"value")&&name.value==="Object";};if(!plain(record))return __gameplayInvalid;var descriptor=Object.getOwnPropertyDescriptor(record,key);if(!descriptor)return {value:null,defined:false};if(!hasOwn.call(descriptor,"value"))return __gameplayInvalid;if(descriptor.value===undefined)return {value:null,defined:false};var value=descriptor.value;if(value===null)return {value:null,defined:true};var seen=[],budget={count:0},enter=function(value,depth){if(depth>maxDepth||budget.count>=maxNodes||seen.indexOf(value)>=0)return false;budget.count+=1;seen.push(value);return true;},leave=function(){seen.pop();};var descriptorIsData=function(value,name){var item=Object.getOwnPropertyDescriptor(value,name);return !!item&&hasOwn.call(item,"value")&&item.enumerable;};var validRecord=function(value,depth){if(value===null)return true;var kind=typeof value;if(kind==="string"||kind==="boolean")return true;if(kind==="number")return Number.isFinite(value);if(kind!=="object")return false;if(Array.isArray(value)){if(!enter(value,depth))return false;var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,indexCount=0,arrayValid=!!lengthDescriptor&&Number.isSafeInteger(length)&&length>=0;var keys=arrayValid?Reflect.ownKeys(value):[];for(var keyIndex=0;arrayValid&&keyIndex<keys.length;keyIndex+=1){var arrayKey=keys[keyIndex];if(typeof arrayKey!=="string"){arrayValid=false;break;}if(arrayKey==="length"){if(lengthDescriptor.enumerable){arrayValid=false;break;}continue;}if(!/^(0|[1-9][0-9]*)$/.test(arrayKey)||Number(arrayKey)>=length||!descriptorIsData(value,arrayKey)){arrayValid=false;break;}indexCount+=1;}if(indexCount!==length)arrayValid=false;if(arrayValid){for(var index=0;index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!validRecord(itemDescriptor.value,depth+1)){arrayValid=false;break;}}}leave();return arrayValid;}if(!plain(value)||!enter(value,depth))return false;var recordValid=true,names=Object.keys(value),ownKeys=Reflect.ownKeys(value);if(ownKeys.length!==names.length)recordValid=false;for(var nameIndex=0;recordValid&&nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];if(name==="__proto__"||name==="prototype"||name==="constructor"||!descriptorIsData(value,name)){recordValid=false;break;}var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!validRecord(nameDescriptor.value,depth+1)){recordValid=false;break;}}leave();return recordValid;};var valid=function(value,expected,depth){if(expected&&typeof expected==="object"){if(expected.kind==="nullable")return value===null||valid(value,expected.value,depth);if(expected.kind==="list"){if(!Array.isArray(value)||!enter(value,depth))return false;var listValid=true,lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length"),length=lengthDescriptor&&hasOwn.call(lengthDescriptor,"value")?lengthDescriptor.value:-1,keys=lengthDescriptor?Reflect.ownKeys(value):[],indexCount=0;if(!lengthDescriptor||lengthDescriptor.enumerable||!Number.isSafeInteger(length)||length<0){listValid=false;}for(var keyIndex=0;listValid&&keyIndex<keys.length;keyIndex+=1){var listKey=keys[keyIndex];if(typeof listKey!=="string"){listValid=false;break;}if(listKey==="length")continue;if(!/^(0|[1-9][0-9]*)$/.test(listKey)||Number(listKey)>=length||!descriptorIsData(value,listKey)){listValid=false;break;}indexCount+=1;}if(indexCount!==length)listValid=false;for(var index=0;listValid&&index<length;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value")||!valid(itemDescriptor.value,expected.element,depth+1))listValid=false;}leave(value);return listValid;}if(expected.kind==="record")return value!==null&&plain(value)&&validRecord(value,depth);return false;}if(value===null)return false;if(expected==="string"||expected==="piece"||expected==="player")return typeof value==="string";if(expected==="number")return typeof value==="number"&&Number.isFinite(value);if(expected==="boolean")return typeof value==="boolean";if(expected==="cell"){if(!plain(value))return false;var xDescriptor=Object.getOwnPropertyDescriptor(value,"x"),yDescriptor=Object.getOwnPropertyDescriptor(value,"y");return !!xDescriptor&&hasOwn.call(xDescriptor,"value")&&!!yDescriptor&&hasOwn.call(yDescriptor,"value")&&Number.isInteger(xDescriptor.value)&&Number.isInteger(yDescriptor.value)&&validRecord(value,depth);}if(expected==="choice")return plain(value)&&validRecord(value,depth);if(expected==="record")return plain(value)&&validRecord(value,depth);return false;};if(!valid(value,type,0))return __gameplayInvalid;var copySeen=[],copy=function(value,depth){if(value===null||typeof value!=="object")return value;if(depth>maxDepth||copySeen.indexOf(value)>=0)return __gameplayInvalid;copySeen.push(value);var result;if(Array.isArray(value)){result=[];var lengthDescriptor=Object.getOwnPropertyDescriptor(value,"length");if(!lengthDescriptor||!hasOwn.call(lengthDescriptor,"value"))return __gameplayInvalid;for(var index=0;index<lengthDescriptor.value;index+=1){var itemDescriptor=Object.getOwnPropertyDescriptor(value,String(index));if(!itemDescriptor||!hasOwn.call(itemDescriptor,"value"))return __gameplayInvalid;var item=copy(itemDescriptor.value,depth+1);if(item===__gameplayInvalid)return __gameplayInvalid;result[index]=item;}}else{if(!plain(value))return __gameplayInvalid;result={};var names=Object.keys(value);for(var nameIndex=0;nameIndex<names.length;nameIndex+=1){var name=names[nameIndex];var nameDescriptor=Object.getOwnPropertyDescriptor(value,name);if(!nameDescriptor||!hasOwn.call(nameDescriptor,"value"))return __gameplayInvalid;var copied=copy(nameDescriptor.value,depth+1);if(copied===__gameplayInvalid)return __gameplayInvalid;Object.defineProperty(result,name,{value:copied,enumerable:true,configurable:true,writable:true});}}copySeen.pop();return result;};var copied=copy(value,0);if(copied===__gameplayInvalid)return __gameplayInvalid;return {value:copied,defined:true};}catch(error){return __gameplayInvalid;}})(${record4},${key},${type})`;
       }
       var RECORD_KEY_GAMEPLAY_MODULES = Object.freeze([{
         id: "data.read-key",
@@ -14352,46 +14357,46 @@ var ContentGraphCore = (() => {
         value: { parameter: "field", types }
       });
       var battle27 = (ctx) => ctx.surface === "pending" ? "ctx.battle" : "battle";
-      var cardStringField = (record3, selected) => `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="string")return __gameplayInvalid;return value;})(${record3}[${JSON.stringify(selected)}])`;
-      var cardRecordField = (record3, selected) => `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="object"||Array.isArray(value))return __gameplayInvalid;return JSON.parse(JSON.stringify(value));})(${record3}[${JSON.stringify(selected)}])`;
+      var cardStringField = (record4, selected) => `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="string")return __gameplayInvalid;return value;})(${record4}[${JSON.stringify(selected)}])`;
+      var cardRecordField = (record4, selected) => `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="object"||Array.isArray(value))return __gameplayInvalid;return JSON.parse(JSON.stringify(value));})(${record4}[${JSON.stringify(selected)}])`;
       function handLowering(ctx) {
         const owner = input43(ctx, "player");
         const state2 = battle27(ctx);
         return `(function(owner){var players=(${state2}.players||[]);var player=owner==null?null:players.find(function(item){return item&&item.playerId===owner;});var hand=player&&Array.isArray(player.hand)?player.hand:null;if(!hand)return {cards:[],hasHand:false};return {cards:hand.map(function(card){return card;}),hasHand:true};})(${owner})`;
       }
       function instanceFieldLowering(ctx) {
-        const record3 = input43(ctx, "card");
+        const record4 = input43(ctx, "card");
         const selected = field2(ctx);
         const key = literal10(ctx, selected);
         let read7;
-        if (selected === "contentState" || selected === "extension") read7 = cardRecordField(record3, selected);
-        else if (selected === "cardId" || selected === "instanceId" || selected === "name") read7 = cardStringField(record3, selected);
-        else if (selected === "boundPieceInstanceId") read7 = `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="string")return __gameplayInvalid;return value?value:null;})(${record3}[${key}])`;
+        if (selected === "contentState" || selected === "extension") read7 = cardRecordField(record4, selected);
+        else if (selected === "cardId" || selected === "instanceId" || selected === "name") read7 = cardStringField(record4, selected);
+        else if (selected === "boundPieceInstanceId") read7 = `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="string")return __gameplayInvalid;return value?value:null;})(${record4}[${key}])`;
         else throw new Error(`module ${ctx.moduleId}: unsupported card instance field`);
-        return `(function(card){if(card===__gameplayInvalid)return __gameplayInvalid;if(card==null||typeof card!=="object"||Array.isArray(card))return {value:null,defined:false};var defined=Object.prototype.hasOwnProperty.call(card,${key});var value=${read7};if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(${record3})`;
+        return `(function(card){if(card===__gameplayInvalid)return __gameplayInvalid;if(card==null||typeof card!=="object"||Array.isArray(card))return {value:null,defined:false};var defined=Object.prototype.hasOwnProperty.call(card,${key});var value=${read7};if(value===__gameplayInvalid)return __gameplayInvalid;return {value:value,defined:defined};})(${record4})`;
       }
       function definitionFieldLowering(ctx) {
-        const record3 = input43(ctx, "card");
+        const record4 = input43(ctx, "card");
         const selected = field2(ctx);
-        const read7 = selected === "id" ? `(function(value){return typeof value==="string"?value:"";})(${record3}.cardId)` : `(function(value){return value?String(value):null;})(${record3}.name)`;
-        return `(function(card){if(card===__gameplayInvalid)return __gameplayInvalid;if(card==null||typeof card!=="object"||Array.isArray(card))return {value:${selected === "id" ? '""' : "null"}};return {value:${read7}};})(${record3})`;
+        const read7 = selected === "id" ? `(function(value){return typeof value==="string"?value:"";})(${record4}.cardId)` : `(function(value){return value?String(value):null;})(${record4}.name)`;
+        return `(function(card){if(card===__gameplayInvalid)return __gameplayInvalid;if(card==null||typeof card!=="object"||Array.isArray(card))return {value:${selected === "id" ? '""' : "null"}};return {value:${read7}};})(${record4})`;
       }
       function contentFieldLowering(ctx) {
-        const record3 = input43(ctx, "record");
+        const record4 = input43(ctx, "record");
         const selected = field2(ctx);
         const key = literal10(ctx, selected);
         if (selected === "velenHolyProphecy") {
-          const read7 = `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="object"||Array.isArray(value))return __gameplayInvalid;return JSON.parse(JSON.stringify(value));})(${record3}[${key}])`;
-          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=${read7};return value===__gameplayInvalid?__gameplayInvalid:{value:value};})(${record3})`;
+          const read7 = `(function(value){if(value===undefined||value===null)return null;if(typeof value!=="object"||Array.isArray(value))return __gameplayInvalid;return JSON.parse(JSON.stringify(value));})(${record4}[${key}])`;
+          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=${read7};return value===__gameplayInvalid?__gameplayInvalid:{value:value};})(${record4})`;
         }
         if (selected === "velenHolyProphecyEnhanced") {
-          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:false};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;return {value:Boolean(state[${key}])};})(${record3})`;
+          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:false};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;return {value:Boolean(state[${key}])};})(${record4})`;
         }
         if (selected === "sourcePieceId") {
-          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=state[${key}];if(value===undefined||value===null)return {value:null};return typeof value==="string"?{value:value}:__gameplayInvalid;})(${record3})`;
+          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=state[${key}];if(value===undefined||value===null)return {value:null};return typeof value==="string"?{value:value}:__gameplayInvalid;})(${record4})`;
         }
         if (selected === "createdTurnNumber") {
-          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=state[${key}];if(value===undefined||value===null)return {value:null};return typeof value==="number"&&Number.isFinite(value)?{value:value}:__gameplayInvalid;})(${record3})`;
+          return `(function(state){if(state===__gameplayInvalid)return __gameplayInvalid;if(state==null)return {value:null};if(typeof state!=="object"||Array.isArray(state))return __gameplayInvalid;var value=state[${key}];if(value===undefined||value===null)return {value:null};return typeof value==="number"&&Number.isFinite(value)?{value:value}:__gameplayInvalid;})(${record4})`;
         }
         throw new Error(`module ${ctx.moduleId}: unsupported card content field`);
       }
@@ -17821,8 +17826,8 @@ var ContentGraphCore = (() => {
           if (node.kind === "identifier") {
             options2.observeIdentifier?.(node.name, bindings, schemas, expected);
             const bound = own5(bindings, node.name);
-            if (bound) return bound.local ? call(body, "local.read", { handle: { value: bound.value, type: "record" } }, { valueType: encodedType(bound.type) }, "value", "1") : bound;
-            const root = own5({ \u5F53\u524D\u68CB\u5B50: "ref.holder", \u5F53\u524D\u73A9\u5BB6: "ref.player", \u5F53\u524D\u624B\u724C: "ref.current-card", \u5F53\u524D\u6280\u80FD: "ref.current-skill", \u5F53\u524D\u89C4\u5219: "ref.current-rule", \u76EE\u6807: "ref.target" }, node.name);
+            if (bound) return bound.local ? { ...call(body, "local.read", { handle: { value: bound.value, type: "record" } }, { valueType: encodedType(bound.type) }, "value", "1"), ...bound.domain ? { domain: bound.domain } : {} } : bound;
+            const root = own5({ \u5F53\u524D\u68CB\u5B50: "ref.holder", \u5F53\u524D\u73A9\u5BB6: "ref.player", \u5F53\u524D\u624B\u724C: "ref.current-card", \u5F53\u524D\u6280\u80FD: "ref.current-skill", \u5F53\u524D\u89C4\u5219: "ref.current-rule" }, node.name);
             if (root) {
               const result = call(body, root, {});
               if (root === "ref.current-skill") return { ...result, domain: "skill-instance" };
@@ -18186,7 +18191,7 @@ var ContentGraphCore = (() => {
         if (receiver === "\u5168\u5C40" || receiver === "\u5F53\u524D\u5BF9\u5C40") suggestions.push({ label: `${receiver}.extension`, value: `${receiver}.extension`, kind: "\u6269\u5C55\u53D8\u91CF" });
         if (dot >= 0) return suggestions;
         for (const [name, value] of Object.entries(bindings)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(value.type) });
-        for (const [name, type] of Object.entries({ \u5F53\u524D\u68CB\u5B50: "piece", \u5F53\u524D\u73A9\u5BB6: "player", \u76EE\u6807: "piece", \u5F53\u524D\u4E8B\u4EF6: "event", \u5168\u5C40: "record" })) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) });
+        for (const [name, type] of Object.entries({ \u5F53\u524D\u68CB\u5B50: "piece", \u5F53\u524D\u73A9\u5BB6: "player", \u5F53\u524D\u4E8B\u4EF6: "event", \u5168\u5C40: "record" })) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) });
         if (["skill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u6280\u80FD", value: "\u5F53\u524D\u6280\u80FD", kind: "\u6280\u80FD\u5B9E\u4F8B" });
         if (["rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u89C4\u5219", value: "\u5F53\u524D\u89C4\u5219", kind: "\u89C4\u5219\u5B9E\u4F8B" });
         if (["card", "rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u624B\u724C", value: "\u5F53\u524D\u624B\u724C", kind: "\u624B\u724C\u5B9E\u4F8B" });
@@ -18223,8 +18228,305 @@ var ContentGraphCore = (() => {
         const value = lowerAuthorExpression(reference, { ...options2, bindings, schemas });
         return { name: reference, type: authorTypeLabel(value.type), fields: Object.entries(fieldsFor(value, { ...options2, schemas })).map(([name, type]) => ({ name, type: authorTypeLabel(type) })), ...value.value.kind === "literal" ? { value: value.value.value } : {} };
       }
-      var GAMEPLAY_MODULE_DOCUMENT_VERSION2 = "rvb-gameplay-module-document/v1";
+      var encode = (type) => typeof type === "string" ? type : JSON.stringify(type);
+      var unwrap = (type) => typeof type === "object" && type.kind === "nullable" ? type.value : type;
+      function compatible(actual, expected) {
+        if (actual === expected) return true;
+        if (typeof expected === "object" && expected.kind === "nullable") return actual === "null" || compatible(unwrap(actual), expected.value);
+        if (expected === "record" && typeof actual === "object" && actual.kind === "record") return true;
+        if (typeof actual === "string" || typeof expected === "string" || actual.kind !== expected.kind) return false;
+        if (actual.kind === "list" || actual.kind === "set") return (expected.kind === "list" || expected.kind === "set") && compatible(actual.element, expected.element);
+        if (actual.kind === "map") return expected.kind === "map" && compatible(actual.key, expected.key) && compatible(actual.value, expected.value);
+        return actual.kind === "record" && expected.kind === "record" && actual.schema === expected.schema;
+      }
+      function requireType(actual, expected) {
+        if (!compatible(actual, expected)) throw new Error("\u8868\u8FBE\u5F0F\u7C7B\u578B\u4E0E\u76EE\u6807\u53D8\u91CF\u6216\u5B57\u6BB5\u7684\u7C7B\u578B\u4E0D\u4E00\u81F4");
+      }
+      function validateName(name) {
+        if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name) || ["__proto__", "prototype", "constructor"].includes(name)) throw new Error("\u53D8\u91CF\u540D\u987B\u4EE5\u6587\u5B57\u6216\u4E0B\u5212\u7EBF\u5F00\u5934\uFF0C\u4E14\u4E0D\u80FD\u4F7F\u7528\u4FDD\u7559\u540D\u79F0");
+      }
+      var domainScopes = {
+        "skill-instance": "skill",
+        "status-instance": "status",
+        "rule-instance": "rule",
+        "card-instance": "card",
+        "cluster-instance": "cluster",
+        "tile-effect": "tile-effect"
+      };
+      function lowerAuthorExtensionDeclaration(ownerSource, name, valueType3, initialSource, options2) {
+        validateName(name);
+        const prefix = options2.prefix ?? "extension";
+        const ownerSyntax = parseAuthorExpression(ownerSource);
+        const global = ownerSyntax.kind === "identifier" && ["\u5168\u5C40", "\u5F53\u524D\u5BF9\u5C40"].includes(ownerSyntax.name);
+        const owner = global ? void 0 : lowerAuthorExpression(ownerSource, { ...options2, expectedType: void 0, prefix: `${prefix}_owner` });
+        const ownerType = owner && unwrap(owner.type);
+        const scope = global ? "battle" : owner?.domain ? domainScopes[owner.domain] : ownerType === "piece" || ownerType === "player" ? ownerType : void 0;
+        if (!scope) throw new Error("\u6B64\u5BF9\u8C61\u6CA1\u6709\u53EF\u5199\u7684\u6269\u5C55\u53D8\u91CF\u5165\u53E3");
+        const initial = lowerAuthorExpression(initialSource, { ...options2, schemas: owner?.schemas ?? options2.schemas, expectedType: valueType3, prefix: `${prefix}_initial` });
+        requireType(initial.type, valueType3);
+        const instance = !["piece", "player", "battle"].includes(scope);
+        const statement2 = {
+          kind: "call",
+          id: `${prefix}_declare`,
+          module: `extension.declare-${instance ? "instance" : scope}`,
+          version: scope === "battle" ? "2" : "1",
+          parameters: { namespace: "content", name, valueType: encode(valueType3), ...instance ? { entityKind: scope } : {} },
+          inputs: { ...owner ? { [instance ? "entity" : "owner"]: owner.value } : {}, value: initial.value }
+        };
+        return { statements: [...owner?.statements ?? [], ...initial.statements, statement2], schemas: initial.schemas, valueType: valueType3, scope };
+      }
+      function writerFor(read7) {
+        const field3 = read7.parameters?.field;
+        if (/^extension\.read-(piece|player|battle|instance)$/.test(read7.module)) return {
+          module: read7.module.replace(".read-", ".write-"),
+          version: read7.module.endsWith("-battle") ? "2" : "1",
+          inputs: { ...read7.inputs },
+          parameters: { ...read7.parameters }
+        };
+        const modules = { "piece.field": "piece.write-field", "player.field": "player.write-field", "author.skill-instance.field": "author.skill-instance.write", "event.field": "event.write-number" };
+        const moduleId = modules[read7.module];
+        if (!moduleId) throw new Error("\u6B64\u5B57\u6BB5\u53EA\u8BFB\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u8D4B\u503C\u76EE\u6807");
+        const version = moduleId === "piece.write-field" ? "2" : "1";
+        const descriptor3 = getGameplayModule(moduleId, version);
+        const allowed2 = descriptor3?.parameters?.find((parameter39) => parameter39.name === "field")?.enum;
+        if (!allowed2?.includes(field3)) throw new Error("\u6B64\u5B57\u6BB5\u53EA\u8BFB\uFF0C\u6216\u987B\u901A\u8FC7\u5BF9\u5E94\u7684\u6E38\u620F\u6548\u679C\u4FEE\u6539");
+        return { module: moduleId, version, inputs: { ...read7.inputs }, parameters: { field: field3, ...moduleId === "piece.write-field" ? { scope: "live" } : {}, ...moduleId === "event.write-number" ? { inputPolicy: "floor" } : {} } };
+      }
+      function lowerAuthorAssignment(targetSource, valueSource, options2) {
+        const targetSyntax = parseAuthorExpression(targetSource);
+        if (!["identifier", "member", "index"].includes(targetSyntax.kind)) throw new Error("\u8D4B\u503C\u5DE6\u4FA7\u987B\u4E3A\u5DF2\u58F0\u660E\u53D8\u91CF\u6216\u53EF\u5199\u5B57\u6BB5");
+        const prefix = options2.prefix ?? "assignment";
+        const local = targetSyntax.kind === "identifier" && Object.hasOwn(options2.bindings ?? {}, targetSyntax.name) ? options2.bindings[targetSyntax.name] : void 0;
+        if (targetSyntax.kind === "identifier") {
+          if (!local) throw new Error(`\u53D8\u91CF\u300C${targetSyntax.name}\u300D\u5C1A\u672A\u58F0\u660E`);
+          if (!local.local) throw new Error("\u6B64\u7ED3\u679C\u4E3A\u53EA\u8BFB\u503C\uFF1B\u9700\u8981\u4FEE\u6539\u65F6\uFF0C\u8BF7\u5148\u65B0\u5EFA\u5C40\u90E8\u53D8\u91CF");
+          const value2 = lowerAuthorExpression(valueSource, { ...options2, expectedType: local.type, prefix: `${prefix}_value` });
+          requireType(value2.type, local.type);
+          return { statements: [...value2.statements, { kind: "call", id: `${prefix}_write`, module: "local.write", version: "1", parameters: { valueType: encode(local.type) }, inputs: { handle: local.value, value: value2.value } }], schemas: value2.schemas, valueType: local.type };
+        }
+        let target;
+        let value;
+        try {
+          target = lowerAuthorExpression(targetSource, { ...options2, expectedType: void 0, prefix: `${prefix}_target` });
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes("\u8BF7\u58F0\u660E\u6B64\u6269\u5C55\u53D8\u91CF\u7684\u7C7B\u578B")) throw error;
+          value = lowerAuthorExpression(valueSource, { ...options2, expectedType: void 0, prefix: `${prefix}_value` });
+          target = lowerAuthorExpression(targetSource, { ...options2, expectedType: value.type, prefix: `${prefix}_target` });
+        }
+        value = lowerAuthorExpression(valueSource, { ...options2, schemas: target.schemas, expectedType: target.type, prefix: `${prefix}_value` });
+        requireType(value.type, target.type);
+        const reads = new Map(target.statements.map((statement2) => [statement2.id, statement2]));
+        let sequence = 0;
+        function commit(reference, syntax, updated, type) {
+          const read7 = reference.kind === "output" ? reads.get(reference.node) : void 0;
+          if (!read7) throw new Error("\u6B64\u7ED3\u679C\u4E3A\u53EA\u8BFB\u503C\uFF1B\u9700\u8981\u4FEE\u6539\u65F6\uFF0C\u8BF7\u5148\u65B0\u5EFA\u5C40\u90E8\u53D8\u91CF");
+          if (read7.kind === "record.get" || read7.kind === "call" && read7.module === "map.get") {
+            if (syntax.kind !== "member" && syntax.kind !== "index") throw new Error("\u8D4B\u503C\u76EE\u6807\u4E0D\u662F\u53EF\u5199\u7ED3\u6784");
+            const parentSyntax = syntax.object;
+            const parentType = lowerAuthorExpression(targetSource.slice(parentSyntax.start, parentSyntax.end), { ...options2, schemas: value.schemas, expectedType: void 0 }).type;
+            const replacementId = `${prefix}_replace_${++sequence}`;
+            const parentReference = read7.kind === "record.get" ? read7.record : read7.inputs?.map;
+            if (!parentReference) throw new Error("\u8D4B\u503C\u76EE\u6807\u7F3A\u5C11\u5BB9\u5668\u5F15\u7528");
+            const replacement = read7.kind === "record.get" ? { kind: "record.with", id: replacementId, record: read7.record, fields: { [read7.field]: updated } } : { ...read7, id: replacementId, module: "map.set", inputs: { ...read7.inputs, value: updated } };
+            return [replacement, ...commit(parentReference, parentSyntax, { kind: "output", node: replacementId, port: "value" }, parentType)];
+          }
+          if (read7.kind !== "call") throw new Error("\u6B64\u5B57\u6BB5\u53EA\u8BFB\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u8D4B\u503C\u76EE\u6807");
+          const writer = read7.module === "local.read" ? { module: "local.write", version: "1", inputs: { handle: read7.inputs.handle }, parameters: { valueType: encode(type) } } : writerFor(read7);
+          const parameters4 = { ...writer.parameters };
+          const descriptor3 = getGameplayModule(writer.module, writer.version);
+          if (descriptor3?.parameters?.some((parameter39) => parameter39.name === "valueType")) parameters4.valueType = encode(type);
+          return [{ kind: "call", id: `${prefix}_write`, ...writer, parameters: parameters4, inputs: { ...writer.inputs, value: updated } }];
+        }
+        const terminal = target.statements.at(-1);
+        if (!terminal || target.value.kind !== "output" || terminal.id !== target.value.node) throw new Error("\u6B64\u5B57\u6BB5\u53EA\u8BFB\uFF0C\u4E0D\u80FD\u4F5C\u4E3A\u8D4B\u503C\u76EE\u6807");
+        return {
+          statements: [...target.statements.slice(0, -1), ...value.statements, ...commit(target.value, targetSyntax, value.value, target.type)],
+          schemas: value.schemas,
+          valueType: target.type
+        };
+      }
+      var PIECE_ABILITY_GROUPS_PROJECTION_VERSION = "rvb-piece-ability-groups/v1";
       var record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+      function unique(values) {
+        const seen = /* @__PURE__ */ new Set();
+        return values.filter((value) => {
+          if (!value || seen.has(value)) return false;
+          seen.add(value);
+          return true;
+        });
+      }
+      function idFrom(value, keys) {
+        if (typeof value === "string" && value) return value;
+        if (!record2(value)) return void 0;
+        for (const key of keys) if (typeof value[key] === "string" && value[key]) return value[key];
+        return void 0;
+      }
+      function entriesFrom(value, keys) {
+        if (!Array.isArray(value)) return idFrom(value, keys) ? [idFrom(value, keys)] : [];
+        return value.map((item) => idFrom(item, keys)).filter((id) => Boolean(id));
+      }
+      function pieceIsPve(id, definition) {
+        const modes = record2(definition.availability) && Array.isArray(definition.availability.modes) ? definition.availability.modes : void 0;
+        if (id.startsWith("pve-")) return { path: "id", value: id };
+        if (modes && modes.length > 0 && modes.every((mode) => mode === "pve")) return { path: "availability.modes", value: modes };
+        return void 0;
+      }
+      function directlyOwnedRuleIds(definition, skillId) {
+        if (!record2(definition) || !record2(definition.cluster)) return /* @__PURE__ */ new Set();
+        const cluster = definition.cluster;
+        if (cluster.version !== SKILL_CLUSTER_DEFINITION_VERSION || cluster.id !== `skills:${skillId}` || !Array.isArray(cluster.links)) return /* @__PURE__ */ new Set();
+        return new Set(cluster.links.filter((link) => record2(link) && link.collection === "rules" && typeof link.id === "string" && link.id && (link.relation === "owned" || link.relation === "shared")).map((link) => link.id));
+      }
+      function normalizePieceInput(catalog, input45) {
+        if (typeof input45 === "string") {
+          const definition = catalog.pieces?.[input45];
+          return definition ? { id: input45, definition, catalog } : void 0;
+        }
+        if (record2(input45) && typeof input45.collection === "string" && typeof input45.id === "string") {
+          const id2 = input45.id;
+          const definition = catalog.pieces?.[id2];
+          return definition ? { id: id2, definition, catalog } : void 0;
+        }
+        if (!record2(input45) || typeof input45.id !== "string" || !input45.id) return void 0;
+        const id = input45.id;
+        const existing = catalog.pieces?.[id];
+        if (existing) return { id, definition: input45, catalog };
+        return {
+          id,
+          definition: input45,
+          catalog: { ...catalog, pieces: { ...catalog.pieces || {}, [id]: input45 } }
+        };
+      }
+      function diagnostic2(message, path, reference) {
+        return {
+          code: "missing-root",
+          severity: "error",
+          message,
+          path,
+          ...reference ? { reference } : {}
+        };
+      }
+      function buildPieceAbilityGroups(catalog, input45) {
+        const resolved = normalizePieceInput(catalog, input45);
+        if (!resolved) {
+          const id2 = typeof input45 === "string" ? input45 : record2(input45) && typeof input45.id === "string" ? input45.id : "";
+          return {
+            version: PIECE_ABILITY_GROUPS_PROJECTION_VERSION,
+            pieceId: id2,
+            groups: [],
+            directSkillIds: [],
+            directRuleIds: [],
+            unassignedRuleIds: [],
+            diagnostics: [diagnostic2(`missing pieces root "${id2}"`, "pieces.id", id2)],
+            execution: "reference-only"
+          };
+        }
+        const { id, definition, catalog: resolvedCatalog } = resolved;
+        const excluded = pieceIsPve(id, definition);
+        if (excluded) {
+          return {
+            version: PIECE_ABILITY_GROUPS_PROJECTION_VERSION,
+            pieceId: id,
+            groups: [],
+            directSkillIds: [],
+            directRuleIds: [],
+            unassignedRuleIds: [],
+            diagnostics: [],
+            excluded: { reason: "pve-only", ...excluded },
+            execution: "reference-only"
+          };
+        }
+        const rawSkills = [
+          ...entriesFrom(definition.skills, ["skillId", "id"]),
+          ...entriesFrom(definition.skillIds, ["skillId", "id"])
+        ];
+        const directSkillIds = unique(rawSkills);
+        const skillSources = /* @__PURE__ */ new Map();
+        [
+          ["skills", definition.skills],
+          ["skillIds", definition.skillIds]
+        ].forEach(([field3, value]) => {
+          if (!Array.isArray(value)) return;
+          value.forEach((item, index) => {
+            const skillId = idFrom(item, ["skillId", "id"]);
+            if (skillId && !skillSources.has(skillId)) skillSources.set(skillId, { collection: "skills", index, id: skillId, path: `pieces.${id}.${field3}[${index}]` });
+          });
+        });
+        const rawRules = [
+          ...entriesFrom(definition.rules, ["ruleId", "id"]),
+          ...entriesFrom(definition.playerRules, ["ruleId", "id"])
+        ];
+        const directRuleIds = unique(rawRules);
+        const ruleSources = /* @__PURE__ */ new Map();
+        for (const [field3, value] of [["rules", definition.rules], ["playerRules", definition.playerRules]]) {
+          if (!Array.isArray(value)) continue;
+          value.forEach((item, index) => {
+            const ruleId = idFrom(item, ["ruleId", "id"]);
+            if (ruleId && !ruleSources.has(ruleId)) ruleSources.set(ruleId, {
+              collection: field3 === "playerRules" ? "playerRules" : "rules",
+              index,
+              id: ruleId,
+              path: `pieces.${id}.${field3}[${index}]`
+            });
+          });
+        }
+        const groups = [];
+        const diagnostics = [];
+        const coveredRules = /* @__PURE__ */ new Set();
+        for (const skillId of directSkillIds) {
+          const root = { collection: "skills", id: skillId };
+          const cluster = buildSkillCluster(resolvedCatalog, root);
+          diagnostics.push(...cluster.diagnostics);
+          const exposedRuleIds = directlyOwnedRuleIds(resolvedCatalog.skills?.[skillId], skillId);
+          const covered = directRuleIds.filter((ruleId) => exposedRuleIds.has(ruleId));
+          covered.forEach((ruleId) => coveredRules.add(ruleId));
+          const source = skillSources.get(skillId);
+          groups.push({
+            id: `skills:${skillId}`,
+            kind: "skill",
+            root,
+            cluster,
+            members: cluster.members,
+            directSkillIds: [skillId],
+            directRuleIds: covered,
+            unassigned: false,
+            sources: source ? [source, ...covered.map((ruleId) => ruleSources.get(ruleId)).filter((item) => Boolean(item))] : covered.map((ruleId) => ruleSources.get(ruleId)).filter((item) => Boolean(item)),
+            execution: "reference-only"
+          });
+        }
+        const unassignedRuleIds = directRuleIds.filter((ruleId) => !coveredRules.has(ruleId));
+        for (const ruleId of unassignedRuleIds) {
+          const root = { collection: "rules", id: ruleId };
+          const cluster = buildSkillCluster(resolvedCatalog, root);
+          diagnostics.push(...cluster.diagnostics);
+          const source = ruleSources.get(ruleId);
+          groups.push({
+            id: `rules:${ruleId}`,
+            kind: "rule",
+            root,
+            cluster,
+            members: cluster.members,
+            directSkillIds: [],
+            directRuleIds: [ruleId],
+            unassigned: true,
+            sources: source ? [source] : [],
+            execution: "reference-only"
+          });
+        }
+        return {
+          version: PIECE_ABILITY_GROUPS_PROJECTION_VERSION,
+          pieceId: id,
+          groups,
+          directSkillIds,
+          directRuleIds,
+          unassignedRuleIds,
+          diagnostics,
+          execution: "reference-only"
+        };
+      }
+      var projectPieceAbilityGroups = buildPieceAbilityGroups;
+      var GAMEPLAY_MODULE_DOCUMENT_VERSION2 = "rvb-gameplay-module-document/v1";
+      var record3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
       var own6 = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
       var defaults = { skill: "code", card: "code", rule: "skillCode", triggerSkill: "code", pending: "effectCode", preview: "previewCode" };
       var fields4 = {
@@ -18248,13 +18550,13 @@ var ContentGraphCore = (() => {
         }
       }
       function primaryField2(content) {
-        if (!record2(content.contentGraph)) return "";
+        if (!record3(content.contentGraph)) return "";
         return typeof content.contentGraphField === "string" ? content.contentGraphField : defaults[String(content.contentGraph.surface)] ?? "";
       }
       function artifact(content) {
         if (!own6(content, "gameplayModules")) return void 0;
         const value = content.gameplayModules;
-        if (!record2(value) || value.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION2 || !record2(value.entries)) fail4("invalid gameplayModules version or entries");
+        if (!record3(value) || value.version !== GAMEPLAY_MODULE_DOCUMENT_VERSION2 || !record3(value.entries)) fail4("invalid gameplayModules version or entries");
         if (Object.keys(value).some((key) => !["version", "entries", "textBindings", "targetBindings"].includes(key))) fail4("unknown gameplayModules metadata");
         if (!Object.keys(value.entries).length) fail4("gameplayModules needs at least one entry");
         return value;
@@ -18275,18 +18577,18 @@ var ContentGraphCore = (() => {
         });
       }
       function assertGameplayModuleDocument2(input45) {
-        if (!record2(input45)) fail4("content must be an object");
+        if (!record3(input45)) fail4("content must be an object");
         assertDeclaredSummonCapability(input45);
         const modules = artifact(input45);
         if (!modules) return;
         if (input45.skillGraph !== void 0) fail4("legacy skillGraph cannot coexist with gameplay modules");
         for (const [field3, entry] of Object.entries(modules.entries)) {
-          if (!record2(entry) || Object.keys(entry).some((key) => key !== "graph" && key !== "compilerVersion")) fail4(`invalid entry ${field3}`);
+          if (!record3(entry) || Object.keys(entry).some((key) => key !== "graph" && key !== "compilerVersion")) fail4(`invalid entry ${field3}`);
           const compile = compilerForVersion(entry.compilerVersion);
           if (!compile) fail4(`unsupported compiler version for ${field3}`);
           const compiled = compile(entry.graph, GAMEPLAY_MODULE_REGISTRY);
           if (!fields4[compiled.surface]?.includes(field3)) fail4(`field ${field3} is incompatible with ${compiled.surface}`);
-          if (primaryField2(input45) === field3 || record2(input45.contentGraphEntries) && own6(input45.contentGraphEntries, field3)) fail4(`multiple authoring sources for ${field3}`);
+          if (primaryField2(input45) === field3 || record3(input45.contentGraphEntries) && own6(input45.contentGraphEntries, field3)) fail4(`multiple authoring sources for ${field3}`);
           if (input45[field3] !== compiled.code) fail4(`generated ${field3} does not match its module graph`);
         }
         if (modules.textBindings !== void 0) {
@@ -18298,27 +18600,27 @@ var ContentGraphCore = (() => {
       }
       function assertGameplayModuleTransition(previous2, next) {
         assertGameplayModuleDocument2(next);
-        if (!record2(previous2) || !own6(previous2, "gameplayModules")) return;
+        if (!record3(previous2) || !own6(previous2, "gameplayModules")) return;
         const before = artifact(previous2);
-        const after = record2(next) ? artifact(next) : void 0;
+        const after = record3(next) ? artifact(next) : void 0;
         for (const field3 of Object.keys(before.entries)) {
           if (!after || !own6(after.entries, field3)) fail4(`cannot detach module-owned field ${field3}`);
         }
       }
       function getGameplayModuleGraph(input45, field3) {
-        if (!record2(input45) || !record2(input45.gameplayModules) || !record2(input45.gameplayModules.entries)) return null;
+        if (!record3(input45) || !record3(input45.gameplayModules) || !record3(input45.gameplayModules.entries)) return null;
         const entry = input45.gameplayModules.entries[field3];
-        return record2(entry) ? entry.graph ?? null : null;
+        return record3(entry) ? entry.graph ?? null : null;
       }
       function applyGameplayModuleGraph(input45, graph2, field3) {
-        if (!record2(input45)) fail4("content must be an object");
+        if (!record3(input45)) fail4("content must be an object");
         const compiled = compileGameplayModuleGraph(graph2, GAMEPLAY_MODULE_REGISTRY);
         const target = field3 ?? defaults[compiled.surface];
         if (!fields4[compiled.surface]?.includes(target)) fail4(`field ${target} is incompatible with ${compiled.surface}`);
         if (input45.skillGraph !== void 0) fail4("legacy skillGraph must be explicitly migrated first");
         const prior = artifact(input45);
         const next = { ...input45 };
-        const additional = record2(input45.contentGraphEntries) ? { ...input45.contentGraphEntries } : {};
+        const additional = record3(input45.contentGraphEntries) ? { ...input45.contentGraphEntries } : {};
         if (primaryField2(input45) === target) {
           delete next.contentGraph;
           delete next.contentGraphField;
@@ -18326,7 +18628,7 @@ var ContentGraphCore = (() => {
           const first = Object.keys(additional).sort()[0];
           if (first) {
             const entry = additional[first];
-            if (!record2(entry)) fail4(`invalid legacy graph entry ${first}`);
+            if (!record3(entry)) fail4(`invalid legacy graph entry ${first}`);
             next.contentGraph = entry.graph;
             next.contentGraphField = first;
             next.contentGraphCompilerVersion = entry.compilerVersion;

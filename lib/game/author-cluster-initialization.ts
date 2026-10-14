@@ -35,7 +35,7 @@ export interface AuthorClusterInitializationCatalog {
 }
 
 export interface AuthorClusterInitializationPlan {
-  /** One definition per directly installed skill and rule root, in piece order. */
+  /** Complete skill abilities plus unassigned rule abilities, in piece order. */
   readonly definitions: readonly AuthorClusterDefinition[]
   /** Conservative diagnostics for links intentionally excluded from adoption. */
   readonly diagnostics: readonly AuthorClusterInitializationDiagnostic[]
@@ -226,7 +226,8 @@ function rootDefinition(
 /**
  * Plan the static runtime groups for a piece without installing anything.
  *
- * Every direct skill and rule gets a singleton root. Explicit Cluster links
+ * Every direct skill gets a root. A directly installed rule gets a separate
+ * root only when no skill group owns it. Explicit Cluster links
  * may bundle another skill/rule only when that member is already present on
  * the same piece. No dependency traversal, graph expansion, or host callback
  * occurs here; callers pass each returned definition to AuthorClusterRuntime.adopt.
@@ -243,7 +244,10 @@ export function planAuthorClusterInitialization(
   const definitions: AuthorClusterDefinition[] = []
 
   for (const id of installedSkills) definitions.push(rootDefinition('skill', id, skillSet, ruleSet, catalog, diagnostics))
-  for (const id of installedRules) definitions.push(rootDefinition('rule', id, skillSet, ruleSet, catalog, diagnostics))
+  const groupedRules = new Set(definitions.flatMap(definition => definition.rules))
+  for (const id of installedRules) {
+    if (!groupedRules.has(id)) definitions.push(rootDefinition('rule', id, skillSet, ruleSet, catalog, diagnostics))
+  }
 
   return { definitions, diagnostics }
 }

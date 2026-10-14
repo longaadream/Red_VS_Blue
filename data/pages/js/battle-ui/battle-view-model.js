@@ -111,6 +111,10 @@
         type: type,
         label: displayStatusLabel(item, meta, iconRegistry),
         description: String(item.description || item.message || ''),
+        ...(item.extension && typeof item.extension === 'object' && !Array.isArray(item.extension)
+          ? { extension: item.extension }
+          : {}),
+        ...(item.ownerPlayerId ? { ownerPlayerId: String(item.ownerPlayerId) } : {}),
         iconId: meta ? meta.iconId : 'fallback',
         // An authored StatusTag icon is presentation data and takes
         // precedence over the built-in registry asset. Keep the registry
@@ -245,6 +249,9 @@
           id: String(rule.id || rule.name),
           label: String(rule.name),
           description: String(rule.description || ''),
+          ...(rule.extension && typeof rule.extension === 'object' && !Array.isArray(rule.extension)
+            ? { extension: rule.extension }
+            : {}),
           iconPath: typeof rule.iconPath === 'string' ? rule.iconPath.trim() : '',
           ...(typeof rule.visible === 'boolean' ? { visible: rule.visible } : {}),
         }
@@ -454,6 +461,10 @@
     const viewer = players.find(function (player) { return player.id.toLowerCase() === viewerId.toLowerCase() }) || null
 
     return {
+      // Description renderers need the authoritative snapshot to project the
+      // exact owner extension.  Consumers must pass it through the safe
+      // description context rather than reading private flowState directly.
+      snapshot: snapshot,
       board: {
         id: String(map.id || ''),
         width: numberOr(map.width, 0),

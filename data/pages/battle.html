@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>对战 - RED vs BLUE</title>
   <script src="js/pack-fetch.js"></script>
+  <script src="js/author-expression-core.js"></script>
   <script src="js/hand-card-face.js"></script>
   <script src="js/skill-description.js"></script>
   <link rel="stylesheet" href="css/skill-description.css" />
@@ -3742,6 +3743,14 @@
       // Status implementation hooks are represented by the shield status itself.
       return displayed.filter(function (skill) { return !['divine-shield-defense', 'holy-shield-defense'].includes(skillIdOf(skill)) })
     }
+    function skillDescriptionContext(piece, skillDef, skillInstance) {
+      return {
+        piece: piece,
+        skill: skillDef,
+        skillInstance: skillInstance,
+        snapshot: G,
+      }
+    }
     function skillDefOf(skillId) {
       if (!skillId) return {}
       const cached = (G && G.skillsById && G.skillsById[skillId]) || skillsById[skillId]
@@ -4120,13 +4129,26 @@
       }
       const typeLabel = def.type === 'reactive' ? '被动触发' : def.type === 'passive' ? '持续' : def.type === 'active' ? '主动' : '手牌'
 
-      document.getElementById('cdIcon').textContent = String(def.name || cardId || '牌').slice(0, 1)
-      document.getElementById('cdName').textContent = def.name || cardId
+      const descriptionContext = {
+        card: cardInstance,
+        handCard: cardInstance,
+        snapshot: G,
+      }
+      const renderedName = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+        ? RvBSkillDescription.interpolate(def.name || cardId || '牌', descriptionContext)
+        : (def.name || cardId)
+      document.getElementById('cdIcon').textContent = String(renderedName).slice(0, 1)
+      document.getElementById('cdName').textContent = renderedName
       document.getElementById('cdType').textContent = typeLabel
       document.getElementById('cdCost').innerHTML =
         `<div style="text-align:center;margin-bottom:8px"><span class="cd-cost ${cost===0?'free':''}">${cost===0?'费用: 免费':'费用: '+cost+' AP'}</span></div>`
       const fullDescription = cardDisplayDescription(cardInstance, def)
-      document.getElementById('cdDesc').textContent = ADVENTURE_MODE && window.adventureCardDetail ? window.adventureCardDetail(cardId, fullDescription) : fullDescription
+      const renderedDescription = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+        ? RvBSkillDescription.interpolate(fullDescription, descriptionContext)
+        : fullDescription
+      document.getElementById('cdDesc').textContent = ADVENTURE_MODE && window.adventureCardDetail
+        ? window.adventureCardDetail(cardId, renderedDescription)
+        : renderedDescription
 
       const isPassiveCard = def.type === 'passive'
       const meta = []
@@ -4559,24 +4581,46 @@
 
       // Tags (display* aware)
       const statusPresentation = window.BattleStatusPresentation
+      const statusContextFor = function (status) {
+        const ownerId = status && status.ownerPlayerId || piece.ownerPlayerId
+        const ownerPlayer = G && Array.isArray(G.players)
+          ? G.players.find(function (candidate) {
+            return String(candidate && candidate.playerId || '').toLowerCase() === String(ownerId || '').toLowerCase()
+          })
+          : null
+        return {
+          currentStatus: status,
+          status: status,
+          piece: piece,
+          currentPiece: piece,
+          player: ownerPlayer,
+          currentPlayer: ownerPlayer,
+          snapshot: G,
+        }
+      }
       const tags = pieceDispTags(piece).filter(t => {
         if (!t || t.visible === false) return false
-        const meta = statusPresentation ? statusPresentation.resolve(t) : null
+        const meta = statusPresentation ? statusPresentation.resolve(t, statusContextFor(t)) : null
         return !meta || meta.visibility !== 'hidden'
       })
       const tagsHtml = tags.length
         ? `<div class="pi-section-label">\u5168\u90e8\u53ef\u89c1\u72b6\u6001</div><div class="pi-status-list">${tags.map(t => {
             const meta = statusPresentation
-              ? statusPresentation.resolve(t)
+              ? statusPresentation.resolve(t, statusContextFor(t))
               : { color: '#94a3b8', glyph: '\u2022', description: '\u72b6\u6001\u8be6\u60c5\u7531\u5f53\u524d\u6743\u5a01\u5feb\u7167\u63d0\u4f9b\u3002' }
-            const detail = statusPresentation ? statusPresentation.detailText(t) : ''
+            const statusContext = statusContextFor(t)
+            const detail = statusPresentation ? statusPresentation.detailText(t, statusContext) : ''
             const label = statusPresentation && statusPresentation.labelForStatus
               ? statusPresentation.labelForStatus(t)
               : (meta.label || t.name || t.label || t.type || t.id || '\u672a\u77e5\u72b6\u6001')
             const iconPath = t && typeof t === 'object' && typeof t.iconPath === 'string' && t.iconPath.trim()
               ? t.iconPath.trim()
               : meta.assetPath || 'images/effect-icons/fallback.svg'
-            const description = t.description || meta.description || ''
+            const description = statusPresentation
+              ? meta.description || ''
+              : (typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+                  ? RvBSkillDescription.interpolate(t.description || meta.description || '', statusContext)
+                  : t.description || meta.description || '')
             return `<div class="pi-status-row" data-status-id="${escHtml(t.id || t.type || '')}">
               <span class="pi-status-icon" style="--status-color:${escHtml(meta.color)}"><img class="pi-status-icon-image" src="${escHtml(iconPath)}" alt="" aria-hidden="true"></span>
               <span class="pi-status-copy"><span class="pi-status-name">${escHtml(label)}</span>
@@ -4652,7 +4696,7 @@
             <span class="pi-skill-name">${escHtml(skName)}</span>
             <span class="pi-skill-badge">${typeLabel}</span>
           </div>
-          <div class="pi-skill-desc">${RvBSkillDescription.render(desc, keywords)}</div>
+          <div class="pi-skill-desc">${RvBSkillDescription.render(desc, keywords, skillDescriptionContext(piece, skd, sk))}</div>
           ${keywords.length ? `<div class="keyword-badges pi-keywords">${keywords.map(name => keywordBadgeHtml(name, 'piece', activePieceKeyword)).join('')}</div>` : ''}
           ${metaParts.length ? `<div class="pi-skill-meta">${metaParts.join(' · ')}</div>` : ''}
         </div>`
@@ -7934,6 +7978,25 @@
       // Keep the opposite-edge skill dock in sync with the current selection.
       const contextPiece = selectedPieceId ? G.pieces.find(p => p.instanceId === selectedPieceId) : null
       renderPieceContextMenu(contextPiece)
+      refreshOpenPieceInfo()
+      refreshOpenCardDetail()
+    }
+
+    function refreshOpenPieceInfo() {
+      const modal = document.getElementById('pieceInfoModal')
+      if (!modal || modal.style.display !== 'flex' || !currentPieceInfoId) return
+      if (currentPieceInfoSource === 'board') {
+        const piece = G.pieces.find(function (candidate) { return candidate.instanceId === currentPieceInfoId })
+        if (piece) renderPieceInfoRecord(piece, true)
+      } else if (currentPieceInfoSource === 'deployment') {
+        showDeploymentPieceInfo(currentPieceInfoId, null, true)
+      }
+    }
+
+    function refreshOpenCardDetail() {
+      const modal = document.getElementById('cardDetailModal')
+      if (!modal || modal.style.display !== 'flex' || !currentCardDetail) return
+      showCardDetail(currentCardDetail.cardInstanceId, currentCardDetail.cardId, true)
     }
 
     function renderPieceCard(piece, isMe) {
@@ -8246,7 +8309,9 @@
 
         const cid = escHtml(card.instanceId)
         const cdid = escHtml(card.cardId)
-        const cardName = def.name || card.cardId
+        const cardName = typeof RvBSkillDescription !== 'undefined' && typeof RvBSkillDescription.interpolate === 'function'
+          ? RvBSkillDescription.interpolate(def.name || card.cardId, { card: card, handCard: card, snapshot: G })
+          : (def.name || card.cardId)
         const cardAriaLabel = isHandSelection
           ? cardName + (isHandChoiceCandidate ? (isHandChoiceSelected ? '，已选择' : '，可选择') : '，不可选择')
           : cardName + (cardPresentation.badge ? '，' + cardPresentation.badge : '') + '，行动点 ' + cost
@@ -8269,7 +8334,13 @@
       const def = definition || {}
       const cardId = card && card.cardId || def.id || ''
       const shown = ADVENTURE_MODE && window.adventureCardPresentation ? window.adventureCardPresentation(card, def) : card
-      return HandCardFace.render(shown, def, { artSrc: cardArtSource(cardId, def.image) })
+      const descriptionContext = card && card.instanceId
+        ? { card: card, handCard: card, snapshot: G }
+        : undefined
+      return HandCardFace.render(shown, def, {
+        artSrc: cardArtSource(cardId, def.image),
+        descriptionContext: descriptionContext,
+      })
     }
 
     function onCardClick(cardInstanceId, cardId, confirmed = false) {

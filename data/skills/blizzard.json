@@ -35,7 +35,10 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:blizzard",
-    "links": []
+    "links": [
+      { "collection": "rules", "id": "rule-freeze-prevent-move", "relation": "shared", "source": "skills.blizzard-damage.gameplayModules.entries.code.graph.body[56].body[6].then[7].then[8].parameters.ruleId" },
+      { "collection": "rules", "id": "rule-freeze-prevent-skill", "relation": "shared", "source": "skills.blizzard-damage.gameplayModules.entries.code.graph.body[56].body[6].then[7].then[9].parameters.ruleId" }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

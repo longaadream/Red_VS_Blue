@@ -32,7 +32,20 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:aizen-kyoka-suiguetsu",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-aizen-kyoka-rewrite",
+        "relation": "owned",
+        "source": "pieces/dark-aizen.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-aizen-kyoka-expire",
+        "relation": "owned",
+        "source": "pieces/dark-aizen.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

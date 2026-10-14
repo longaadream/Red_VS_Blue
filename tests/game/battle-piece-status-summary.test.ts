@@ -10,9 +10,11 @@ function loadBrowserModule(relativePath: string, exportName: string, window: Rec
   const context = createContext({ window, globalThis: window, console })
   const source = readFileSync(resolve(pagesDir, relativePath), 'utf8')
   new Script(source, { filename: relativePath }).runInContext(context)
+  const exported = window[exportName] ?? context[exportName]
+  if (window[exportName] === undefined && exported !== undefined) window[exportName] = exported
   // Browser globals under test intentionally have no TypeScript declarations.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return window[exportName] as Record<string, any>
+  return exported as Record<string, any>
 }
 
 function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
@@ -35,7 +37,46 @@ function fixtureSnapshot(statusTags: Array<Record<string, unknown>>) {
   }
 }
 
+function installDescriptionRuntime(window: Record<string, unknown>) {
+  const runtime = createContext({ console })
+  new Script(readFileSync(resolve(pagesDir, 'js/author-expression-core.js'), 'utf8')).runInContext(runtime)
+  new Script(readFileSync(resolve(pagesDir, 'js/skill-description.js'), 'utf8')).runInContext(runtime)
+  window.RvBAuthorExpression = runtime.RvBAuthorExpression
+  window.RvBSkillDescription = runtime.RvBSkillDescription
+}
+
 describe('battle piece health and negative-status summary', () => {
+  it('interpolates status descriptions from the exact owner snapshot context', () => {
+    const window: Record<string, unknown> = {}
+    installDescriptionRuntime(window)
+    loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)
+    const statusPresentation = loadBrowserModule(
+      'js/battle-ui/battle-status-presentation.js',
+      'BattleStatusPresentation',
+      window,
+    )
+    const status = {
+      id: 'dynamic-status',
+      name: '动态状态',
+      visible: true,
+      extension: { 层数: 2 },
+      description: '当前层数：{当前状态.扩展变量.层数}',
+    }
+    const snapshot = fixtureSnapshot([status])
+    const context = {
+      currentStatus: status,
+      status,
+      piece: snapshot.pieces[0],
+      player: snapshot.players[0],
+      currentPlayer: snapshot.players[0],
+      snapshot,
+    }
+
+    expect(statusPresentation.resolve(status, context).description).toBe('当前层数：2')
+    status.extension.层数 = 4
+    expect(statusPresentation.resolve(status, context).description).toBe('当前层数：4')
+  })
+
   it('mirrors a living clone master status display dynamically without copying effects', () => {
     const window: Record<string, unknown> = {}
     loadBrowserModule('js/battle-ui/battle-effect-icons.js', 'BattleEffectIcons', window)

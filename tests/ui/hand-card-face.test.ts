@@ -4,6 +4,8 @@ import { createContext, Script } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 const context = createContext({})
+new Script(readFileSync(resolve('data/pages/js/author-expression-core.js'), 'utf8')).runInContext(context)
+new Script(readFileSync(resolve('data/pages/js/skill-description.js'), 'utf8')).runInContext(context)
 new Script(readFileSync(resolve('data/pages/js/hand-card-face.js'), 'utf8')).runInContext(context)
 const face = context.HandCardFace
 
@@ -15,7 +17,7 @@ describe('shared read-only hand card face', () => {
     expect(html).not.toContain('基础效果')
     expect(html).toContain('card-content-badge">强化')
     expect(html).toContain('触发')
-    expect(html).toContain('CD3')
+    expect(html).toContain('3回合冷却')
   })
   it('renders complete descriptions and local nested art without playable controls', () => {
     const description = '完整效果。'.repeat(60)
@@ -32,5 +34,23 @@ describe('shared read-only hand card face', () => {
       expect(html).not.toContain('<script>')
       expect(html).toContain('&lt;script&gt;')
     }
+  })
+  it('interpolates live card names and descriptions only with an explicit instance context', () => {
+    const card = { cardId: 'curse', instanceId: 'curse-1', extension: { 伤害量: 3 } }
+    const definition = {
+      name: '诅咒（{当前手牌.extension.伤害量}）',
+      description: '回合结束造成{当前手牌.extension.伤害量}点伤害。',
+    }
+    const html = face.render(card, definition, { descriptionContext: { card, handCard: card } })
+    expect(html).toContain('诅咒（3）')
+    expect(html).toContain('回合结束造成3点伤害。')
+    card.extension.伤害量 = 5
+    const updated = face.render(card, definition, { descriptionContext: { card, handCard: card } })
+    expect(updated).toContain('诅咒（5）')
+    expect(updated).toContain('回合结束造成5点伤害。')
+
+    const unresolved = face.render({ cardId: 'curse' }, definition, { descriptionContext: {} })
+    expect(unresolved).toContain('诅咒（未赋值）')
+    expect(unresolved).toContain('回合结束造成未赋值点伤害。')
   })
 })

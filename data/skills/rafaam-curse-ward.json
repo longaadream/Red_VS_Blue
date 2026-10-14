@@ -25,6 +25,12 @@
         "id": "rule-rafaam-curse-ward",
         "relation": "owned",
         "source": "pieces/red-rafaam.rules"
+      },
+      {
+        "collection": "cards",
+        "id": "rafaam-curse-sample",
+        "relation": "owned",
+        "source": "rules.rule-rafaam-curse-ward.gameplayModules.entries.skillCode.graph.body[3].then[4].then[5].then[34].then[14].inputs.templateId.value"
       }
     ]
   },

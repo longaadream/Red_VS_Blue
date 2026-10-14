@@ -175,8 +175,8 @@ describe('Shishio/Velen/Colt semantic rule graphs', () => {
     expect(result.state.pieces[1].statusTags).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'silenced', currentDuration: 1 })]))
   })
 
-  it('preserves Velen death cleanup across hand, battlefield, and graveyard', () => {
-    const result = expectEquivalent('rule-velen-death-cleanup', () => {
+  it('retains Velen prophecy while cleaning fate shelter across battlefield and graveyard', () => {
+    const build = () => {
       const velen = testPiece({ instanceId: 'velen', templateId: 'velen', ownerPlayerId: 'player-red', name: '维伦', currentHp: 0 })
       const ally = testPiece({ instanceId: 'ally', ownerPlayerId: 'player-red', statusTags: [{ id: 'shelter', type: 'velen-fate-shelter', sourceId: velen.instanceId }], rules: [{ id: 'rule-velen-fate-target' }] })
       const grave = testPiece({ instanceId: 'grave', ownerPlayerId: 'player-blue', statusTags: [{ id: 'grave-shelter', type: 'velen-fate-shelter', sourceId: velen.instanceId }], rules: [{ id: 'rule-velen-fate-target' }] })
@@ -185,11 +185,14 @@ describe('Shishio/Velen/Colt semantic rule graphs', () => {
       state.graveyard = [grave]
       state.players[0].hand = [{ instanceId: 'prophecy-1', cardId: 'holy-smite', contentState: { velenHolyProphecy: { sourcePieceId: velen.instanceId, createdTurnNumber: 1 } } }]
       return { state, contexts: [{ type: 'onPieceDied', rulePiece: velen, sourcePiece: velen, playerId: 'player-red' }] }
-    })
-    expect(result.results[0]).toMatchObject({ success: true })
-    expect(result.state.players[0].hand[0].contentState.velenHolyProphecy).toBeUndefined()
-    expect(result.state.graveyard[0].statusTags).toEqual([])
-    expect(result.state.pieces[2].rules).toEqual([{ id: 'rule-velen-fate-target' }])
+    }
+    const semantic = execute('rule-velen-death-cleanup', true, build)
+    const legacy = execute('rule-velen-death-cleanup', false, build)
+    expect(semantic.results[0]).toMatchObject({ success: true })
+    expect(semantic.state.players[0].hand[0].contentState.velenHolyProphecy).toEqual({ sourcePieceId: 'velen', createdTurnNumber: 1 })
+    expect(semantic.state.graveyard[0].statusTags).toEqual([])
+    expect(semantic.state.pieces[2].rules).toEqual([{ id: 'rule-velen-fate-target' }])
+    expect(legacy.state.players[0].hand[0].contentState.velenHolyProphecy).toBeUndefined()
   })
 
   it('preserves Velen delayed prophecy enhancement', () => {

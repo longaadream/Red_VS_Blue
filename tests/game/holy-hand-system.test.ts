@@ -66,7 +66,9 @@ describe('RED-121 holy-hand roster contracts', () => {
     expect(getPieceById('velen')).toMatchObject({
       name: '\u7ef4\u4f26', rarity: 'legendary',
       stats: { maxHp: 12, attack: 3, defense: 1, moveRange: 3 },
+      rules: ['rule-velen-delayed-effects', 'rule-velen-death-cleanup'],
     })
+    expect(getPieceById('velen')).not.toHaveProperty('playerRules')
     expect(getPieceById('turalyon')).toMatchObject({
       name: '\u56fe\u62c9\u626c', rarity: 'legendary',
       stats: { maxHp: 15, attack: 4, defense: 2, moveRange: 3 },
@@ -429,9 +431,12 @@ describe('Velen delayed holy cards', () => {
   })
 
 
-  it('resolves fate shelter for 8 healing plus shield, and clears unfinished prophecy when Velen dies', () => {
+  it('resolves fate shelter, preserves Velen prophecy after death, and completes it on a later owner turn', () => {
     const velen = makePiece({ instanceId: 'velen', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0 }) as any
-    velen.rules = [loadRuleById('rule-velen-delayed-effects', true)!, loadRuleById('rule-velen-death-cleanup', true)!]
+    velen.rules = [
+      loadRuleById('rule-velen-delayed-effects', true)!,
+      loadRuleById('rule-velen-death-cleanup', true)!,
+    ]
     const ally = makePiece({ instanceId: 'ally', ownerPlayerId: 'player-red', x: 1, y: 0, currentHp: 2, maxHp: 12 }) as any
     const state = makeState({ pieces: [velen, ally], turnNumber: 1 }) as any
 
@@ -441,13 +446,27 @@ describe('Velen delayed holy cards', () => {
     expect(ally.currentHp).toBe(10)
     expect(ally.statusTags.some((tag: any) => tag.type === 'divine-shield')).toBe(true)
 
-    state.players[0].hand = [{
-      cardId: 'holy-heal', instanceId: 'unfinished', ownerPlayerId: 'player-red',
-      contentState: { velenHolyProphecy: { sourcePieceId: 'velen', createdTurnNumber: 2 } },
-    }]
+    state.players[0].hand = ['unfinished-a', 'unfinished-b'].map(instanceId => ({
+      cardId: 'holy-heal', instanceId, ownerPlayerId: 'player-red',
+    }))
+    expect(executeSkill('velen-holy-prophecy', state, 'velen', { selectedOption: 'unfinished-a' }).success).toBe(true)
+    expect(executeSkill('velen-holy-prophecy', state, 'velen', { selectedOption: 'unfinished-b' }).success).toBe(true)
+    expect(state.players[0].rules).toEqual([
+      expect.objectContaining({ id: 'rule-velen-delayed-effects' }),
+    ])
     velen.currentHp = 0
     new TriggerSystem().checkTriggers(state, { type: 'onPieceDied', playerId: 'player-red', sourcePiece: velen } as any)
-    expect(state.players[0].hand[0].contentState?.velenHolyProphecy).toBeUndefined()
+    expect(state.players[0].hand).toHaveLength(2)
+    expect(state.players[0].hand.every((card: any) => card.contentState?.velenHolyProphecy)).toBe(true)
+
+    state.pieces = state.pieces.filter((piece: any) => piece.instanceId !== velen.instanceId)
+    state.graveyard = [velen]
+    state.turn.turnNumber = 3
+    new TriggerSystem().checkTriggers(state, { type: 'beginTurn', playerId: 'player-red' } as any)
+    expect(state.players[0].hand).toEqual([
+      expect.objectContaining({ instanceId: 'unfinished-a', contentState: { velenHolyProphecyEnhanced: true }, effectModifiers: [{ effect: 'heal', operation: 'multiply', value: 1.5 }] }),
+      expect.objectContaining({ instanceId: 'unfinished-b', contentState: { velenHolyProphecyEnhanced: true }, effectModifiers: [{ effect: 'heal', operation: 'multiply', value: 1.5 }] }),
+    ])
   })
 
   it('cancels fate shelter when its target dies before the next own turn', () => {
@@ -495,7 +514,7 @@ describe('Velen delayed holy cards', () => {
     expect(ally.statusTags).toEqual([expect.objectContaining({ id: 'keep-idless-regression', type: 'other-status' })])
   })
 
-  it('clears Velen prophecy from hand and fate shelter from a graveyard piece on Velen death', () => {
+  it('preserves Velen prophecy while clearing fate shelter from a graveyard piece on Velen death', () => {
     const velen = makePiece({
       instanceId: 'velen-graveyard-cleanup', templateId: 'velen', ownerPlayerId: 'player-red', x: 0, y: 0,
     }) as any
@@ -525,7 +544,7 @@ describe('Velen delayed holy cards', () => {
       type: 'onPieceDied', playerId: 'player-red', sourcePiece: velen,
     } as any)
 
-    expect(state.players[0].hand[0].contentState?.velenHolyProphecy).toBeUndefined()
+    expect(state.players[0].hand[0].contentState?.velenHolyProphecy).toEqual({ sourcePieceId: velen.instanceId, createdTurnNumber: 1 })
     expect(state.players[0].hand[1].contentState?.velenHolyProphecy).toBeDefined()
     expect(deadAlly.statusTags).toEqual([expect.objectContaining({ id: 'graveyard-keep', type: 'other-status' })])
   })

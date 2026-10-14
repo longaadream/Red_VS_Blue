@@ -236,6 +236,7 @@ function buildHolyProphecyGraph(): GameplayModuleGraph {
     call('caster-id', 'piece.identifier', { piece: out('caster', 'piece') }),
     { kind: 'record.create', id: 'prophecy-record', schema: 'velen-holy-prophecy@1', fields: { sourcePieceId: out('caster-id', 'id'), createdTurnNumber: out('turn', 'value') } },
     call('set-record', 'card.set-content-record', { player: out('owner', 'player'), card: out('selected', 'text'), record: out('prophecy-record', 'value') }, { field: 'velenHolyProphecy' }),
+    call('install-delayed-rule', 'rule.apply-player', { target: out('owner', 'player') }, { ruleId: 'rule-velen-delayed-effects' }),
     call('caster-name', 'attribute.text', { piece: out('caster', 'piece') }, { attribute: 'name' }),
     call('message', 'text.concat', { left: out('caster-name', 'text'), right: literal('留下了圣光预言') }),
   )

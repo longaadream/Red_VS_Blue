@@ -975,7 +975,9 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
         if (candidates.length > 1) throw new Error('flow: 手牌实例标识不唯一')
         const card = context.cardInstance?.instanceId === id ? context.cardInstance : candidates[0]
         if (!card || card.cardId !== instance.cardId || card.ownerPlayerId !== instance.ownerPlayerId) throw new Error('flow: 手牌实例引用已失效')
-        return id
+        // The author port is a record, including when stored in a typed local.
+        // Retain the exact instance identity without exposing the mutable card.
+        return Object.freeze({ instanceId: id, ownerPlayerId: card.ownerPlayerId })
       },
       holder: () => holder()?.instanceId ?? null,
       source: () => context.sourcePiece?.instanceId ?? (surface === 'skill' ? context.piece?.instanceId : null),

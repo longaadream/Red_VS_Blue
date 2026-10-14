@@ -463,6 +463,13 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:sasuke-susanoo",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-mangekyo-friendly-death",
+        "relation": "shared",
+        "source": "pieces/red-sasuke.rules"
+      }
+    ]
   }
 }

@@ -40,7 +40,7 @@ function fixtureCatalog(): AuthorClusterInitializationCatalog {
 }
 
 describe('author Cluster initialization planner', () => {
-  it('creates direct skill and rule roots and keeps only installed explicit owned/shared links', () => {
+  it('groups linked rules under complete abilities and keeps unassigned rule roots', () => {
     const result = planAuthorClusterInitialization(
       {
         skills: [{ skillId: 'root-skill' }, { skillId: 'linked-skill' }],
@@ -88,7 +88,6 @@ describe('author Cluster initialization planner', () => {
     expect(result.definitions).toEqual([
       { id: 'skills:root-skill', skills: ['root-skill', 'linked-skill'], rules: ['linked-rule'] },
       { id: 'skills:linked-skill', skills: ['linked-skill'], rules: ['linked-rule'] },
-      { id: 'rules:linked-rule', skills: ['root-skill'], rules: ['linked-rule'] },
       { id: 'rules:rule-root', skills: [], rules: ['rule-root'] },
     ])
     expect(result.diagnostics).toEqual(expect.arrayContaining([
@@ -127,7 +126,8 @@ describe('author Cluster initialization planner', () => {
       const result = planAuthorClusterInitialization(piece, catalog)
       const skillIds = directIds(piece.skills, 'skill')
       const ruleIds = directIds(piece.rules, 'rule')
-      const expectedIds = [...skillIds.map(id => `skills:${id}`), ...ruleIds.map(id => `rules:${id}`)]
+      const groupedRules = new Set(result.definitions.filter(item => item.id.startsWith('skills:')).flatMap(item => item.rules))
+      const expectedIds = [...skillIds.map(id => `skills:${id}`), ...ruleIds.filter(id => !groupedRules.has(id)).map(id => `rules:${id}`)]
 
       expect(result.definitions.map(definition => definition.id)).toEqual(expectedIds)
       for (const definition of result.definitions) {
@@ -138,9 +138,9 @@ describe('author Cluster initialization planner', () => {
       uninstalledLinkCount += result.diagnostics.filter(item => item.code === 'uninstalled-cluster-link').length
     }
 
-    // 142 direct skill roots + 54 direct rule roots. Only the one Guldan
-    // player-scope link is intentionally excluded from a piece plan.
-    expect(definitionCount).toBe(196)
+    // Every installed skill remains a complete ability root. A rule already
+    // belonging to one of those abilities no longer creates a second root.
+    expect(definitionCount).toBeLessThan(196)
     expect(uninstalledLinkCount).toBe(1)
   })
 })

@@ -247,8 +247,23 @@ describe('battle page runtime source', () => {
   })
 
   it('uses the instance-aware display description in the card detail modal', () => {
-    expect(runtimeFunction(readBattlePage(), 'showCardDetail'))
-      .toMatch(/cardDisplayDescription\(cardInstance, def\)/)
+    const source = runtimeFunction(readBattlePage(), 'showCardDetail')
+    expect(source).toMatch(/cardDisplayDescription\(cardInstance, def\)/)
+    expect(source).toMatch(/RvBSkillDescription\.interpolate\(def\.name \|\| cardId \|\| '牌', descriptionContext\)/)
+    expect(source).toMatch(/RvBSkillDescription\.interpolate\(fullDescription, descriptionContext\)/)
+  })
+
+  it('passes live hand-card context to the shared card face renderer', () => {
+    expect(runtimeFunction(readBattlePage(), 'renderHandCardFace'))
+      .toMatch(/descriptionContext: descriptionContext/)
+  })
+
+  it('binds skill descriptions to the live instance and refreshes open details with snapshots', () => {
+    const html = readBattlePage()
+    expect(runtimeFunction(html, 'renderPieceInfoRecord'))
+      .toMatch(/RvBSkillDescription\.render\(desc, keywords, skillDescriptionContext\(piece, skd, sk\)\)/)
+    expect(runtimeFunction(html, 'renderPanels')).toMatch(/refreshOpenPieceInfo\(\)/)
+    expect(runtimeFunction(html, 'refreshOpenPieceInfo')).toMatch(/renderPieceInfoRecord\(piece, true\)/)
   })
 
   it('includes template-derived skills in battle piece details without adding them to runtime skills', () => {

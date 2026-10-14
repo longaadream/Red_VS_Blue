@@ -70,7 +70,26 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:recall",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-recall-skill",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-recall-move",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-recall-endturn",
+        "relation": "owned",
+        "source": "pieces/tracer.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

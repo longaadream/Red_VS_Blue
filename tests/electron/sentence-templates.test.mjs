@@ -582,3 +582,12 @@ test('browser aliases are available for both editor entry points', () => {
   assert.equal(globalThis.SkillSentenceTemplates, templates)
   assert.equal(globalThis.GameplaySentenceTemplates, templates)
 })
+
+test('author statement catalog keeps writes behind three unified entries', () => {
+  assert.deepEqual(templates.authorStatementCatalog.map(item => item.id), [
+    'local.declare', 'author.extension.declare', 'author.assignment',
+  ])
+  assert.equal(templates.isExpressionOnlyModule('math.add'), true)
+  assert.equal(templates.isExpressionOnlyModule('compare.greater-than'), true)
+  assert.equal(templates.isExpressionOnlyModule('author.assignment'), false)
+})

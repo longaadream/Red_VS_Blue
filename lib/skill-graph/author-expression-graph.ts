@@ -302,9 +302,9 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
       options.observeIdentifier?.(node.name, bindings, schemas, expected)
       const bound = own(bindings, node.name)
       if (bound) return bound.local
-        ? call(body, 'local.read', { handle: { value: bound.value, type: 'record' } }, { valueType: encodedType(bound.type) }, 'value', '1')
+        ? { ...call(body, 'local.read', { handle: { value: bound.value, type: 'record' } }, { valueType: encodedType(bound.type) }, 'value', '1'), ...(bound.domain ? { domain: bound.domain } : {}) }
         : bound
-      const root = own({ 当前棋子: 'ref.holder', 当前玩家: 'ref.player', 当前手牌: 'ref.current-card', 当前技能: 'ref.current-skill', 当前规则: 'ref.current-rule', 目标: 'ref.target' }, node.name)
+      const root = own({ 当前棋子: 'ref.holder', 当前玩家: 'ref.player', 当前手牌: 'ref.current-card', 当前技能: 'ref.current-skill', 当前规则: 'ref.current-rule' }, node.name)
       if (root) {
         const result = call(body, root, {})
         if (root === 'ref.current-skill') return { ...result, domain: 'skill-instance' }

@@ -54,7 +54,14 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:akaza-flash-step",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-akaza-damage-mark",
+        "relation": "shared",
+        "source": "pieces/dark-akaza.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

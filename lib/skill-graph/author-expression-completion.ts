@@ -116,7 +116,7 @@ export function completeAuthorExpression(prefix: string, options: AuthorExpressi
   if (receiver === '全局' || receiver === '当前对局') suggestions.push({ label: `${receiver}.extension`, value: `${receiver}.extension`, kind: '扩展变量' })
   if (dot >= 0) return suggestions
   for (const [name, value] of Object.entries(bindings)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(value.type) })
-  for (const [name, type] of Object.entries({ 当前棋子: 'piece', 当前玩家: 'player', 目标: 'piece', 当前事件: 'event', 全局: 'record' } as const)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) })
+  for (const [name, type] of Object.entries({ 当前棋子: 'piece', 当前玩家: 'player', 当前事件: 'event', 全局: 'record' } as const)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) })
   if (['skill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前技能', value: '当前技能', kind: '技能实例' })
   if (['rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前规则', value: '当前规则', kind: '规则实例' })
   if (['card', 'rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前手牌', value: '当前手牌', kind: '手牌实例' })

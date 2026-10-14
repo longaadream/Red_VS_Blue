@@ -124,6 +124,19 @@
 .skill-cluster-piece-stat input { background: var(--cluster-surface); border: 1px solid var(--cluster-border-strong); border-radius: 5px; color: var(--cluster-text); font-size: 13px; min-width: 0; padding: 6px 7px; width: 100%; }
 .skill-cluster-piece-stat input:focus { border-color: #83a9df; outline: 2px solid #c7dafa; outline-offset: 0; }
 .skill-cluster-piece-stat input:disabled { background: #f1f3f6; color: var(--cluster-muted); cursor: not-allowed; }
+.skill-cluster-piece-ability-groups { background: var(--cluster-surface); border: 1px solid var(--cluster-border); border-radius: 9px; padding: 15px; }
+.skill-cluster-piece-ability-list { display: grid; gap: 8px; margin-top: 11px; }
+.skill-cluster-piece-ability-card { background: #fbfcfd; border: 1px solid var(--cluster-border); border-radius: 8px; display: grid; gap: 8px; padding: 11px; }
+.skill-cluster-piece-ability-card.is-unassigned { background: #fffaf0; border-color: #eadab3; }
+.skill-cluster-piece-ability-top { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; justify-content: space-between; }
+.skill-cluster-piece-ability-top strong { font-size: 13px; overflow-wrap: anywhere; }
+.skill-cluster-piece-ability-counts { display: flex; flex-wrap: wrap; gap: 5px; }
+.skill-cluster-piece-ability-rules { color: var(--cluster-muted); font: 10px/1.5 var(--mono, ui-monospace, monospace); margin: 0 !important; overflow-wrap: anywhere; }
+.skill-cluster-piece-ability-members { border-top: 1px solid var(--cluster-border); display: grid; gap: 6px; padding-top: 8px; }
+.skill-cluster-piece-ability-member { align-items: center; background: #fff; border: 1px solid var(--cluster-border); border-radius: 6px; display: flex; gap: 8px; justify-content: space-between; padding: 7px 8px; }
+.skill-cluster-piece-ability-member-copy { display: grid; gap: 2px; min-width: 0; }
+.skill-cluster-piece-ability-member-copy strong { font-size: 11px; overflow-wrap: anywhere; }
+.skill-cluster-piece-ability-member-kind { color: var(--cluster-muted); font-size: 10px; }
 .skill-cluster-piece-skill-group + .skill-cluster-piece-skill-group { border-top: 1px solid var(--cluster-border); margin-top: 13px; padding-top: 12px; }
 .skill-cluster-piece-skill-group h4 { color: var(--cluster-muted); font-size: 10px; letter-spacing: .08em; margin-bottom: 7px; text-transform: uppercase; }
 .skill-cluster-piece-skill-row, .skill-cluster-piece-related-row { align-items: center; background: #fbfcfd; border: 1px solid var(--cluster-border); border-radius: 8px; cursor: pointer; display: grid; gap: 10px; padding: 10px 11px; text-align: left; width: 100%; }

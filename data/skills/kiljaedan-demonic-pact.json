@@ -23,6 +23,36 @@
         "id": "rule-kiljaedan-gamestart",
         "relation": "owned",
         "source": "pieces/kiljaedan.rules"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-1",
+        "relation": "owned",
+        "source": "skills.kiljaedan-demonic-pact.gameplayModules.entries.code.graph.body[26].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-2",
+        "relation": "owned",
+        "source": "cards.demon-summon-1.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-3",
+        "relation": "owned",
+        "source": "cards.demon-summon-2.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-4",
+        "relation": "owned",
+        "source": "cards.demon-summon-3.gameplayModules.entries.code.graph.body[11].parameters.cardId"
+      },
+      {
+        "collection": "cards",
+        "id": "demon-summon-5",
+        "relation": "owned",
+        "source": "cards.demon-summon-4.gameplayModules.entries.code.graph.body[11].parameters.cardId"
       }
     ]
   },

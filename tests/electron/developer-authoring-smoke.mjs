@@ -666,11 +666,52 @@ async function applySentenceExpression(statementId, slotName, source) {
   await delay(180)
 }
 
+async function applySentenceModuleExpression(statementId, slotName, moduleId, label = moduleId) {
+  await openSentenceSlot(statementId, 'input', slotName)
+  const detail = activeDetailSelector()
+  const chooser = `${detail} [data-sentence-expression-chooser=${JSON.stringify(slotName)}]`
+  const editor = `${detail} [data-sentence-author-expression=${JSON.stringify(slotName)}] .ei-editor`
+  const direct = `${detail} [data-sentence-direct-expression=${JSON.stringify(slotName)}]`
+  const compose = `${detail} [data-sentence-create-expression=${JSON.stringify(slotName)}]`
+  if (!await visible(editor)) {
+    if (await visible(compose)) await click(compose, `打开${label}表达式组合器`)
+    else if (await visible(direct)) await click(direct, `打开${label}表达式组合器`)
+  }
+  const moduleSelector = `${chooser} [data-sentence-expression-module=${JSON.stringify(moduleId)}]`
+  await until(`Boolean(document.querySelector(${JSON.stringify(moduleSelector)}))`, `纯表达式模块 ${label}`)
+  await click(moduleSelector, `选择纯表达式 ${label}`)
+  await delay(220)
+  const graph = await sentenceGraphSnapshot()
+  const statement = findGraphStatement(graph, item => item?.kind === 'call'
+    && item.module === moduleId
+    && item.layout?.sentenceExpression?.owner === statementId
+    && item.layout?.sentenceExpression?.input === slotName)
+  if (!statement) {
+    blocker('PURE_EXPRESSION_NOT_CREATED', { statementId, slotName, moduleId, label, graph })
+    return null
+  }
+  return statement.id
+}
+
 async function saveSentenceOutput(statementId, outputName, variableName) {
   await openSentenceEditor()
   const rowSelector = `${activeDetailSelector()} [data-sentence-node=${JSON.stringify(statementId)}]`
   await until(`Boolean(document.querySelector(${JSON.stringify(rowSelector)}))`, `返回值行 ${outputName}`)
-  const result = await evaluate(`(()=>{const row=document.querySelector(${JSON.stringify(rowSelector)});const details=row?.querySelector('.sentence-result-names');if(!details)return {ok:false,reason:'RESULTS_NOT_AVAILABLE'};details.open=true;const inputs=[...details.querySelectorAll('input')];if(!inputs.length)return {ok:false,reason:'RESULT_INPUT_MISSING'};const input=inputs.find(item=>String(item.getAttribute('aria-label')||'').includes(${JSON.stringify(outputName)}))||inputs[0];input.value=${JSON.stringify(variableName)};input.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,value:input.value}})()`)
+  const result = await evaluate(`(()=>{
+    const row=document.querySelector(${JSON.stringify(rowSelector)})
+    const key=${JSON.stringify(`${statementId}:${outputName}`)}
+    const byKey=(name)=>[...row?.querySelectorAll(name)||[]].find(item=>item.dataset.sentenceSaveResult===key||item.dataset.sentenceResultVariableName===key||item.dataset.sentenceResultVariableApply===key)
+    const save=byKey('[data-sentence-save-result]')
+    if(!save)return {ok:false,reason:'RESULT_SAVE_CONTROL_MISSING'}
+    save.click()
+    const input=byKey('[data-sentence-result-variable-name]')
+    const apply=byKey('[data-sentence-result-variable-apply]')
+    if(!input||!apply)return {ok:false,reason:'RESULT_VARIABLE_EDITOR_MISSING'}
+    input.value=${JSON.stringify(variableName)}
+    input.dispatchEvent(new Event('input',{bubbles:true}))
+    apply.click()
+    return {ok:true,value:input.value}
+  })()`)
   if (!result?.ok) {
     blocker('RESULT_NAME_CONTROL_MISSING', { statementId, outputName, variableName, ...result })
     return false
@@ -700,12 +741,37 @@ async function setSentenceParameter(statementId, name, value) {
   const detail = activeDetailSelector()
   const field = `${detail} [data-sentence-module-parameter=${JSON.stringify(name)}]`
   await until(`Boolean(document.querySelector(${JSON.stringify(field)}))`, `句子参数 ${name}`)
-  const result = await evaluate(`(()=>{const field=document.querySelector(${JSON.stringify(field)});const details=field.closest('details');if(details&&!details.open)details.querySelector('summary')?.click();const select=field.querySelector('[data-sentence-literal-enum],select');const checkbox=field.querySelector('input[type="checkbox"]');const input=field.querySelector('input:not([type="checkbox"]),textarea');if(select){const raw=${JSON.stringify(value)};const json=JSON.stringify(raw);const values=[...select.options].map(item=>item.value);select.value=values.includes(json)?json:String(raw);if(!values.includes(select.value))return {ok:false,reason:'OPTION_MISSING',options:[...select.options].map(item=>({value:item.value,text:item.textContent}))};select.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'select',value:select.value}}if(checkbox){checkbox.checked=Boolean(${JSON.stringify(value)});checkbox.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'checkbox',value:checkbox.checked}}if(input){input.value=${JSON.stringify(String(value))};input.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'input',value:input.value}}return {ok:false,reason:'CONTROL_MISSING',html:field.outerHTML.slice(0,5000)}})()`)
+  const result = await evaluate(`(()=>{const field=document.querySelector(${JSON.stringify(field)});const details=field.closest('details');if(details&&!details.open)details.querySelector('summary')?.click();const select=field.querySelector('[data-sentence-literal-enum],select');const checkbox=field.querySelector('input[type="checkbox"]');const input=field.querySelector('input:not([type="checkbox"]),textarea');if(select){const raw=${JSON.stringify(value)};const json=JSON.stringify(raw);const options=[...select.options];const values=options.map(item=>item.value);let selected=values.includes(json)?json:String(raw);if(!values.includes(selected)){const labelled=options.find(item=>item.textContent.trim()===String(raw));if(labelled)selected=labelled.value}select.value=selected;if(!values.includes(select.value))return {ok:false,reason:'OPTION_MISSING',options:options.map(item=>({value:item.value,text:item.textContent}))};select.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'select',value:select.value,label:select.options[select.selectedIndex]?.textContent||''}}if(checkbox){checkbox.checked=Boolean(${JSON.stringify(value)});checkbox.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'checkbox',value:checkbox.checked}}if(input){input.value=${JSON.stringify(String(value))};input.dispatchEvent(new Event('change',{bubbles:true}));return {ok:true,tag:'input',value:input.value}}return {ok:false,reason:'CONTROL_MISSING',html:field.outerHTML.slice(0,5000)}})()`)
   if (!result.ok) {
     blocker('SENTENCE_PARAMETER_CONTROL_MISSING', { statementId, name, value, ...result })
     return false
   }
   await delay(180)
+  return true
+}
+
+async function setSentenceRecordValueType(statementId, schemaReference) {
+  await openSentenceStatement(statementId)
+  const detail = activeDetailSelector()
+  const field = `${detail} [data-sentence-module-parameter="valueType"]`
+  await until(`Boolean(document.querySelector(${JSON.stringify(field)}))`, '局部变量值类型')
+  const result = await evaluate(`(()=>{
+    const field=document.querySelector(${JSON.stringify(field)})
+    const mode=field?.querySelector('[data-sentence-type-kind]')
+    if(!mode)return {ok:false,reason:'TYPE_MODE_MISSING'}
+    mode.value='record-schema';mode.dispatchEvent(new Event('change',{bubbles:true}))
+    const schema=field.querySelector('[data-sentence-record-type]')
+    if(!schema)return {ok:false,reason:'RECORD_SCHEMA_CONTROL_MISSING'}
+    schema.value=${JSON.stringify(schemaReference)}
+    if(schema.value!==${JSON.stringify(schemaReference)})return {ok:false,reason:'RECORD_SCHEMA_OPTION_MISSING',options:[...schema.options].map(item=>item.value)}
+    schema.dispatchEvent(new Event('change',{bubbles:true}))
+    return {ok:true,value:schema.value}
+  })()`)
+  if (!result?.ok) {
+    blocker('SENTENCE_RECORD_VALUE_TYPE_MISSING', { statementId, schemaReference, ...result })
+    return false
+  }
+  await delay(220)
   return true
 }
 
@@ -755,16 +821,23 @@ async function buildFireball() {
   const target = await addSentenceModule('author.choice.target-piece', '选择棋子目标')
   await setSentenceParameter(target, 'range', 5)
   await setSentenceParameter(target, 'filter', 'enemy')
+  assert.equal(await saveSentenceOutput(target, 'piece', 'target'), true, '火球目标选择结果必须通过返回值控件命名为 target')
   const damage = await addSentenceModule('author.effect.damage', '造成伤害')
   if (damage) {
     await applySentenceExpression(damage, 'source', '当前棋子')
-    await applySentenceExpression(damage, 'target', '目标')
+    await applySentenceExpression(damage, 'target', 'target')
     await applySentenceExpression(damage, 'amount', '当前棋子.攻击力 * 1.5')
   }
   const fireballGraph = await sentenceGraphSnapshot()
   const fireballDamage = findGraphStatement(fireballGraph, item => item?.kind === 'call' && item.module === 'author.effect.damage')
-  assert.equal(fireballGraph?.body?.find(item => item?.id === target)?.parameters?.range, 5, '火球目标范围由中文参数控件设置为5')
-  assert.equal(fireballGraph?.body?.find(item => item?.id === target)?.parameters?.filter, 'enemy', '火球目标筛选为敌方')
+  const fireballTarget = fireballGraph?.body?.find(item => item?.id === target)
+  assert.equal(fireballTarget?.parameters?.range, 5, '火球目标范围由中文参数控件设置为5')
+  assert.equal(fireballTarget?.parameters?.filter, 'enemy', '火球目标筛选为敌方')
+  assert.equal(fireballTarget?.layout?.resultVariables?.piece?.name, 'target', '火球选择返回值由中文控件保存为 target')
+  const fireballTargetDeclaration = fireballGraph?.body?.find(item => item?.module === 'local.declare' && item?.parameters?.name === 'target')
+  assert.equal(fireballTargetDeclaration?.version, '2', '火球目标返回值绑定使用局部变量声明')
+  assert.deepEqual(fireballTargetDeclaration?.inputs?.initial, { kind: 'output', node: target, port: 'piece' }, '火球目标局部变量由选择返回值初始化')
+  assert.equal(fireballDamage?.layout?.authorExpressions?.target?.source, 'target', '火球伤害目标引用显式 target 变量')
   assert.match(fireballDamage?.layout?.authorExpressions?.amount?.source || '', /攻击力\s*\*\s*1\.5/, '火球伤害量来自攻击力乘以1.5')
   assert.equal(fireballDamage?.parameters?.skillId, undefined, '火球不把内部技能 UUID 写入作者参数')
   observations.push({ stage: 'fireball-controls', target, graph: fireballGraph })
@@ -863,13 +936,14 @@ async function buildShadowClone(passiveRuleId) {
 
   const originalPositionRead = '原位'
 
-  // Capture the live source before branching. Every template/display field
-  // below comes from this typed snapshot or one of its typed record fields;
-  // the authoring route never pastes a fixed clone shape into a summon call.
-  const copy = await addSentenceModule('instance.copy-piece', '复制当前棋子实例')
-  await applySentenceExpression(copy, 'piece', '当前棋子')
-  await saveSentenceOutput(copy, 'snapshot', '实例副本')
-  const snapshot = outputRef(copy, 'snapshot')
+  // Capture the live source before branching. Pure copy is composed inside a
+  // real local.declare initial expression; it is intentionally unavailable in
+  // the effect-module palette because it has no executable side effect.
+  const copy = await addSentenceModule('local.declare', '保存实例副本')
+  assert.equal(await setSentenceRecordValueType(copy, 'author.piece-instance@1'), true, '局部变量值类型必须使用棋子实例副本结构')
+  await setSentenceParameter(copy, 'name', '实例副本')
+  const copyExpression = await applySentenceModuleExpression(copy, 'initial', 'instance.copy-piece', '复制当前棋子实例')
+  assert.ok(copyExpression, '纯复制表达式必须写入局部变量 initial')
   // A saved result can be traversed directly with the same Chinese dot
   // expressions a developer writes in the editor. This keeps the graph
   // readable and exercises first-class record access instead of exposing a
@@ -893,7 +967,7 @@ async function buildShadowClone(passiveRuleId) {
   const snapshotIdentityExpression = field => '实例副本.身份.' + (snapshotFieldLabels[field] || field)
 
   const template = await addRecordCreate('author.piece-template@1', '创建影分身模板')
-  await setRecordFieldReference(template, 'baseSnapshot', snapshot, '基础副本')
+  await setRecordFieldExpression(template, 'baseSnapshot', '实例副本', '基础副本')
   await setStructuredLiteral(template, 'moveRange', 0, '移动范围')
   await setStructuredLiteral(template, 'skills', [], '初始技能')
   await setStructuredLiteral(template, 'statusTags', [], '初始状态')
@@ -905,7 +979,11 @@ async function buildShadowClone(passiveRuleId) {
   await saveSentenceOutput(template, 'value', '分身模板')
 
   const display = await addRecordCreate('author.piece-display@1', '创建影分身显示')
-  const displayFields = ['templateId', 'name', 'currentHp', 'maxHp', 'attack', 'defense', 'moveRange', 'shield', 'skills', 'statusTags', 'isCore', 'ownerPlayerId', 'faction']
+  // Keep the authored display within the editor's executable-code budget while
+  // retaining the identity and combat fields consumed by the runtime preview.
+  // Faction is optional on author.piece-display and remains on the captured
+  // template/instance records.
+  const displayFields = ['templateId', 'name', 'currentHp', 'maxHp', 'attack', 'defense', 'moveRange', 'shield', 'skills', 'statusTags', 'isCore', 'ownerPlayerId']
   for (const field of displayFields) {
     const source = ['templateId', 'name', 'ownerPlayerId', 'faction'].includes(field)
       ? snapshotIdentityExpression(field)
@@ -917,7 +995,7 @@ async function buildShadowClone(passiveRuleId) {
   await setRecordFieldExpression(display, 'attack', snapshotFieldExpression('attack') + ' + 0')
   await setRecordFieldExpression(display, 'attack', snapshotFieldExpression('attack'))
   const editedDisplay = findGraphStatement(await sentenceGraphSnapshot(), item => item.id === display)
-  assert.equal(editedDisplay.layout.authorExpressions.attack.nodes.length, 2, '重填字段会替换旧的嵌套读取')
+  assert.equal(editedDisplay.layout.authorExpressions.attack.nodes.length, 3, '重填字段会替换旧的嵌套读取')
   await saveSentenceOutput(display, 'value', '本体显示')
   const audiences = await addRecordCreate('author.piece-display-audiences@1', '创建显示对象')
   for (const audience of ['allies', 'enemies', 'spectators']) await setRecordFieldReference(audiences, audience, outputRef(display, 'value'), `${audience}显示`)
@@ -932,7 +1010,7 @@ async function buildShadowClone(passiveRuleId) {
 
   const teleport = await addBranchSentenceModule(condition, 'then', 'effect.displace-one', '传送到目标地格')
   if (teleport) {
-    await setSentenceParameter(teleport, 'kind', 'teleport')
+    await setSentenceParameter(teleport, 'kind', '传送')
     await applySentenceExpression(teleport, 'piece', '当前棋子')
     await applySentenceExpression(teleport, 'destination', '落点')
   }

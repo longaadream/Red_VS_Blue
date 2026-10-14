@@ -24,7 +24,14 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:shishio-flame-spirit",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-shishio-kill-track",
+        "relation": "shared",
+        "source": "pieces/red-shishio.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

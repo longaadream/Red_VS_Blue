@@ -13,6 +13,28 @@
 <a id="workbench-start"></a>
 ### 当前工作台怎样开始
 
+2026-10-14 验收修正：新增变量操作统一为以下三种句式；底层按棋子、玩家或全局拆分的读写接口留给编译器，不再作为多个新增语句入口。接口注册总数不等于作者菜单项数。
+
+| 作者操作 | 句式与示例 |
+| --- | --- |
+| 新建局部变量 | 新建【数值】变量【伤害量】＝【当前棋子.攻击力 * 1.5】 |
+| 声明扩展变量 | 在【当前玩家】的扩展中新建【数值】变量【计数】＝【0】 |
+| 赋值 | 【当前玩家.扩展变量.计数】＝【当前玩家.扩展变量.计数 + 1】 |
+
+字段读取、四则、比较和逻辑运算写在表达式中。选择器返回值须先保存为作者指定的名称，后续再引用；“目标”不隐式表示最近一次选择。统一声明中的类型、名称和初值可以先作为草稿一起编辑，再应用。中文输入法选字时不触发编辑器补全、提交或退出。
+
+扩展声明的对象不限于棋子、玩家或全局：手牌、技能、规则、状态、能力组和地格效果的具体实例均有各自的扩展。保存实例到局部变量后仍按该实例读写，不能按同名定义批量修改。例如，在选中的手牌上声明 `倍率` 再赋值，只影响那一张牌；效果必须显式读取该变量才会改变数值。
+
+不要把维伦与泰兰德的强化混同。已商定的维伦预言强化归属手牌实例，由该牌的规则在使用前改写本次局部数值，永久保留；泰兰德月神赐福归属玩家，玩家扩展保存倍率，由玩家规则在下一次圣光牌使用前改写本次局部数值、成功使用后消费。详见各自作者草案，通用扩展测试不代表这两项技能全部已迁移验收。
+
+2026-10-14 补充确认：能力组是实现一项完整主动或被动能力所需的技能、规则、状态、卡牌与扩展声明的集合；一个棋子可有多个能力组。按底层类型汇总一个棋子的全部成员，不等于已完成逐能力分组。共用卡牌或状态定义可以在多组引用，定义引用不等同于获得能力时立即附加该状态或生成手牌。
+
+描述动态插值已接入，例如 `造成 {当前手牌.扩展变量.伤害量} 点真实伤害。`。描述编辑提供“插入表达式”，在光标位置插入占位符，支持中文字段、扩展变量、索引、算术与逻辑表达式；渲染使用同一作者表达式解析器，只读求值，不消耗赐福、不触发规则、不执行随机或效果函数。具体显示链路和状态更新验证见本批验收记录，静态文本保存不能替代动态运行验证。
+
+占位符支持半角 `{…}` 与全角 `｛…｝`。数值结果保留小数；需要整数显示时写 `{向下取整(当前手牌.扩展变量.伤害量 * 1.5)}`。布尔值显示“是/否”；缺失字段显示“未赋值”，并提供描述诊断。元组索引从 1 开始；结构与映射按实际键访问。描述当前登记的纯函数为加减乘除、余数、幂、向下取整、绝对值、最小值和最大值，尚不支持任意作者函数、随机、距离或容器查询调用。描述更新沿用战局快照与界面更新入口，不增设轮询。
+
+图文操作见[开发者工作台使用说明](../../electron-editor/ui/developer-guide.html)。旧资源已有读写节点仍可打开编辑，底层编译器继续检查实际宿主的可写字段；只读字段与棋盘坐标不能借赋值绕过游戏效果。
+
 按当前工作台的可观察路径操作：
 
 1. 从 **棋子** 列表进入一个棋子；默认会进入技能编辑面板。需要编辑卡牌、Rule 或其他内容时，从关联入口进入对应内容页。内部路由名不属于作者接口，不需要记忆。
@@ -33,7 +55,7 @@
 | 保存并重新打开 | smoke 修改参数后保存到磁盘，再重新打开同一技能并核对已保存值；这不等于每种作者语句都能运行结算 | [studio-shell-smoke.mjs（保存、重开断言）](../../tests/electron/studio-shell-smoke.mjs)、[sentence-editor-smoke.mjs（持久化断言）](../../tests/electron/sentence-editor-smoke.mjs)、[index.html（保存/重开实现，约第 472、1020、1030 行）](../../electron-editor/ui/index.html) |
 | 状态目录与图标资源 | smoke 浏览状态入口和归属文档，选择图片资源，保存并重开后核对 `iconPath`；这是表现层资源路径，不证明状态规则已结算 | [studio-shell-smoke.mjs（状态导航、`iconPath` 保存重开断言）](../../tests/electron/studio-shell-smoke.mjs)、[studio-shell.js（状态资源读取，约第 27 行）](../../electron-editor/ui/studio-shell.js)、[skill-cluster-editor.js（状态字段，约第 250 行）](../../electron-editor/ui/skill-cluster-editor.js) |
 | 资源包 | smoke 先用未保存草稿确认生成被阻止，再保存后生成本地作者包，并核对内容和图片进入包；脚本明确把发布放在 smoke 范围外 | [studio-shell-smoke.mjs（脏草稿阻断与已保存包断言）](../../tests/electron/studio-shell-smoke.mjs)、[index.html（资源包入口，约第 277、1229 行）](../../electron-editor/ui/index.html)、[管线说明](WORKBENCH_ENGINE_IMPLEMENTATION_PROMPT.md#八验收与交付) |
-| Cluster 初始化与运行时能力组 | 静态 Skill/Rule 完成权威安装后，每个直接 Skill/Rule 形成独立能力组；已安装的显式关联成员才会被采用，不自动把玩家 Rule 装到棋子；重复定义去重，移除只清理最后一个能力组拥有的成员 | [author-cluster-initialization.ts](../../lib/game/author-cluster-initialization.ts)、[author-clusters.ts](../../lib/game/author-clusters.ts)、[author-cluster-battle-setup.test.ts](../../tests/game/author-cluster-battle-setup.test.ts)、[author-clusters.test.ts](../../tests/game/author-clusters.test.ts) |
+| Cluster 初始化与运行时能力组 | 静态 Skill/Rule 完成权威安装后，按完整能力归组；技能的 owned/shared 已安装规则并入该组，仅未归属规则另建被动根。related 仅供查看，不取得成员所有权；不自动把玩家 Rule 装到棋子。重复定义去重，移除只清理最后一个能力组拥有的成员 | [author-cluster-initialization.ts](../../lib/game/author-cluster-initialization.ts)、[author-clusters.ts](../../lib/game/author-clusters.ts)、[author-cluster-battle-setup.test.ts](../../tests/game/author-cluster-battle-setup.test.ts)、[author-clusters.test.ts](../../tests/game/author-clusters.test.ts) |
 | 实体 extension 与稳定实例引用 | Skill、Status、Rule、Card、Cluster、tile-effect 的扩展写回落在权威实例；声明类型和命名空间独立校验。具体实例在进入序列化/挂起边界时带稳定 `instanceId`，恢复按精确身份查找，移除或替换后的旧引用不会按数组位置重绑定；普通执行期枚举仍保持只读 | [flow-runtime.ts](../../lib/game/flow-runtime.ts)、[author-instance-state.ts](../../lib/game/author-instance-state.ts)、[author-entity-extension.test.ts](../../tests/game/author-entity-extension.test.ts)、[author-player-status-identity.test.ts](../../tests/game/author-player-status-identity.test.ts) |
 | 结构化代码块运行 | 代码块只保存数据定义和显式参数，先校验/编译再调用；返回值按声明类型检查，并共享有上限的嵌套调用与递归预算 | [author-code-block.ts](../../lib/skill-graph/author-code-block.ts)、[author-code-block-runtime.ts](../../lib/game/author-code-block-runtime.ts)、[author-code-block-runtime.test.ts](../../tests/game/author-code-block-runtime.test.ts)、[author-code-block-host.test.ts](../../tests/game/author-code-block-host.test.ts) |
 
@@ -1285,7 +1307,7 @@ amount = amount + 2
 | 普通移动后的实际路径 | 在 `当前棋子.普通移动后` 读取 `当前事件.实际路径：元组<地格>` | 只记录实际进入地格，不含起点；中途停止只保留已走部分；冲刺/传送不借用此事件。 |
 | 状态剩余持续时间 | `StatusTag实例.剩余持续时间 = 数值表达式` | 正值刷新保留身份、来源、extension，不移除重加、不重新部署 Rule；非正值的精确移除原因仍待定。 |
 | 状态选择取消/无候选 | `目标选择器(StatusTag，所属对象，筛选条件，可见，允许取消:true)` | 取消或没有可见候选返回空，不弹空菜单；依赖引用的语句跳过；等待期间失效不换同名状态。已提交效果在治疗后继续选择时不重放治疗。 |
-| Cluster 初始化 | 在 Cluster 初始化声明区声明 extension 字段并部署作者明确的 Rule | 已接入静态 Skill/Rule 完成后的能力组采用：每个直接成员形成独立组，显式已安装关联成员才加入；不把 Skill 正文或副作用 Rule 拿去渲染。费用/资格/冷却预览和全部内容迁移仍需按各模块验证。 |
+| Cluster 初始化 | 在 Cluster 初始化声明区声明 extension 字段并部署作者明确的 Rule | 已接入完整能力分组：直接技能及其 owned/shared 已安装规则共同成组，未归属规则另建被动根；related 不取得所有权，未安装依赖不会凭引用被授予。不把 Skill 正文或副作用 Rule 拿去渲染。费用/资格/冷却预览和全部内容迁移仍需按各模块验证。 |
 | 代码块 | `执行代码块(代码块，参数：有类型结构体)` | 已支持结构化语句的校验、编译、显式参数和声明返回值检查；不保存 JavaScript 函数、不额外扣费或伪造使用事件，递归/总调用数有运行上限。真实 Electron flat smoke 已从空白卡牌入口写入选择、结构化代码块、手牌 extension、目标、伤害和治疗，并保存后重开核对；证据仅覆盖该隔离 fixture，不代表任意卡牌或全部内容迁移。反应队列的 settled result continuation 仍未实现。 |
 | 召唤技能初始化 | 召唤创建成员由引擎初始化；新召唤冷却为 0，恢复原棋子能力保留对应剩余次数 | 作者不逐个补 Skill 初始化结构体；这是设计合同，尚未宣称运行实现。 |
 | 满手获得手牌 | `获得手牌(...)` 仍返回新实例；满手实例直接进入弃牌区 | “进入弃牌区”不等于创建失败或主动弃置；UI/日志须区分两种区域。 |

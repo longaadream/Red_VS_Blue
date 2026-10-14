@@ -2794,6 +2794,25 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:velen-thousand-futures-ultimate",
-    "links": []
+    "links": [
+      {
+        "collection": "cards",
+        "id": "holy-smite",
+        "relation": "shared",
+        "source": "skills.velen-thousand-futures-ultimate.gameplayModules.entries.code.graph.body[12].then[5].then[2].then[4].else[4].else[4].then[0].body[6].inputs.right.value"
+      },
+      {
+        "collection": "cards",
+        "id": "holy-heal",
+        "relation": "shared",
+        "source": "skills.velen-thousand-futures-ultimate.gameplayModules.entries.code.graph.body[12].then[5].then[2].then[4].else[4].else[4].then[0].body[7].inputs.right.value"
+      },
+      {
+        "collection": "cards",
+        "id": "holy-charge",
+        "relation": "shared",
+        "source": "skills.velen-thousand-futures-ultimate.gameplayModules.entries.code.graph.body[12].then[5].then[2].then[4].else[4].else[4].then[0].body[8].inputs.right.value"
+      }
+    ]
   }
 }

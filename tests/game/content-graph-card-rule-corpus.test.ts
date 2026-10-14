@@ -186,6 +186,47 @@ function snapshotValue(value: unknown, context: SnapshotContext = {
   return result
 }
 
+function collectSnapshotProperties(value: unknown, key: string, matches: unknown[] = []): unknown[] {
+  if (Array.isArray(value)) {
+    value.forEach(item => collectSnapshotProperties(item, key, matches))
+    return matches
+  }
+  if (value === null || typeof value !== 'object') return matches
+  const record = value as JsonRecord
+  if (Object.prototype.hasOwnProperty.call(record, key)) matches.push(record[key])
+  Object.values(record).forEach(item => collectSnapshotProperties(item, key, matches))
+  return matches
+}
+
+function collectSnapshotArrayValues(value: unknown, key: string): unknown[] {
+  return collectSnapshotProperties(value, key).flatMap(candidate => {
+    if (!candidate || typeof candidate !== 'object' || !Array.isArray((candidate as JsonRecord).array)) return []
+    return (candidate as JsonRecord).array
+  })
+}
+
+/**
+ * The approved Velen death change keeps Fate Shelter cleanup equivalent while
+ * intentionally changing prophecy state and the cleanup log. Remove only
+ * those approved values plus snapshot identity bookkeeping before comparing
+ * the remaining state; callers assert each removed value below.
+ */
+function normalizeVelenDeathCleanupDelta(value: unknown, path = ''): unknown {
+  if (Array.isArray(value)) return value.map((item, index) => normalizeVelenDeathCleanupDelta(item, `${path}[${index}]`))
+  if (value === null || typeof value !== 'object') return value
+  const record = value as JsonRecord
+  const normalized: JsonRecord = {}
+  for (const [key, nested] of Object.entries(record)) {
+    if (key === 'id' && typeof nested === 'number') continue
+    if (key === 'reference') continue
+    if (key === 'velenHolyProphecy') continue
+    if (key === 'messages' && path === 'result') continue
+    if (key === 'description' && path.startsWith('triggerRules')) continue
+    normalized[key] = normalizeVelenDeathCleanupDelta(nested, path ? `${path}.${key}` : key)
+  }
+  return normalized
+}
+
 function captureError(error: unknown): unknown {
   if (error instanceof Error) return { name: error.name, message: error.message }
   return snapshotValue(error)
@@ -418,6 +459,32 @@ function ruleInput(rule: TriggerRule, variant: number): {
   battle.players[0].hand = [{ cardId: 'soul-fragment', instanceId: 'rule-card-red' }]
   battle.players[1].hand = [{ cardId: 'soul-fragment', instanceId: 'rule-card-blue' }]
 
+  if (rule.id === 'rule-velen-death-cleanup') {
+    source.instanceId = 'velen'
+    source.templateId = 'velen'
+    source.name = '维伦'
+    ally.statusTags = [{ id: 'fate-shelter-ally', type: 'velen-fate-shelter', sourceId: source.instanceId }]
+    ally.rules = [{ id: 'rule-velen-fate-target' }]
+    const graveyardAlly = namedPiece({
+      instanceId: 'rule-graveyard-ally',
+      templateId: 'test-ally',
+      ownerPlayerId: 'player-red',
+      faction: 'red',
+      x: 4,
+      y: 3,
+      currentHp: 0,
+      maxHp: 12,
+    })
+    graveyardAlly.statusTags = [{ id: 'fate-shelter-graveyard', type: 'velen-fate-shelter', sourceId: source.instanceId }]
+    graveyardAlly.rules = [{ id: 'rule-velen-fate-target' }]
+    battle.graveyard = [graveyardAlly]
+    battle.players[0].hand = [{
+      cardId: 'holy-smite',
+      instanceId: 'rule-prophecy-red',
+      contentState: { velenHolyProphecy: { sourcePieceId: source.instanceId, createdTurnNumber: 1 } },
+    }]
+  }
+
   const queueValues = {
     damage: [],
     heal: [],
@@ -578,10 +645,39 @@ describe('RED-252 card and rule content graph corpus', () => {
   for (const candidate of candidates.rules) {
     it(`rule ${candidate.id} preserves common trigger contexts`, () => {
       for (let variant = 0; variant < 3; variant += 1) {
+        const legacy = runRule(candidate.legacy, candidate.id, variant)
+        const graph = runRule(candidate.graph, candidate.id, variant)
+        if (candidate.id !== 'rule-velen-death-cleanup') {
+          expect(legacy, `${candidate.id} legacy context ${variant}`).toEqual(graph)
+          continue
+        }
+
         expect(
-          runRule(candidate.legacy, candidate.id, variant),
-          `${candidate.id} legacy context ${variant}`,
-        ).toEqual(runRule(candidate.graph, candidate.id, variant))
+          normalizeVelenDeathCleanupDelta(legacy),
+          `${candidate.id} approved semantic context ${variant}`,
+        ).toEqual(normalizeVelenDeathCleanupDelta(graph))
+
+        if (variant === 0) {
+          expect(collectSnapshotProperties(legacy, 'velenHolyProphecy')).toEqual([])
+          expect(collectSnapshotProperties(graph, 'velenHolyProphecy')).toEqual([
+            expect.objectContaining({ createdTurnNumber: 1, sourcePieceId: 'velen' }),
+          ])
+          expect(collectSnapshotArrayValues(legacy, 'messages')).toEqual(['维伦死亡，1张未完预言消散'])
+          expect(collectSnapshotArrayValues(graph, 'messages')).toEqual(['维伦死亡，2个命运庇护消散'])
+          expect(collectSnapshotProperties(legacy, 'description')).toEqual([
+            '维伦死亡时清除由他留下的未完圣光预言与命运庇护。',
+          ])
+          expect(collectSnapshotProperties(graph, 'description')).toEqual([
+            '维伦死亡时清理由他留下的命运庇护；未完圣光预言保留至后续己方回合。',
+          ])
+        } else {
+          // Unrelated deaths must preserve the pending record and messages
+          // exactly. The approved source-death delta cannot mask these paths.
+          const pending = collectSnapshotProperties(legacy, 'velenHolyProphecy')
+          expect(pending).toEqual([expect.objectContaining({ createdTurnNumber: 1, sourcePieceId: 'velen' })])
+          expect(collectSnapshotProperties(graph, 'velenHolyProphecy')).toEqual(pending)
+          expect(collectSnapshotArrayValues(graph, 'messages')).toEqual(collectSnapshotArrayValues(legacy, 'messages'))
+        }
       }
     })
   }

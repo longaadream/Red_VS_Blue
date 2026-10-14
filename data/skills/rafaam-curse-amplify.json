@@ -20,7 +20,14 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:rafaam-curse-amplify",
-    "links": []
+    "links": [
+      {
+        "collection": "cards",
+        "id": "rafaam-curse-sample",
+        "relation": "shared",
+        "source": "scripts/audit-content-graph-coverage.mjs:dynamicResolution.copySourceProof.ordinaryCurseIds"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

@@ -436,35 +436,38 @@ function buildVelenDeathCleanupGraph(): GameplayModuleGraph {
   const piece = holder(body)
   sourceSame(body, piece)
   body.push(
-    call('owner', 'piece.owner', { piece }),
-    call('cards', 'card.clear-content-records', { player: out('owner', 'player'), source: piece }, { field: 'velenHolyProphecy' }),
+    call('removed-counter', 'local.counter-create', { initial: literal(0) }),
     call('all-pieces', 'query.all-pieces'),
     { kind: 'foreach', id: 'cleanup-loop', items: out('all-pieces', 'pieces'), item: 'target', index: 'index', body: [
       call('remove-shelter', 'status.remove-source-type-raw', { target: input('target'), source: piece }, { statusType: 'velen-fate-shelter' }),
+      call('count-removed', 'local.counter-add', { counter: out('removed-counter', 'counter'), amount: out('remove-shelter', 'count') }),
       call('removed-shelter', 'compare.greater-than', { left: out('remove-shelter', 'count'), right: literal(0) }),
       { kind: 'if', id: 'remove-owned-shelter-rule', condition: out('removed-shelter', 'value'), then: [
         call('remove-rule', 'rule.remove-id-raw', { target: input('target') }, { ruleId: 'rule-velen-fate-target' }),
       ] },
     ] },
-    call('has-cards', 'compare.greater-than', { left: out('cards', 'count'), right: literal(0) }),
+    call('removed-total', 'local.counter-read', { counter: out('removed-counter', 'counter') }),
+    call('has-shelter', 'compare.greater-than', { left: out('removed-total', 'value'), right: literal(0) }),
     call('name', 'attribute.text', { piece }, { attribute: 'name' }),
-    call('count-text', 'text.from-number', { value: out('cards', 'count') }),
+    call('count-text', 'text.from-number', { value: out('removed-total', 'value') }),
     call('m0', 'text.concat', { left: out('name', 'text'), right: literal('死亡，') }),
     call('m1', 'text.concat', { left: out('m0', 'text'), right: out('count-text', 'text') }),
-    call('message', 'text.concat', { left: out('m1', 'text'), right: literal('张未完预言消散') }),
+    call('message', 'text.concat', { left: out('m1', 'text'), right: literal('个命运庇护消散') }),
   )
-  body.push({ kind: 'if', id: 'cleanup-result', condition: out('has-cards', 'value'), then: success('cleanup-success', out('message', 'text')), else: failure('cleanup-empty') })
+  body.push({ kind: 'if', id: 'cleanup-result', condition: out('has-shelter', 'value'), then: success('cleanup-success', out('message', 'text')), else: failure('cleanup-empty') })
   return { version: GAMEPLAY_MODULE_GRAPH_VERSION, surface: 'rule', outputs: resultOutputs, body }
 }
 
 function buildVelenDelayedEffectsGraph(): GameplayModuleGraph {
   const body: GameplayStatement[] = []
-  const piece = holder(body)
-  body.push(call('alive', 'piece.alive', { piece }), call('owner', 'piece.owner', { piece }), call('event-player', 'ref.event-player'), call('owner-match', 'compare.player-reference', { left: out('owner', 'player'), right: out('event-player', 'player') }))
-  body.push(call('eligible-a', 'logic.and', { left: out('alive', 'alive'), right: out('owner-match', 'value') }))
-  requireCondition(body, 'eligible-check', out('eligible-a', 'value'))
-  body.push(call('turn', 'turn.number'), call('prophecies', 'card.find-content-records', { player: out('owner', 'player'), source: piece, turn: out('turn', 'value') }, { field: 'velenHolyProphecy' }), call('completed-counter', 'local.counter-create', { initial: literal(0) }))
-  body.push({ kind: 'foreach', id: 'prophecy-loop', items: out('prophecies', 'cards'), item: 'card', index: 'index', body: [
+  body.push(call('holder-ref', 'ref.holder'), call('holder-present', 'query.has-piece', { pieceId: out('holder-ref', 'piece') }), call('holder', 'query.piece', { pieceId: out('holder-ref', 'piece') }))
+  const piece = out('holder', 'piece')
+  const pieceBody: GameplayStatement[] = []
+  pieceBody.push(call('alive', 'piece.alive', { piece }), call('owner', 'piece.owner', { piece }), call('event-player', 'ref.event-player'), call('owner-match', 'compare.player-reference', { left: out('owner', 'player'), right: out('event-player', 'player') }))
+  pieceBody.push(call('eligible-a', 'logic.and', { left: out('alive', 'alive'), right: out('owner-match', 'value') }))
+  requireCondition(pieceBody, 'eligible-check', out('eligible-a', 'value'))
+  pieceBody.push(call('turn', 'turn.number'), call('prophecies', 'card.find-content-records', { player: out('owner', 'player'), source: piece, turn: out('turn', 'value') }, { field: 'velenHolyProphecy' }), call('completed-counter', 'local.counter-create', { initial: literal(0) }))
+  pieceBody.push({ kind: 'foreach', id: 'prophecy-loop', items: out('prophecies', 'cards'), item: 'card', index: 'index', body: [
     call('enhance-flag', 'card.set-content-boolean', { player: out('owner', 'player'), card: input('card') }, { field: 'velenHolyProphecyEnhanced' }),
     call('clear-prophecy', 'card.clear-content-field', { player: out('owner', 'player'), card: input('card') }, { field: 'velenHolyProphecy' }),
     call('card-id', 'card.read-definition-id', { player: out('owner', 'player'), card: input('card') }),
@@ -493,13 +496,13 @@ function buildVelenDelayedEffectsGraph(): GameplayModuleGraph {
     },
     call('one', 'local.counter-add', { counter: out('completed-counter', 'counter'), amount: literal(1) }),
   ] })
-  body.push(call('allies', 'query.pieces', { originId: piece }, { relation: 'ally', includeDead: false }))
-  body.push({ kind: 'collection', id: 'sheltered', method: 'filter', items: out('allies', 'pieces'), item: 'target', inputs: { source: piece, turn: out('turn', 'value') }, body: [
+  pieceBody.push(call('allies', 'query.pieces', { originId: piece }, { relation: 'ally', includeDead: false }))
+  pieceBody.push({ kind: 'collection', id: 'sheltered', method: 'filter', items: out('allies', 'pieces'), item: 'target', inputs: { source: piece, turn: out('turn', 'value') }, body: [
     call('shelter-id', 'status.find-source-before-id', { piece: input('target'), source: input('source'), turn: input('turn') }, { statusType: 'velen-fate-shelter' }),
     call('has-shelter', 'value.present-string', { value: out('shelter-id', 'id') }),
     { kind: 'return', id: 'shelter-return', value: out('has-shelter', 'present') },
   ] })
-  body.push({ kind: 'foreach', id: 'shelter-loop', items: out('sheltered', 'value'), item: 'target', index: 'index', body: [
+  pieceBody.push({ kind: 'foreach', id: 'shelter-loop', items: out('sheltered', 'value'), item: 'target', index: 'index', body: [
     call('shelter-id-apply', 'status.find-source-before-id', { piece: input('target'), source: piece, turn: out('turn', 'value') }, { statusType: 'velen-fate-shelter' }),
     call('heal', 'effect.heal', { source: piece, target: input('target'), amount: literal(8) }, { skillId: 'velen-fate-shelter' }),
     call('shield-id', 'status.find-id', { piece: input('target') }, { statusType: 'divine-shield' }),
@@ -515,15 +518,15 @@ function buildVelenDelayedEffectsGraph(): GameplayModuleGraph {
     call('remove-shelter', 'status.remove-record', { piece: input('target'), value: out('shelter-id-apply', 'id') }, { selector: 'id' }),
     call('remove-shelter-rule', 'rule.remove-piece', { target: input('target') }, { ruleId: 'rule-velen-fate-target' }),
   ] })
-  body.push(
+  pieceBody.push(
     call('completed', 'local.counter-read', { counter: out('completed-counter', 'counter') }),
     call('sheltered-count', 'list.count-pieces', { items: out('sheltered', 'value') }),
     call('any-completed', 'compare.greater-than', { left: out('completed', 'value'), right: literal(0) }),
     call('any-sheltered', 'compare.greater-than', { left: out('sheltered-count', 'value'), right: literal(0) }),
     call('any', 'logic.or', { left: out('any-completed', 'value'), right: out('any-sheltered', 'value') }),
   )
-  requireCondition(body, 'anything-check', out('any', 'value'))
-  body.push(
+  requireCondition(pieceBody, 'anything-check', out('any', 'value'))
+  pieceBody.push(
     call('name', 'attribute.text', { piece }, { attribute: 'name' }),
     call('completed-text', 'text.from-number', { value: out('completed', 'value') }),
     call('completed-part', 'text.concat', { left: out('completed-text', 'text'), right: literal('张圣光手牌完成预言') }),
@@ -540,7 +543,76 @@ function buildVelenDelayedEffectsGraph(): GameplayModuleGraph {
     call('prefix', 'text.concat', { left: out('name', 'text'), right: literal('：') }),
     call('message', 'text.concat', { left: out('prefix', 'text'), right: out('parts-selected', 'text') }),
   )
-  body.push(...success('delayed-success', out('message', 'text')))
+  pieceBody.push(...success('delayed-success', out('message', 'text')))
+
+  const playerBody: GameplayStatement[] = []
+  playerBody.push(
+    call('player', 'ref.player'),
+    call('player-event', 'ref.event-player'),
+    call('player-match', 'compare.player-reference', { left: out('player', 'player'), right: out('player-event', 'player') }),
+  )
+  requireCondition(playerBody, 'player-match-check', out('player-match', 'value'))
+  playerBody.push(
+    call('player-turn', 'turn.number'),
+    call('player-hand', 'card.hand-records', { player: out('player', 'player') }),
+    { kind: 'collection', id: 'player-pending-records', method: 'filter', items: out('player-hand', 'cards'), item: 'card', inputs: { turn: out('player-turn', 'value') }, body: [
+      call('player-content-state', 'card.instance-field', { card: input('card') }, { field: 'contentState' }),
+      call('player-prophecy', 'card.content-field', { record: out('player-content-state', 'value') }, { field: 'velenHolyProphecy' }),
+      call('player-has-prophecy', 'compare.values', { left: out('player-prophecy', 'value'), right: literal(null) }, { valueType: JSON.stringify({ kind: 'nullable', value: 'record' }), operator: '!=' }),
+      call('player-created-turn', 'card.content-field', { record: out('player-prophecy', 'value') }, { field: 'createdTurnNumber' }),
+      call('player-created-default', 'value.coalesce', { value: out('player-created-turn', 'value'), defaultValue: input('turn') }, { valueType: 'number' }),
+      call('player-before-turn', 'compare.less-than', { left: out('player-created-default', 'value'), right: input('turn') }),
+      call('player-created-missing', 'compare.values', { left: out('player-created-turn', 'value'), right: literal(null) }, { valueType: JSON.stringify({ kind: 'nullable', value: 'number' }), operator: '==' }),
+      call('player-created-allowed', 'logic.or', { left: out('player-created-missing', 'value'), right: out('player-before-turn', 'value') }),
+      call('player-pending-match', 'logic.and', { left: out('player-has-prophecy', 'value'), right: out('player-created-allowed', 'value') }),
+      { kind: 'return', id: 'player-pending-return', value: out('player-pending-match', 'value') },
+    ] },
+    { kind: 'collection', id: 'player-pending-cards', method: 'map', items: out('player-pending-records', 'value'), item: 'card', body: [
+      call('player-card-id', 'card.instance-field', { card: input('card') }, { field: 'instanceId' }),
+      call('player-card-id-safe', 'value.coalesce', { value: out('player-card-id', 'value'), defaultValue: literal('') }, { valueType: 'string' }),
+      { kind: 'return', id: 'player-card-id-return', value: out('player-card-id-safe', 'value') },
+    ] },
+    call('player-completed-counter', 'local.counter-create', { initial: literal(0) }),
+    { kind: 'foreach', id: 'player-prophecy-loop', items: out('player-pending-cards', 'value'), item: 'card', index: 'index', body: [
+      call('player-enhance-flag', 'card.set-content-boolean', { player: out('player', 'player'), card: input('card') }, { field: 'velenHolyProphecyEnhanced' }),
+      call('player-clear-prophecy', 'card.clear-content-field', { player: out('player', 'player'), card: input('card') }, { field: 'velenHolyProphecy' }),
+      call('player-card-id-read', 'card.read-definition-id', { player: out('player', 'player'), card: input('card') }),
+      call('player-is-smite', 'compare.equal-string', { left: out('player-card-id-read', 'cardId'), right: literal('holy-smite') }),
+      call('player-is-heal', 'compare.equal-string', { left: out('player-card-id-read', 'cardId'), right: literal('holy-heal') }),
+      call('player-is-charge', 'compare.equal-string', { left: out('player-card-id-read', 'cardId'), right: literal('holy-charge') }),
+      {
+        kind: 'if', id: 'player-smite-enhancement', condition: out('player-is-smite', 'value'), then: [
+          call('player-smite-modifier', 'card.set-effect-modifier', { player: out('player', 'player'), card: input('card') }, { effect: 'damage', operation: 'multiply', value: 1.5 }),
+          call('player-smite-presentation', 'card.set-presentation', { player: out('player', 'player'), card: input('card') }, { variant: 'enhanced', badge: '预言强化', description: '预言强化：对敌方生命值最低的棋子造成7点真实伤害。' }),
+        ], else: [
+          {
+            kind: 'if', id: 'player-heal-enhancement', condition: out('player-is-heal', 'value'), then: [
+              call('player-heal-modifier', 'card.set-effect-modifier', { player: out('player', 'player'), card: input('card') }, { effect: 'heal', operation: 'multiply', value: 1.5 }),
+              call('player-heal-presentation', 'card.set-presentation', { player: out('player', 'player'), card: input('card') }, { variant: 'enhanced', badge: '预言强化', description: '预言强化：治疗己方生命值最低的棋子12点生命。' }),
+            ], else: [
+              {
+                kind: 'if', id: 'player-charge-enhancement', condition: out('player-is-charge', 'value'), then: [
+                  call('player-charge-modifier', 'card.set-effect-modifier', { player: out('player', 'player'), card: input('card') }, { effect: 'statusIntensity', operation: 'multiply', value: 1.5, statusType: 'damage-buff' }),
+                  call('player-charge-presentation', 'card.set-presentation', { player: out('player', 'player'), card: input('card') }, { variant: 'enhanced', badge: '预言强化', description: '预言强化：使己方所有棋子下次造成的伤害提高3点。' }),
+                ], else: [],
+              },
+            ],
+          },
+        ],
+      },
+      call('player-one', 'local.counter-add', { counter: out('player-completed-counter', 'counter'), amount: literal(1) }),
+    ] },
+    call('player-completed', 'local.counter-read', { counter: out('player-completed-counter', 'counter') }),
+    call('player-any', 'compare.greater-than', { left: out('player-completed', 'value'), right: literal(0) }),
+  )
+  requireCondition(playerBody, 'player-any-check', out('player-any', 'value'))
+  playerBody.push(
+    call('player-count-text', 'text.from-number', { value: out('player-completed', 'value') }),
+    call('player-message', 'text.concat', { left: out('player-count-text', 'text'), right: literal('张圣光手牌完成预言') }),
+    ...success('player-success', out('player-message', 'text')),
+  )
+
+  body.push({ kind: 'if', id: 'delayed-scope', condition: out('holder-present', 'exists'), then: pieceBody, else: playerBody })
   return { version: GAMEPLAY_MODULE_GRAPH_VERSION, surface: 'rule', outputs: resultOutputs, schemas: [statusSchema], body }
 }
 

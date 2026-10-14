@@ -12,7 +12,9 @@ export * from './module-cluster'
 export * from './author-expression'
 export * from './author-expression-graph'
 export * from './author-expression-completion'
+export * from './author-statements'
 export * from './author-target-binding'
+export * from './piece-ability-groups'
 
 export const GAMEPLAY_MODULE_DOCUMENT_VERSION = 'rvb-gameplay-module-document/v1' as const
 type Document = Record<string, unknown>

@@ -40,8 +40,34 @@
     return label ? label.slice(0, 1).toUpperCase() : '?'
   }
 
-  function playerEffectEntries(player) {
+  function sourcePlayer(player, snapshot) {
+    const playerId = String(player && (player.id || player.playerId) || '')
+    const sourcePlayers = snapshot && Array.isArray(snapshot.players) ? snapshot.players : []
+    return sourcePlayers.find(function (candidate) {
+      return String(candidate && (candidate.playerId || candidate.id) || '').toLowerCase() === playerId.toLowerCase()
+    }) || player
+  }
+
+  function renderDescription(description, context) {
+    const presentation = root.BattleStatusPresentation
+    if (presentation && typeof presentation.interpolateDescription === 'function') {
+      return presentation.interpolateDescription(description, context)
+    }
+    const renderer = root.RvBSkillDescription
+    if (context && renderer && typeof renderer.interpolate === 'function') {
+      return renderer.interpolate(description, context)
+    }
+    return String(description == null ? '' : description)
+  }
+
+  function playerEffectEntries(player, snapshot) {
     const rules = (player && Array.isArray(player.ruleSummary)) ? player.ruleSummary : []
+    const owner = sourcePlayer(player, snapshot)
+    const baseContext = snapshot === undefined ? undefined : {
+      player: owner,
+      currentPlayer: owner,
+      snapshot: snapshot,
+    }
     const hiddenRuleIds = new Set(player && Array.isArray(player.hiddenRuleIds) ? player.hiddenRuleIds : [])
     const ruleEntries = rules.flatMap(function (rule) {
       const id = String(rule && rule.id || '')
@@ -52,13 +78,17 @@
       // authored rules default to hidden and must opt in with visible:true.
       if (rule.visible !== true && !legacy) return []
       const source = rule.visible === true ? rule : legacy || fallback
+      const ruleContext = baseContext
+        ? Object.assign({}, baseContext, { rule: rule, currentRule: rule })
+        : undefined
+      const label = renderDescription(source && (source.label || source.name) || fallback.label || id || '玩家规则', ruleContext)
       return [{
         id: 'player-rule:' + id,
         ruleId: id,
         authoredRule: true,
-        label: String(source && (source.label || source.name) || fallback.label || id || '玩家规则'),
+        label: label,
         icon: String(source && (source.iconPath || source.icon) || fallback.icon || 'images/effect-icons/fallback.svg'),
-        description: String(source && source.description || fallback.description || '玩家规则'),
+        description: renderDescription(source && source.description || fallback.description || '玩家规则', ruleContext),
       }]
     })
     const ruleIds = new Set(ruleEntries.map(function (entry) { return entry.ruleId }))
@@ -169,7 +199,7 @@
           ? (player.faction === 'blue' ? '蓝方' : '红方') + ' · ' + (player.isFirstPlayer ? '先手' : '后手')
           : (player.faction === 'blue' ? '蓝方 · 后手' : '红方 · 先手')
         const currentLabel = player.isCurrent ? '，当前行动方' : ''
-        const effects = playerEffectEntries(player)
+        const effects = playerEffectEntries(player, model.snapshot)
         const tags = effects.filter(function (effect) {
           return effect.statusType ? (player.statusSummary || []).some(function (status) { return status.type === effect.statusType })
             : effect.buffId ? (player.buffSummary || []).some(function (buff) { return buff.id === effect.buffId && buff.uses > 0 })

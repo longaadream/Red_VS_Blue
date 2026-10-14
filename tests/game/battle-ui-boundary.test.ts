@@ -6,14 +6,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 const pagesDir = resolve(process.cwd(), 'data/pages')
 
-function loadBrowserModule(relativePath: string, exportName: string) {
-  const window: Record<string, unknown> = {}
+function loadBrowserModule(relativePath: string, exportName: string, window: Record<string, unknown> = {}) {
   const context = createContext({ window, globalThis: window, console })
+  Object.keys(window).forEach((key) => { context[key] = window[key] })
   const source = readFileSync(resolve(pagesDir, relativePath), 'utf8')
   new Script(source, { filename: relativePath }).runInContext(context)
+  const exported = window[exportName] ?? context[exportName]
+  if (window[exportName] === undefined && exported !== undefined) window[exportName] = exported
   // Browser globals under test intentionally have no TypeScript declarations.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return window[exportName] as Record<string, any>
+  return exported as Record<string, any>
 }
 
 function fixtureSnapshot() {
@@ -56,6 +58,14 @@ function fixtureSnapshot() {
   }
 }
 
+function installDescriptionRuntime(window: Record<string, unknown>) {
+  const runtime = createContext({ console })
+  new Script(readFileSync(resolve(pagesDir, 'js/author-expression-core.js'), 'utf8')).runInContext(runtime)
+  new Script(readFileSync(resolve(pagesDir, 'js/skill-description.js'), 'utf8')).runInContext(runtime)
+  window.RvBAuthorExpression = runtime.RvBAuthorExpression
+  window.RvBSkillDescription = runtime.RvBSkillDescription
+}
+
 describe('battle presentation boundary', () => {
   it('keeps cast range separate from selectable targets', () => {
     const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
@@ -90,31 +100,60 @@ describe('battle presentation boundary', () => {
   })
 
   it('shows player-wide protection and rules, then reflects consumed protection without rule code', () => {
-    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel')
-    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI')
+    const expressionWindow: Record<string, unknown> = {}
+    const viewModel = loadBrowserModule('js/battle-ui/battle-view-model.js', 'BattleViewModel', expressionWindow)
+    installDescriptionRuntime(expressionWindow)
+    const domUi = loadBrowserModule('js/battle-ui/battle-dom-ui.js', 'BattleDomUI', expressionWindow)
     const snapshot = fixtureSnapshot()
-    Object.assign(snapshot.players[0], {
+    const flowState = (snapshot.extensions as typeof snapshot.extensions & {
+      flowState: Array<{
+        schemaVersion: number
+        scope: string
+        entityId: string
+        namespace: string
+        name: string
+        value: { format: string; value: number }
+      }>
+    })
+    flowState.flowState = [{
+      schemaVersion: 1,
+      scope: 'player',
+      entityId: 'player-red',
+      namespace: 'content',
+      name: '加成',
+      value: { format: 'author-extension-value/v1', value: 3 },
+    }]
+    const authoredPlayer = snapshot.players[0] as typeof snapshot.players[0] & {
+      rules: Array<{ extension?: { 层数: number } }>
+    }
+    Object.assign(authoredPlayer, {
       statusTags: [{ id: 'elune-protection', type: 'elune-protection', name: '艾露恩的守护', description: '全队共用一次，免疫致命伤害并恢复5点生命' }],
       rules: [
         { id: 'rule-elune-protection-player', name: '艾露恩的守护', description: '消耗守护来保护队友', effect: 'private-rule-code' },
-        { id: 'rule-custom-player', name: '火焰誓约', description: '火球伤害提高', iconPath: 'images/custom/player-fire.svg', visible: true, effect: 'private-rule-code' },
+        { id: 'rule-custom-player', name: '火焰誓约{当前规则.扩展变量.层数}', description: '火球伤害提高{当前玩家.扩展变量.加成}%', extension: { 层数: 2 }, iconPath: 'images/custom/player-fire.svg', visible: true, effect: 'private-rule-code' },
       ],
     })
     const hud = { className: '', innerHTML: '' }
     const ui = domUi.create({ document: { getElementById: (id: string) => id === 'playerResCards' ? hud : null } })
     const model = viewModel.create({ snapshot, viewerId: 'player-red' })
+    expect(model.snapshot).toBe(snapshot)
     expect(JSON.stringify(model.players)).not.toContain('private-rule-code')
     expect(model.players[0].ruleSummary).toContainEqual(expect.objectContaining({
-      id: 'rule-custom-player', iconPath: 'images/custom/player-fire.svg', description: '火球伤害提高',
+      id: 'rule-custom-player', iconPath: 'images/custom/player-fire.svg', description: '火球伤害提高{当前玩家.扩展变量.加成}%',
     }))
     ui.update(model)
     expect(hud.innerHTML).toContain('player-elune.svg')
     expect(hud.innerHTML).toContain('images/custom/player-fire.svg')
-    expect(hud.innerHTML).toContain('火焰誓约')
-    expect(hud.innerHTML).toContain('火球伤害提高')
+    expect(hud.innerHTML).toContain('火焰誓约2')
+    expect(hud.innerHTML).toContain('火球伤害提高3%')
     expect(hud.innerHTML).not.toContain('player-rule-tray')
     expect(hud.innerHTML).toContain('全队共用一次')
     expect(hud.innerHTML).not.toContain('守护已消耗')
+    flowState.flowState[0].value.value = 5
+    authoredPlayer.rules[1].extension!.层数 = 4
+    ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
+    expect(hud.innerHTML).toContain('火焰誓约4')
+    expect(hud.innerHTML).toContain('火球伤害提高5%')
     Object.assign(snapshot.players[0], { statusTags: [], rules: [{ id: 'rule-soul-fracture-player', name: '裂魂' }, { id: 'rule-sasuke-amaterasu-stack', name: '天照叠层' }] })
     ui.update(viewModel.create({ snapshot, viewerId: 'player-red' }))
     expect(hud.innerHTML).not.toContain('player-elune.svg')

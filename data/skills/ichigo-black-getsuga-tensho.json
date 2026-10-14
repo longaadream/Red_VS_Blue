@@ -38,7 +38,14 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:ichigo-black-getsuga-tensho",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-ichigo-black-getsuga-teleport",
+        "relation": "owned",
+        "source": "pieces/blue-ichigo.rules"
+      }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

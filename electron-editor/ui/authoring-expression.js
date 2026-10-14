@@ -499,6 +499,8 @@
 
     let destroyed = false
     let composing = false
+    let compositionSettling = false
+    let compositionEndTimer = null
     let panelOpen = false
     let hintVisible = false
     let hintRect = null
@@ -509,6 +511,10 @@
     let anchorRect = null
     let savedRange = null
     let restoreNumber = 0
+
+    function isComposing() {
+      return composing || compositionSettling
+    }
 
     function hideParameterHint() {
       hintVisible = false
@@ -585,7 +591,7 @@
       }
 
       const apply = items => {
-        if (destroyed || sequence !== restoreNumber || value() !== source) return
+        if (destroyed || isComposing() || sequence !== restoreNumber || value() !== source) return
         const seen = new Set()
         const references = (Array.isArray(items) ? items : [])
           .map(normaliseCandidate)
@@ -763,7 +769,7 @@
     }
 
     function updateParameterHint() {
-      if (!hintElement || destroyed || composing || document.activeElement !== editor) {
+      if (!hintElement || destroyed || isComposing() || document.activeElement !== editor) {
         hideParameterHint()
         return
       }
@@ -891,7 +897,7 @@
     }
 
     function readSuggestions(query) {
-      if (destroyed || composing) return
+      if (destroyed || isComposing()) return
       const sequence = ++requestNumber
       let result
       try {
@@ -902,7 +908,7 @@
         result = []
       }
       const applySuggestions = items => {
-        if (destroyed || composing || sequence !== requestNumber) return
+        if (destroyed || isComposing() || sequence !== requestNumber) return
         const list = Array.isArray(items) ? items : []
         const seen = new Set()
         candidates = list.map(normaliseCandidate).filter(item => {
@@ -926,7 +932,7 @@
     }
 
     function openPanel() {
-      if (destroyed || composing) return
+      if (destroyed || isComposing()) return
       panelOpen = true
       anchor()
       panel.classList.add('ei-open')
@@ -1074,7 +1080,7 @@
     }
 
     function choose(index) {
-      if (destroyed || !candidates[index]) return
+      if (destroyed || isComposing() || !candidates[index]) return
       const candidate = candidates[index]
       const current = selectionRange(editor) || (restoreSelection() ? selectionRange(editor) : null)
       focusEditor()
@@ -1100,6 +1106,7 @@
 
     function onFocus() {
       if (!selectionRange(editor)) restoreSelection()
+      if (isComposing()) return
       updateParameterHint()
       if (!panelOpen) openPanel()
     }
@@ -1110,8 +1117,12 @@
       closePanel()
     }
 
-    function onInput() {
-      if (composing) return
+    function onInput(event) {
+      if (event?.isComposing) {
+        if (!composing) onCompositionStart()
+        return
+      }
+      if (isComposing()) return
       normalizeMemberDots()
       rememberSelection()
       notify()
@@ -1125,15 +1136,40 @@
     }
 
     function onCompositionStart() {
+      if (destroyed) return
+      if (compositionEndTimer !== null) {
+        global.clearTimeout(compositionEndTimer)
+        compositionEndTimer = null
+      }
       composing = true
+      compositionSettling = false
+      closePanel()
+      hideParameterHint()
+      config.onCompositionStart?.()
+    }
+
+    function onCompositionUpdate() {
+      if (!composing) onCompositionStart()
       hideParameterHint()
     }
 
-    function onCompositionEnd() {
+    function finishComposition() {
+      compositionEndTimer = null
+      if (destroyed || (!composing && !compositionSettling)) return
       composing = false
-      normalizeMemberDots()
-      rememberSelection()
-      notify()
+      compositionSettling = true
+      try {
+        normalizeMemberDots()
+        rememberSelection()
+        // Keep compositionSettling set while the host receives the final
+        // value. Sentence editor render guards use isComposing() to defer
+        // replacing this editing host until the value is fully committed.
+        notify()
+      } finally {
+        compositionSettling = false
+        config.onCompositionEnd?.()
+      }
+      if (destroyed) return
       anchorRect = null
       updateParameterHint()
       if (panelOpen) {
@@ -1143,8 +1179,17 @@
       }
     }
 
+    function onCompositionEnd() {
+      if (destroyed) return
+      if (compositionEndTimer !== null) global.clearTimeout(compositionEndTimer)
+      // Chromium can deliver the final composition input after compositionend.
+      // Keep the widget in a settling state through that input and finalize on
+      // the next task so it cannot trigger a replacement mid-composition.
+      compositionEndTimer = global.setTimeout(finishComposition, 0)
+    }
+
     function onKeyDown(event) {
-      if (composing || event.isComposing || event.keyCode === 229) return
+      if (isComposing() || event.isComposing || event.keyCode === 229) return
       if (event.key === 'F10' && event.shiftKey) {
         const range = selectionRange(editor)
         if (inspectAtRange(range, null, null, true)) {
@@ -1175,6 +1220,7 @@
     }
 
     function onClick() {
+      if (isComposing()) return
       // Let the browser place the caret inside the editable chip.  Treating
       // the visual group as an atomic replacement made a click followed by a
       // character edit unexpectedly replace the whole reference.
@@ -1184,6 +1230,7 @@
     }
 
     function onPaste(event) {
+      if (isComposing()) return
       const clipboard = event.clipboardData
       if (!clipboard) return
       event.preventDefault()
@@ -1211,7 +1258,7 @@
     }
 
     function onSelectionChange() {
-      if (destroyed || composing || document.activeElement !== editor || !selectionRange(editor)) return
+      if (destroyed || isComposing() || document.activeElement !== editor || !selectionRange(editor)) return
       rememberSelection()
       anchorRect = null
       updateParameterHint()
@@ -1338,6 +1385,7 @@
     editor.addEventListener('click', onClick)
     editor.addEventListener('paste', onPaste)
     editor.addEventListener('compositionstart', onCompositionStart)
+    editor.addEventListener('compositionupdate', onCompositionUpdate)
     editor.addEventListener('compositionend', onCompositionEnd)
     editor.addEventListener('contextmenu', onContextMenu)
     expand.addEventListener('click', () => {
@@ -1354,7 +1402,7 @@
     restoreCandidateList(value())
 
     function setValue(nextValue) {
-      if (destroyed) return
+      if (destroyed || isComposing()) return
       const next = text(nextValue)
       if (value() === next) return
       closePanel()
@@ -1365,7 +1413,7 @@
     }
 
     function insertText(nextValue) {
-      if (destroyed || composing) return
+      if (destroyed || isComposing()) return
       const inserted = text(nextValue)
       if (!inserted) return
       focusEditor()
@@ -1383,6 +1431,12 @@
     function destroy() {
       if (destroyed) return
       destroyed = true
+      if (compositionEndTimer !== null) {
+        global.clearTimeout(compositionEndTimer)
+        compositionEndTimer = null
+      }
+      composing = false
+      compositionSettling = false
       hideParameterHint()
       document.removeEventListener('pointerdown', onDocumentPointerDown)
       document.removeEventListener('selectionchange', onSelectionChange)
@@ -1397,6 +1451,7 @@
       editor.removeEventListener('click', onClick)
       editor.removeEventListener('paste', onPaste)
       editor.removeEventListener('compositionstart', onCompositionStart)
+      editor.removeEventListener('compositionupdate', onCompositionUpdate)
       editor.removeEventListener('compositionend', onCompositionEnd)
       editor.removeEventListener('contextmenu', onContextMenu)
       expand.replaceWith(expand.cloneNode(true))
@@ -1412,7 +1467,7 @@
       if (!panelOpen) openPanel()
     }
 
-    return { setValue, destroy, focus, insertText, getText: value }
+    return { setValue, destroy, focus, insertText, getText: value, isComposing }
   }
 
   global.ExpressionInput = {

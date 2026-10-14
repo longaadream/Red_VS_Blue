@@ -23,7 +23,10 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:frostbolt",
-    "links": []
+    "links": [
+      { "collection": "rules", "id": "rule-freeze-prevent-move", "relation": "shared", "source": "skills.frostbolt.gameplayModules.entries.code.graph.body[13].then[5].parameters.ruleId" },
+      { "collection": "rules", "id": "rule-freeze-prevent-skill", "relation": "shared", "source": "skills.frostbolt.gameplayModules.entries.code.graph.body[13].then[6].parameters.ruleId" }
+    ]
   },
   "gameplayModules": {
     "version": "rvb-gameplay-module-document/v1",

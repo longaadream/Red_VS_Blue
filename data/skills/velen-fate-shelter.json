@@ -942,6 +942,19 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:velen-fate-shelter",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-velen-delayed-effects",
+        "relation": "shared",
+        "source": "pieces/velen.rules"
+      },
+      {
+        "collection": "rules",
+        "id": "rule-velen-death-cleanup",
+        "relation": "shared",
+        "source": "pieces/velen.rules"
+      }
+    ]
   }
 }

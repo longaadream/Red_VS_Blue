@@ -464,6 +464,13 @@
   "cluster": {
     "version": "rvb-skill-cluster/v1",
     "id": "skills:obito-space-time",
-    "links": []
+    "links": [
+      {
+        "collection": "rules",
+        "id": "rule-mangekyo-friendly-death",
+        "relation": "shared",
+        "source": "pieces/red-obito.rules"
+      }
+    ]
   }
 }

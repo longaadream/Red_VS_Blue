@@ -78,6 +78,21 @@ describe('author text lowers to the authoritative graph compiler', () => {
     expect(lowered.statements.map(statement => statement.kind === 'call' ? statement.module : statement.kind)).toEqual(['ref.current-card', 'card.instance-field'])
     expect(lowered.statements.at(-1)).toMatchObject({ module: 'card.instance-field', parameters: { field: 'instanceId' } })
   })
+  it('requires target to be declared instead of falling back to the legacy ref', () => {
+    expect(() => lowerAuthorExpression('目标.生命值', { surface: 'skill' })).toThrow('变量「目标」尚未声明')
+  })
+  it('uses explicitly bound Chinese and English target names', () => {
+    const chineseTarget = { value: { kind: 'output' as const, node: 'choice-one', port: 'choice' }, type: 'piece' as const }
+    const englishTarget = { value: { kind: 'output' as const, node: 'choice-two', port: 'choice' }, type: 'piece' as const }
+    const lowered = lowerAuthorExpression('目标.生命值 + target.生命值', {
+      surface: 'skill',
+      bindings: { 目标: chineseTarget, target: englishTarget },
+    })
+    expect(lowered.statements.filter(statement => statement.kind === 'call' && statement.module === 'piece.field')).toEqual([
+      expect.objectContaining({ inputs: { piece: chineseTarget.value }, parameters: { field: 'currentHp' } }),
+      expect.objectContaining({ inputs: { piece: englishTarget.value }, parameters: { field: 'currentHp' } }),
+    ])
+  })
   it('keeps record fields, tuples, 1-based indexing and nested item scopes typed', () => {
     expect(execute('{生命: 3, 数值: 5}.数值')).toEqual({ value: 5 })
     expect(execute('{3, 5, 7}[2]')).toEqual({ value: 5 })
