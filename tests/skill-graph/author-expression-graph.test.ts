@@ -78,6 +78,12 @@ describe('author text lowers to the authoritative graph compiler', () => {
     expect(lowered.statements.map(statement => statement.kind === 'call' ? statement.module : statement.kind)).toEqual(['ref.current-card', 'card.instance-field'])
     expect(lowered.statements.at(-1)).toMatchObject({ module: 'card.instance-field', parameters: { field: 'instanceId' } })
   })
+  it('lowers the current ability-group root as an authenticated cluster instance', () => {
+    const lowered = lowerAuthorExpression('当前能力组', { surface: 'skill' })
+    expect(lowered.domain).toBe('cluster-instance')
+    expect(lowered.type).toBe('record')
+    expect(lowered.statements).toContainEqual(expect.objectContaining({ module: 'ref.current-cluster', version: '1' }))
+  })
   it('requires target to be declared instead of falling back to the legacy ref', () => {
     expect(() => lowerAuthorExpression('目标.生命值', { surface: 'skill' })).toThrow('变量「目标」尚未声明')
   })

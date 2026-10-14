@@ -119,6 +119,7 @@ export function completeAuthorExpression(prefix: string, options: AuthorExpressi
   for (const [name, type] of Object.entries({ 当前棋子: 'piece', 当前玩家: 'player', 当前事件: 'event', 全局: 'record' } as const)) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) })
   if (['skill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前技能', value: '当前技能', kind: '技能实例' })
   if (['rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前规则', value: '当前规则', kind: '规则实例' })
+  if (['skill', 'rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前能力组', value: '当前能力组', kind: '能力组实例' })
   if (['card', 'rule', 'triggerSkill', 'pending'].includes(options.surface)) suggestions.push({ label: '当前手牌', value: '当前手牌', kind: '手牌实例' })
   for (const [name, spec] of Object.entries(authorFunctionSpecs)) suggestions.push({ label: name, value: `${name}()`, kind: '函数', signature: `${name}()`, description: (spec.labels ?? spec.args).join('，') })
   for (const name of ['筛选', '逐项变换', '查找首项', '任意满足', '全部满足']) suggestions.push({ label: name, value: `${name}()`, kind: '函数', signature: `${name}()`, description: '容器，关于每项的表达式' })

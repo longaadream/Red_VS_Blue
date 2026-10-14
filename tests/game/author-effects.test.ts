@@ -124,6 +124,37 @@ function tupleDamageGraph(): GameplayModuleGraph {
   }
 }
 
+function typedClusterDamageGraph(): GameplayModuleGraph {
+  return {
+    version: GAMEPLAY_MODULE_GRAPH_VERSION,
+    surface: 'skill',
+    body: [
+      { kind: 'call', id: 'source', module: 'ref.source', version: '1' },
+      { kind: 'call', id: 'target', module: 'ref.target', version: '1' },
+      {
+        kind: 'call',
+        id: 'effect',
+        module: 'author.effect.damage',
+        version: '3',
+        inputs: {
+          source: output('source', 'piece'),
+          target: output('target', 'piece'),
+          amount: literal(3),
+        },
+        parameters: {
+          sourceType: 'piece',
+          targetType: 'piece',
+          amountType: 'number',
+          resultType: 'record',
+          damageType: 'true',
+        },
+      },
+      { kind: 'return', id: 'done', values: { result: output('effect', 'result') } },
+    ],
+    outputs: [{ name: 'result', type: 'record' }],
+  }
+}
+
 describe('author effect runtime', () => {
   beforeEach(() => globalTriggerSystem.clearRules())
   afterEach(() => globalTriggerSystem.clearRules())
@@ -712,5 +743,29 @@ describe('author effect runtime', () => {
     ])
     expect(target.currentHp).toBe(18)
     expect(second.currentHp).toBe(17)
+  })
+
+  it('uses the exact current multi-member Cluster while preserving legacy action attribution', () => {
+    const { state, source, target } = fixture()
+    source.skills = [{ skillId: 'fireball', instanceId: 'fireball-instance', abilityGroupIds: ['custom-group:0'] }]
+    source.abilityGroups = [{ id: 'custom-group', instanceId: 'custom-group:0', skills: ['helper', 'fireball'], rules: [] }]
+    const context = {
+      sourcePiece: source,
+      targetPiece: target,
+      piece: source,
+      skill: { id: 'fireball' },
+      skillInstance: source.skills[0],
+      skillInstanceId: 'fireball-instance',
+    }
+    const { flow } = runtimeFor(state, context)
+    const compiled = compileGameplayModuleGraph(typedClusterDamageGraph(), GAMEPLAY_MODULE_REGISTRY)
+    expect(compiled.diagnostics).toEqual([])
+
+    const execute = runInNewContext('(' + compiled.code + ')', { flow }) as (value: unknown) => any
+    const result = execute(context)
+
+    expect(result).toMatchObject({ result: { success: true, targetId: target.instanceId, damage: 3 } })
+    expect(target.currentHp).toBe(17)
+    expect(state.actions.filter((action: any) => action.type === 'damage').at(-1)?.payload?.skillId).toBe('custom-group')
   })
 })

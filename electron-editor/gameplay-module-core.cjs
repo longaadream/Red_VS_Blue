@@ -3175,7 +3175,7 @@ var listNumber = { kind: "list", element: "number" };
 var decode = (value) => typeof value === "string" && value.trimStart().startsWith("{") ? JSON.parse(value) : value;
 var canonical2 = (value) => value && typeof value === "object" && !Array.isArray(value) ? JSON.stringify(Object.keys(value).sort().map((key) => [key, canonical2(value[key])])) : JSON.stringify(value);
 var same = (left, right) => canonical2(left) === canonical2(right);
-var UNIFIED_AUTHOR_EFFECT_MODULES = ["damage", "heal"].map((kind) => ({
+var UNIFIED_AUTHOR_EFFECT_V2_MODULES = ["damage", "heal"].map((kind) => ({
   id: `author.effect.${kind}`,
   version: "2",
   label: kind === "damage" ? "\u9020\u6210\u4F24\u5BB3" : "\u6062\u590D\u751F\u547D",
@@ -3248,6 +3248,74 @@ var UNIFIED_AUTHOR_EFFECT_MODULES = ["damage", "heal"].map((kind) => ({
     return `({result:${flow42}.effects.apply(${JSON.stringify(kind)},${ctx.inputs.source},${ctx.emitLiteral(ctx.parameters.sourceType)},${ctx.inputs.target},${ctx.inputs.amount},${ctx.emitLiteral(ctx.parameters.damageType)},${skill}${killerAttribution})})`;
   }
 }));
+var TYPED_DAMAGE_MODULE = {
+  id: "author.effect.damage",
+  version: "3",
+  label: "\u9020\u6210\u4F24\u5BB3\uFF08\u80FD\u529B\u7EC4\u5F52\u56E0\uFF09",
+  description: "\u901A\u8FC7\u5F53\u524D\u6216\u6307\u5B9A\u80FD\u529B\u7EC4\u5B9E\u4F8B\u5F52\u56E0\u9020\u6210\u4F24\u5BB3\uFF1B\u4E3B\u52A8\u6280\u80FD\u9ED8\u8BA4\u4F7F\u7528\u5F53\u524D\u80FD\u529B\u7EC4\uFF0C\u5176\u4ED6\u5165\u53E3\u672A\u586B\u5199\u80FD\u529B\u7EC4\u65F6\u4E0D\u5F52\u56E0\u3002\u652F\u6301\u5355\u76EE\u6807\u3001\u76EE\u6807\u5143\u7EC4\u4E0E\u4FDD\u7559\u6765\u6E90\u3002",
+  inputs: [
+    { name: "source", type: "piece", label: "\u6765\u6E90" },
+    { name: "target", type: "piece", label: "\u76EE\u6807" },
+    { name: "amount", type: "number", label: "\u4F24\u5BB3\u91CF" },
+    { name: "abilityGroup", type: "record", label: "\u80FD\u529B\u7EC4\u5F52\u56E0", optional: true },
+    { name: "killerPlayer", type: "player", label: "\u51FB\u6740\u5F52\u5C5E", optional: true, nullable: true }
+  ],
+  inputValueTypeBindings: { source: { parameter: "sourceType" }, target: { parameter: "targetType" }, amount: { parameter: "amountType" } },
+  outputs: [{ name: "result", type: "record", label: "\u7ED3\u7B97\u7ED3\u679C" }],
+  outputValueTypeBindings: { result: { parameter: "resultType" } },
+  parameters: [
+    { name: "sourceType", type: "string", label: "\u6765\u6E90\u7C7B\u578B", default: "piece", enum: ["piece", "player", "card", "record"] },
+    { name: "targetType", type: "string", label: "\u76EE\u6807\u7C7B\u578B", default: "piece", enum: ["piece", "record", JSON.stringify(listPiece)] },
+    { name: "amountType", type: "string", label: "\u6570\u503C\u7C7B\u578B", default: "number" },
+    { name: "resultType", type: "string", label: "\u7ED3\u679C\u7C7B\u578B", default: "record" },
+    { name: "damageType", type: "string", label: "\u4F24\u5BB3\u7C7B\u578B", enum: ["normal", "true"], default: "normal" },
+    { name: "legacyNormalSpelling", type: "string", label: "\u65E7\u65E5\u5FD7\u4F24\u5BB3\u540D\u79F0", enum: ["physical", "magical"], default: "physical" },
+    { name: "attribution", type: "string", label: "\u5F52\u5C5E\u65B9\u5F0F", enum: ["current", "unattributed"], default: "current" }
+  ],
+  allowedSurfaces: ["skill", "card", "rule", "triggerSkill", "pending"],
+  effects: { pure: false, previewSafe: false, writes: ["damage", "events"], events: ["beforeDamageDealt", "afterDamageDealt"] },
+  ui: { category: "effect", authoring: "standard" },
+  lower: (ctx) => {
+    const source = ctx.inputs.source;
+    const target = ctx.inputs.target;
+    const amount = ctx.inputs.amount;
+    if (![source, target, amount].every((value) => typeof value === "string" && value.length > 0)) throw new Error(`module ${ctx.moduleId}: missing damage input`);
+    const targets = decode(ctx.parameters.targetType);
+    const amountType = decode(ctx.parameters.amountType);
+    const result = decode(ctx.parameters.resultType);
+    const sourceType = ctx.parameters.sourceType;
+    const captured = sourceType === "record";
+    const capturedRecordTarget = same(targets, "record");
+    if (captured) {
+      if (ctx.inputs.killerPlayer !== void 0) throw new Error("\u5DF2\u4FDD\u7559\u6765\u6E90\u4E0D\u652F\u6301\u8986\u76D6\u51FB\u6740\u5F52\u5C5E\uFF0C\u8BF7\u4F7F\u7528\u68CB\u5B50\u3001\u73A9\u5BB6\u6216\u624B\u724C\u6765\u6E90");
+      if (!same(targets, listPiece) && !capturedRecordTarget) throw new Error("\u5DF2\u4FDD\u7559\u6765\u6E90\u53EA\u80FD\u4F7F\u7528\u68CB\u5B50\u5143\u7EC4\u6216\u4FDD\u7559\u76EE\u6807\u8BB0\u5F55");
+      if (!same(amountType, "number")) throw new Error("\u5DF2\u4FDD\u7559\u6765\u6E90\u53EA\u80FD\u4F7F\u7528\u7EDF\u4E00\u6570\u503C");
+      if (!same(result, "record")) throw new Error("\u5DF2\u4FDD\u7559\u6765\u6E90\u7ED3\u679C\u987B\u4E3A\u6279\u91CF\u8BB0\u5F55");
+    } else {
+      if (!same(targets, "piece") && !same(targets, listPiece)) throw new Error("\u76EE\u6807\u987B\u4E3A\u68CB\u5B50\u6216\u68CB\u5B50\u5143\u7EC4");
+      if (!same(amountType, "number") && !same(amountType, listNumber)) throw new Error("\u6570\u503C\u987B\u4E3A\u6570\u503C\u6216\u6570\u503C\u5143\u7EC4");
+      if (!same(result, same(targets, "piece") ? "record" : { kind: "list", element: "record" })) throw new Error("\u7ED3\u679C\u5F62\u72B6\u987B\u4E0E\u76EE\u6807\u5F62\u72B6\u4E00\u81F4");
+    }
+    const flow42 = ctx.surface === "pending" ? "ctx.flow" : "flow";
+    const hasExplicitGroup = typeof ctx.inputs.abilityGroup === "string" && ctx.inputs.abilityGroup.length > 0;
+    const attribution = !hasExplicitGroup && ctx.surface !== "skill" ? "unattributed" : ctx.parameters.attribution ?? "current";
+    if (!["current", "unattributed"].includes(String(attribution))) throw new Error("\u4F24\u5BB3\u5F52\u5C5E\u65B9\u5F0F\u4E0D\u5408\u6CD5");
+    const group = attribution === "unattributed" ? void 0 : typeof ctx.inputs.abilityGroup === "string" && ctx.inputs.abilityGroup.length > 0 ? ctx.inputs.abilityGroup : `${flow42}.clusters.current().group`;
+    const skill = attribution === "unattributed" ? "undefined" : `${flow42}.clusters.attribution(${group})`;
+    if (captured) {
+      const damageType = ctx.parameters.damageType === "true" ? "true" : ctx.parameters.legacyNormalSpelling ?? "physical";
+      const policy = attribution === "unattributed" ? ',"unattributed"' : "";
+      if (capturedRecordTarget) return `({result:${flow42}.effects.authorDamageCaptured(${source},${target},${amount},${ctx.emitLiteral(damageType)},${skill}${policy})})`;
+      return `({result:${flow42}.effects.damageManyCaptured(${source},${target},${amount},${ctx.emitLiteral(damageType)},${skill}${policy})})`;
+    }
+    const killerAttribution = ctx.inputs.killerPlayer === void 0 ? "" : `,${ctx.inputs.killerPlayer}`;
+    return `({result:${flow42}.effects.apply("damage",${source},${ctx.emitLiteral(ctx.parameters.sourceType)},${target},${amount},${ctx.emitLiteral(ctx.parameters.damageType)},${skill}${killerAttribution})})`;
+  }
+};
+var UNIFIED_AUTHOR_EFFECT_MODULES = Object.freeze([
+  ...UNIFIED_AUTHOR_EFFECT_V2_MODULES,
+  TYPED_DAMAGE_MODULE
+]);
 
 // lib/game/author-summon-schema.ts
 var port4 = (name, type, optional = false, label) => ({ name, type, ...optional ? { optional: true } : {}, ...label ? { label } : {} });
@@ -3520,7 +3588,11 @@ var CURRENT_SKILL_FIELDS = Object.freeze({
   usesRemaining: numberType2,
   skillId: stringType2,
   level: numberType2,
-  owner: pieceType2
+  owner: pieceType2,
+  // The multiplier is part of the verified Skill definition selected by the
+  // concrete instance.  It is deliberately read-only here: authors may
+  // change runtime cooldown/count/level, but cannot mutate content metadata.
+  powerMultiplier: numberType2
 });
 var WRITABLE_CURRENT_SKILL_FIELDS = ["currentCooldown", "usesRemaining", "level"];
 var port5 = (name, type, options2 = {}) => ({ name, type, ...options2 });
@@ -3607,15 +3679,32 @@ var AUTHOR_SKILL_INSTANCE_MODULES = Object.freeze([
 var recordType4 = "record";
 var recordListType = { kind: "list", element: recordType4 };
 var activeSurfaces = ["skill", "card", "rule", "triggerSkill", "pending"];
+var currentClusterSurfaces = ["skill", "rule", "triggerSkill", "pending"];
 function flow5(ctx) {
   return ctx.surface === "pending" ? "ctx.flow" : "flow";
 }
 var AUTHOR_CLUSTER_MODULES = Object.freeze([
   {
+    id: "ref.current-cluster",
+    version: "1",
+    label: "\u5F53\u524D\u80FD\u529B\u7EC4\u5B9E\u4F8B",
+    description: "\u53D6\u5F97\u5F53\u524D\u6267\u884C\u7684\u4E3B\u52A8\u6280\u80FD\u6216\u89C4\u5219\u6240\u5C5E\u7684\u5B9E\u9645\u80FD\u529B\u7EC4\u5B9E\u4F8B\uFF1B\u6CA1\u6709\u552F\u4E00\u6709\u6548\u5F52\u5C5E\u65F6\u7531\u8FD0\u884C\u65F6\u4F7F\u8BED\u53E5\u5931\u6548\u3002",
+    inputs: [],
+    outputs: [{ name: "group", type: recordType4, label: "\u80FD\u529B\u7EC4\u5B9E\u4F8B" }],
+    allowedSurfaces: currentClusterSurfaces,
+    effects: {
+      pure: true,
+      previewSafe: false,
+      reads: ["execution-context", "pieces"]
+    },
+    lower: (ctx) => `${flow5(ctx)}.clusters.current()`,
+    ui: { category: "reference", authoring: "standard" }
+  },
+  {
     id: "author.cluster.acquire",
     version: "1",
     label: "\u83B7\u5F97\u80FD\u529B\u7EC4",
-    description: "\u6309\u7ED3\u6784\u5316\u80FD\u529B\u7EC4\u5B9A\u4E49\u4E3A\u6307\u5B9A\u68CB\u5B50\u83B7\u5F97\u4E00\u7EC4Skill\u4E0ERule\uFF0C\u5E76\u8FD4\u56DE\u672C\u6B21\u80FD\u529B\u7EC4\u5B9E\u4F8B\u3002",
+    description: "\u6309\u7ED3\u6784\u5316\u80FD\u529B\u7EC4\u5B9A\u4E49\u4E3A\u6307\u5B9A\u68CB\u5B50\u83B7\u5F97\u4E00\u7EC4\u4E3B\u52A8\u6280\u80FD\u4E0E\u89C4\u5219\uFF0C\u5E76\u8FD4\u56DE\u672C\u6B21\u80FD\u529B\u7EC4\u5B9E\u4F8B\u3002",
     inputs: [
       { name: "piece", type: "piece", label: "\u68CB\u5B50" },
       { name: "definition", type: "record", label: "\u80FD\u529B\u7EC4\u5B9A\u4E49" }
@@ -17868,6 +17957,7 @@ function lowerAuthorExpression(source, options2) {
       "ref.current-skill": "skill-instance",
       "ref.current-card": "card-instance",
       "ref.current-rule": "rule-instance",
+      "ref.current-cluster": "cluster-instance",
       "status.query-instances": "status-instances",
       "status.instances": "status-instances",
       "status.instances-by-id": "status-instances",
@@ -17875,7 +17965,7 @@ function lowerAuthorExpression(source, options2) {
       "skill.instances": "skill-instances",
       "author.cluster.list": "cluster-instances"
     };
-    const domain = output.name === "value" || output.name === "instance" || output.name === "card" || output.name === "status" || output.name === "statuses" || output.name === "instances" || output.name === "groups" ? domainByModule[module2] : void 0;
+    const domain = output.name === "value" || output.name === "instance" || output.name === "card" || output.name === "status" || output.name === "statuses" || output.name === "instances" || output.name === "groups" || module2 === "ref.current-cluster" ? domainByModule[module2] : void 0;
     return { value: { kind: "output", node: nodeId, port: output.name }, type: output.nullable ? { kind: "nullable", value: type } : type, ...domain ? { domain } : {} };
   }
   const unwrapNullable = (type) => typeof type === "object" && type.kind === "nullable" ? type.value : type;
@@ -18047,12 +18137,13 @@ function lowerAuthorExpression(source, options2) {
       options2.observeIdentifier?.(node.name, bindings, schemas, expected);
       const bound = own5(bindings, node.name);
       if (bound) return bound.local ? { ...call(body, "local.read", { handle: { value: bound.value, type: "record" } }, { valueType: encodedType(bound.type) }, "value", "1"), ...bound.domain ? { domain: bound.domain } : {} } : bound;
-      const root = own5({ \u5F53\u524D\u68CB\u5B50: "ref.holder", \u5F53\u524D\u73A9\u5BB6: "ref.player", \u5F53\u524D\u624B\u724C: "ref.current-card", \u5F53\u524D\u6280\u80FD: "ref.current-skill", \u5F53\u524D\u89C4\u5219: "ref.current-rule" }, node.name);
+      const root = own5({ \u5F53\u524D\u68CB\u5B50: "ref.holder", \u5F53\u524D\u73A9\u5BB6: "ref.player", \u5F53\u524D\u624B\u724C: "ref.current-card", \u5F53\u524D\u6280\u80FD: "ref.current-skill", \u5F53\u524D\u89C4\u5219: "ref.current-rule", \u5F53\u524D\u80FD\u529B\u7EC4: "ref.current-cluster" }, node.name);
       if (root) {
         const result = call(body, root, {});
         if (root === "ref.current-skill") return { ...result, domain: "skill-instance" };
         if (root === "ref.current-card") return { ...result, domain: "card-instance" };
         if (root === "ref.current-rule") return { ...result, domain: "rule-instance" };
+        if (root === "ref.current-cluster") return { ...result, domain: "cluster-instance" };
         return result;
       }
       return fail5(node, `\u53D8\u91CF\u300C${node.name}\u300D\u5C1A\u672A\u58F0\u660E`);
@@ -18416,6 +18507,7 @@ function completeAuthorExpression(prefix, options2) {
   for (const [name, type] of Object.entries({ \u5F53\u524D\u68CB\u5B50: "piece", \u5F53\u524D\u73A9\u5BB6: "player", \u5F53\u524D\u4E8B\u4EF6: "event", \u5168\u5C40: "record" })) suggestions.push({ label: name, value: name, kind: authorTypeLabel(type) });
   if (["skill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u6280\u80FD", value: "\u5F53\u524D\u6280\u80FD", kind: "\u6280\u80FD\u5B9E\u4F8B" });
   if (["rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u89C4\u5219", value: "\u5F53\u524D\u89C4\u5219", kind: "\u89C4\u5219\u5B9E\u4F8B" });
+  if (["skill", "rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u80FD\u529B\u7EC4", value: "\u5F53\u524D\u80FD\u529B\u7EC4", kind: "\u80FD\u529B\u7EC4\u5B9E\u4F8B" });
   if (["card", "rule", "triggerSkill", "pending"].includes(options2.surface)) suggestions.push({ label: "\u5F53\u524D\u624B\u724C", value: "\u5F53\u524D\u624B\u724C", kind: "\u624B\u724C\u5B9E\u4F8B" });
   for (const [name, spec] of Object.entries(authorFunctionSpecs)) suggestions.push({ label: name, value: `${name}()`, kind: "\u51FD\u6570", signature: `${name}()`, description: (spec.labels ?? spec.args).join("\uFF0C") });
   for (const name of ["\u7B5B\u9009", "\u9010\u9879\u53D8\u6362", "\u67E5\u627E\u9996\u9879", "\u4EFB\u610F\u6EE1\u8DB3", "\u5168\u90E8\u6EE1\u8DB3"]) suggestions.push({ label: name, value: `${name}()`, kind: "\u51FD\u6570", signature: `${name}()`, description: "\u5BB9\u5668\uFF0C\u5173\u4E8E\u6BCF\u9879\u7684\u8868\u8FBE\u5F0F" });

@@ -17,8 +17,11 @@ const temporary = fs.mkdtempSync(path.join(tmpdir(), 'rvb-result-binding-'))
 const userData = path.join(temporary, 'user')
 fs.mkdirSync(userData)
 const project = createContentProject(temporary, 'blank', root)
+const evidence = path.resolve(process.env.RVB_SELECTOR_RESULT_BINDING_EVIDENCE_DIR || path.join(root, 'output', 'completion-selector-result-binding'))
+fs.mkdirSync(evidence, { recursive: true })
 const skillId = 'result-binding-regression'
 const cardId = 'result-binding-card-regression'
+const ruleId = 'result-binding-rule-regression'
 const producer = {
   kind: 'call',
   id: 'compare-result',
@@ -47,11 +50,78 @@ const staleBindingProducer = {
   // a new binding elsewhere in the graph.
   layout: { resultVariables: { value: { name: '空缺', declarationId: 'removed-result-declaration', valueType: 'boolean' } } },
 }
+const invalidPortProducer = {
+  kind: 'call',
+  id: 'invalid-port-result',
+  module: 'compare.equal-string',
+  version: '1',
+  inputs: { left: { kind: 'literal', value: '失效' }, right: { kind: 'literal', value: '失效' } },
+  parameters: {},
+  // The compare module exposes `value`, not `removed`. The declaration below
+  // deliberately keeps the old port so the editor must show both rows and a
+  // repair hint instead of projecting the declaration away.
+  layout: { resultVariables: { removed: { name: '失效绑定', declarationId: 'invalid-port-declaration', valueType: 'boolean' } } },
+}
+const invalidPortDeclaration = {
+  kind: 'call',
+  id: 'invalid-port-declaration',
+  module: 'local.declare',
+  version: '2',
+  inputs: { initial: { kind: 'output', node: 'invalid-port-result', port: 'removed' } },
+  parameters: { name: '失效绑定', valueType: 'boolean' },
+}
 const declarationId = 'compare-result_value_result-1'
 const multiOutputProducer = {
   kind: 'call', id: 'multiple-result', module: 'author.card.gain', version: '1',
   inputs: { player: { kind: 'output', node: 'fixture-player', port: 'player' }, card: { kind: 'output', node: 'fixture-card', port: 'card' } }, parameters: { extensionType: 'record' },
   layout: { resultVariables: { success: { name: '复用', declarationId: 'removed-output-variable', valueType: 'boolean' } } },
+}
+const selectorPiece = {
+  kind: 'call', id: 'selector-piece', module: 'author.choice.target-piece', version: '1',
+  inputs: {}, parameters: { range: 5, filter: 'enemy' },
+}
+const selectorPieceSecond = {
+  kind: 'call', id: 'selector-piece-second', module: 'author.choice.target-piece', version: '1',
+  inputs: {}, parameters: { range: 6, filter: 'enemy' },
+}
+const selectorCell = {
+  kind: 'call', id: 'selector-cell', module: 'author.choice.target-cell', version: '1',
+  inputs: {}, parameters: { range: 4, filter: 'all', requireWalkable: true, requireUnoccupied: true },
+}
+const selectorOption = {
+  kind: 'call', id: 'selector-option', module: 'author.choice.option', version: '3',
+  inputs: { options: { kind: 'literal', value: { format: 'author-map/v1', entries: [['甲', '一'], ['乙', '二']] } } },
+  parameters: {
+    optionsType: JSON.stringify({ kind: 'map', key: 'string', value: 'string' }),
+    valueType: JSON.stringify({ kind: 'list', element: 'string' }),
+    selectionMode: 'multi', title: '选择选项', canCancel: false,
+  },
+}
+const selectorDelete = {
+  kind: 'call', id: 'selector-delete', module: 'author.choice.target-piece', version: '1',
+  inputs: {}, parameters: { range: 3, filter: 'enemy' },
+}
+const selectorDamage = {
+  kind: 'call', id: 'selector-damage', module: 'author.effect.damage', version: '1',
+  inputs: {
+    source: { kind: 'output', node: 'selector-piece', port: 'piece' },
+    target: { kind: 'output', node: 'selector-piece-second', port: 'piece' },
+    amount: { kind: 'literal', value: 1 },
+  },
+  // Keep the legacy parameter pointed at the fixture's real skill so the
+  // sentence shows its author-facing name. Missing IDs are covered after the
+  // field is edited below and must retain the repair token/diagnostic.
+  parameters: { damageType: 'normal', skillId },
+}
+const independentDeclaration = {
+  kind: 'call', id: 'manual-declare', module: 'local.declare', version: '2',
+  inputs: { initial: { kind: 'literal', value: true } },
+  parameters: { name: '手写变量', valueType: 'boolean' },
+}
+const independentOutputDeclaration = {
+  kind: 'call', id: 'manual-output-declare', module: 'local.declare', version: '2',
+  inputs: { initial: { kind: 'output', node: 'multiple-result', port: 'placement' } },
+  parameters: { name: '手写输出变量', valueType: 'string' },
 }
 const writer = {
   kind: 'call',
@@ -75,17 +145,29 @@ const reader = {
 const terminal = {
   kind: 'return',
   id: 'return-result',
-  values: { value: { kind: 'output', node: 'read-target', port: 'value' } },
+  values: {
+    value: { kind: 'output', node: 'read-target', port: 'value' },
+    piece: { kind: 'output', node: 'selector-piece', port: 'piece' },
+    pieceSecond: { kind: 'output', node: 'selector-piece-second', port: 'piece' },
+    cell: { kind: 'output', node: 'selector-cell', port: 'cell' },
+    selected: { kind: 'output', node: 'selector-option', port: 'value' },
+  },
 }
 const graph = {
   version: 'rvb-gameplay-modules/v1',
   surface: 'skill',
-  body: [producer, writer, reader, legacyProducer, staleBindingProducer,
+  body: [producer, writer, reader, legacyProducer, staleBindingProducer, invalidPortProducer, invalidPortDeclaration,
     { kind: 'call', id: 'fixture-player', module: 'ref.player', version: '1', inputs: {}, parameters: {} },
     { kind: 'call', id: 'fixture-card', module: 'ref.card-definition', version: '1', inputs: {}, parameters: { cardId } },
-    multiOutputProducer, terminal],
+    multiOutputProducer, selectorPiece, selectorPieceSecond, selectorCell, selectorOption, selectorDelete, selectorDamage, independentDeclaration, independentOutputDeclaration, terminal],
   inputs: [],
-  outputs: [{ name: 'value', type: 'boolean' }],
+  outputs: [
+    { name: 'value', type: 'boolean' },
+    { name: 'piece', type: 'piece' },
+    { name: 'pieceSecond', type: 'piece' },
+    { name: 'cell', type: 'cell' },
+    { name: 'selected', type: { kind: 'list', element: 'string' } },
+  ],
   composites: [],
   continuations: [],
 }
@@ -112,8 +194,20 @@ const cardGraph = {
   composites: [],
   continuations: [],
 }
+const ruleGraph = {
+  version: 'rvb-gameplay-modules/v1',
+  surface: 'rule',
+  body: [
+    { kind: 'return', id: 'rule-return', values: { value: { kind: 'literal', value: true } } },
+  ],
+  inputs: [],
+  outputs: [{ name: 'value', type: 'boolean' }],
+  composites: [],
+  continuations: [],
+}
 fs.writeFileSync(path.join(project, 'data/skills/manifest.json'), JSON.stringify([skillId]) + '\n')
 fs.writeFileSync(path.join(project, 'data/cards/manifest.json'), JSON.stringify([cardId]) + '\n')
+fs.writeFileSync(path.join(project, 'data/rules/manifest.json'), JSON.stringify([ruleId]) + '\n')
 fs.writeFileSync(path.join(project, 'data/skills', skillId + '.json'), JSON.stringify({
   id: skillId,
   name: '返回值绑定回归',
@@ -135,6 +229,18 @@ fs.writeFileSync(path.join(project, 'data/cards', cardId + '.json'), JSON.string
   gameplayModules: {
     version: 'rvb-gameplay-module-document/v1',
     entries: { code: { graph: cardGraph, compilerVersion: 'rvb-gameplay-module-compiler/v3' } },
+  },
+}, null, 2) + '\n')
+fs.writeFileSync(path.join(project, 'data/rules', ruleId + '.json'), JSON.stringify({
+  id: ruleId,
+  name: '规则能力组归因回归',
+  description: '验证规则伤害可以从无归因切换为当前能力组。',
+  priority: 1,
+  trigger: { type: 'beginTurn' },
+  skillCode: '',
+  gameplayModules: {
+    version: 'rvb-gameplay-module-document/v1',
+    entries: { skillCode: { graph: ruleGraph, compilerVersion: 'rvb-gameplay-module-compiler/v3' } },
   },
 }, null, 2) + '\n')
 fs.writeFileSync(path.join(userData, 'content-project-selection.json'), JSON.stringify({ root: project }) + '\n')
@@ -295,6 +401,326 @@ try {
   assert.equal(persisted.link?.declarationId, persisted.declaration?.id)
   assert.equal(persisted.visible, true)
 
+  // A declaration whose producer port disappeared is an ordinary visible
+  // declaration with a repair hint. It must not be mistaken for a generated
+  // binding merely because the old metadata still points at the producer.
+  const invalidPortState = await evaluate(`(()=>({
+    producerVisible:Boolean(document.querySelector('[data-sentence-node="invalid-port-result"]')),
+    declarationVisible:Boolean(document.querySelector('[data-sentence-node="invalid-port-declaration"]')),
+    diagnostic:document.querySelector('[data-sentence-node="invalid-port-result"] [data-sentence-result-binding-invalid="invalid-port-result:removed"]')?.textContent||'',
+  }))()`)
+  assert.equal(invalidPortState.producerVisible, true)
+  assert.equal(invalidPortState.declarationVisible, true)
+  assert.match(invalidPortState.diagnostic, /返回值绑定已失效/u)
+  assert.match(invalidPortState.diagnostic, /返回端口已不存在/u)
+  await click('#skills-detail [data-sentence-node="invalid-port-declaration"] [data-sentence-row-action="delete"]')
+  await until(`!document.querySelector('[data-sentence-node="invalid-port-declaration"]')`)
+  await click('#skills-detail [data-sentence-node="invalid-port-result"] [data-sentence-row-action="delete"]')
+  await until(`!document.querySelector('[data-sentence-node="invalid-port-result"]')`)
+
+  // Selector results keep their single typed return binding on the selector
+  // row. The generated local declaration remains executable IR, but it is an
+  // internal binding and must not become a second author sentence. Two
+  // selectors also need distinct names so later value labels never fall back
+  // to the implicit current target.
+  const saveSelectorResult = async (nodeId, port, name, checkEmptyName = false) => {
+    await click(`#skills-detail [data-sentence-save-result="${nodeId}:${port}"]`)
+    await until(`Boolean(document.querySelector('[data-sentence-result-variable-editor="${nodeId}:${port}"] input[data-sentence-result-variable-name]'))`)
+    if (checkEmptyName) {
+      await evaluate(`(()=>{
+        const input=document.querySelector('[data-sentence-result-variable-name="${nodeId}:${port}"]')
+        const apply=document.querySelector('[data-sentence-result-variable-apply="${nodeId}:${port}"]')
+        input.value=''
+        input.dispatchEvent(new Event('input',{bubbles:true}))
+        apply?.click()
+      })()`)
+      await until("document.body.innerText.includes('请填写变量名。')")
+      // Keep the rejected name attached to A's draft while opening an
+      // already-bound, read-only result viewer B. The global banner should
+      // disappear, but A's editor must still carry the actionable error.
+      await click('#skills-detail [data-sentence-save-result="selector-piece:piece"]')
+      await until("Boolean(document.querySelector('[data-sentence-result-variable-editor=\"selector-piece:piece\"]'))")
+      const switchedError = await evaluate(`(()=>({
+        global:Boolean([...document.querySelectorAll('#skills-detail .sentence-message.error')].some(node=>node.textContent.includes('请填写变量名'))),
+        local:Boolean(document.querySelector('[data-sentence-result-variable-error]')?.textContent?.includes('请填写变量名')),
+      }))()`)
+      assert.equal(switchedError.global, false)
+      assert.equal(switchedError.local, true)
+      await click('#skills-detail [data-sentence-result-variable-editor="selector-piece:piece"] .sentence-result-cancel')
+      await click('#skills-detail [data-sentence-result-variable-editor="selector-delete:piece"] .sentence-result-cancel')
+      await click(`#skills-detail [data-sentence-save-result="${nodeId}:${port}"]`)
+      await until(`Boolean(document.querySelector('[data-sentence-result-variable-editor="${nodeId}:${port}"] input[data-sentence-result-variable-name]'))`)
+    }
+    await evaluate(`(()=>{
+      const input=document.querySelector('[data-sentence-result-variable-name="${nodeId}:${port}"]')
+      input.value=${JSON.stringify(name)}
+      input.dispatchEvent(new Event('input',{bubbles:true}))
+      document.querySelector('[data-sentence-result-variable-apply="${nodeId}:${port}"]')?.click()
+    })()`)
+    await until(`(()=>{
+      const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+      const producer=(source.gameplayModules.entries.code.graph.body||[]).find(item=>item?.id===${JSON.stringify(nodeId)})
+      return producer?.layout?.resultVariables?.[${JSON.stringify(port)}]?.name===${JSON.stringify(name)}
+    })()`)
+  }
+  const applyAuthorExpression = async (name, source) => {
+    await until(`Boolean(document.querySelector('#skills-detail [data-sentence-author-expression="${name}"] .ei-editor'))`)
+    await evaluate(`(()=>{
+      const editor=document.querySelector('[data-sentence-author-expression="${name}"] .ei-editor')
+      editor.focus()
+      editor.textContent=${JSON.stringify(source)}
+      editor.dispatchEvent(new InputEvent('input',{bubbles:true,data:${JSON.stringify(source)},inputType:'insertText',isComposing:false}))
+    })()`)
+    await until(`Boolean(document.querySelector('#skills-detail [data-sentence-apply-expression="${name}"]')) && document.querySelector('#skills-detail [data-sentence-apply-expression="${name}"]')?.disabled===false`)
+    await click(`#skills-detail [data-sentence-apply-expression="${name}"]`)
+  }
+  const applyModuleInputExpression = async (nodeId, name, source) => {
+    await click(`#skills-detail [data-sentence-module-editor="${nodeId}"]`)
+    await until(`Boolean(document.querySelector('#skills-detail [data-sentence-inline-editor="${nodeId}"]'))`)
+    const field = `#skills-detail [data-sentence-inline-editor="${nodeId}"] [data-sentence-module-input="${name}"]`
+    const hasField = await evaluate(`Boolean(document.querySelector(${JSON.stringify(field)}))`)
+    if (!hasField) {
+      const debug = await evaluate(`(()=>{const panel=document.querySelector('#skills-detail [data-sentence-inline-editor="${nodeId}"]');return {text:panel?.innerText||'',inputs:[...panel?.querySelectorAll('[data-sentence-module-input]')||[]].map(item=>item.dataset.sentenceModuleInput),parameters:[...panel?.querySelectorAll('[data-sentence-module-parameter]')||[]].map(item=>item.dataset.sentenceModuleParameter)}})()`)
+      throw new Error(`missing module input ${name}: ${JSON.stringify(debug)}`)
+    }
+    await evaluate(`(()=>{const field=document.querySelector(${JSON.stringify(field)});const details=field?.closest('details');if(details&&!details.open)details.querySelector('summary')?.click()})()`)
+    const direct = `${field} [data-sentence-direct-expression="${name}"]`
+    if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(direct)}))`)) await click(direct)
+    await applyAuthorExpression(name, source)
+  }
+  const applyRuleModuleInputExpression = async (nodeId, name, source) => {
+    await click(`#rules-detail [data-sentence-module-editor="${nodeId}"]`)
+    await until(`Boolean(document.querySelector('#rules-detail [data-sentence-inline-editor="${nodeId}"]'))`)
+    const field = `#rules-detail [data-sentence-inline-editor="${nodeId}"] [data-sentence-module-input="${name}"]`
+    const hasField = await evaluate(`Boolean(document.querySelector(${JSON.stringify(field)}))`)
+    if (!hasField) {
+      const debug = await evaluate(`(()=>{const panel=document.querySelector('#rules-detail [data-sentence-inline-editor="${nodeId}"]');return {text:panel?.innerText||'',inputs:[...panel?.querySelectorAll('[data-sentence-module-input]')||[]].map(item=>item.dataset.sentenceModuleInput),parameters:[...panel?.querySelectorAll('[data-sentence-module-parameter]')||[]].map(item=>item.dataset.sentenceModuleParameter)}})()`)
+      throw new Error(`missing rule module input ${name}: ${JSON.stringify(debug)}`)
+    }
+    await evaluate(`(()=>{const field=document.querySelector(${JSON.stringify(field)});const details=field?.closest('details');if(details&&!details.open)details.querySelector('summary')?.click()})()`)
+    const direct = `${field} [data-sentence-direct-expression="${name}"]`
+    if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(direct)}))`)) await click(direct)
+    await until(`Boolean(document.querySelector('#rules-detail [data-sentence-author-expression="${name}"] .ei-editor'))`)
+    await evaluate(`(()=>{
+      const editor=document.querySelector('#rules-detail [data-sentence-author-expression="${name}"] .ei-editor')
+      editor.focus()
+      editor.textContent=${JSON.stringify(source)}
+      editor.dispatchEvent(new InputEvent('input',{bubbles:true,data:${JSON.stringify(source)},inputType:'insertText',isComposing:false}))
+    })()`)
+    await until(`Boolean(document.querySelector('#rules-detail [data-sentence-apply-expression="${name}"]')) && document.querySelector('#rules-detail [data-sentence-apply-expression="${name}"]')?.disabled===false`)
+    await click(`#rules-detail [data-sentence-apply-expression="${name}"]`)
+  }
+  await saveSelectorResult('selector-piece', 'piece', '目标一')
+  await saveSelectorResult('selector-piece-second', 'piece', '目标二')
+  await saveSelectorResult('selector-cell', 'cell', '地格一')
+  await saveSelectorResult('selector-option', 'value', '选项组')
+  const selectorBindingState = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.code.graph.body||[]
+    const selectors=[['selector-piece','piece'],['selector-piece-second','piece'],['selector-cell','cell'],['selector-option','value']]
+    const bindings=selectors.map(([node,port])=>{
+      const producer=body.find(item=>item?.id===node)
+      const link=producer?.layout?.resultVariables?.[port]
+      const declaration=body.find(item=>item?.id===link?.declarationId)
+      return {node,port,link,declarationId:declaration?.id,visible:Boolean(declaration&&document.querySelector('[data-sentence-node="'+declaration.id+'"]')),
+        rowText:document.querySelector('[data-sentence-node="'+node+'"]')?.innerText||''}
+    })
+    return {bindings,independentVisible:Boolean(document.querySelector('[data-sentence-node="manual-declare"]')),
+      independentOutputVisible:Boolean(document.querySelector('[data-sentence-node="manual-output-declare"]')),
+      declarationCount:body.filter(item=>item?.module==='local.declare').length}
+  })()`)
+  assert.deepEqual(selectorBindingState.bindings.map(item=>({node:item.node,port:item.port,visible:item.visible})), [
+    { node: 'selector-piece', port: 'piece', visible: false },
+    { node: 'selector-piece-second', port: 'piece', visible: false },
+    { node: 'selector-cell', port: 'cell', visible: false },
+    { node: 'selector-option', port: 'value', visible: false },
+  ])
+  assert.equal(selectorBindingState.independentVisible, true)
+  assert.equal(selectorBindingState.independentOutputVisible, true)
+  assert.equal(selectorBindingState.declarationCount, 7)
+  assert.match(selectorBindingState.bindings[0].rowText, /查看变量（目标一）/u)
+  assert.match(selectorBindingState.bindings[1].rowText, /查看变量（目标二）/u)
+  const selectorDamageText = await evaluate(`(()=>document.querySelector('[data-sentence-node="selector-damage"]')?.innerText||'')()`)
+  assert.match(selectorDamageText, /目标一/u)
+  assert.match(selectorDamageText, /目标二/u)
+  assert.match(selectorDamageText, /返回值绑定回归/u)
+  assert.doesNotMatch(selectorDamageText, /selector-result-binding/u)
+  assert.doesNotMatch(selectorDamageText, /当前目标/u)
+  const selectorScreenshot = await call('Page.captureScreenshot', { format: 'png', fromSurface: true })
+  fs.writeFileSync(path.join(evidence, 'selector-result-binding.png'), Buffer.from(selectorScreenshot.data, 'base64'))
+
+  // Legacy damage v1 keeps its authored skillId editable. It is a real
+  // parameter on the old descriptor, so opening it must not turn the field
+  // into a misleading prerequisite warning.
+  await click('#skills-detail [data-sentence-module-editor="selector-damage"]')
+  await until("Boolean(document.querySelector('#skills-detail [data-sentence-inline-editor=\"selector-damage\"]'))")
+  const legacyDamageEditor = await evaluate(`(()=>{
+    const panel=document.querySelector('#skills-detail [data-sentence-inline-editor="selector-damage"]')
+    const field=panel?.querySelector('[data-sentence-module-parameter="skillId"]')
+    const warning=panel?.querySelector('[data-sentence-pending-parameter="selector-damage:skillId"]')
+    return {field:Boolean(field),warning:Boolean(warning),value:field?.querySelector('input')?.value||''}
+  })()`)
+  assert.equal(legacyDamageEditor.field, true)
+  assert.equal(legacyDamageEditor.warning, false)
+  await evaluate(`(()=>{
+    const field=document.querySelector('#skills-detail [data-sentence-inline-editor="selector-damage"] [data-sentence-module-parameter="skillId"]')
+    const details=field?.closest('details');if(details&&!details.open)details.querySelector('summary')?.click()
+    const input=field?.querySelector('input');if(!input)throw new Error('legacy skillId input missing')
+    input.value='legacy-fireball';input.dispatchEvent(new Event('change',{bubbles:true}))
+  })()`)
+  await until(`(()=>JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body.find(item=>item?.id==='selector-damage')?.parameters?.skillId==='legacy-fireball')()`)
+  await click('#skills-detail [data-sentence-inline-editor="selector-damage"] .sentence-popover-close')
+  const missingSkillReference = await evaluate(`(()=>{
+    const row=document.querySelector('#skills-detail [data-sentence-node="selector-damage"]')
+    const token=row?.querySelector('[data-sentence-slot-name="skillId"]')
+    return {text:row?.innerText||'',missing:token?.dataset?.sentenceReferenceMissing||'',id:token?.dataset?.sentenceReferenceId||''}
+  })()`)
+  assert.match(missingSkillReference.text, /缺失的技能引用/u)
+  assert.equal(missingSkillReference.missing, 'true')
+  assert.equal(missingSkillReference.id, 'legacy-fireball')
+
+  // Add a fresh typed damage row, choose the v3 descriptor, bind its optional
+  // abilityGroup input from the Chinese current-context suggestion, and use
+  // the current skill multiplier as a typed amount expression.
+  await click('#skills-detail [data-sentence-add-effect]')
+  await until("Boolean(document.querySelector('#skills-detail [data-sentence-popover=\"module\"]'))")
+  await evaluate(`(()=>{
+    const items=[...document.querySelectorAll('#skills-detail [data-sentence-popover="module"] [data-sentence-module="author.effect.damage"]')]
+    const item=items.at(-1);if(!item)throw new Error('typed damage module missing')
+    item.click()
+  })()`)
+  await delay(120)
+  const typedDamageId = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    return [...(source.gameplayModules?.entries?.code?.graph?.body||[])].reverse().find(item=>item?.module==='author.effect.damage')?.id
+  })()`)
+  assert.equal(typeof typedDamageId, 'string')
+  await click(`#skills-detail [data-sentence-module-editor="${typedDamageId}"]`)
+  await until(`Boolean(document.querySelector('#skills-detail [data-sentence-inline-editor="${typedDamageId}"]'))`)
+  await evaluate(`(()=>{
+    const panel=document.querySelector('#skills-detail [data-sentence-inline-editor="${typedDamageId}"]')
+    const select=panel?.querySelector('[data-sentence-module-select]')
+    if(!select)throw new Error('typed damage version selector missing')
+    const expected=${JSON.stringify('author.effect.damage\0' + '3')}
+    if(select.value!==expected){select.value=expected;select.dispatchEvent(new Event('change',{bubbles:true}))}
+  })()`)
+  await delay(120)
+  await click(`#skills-detail [data-sentence-inline-editor="${typedDamageId}"] .sentence-popover-close`)
+  await until(`Boolean(document.querySelector('#skills-detail [data-sentence-node="${typedDamageId}"] [data-sentence-auto-current-cluster="true"]'))`)
+  const defaultClusterSlot = await evaluate(`(()=>{
+    const row=document.querySelector('#skills-detail [data-sentence-node="${typedDamageId}"]')
+    const slot=row?.querySelector('[data-sentence-auto-current-cluster="true"]')
+    return {text:slot?.textContent||'',name:slot?.dataset?.sentenceSlotName||''}
+  })()`)
+  assert.equal(defaultClusterSlot.name, 'abilityGroup')
+  assert.equal(defaultClusterSlot.text, '当前能力组')
+  await click(`#skills-detail [data-sentence-node="${typedDamageId}"] [data-sentence-auto-current-cluster="true"]`)
+  await until(`Boolean(document.querySelector('#skills-detail [data-sentence-inline-editor="${typedDamageId}"][data-sentence-slot-editor="input:abilityGroup"]'))`)
+  const defaultClusterDraft = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.code.graph.body||[]
+    const damage=body.find(item=>item?.id===${JSON.stringify(typedDamageId)})
+    const ref=damage?.inputs?.abilityGroup
+    const producer=ref?.kind==='output' ? body.find(item=>item?.id===ref.node) : null
+    return {ref,producerModule:producer?.module||'',producerPort:ref?.port||''}
+  })()`)
+  assert.equal(defaultClusterDraft.ref?.kind, 'output')
+  assert.equal(defaultClusterDraft.producerModule, 'ref.current-cluster')
+  assert.equal(defaultClusterDraft.producerPort, 'group')
+  await click(`#skills-detail [data-sentence-inline-editor="${typedDamageId}"] .sentence-popover-close`)
+  await applyModuleInputExpression(typedDamageId, 'source', '当前棋子')
+  await applyModuleInputExpression(typedDamageId, 'target', '目标一')
+  await applyModuleInputExpression(typedDamageId, 'amount', '当前技能.倍率')
+  await applyModuleInputExpression(typedDamageId, 'abilityGroup', '当前能力组')
+  const typedDamageDraft = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    return (source.gameplayModules.entries.code.graph.body||[]).find(item=>item?.id===${JSON.stringify(typedDamageId)})
+  })()`)
+  assert.equal(typedDamageDraft.version, '3')
+  assert.deepEqual(typedDamageDraft.inputs?.abilityGroup, { kind: 'output', node: typedDamageDraft.inputs.abilityGroup.node, port: 'group' })
+  assert.equal(typedDamageDraft.layout?.authorExpressions?.abilityGroup?.source, '当前能力组')
+  assert.equal(typedDamageDraft.layout?.authorExpressions?.amount?.source, '当前技能.倍率')
+  assert.match(await evaluate(`(()=>document.querySelector('[data-sentence-node="${typedDamageId}"]')?.innerText||'')()`), /当前能力组/u)
+  await until("document.querySelector('#studio-save')?.disabled===false")
+  await click('#studio-save')
+  await delay(140)
+  const savedTypedDamage = JSON.parse(fs.readFileSync(path.join(project, 'data/skills', skillId + '.json'), 'utf8')).gameplayModules.entries.code.graph.body.find(item => item?.id === typedDamageId)
+  assert.equal(savedTypedDamage?.version, '3')
+  assert.equal(savedTypedDamage?.layout?.authorExpressions?.abilityGroup?.source, '当前能力组')
+  assert.equal(savedTypedDamage?.layout?.authorExpressions?.amount?.source, '当前技能.倍率')
+  await evaluate(`document.querySelector('#skills-list .entity-item[data-entity-id="${skillId}"]')?.click()`)
+  await delay(120)
+  await until(`Boolean(document.querySelector('#skills-detail [data-sentence-node="${typedDamageId}"]'))`)
+  const reopenedTypedDamage = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.code.graph.body||[]
+    return body.find(item=>item?.id===${JSON.stringify(typedDamageId)})
+  })()`)
+  assert.equal(reopenedTypedDamage?.version, '3')
+  assert.equal(reopenedTypedDamage?.layout?.authorExpressions?.abilityGroup?.source, '当前能力组')
+  assert.equal(reopenedTypedDamage?.layout?.authorExpressions?.amount?.source, '当前技能.倍率')
+  const typedDamageScreenshot = await call('Page.captureScreenshot', { format: 'png', fromSurface: true })
+  fs.writeFileSync(path.join(evidence, 'damage-v3-ability-group.png'), Buffer.from(typedDamageScreenshot.data, 'base64'))
+
+  // The executable declaration follows its selector when the author moves a
+  // row. An unreferenced selector can also be deleted as one row without
+  // leaving an orphaned local.declare in the graph.
+  await saveSelectorResult('selector-delete', 'piece', '待删除', true)
+  const deleteBinding = await evaluate(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    return body.find(item=>item?.id==='selector-delete')?.layout?.resultVariables?.piece?.declarationId
+  })()`)
+  const movedCellBinding = await evaluate(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    return body.find(item=>item?.id==='selector-cell')?.layout?.resultVariables?.cell?.declarationId
+  })()`)
+  const movedOptionBinding = await evaluate(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    return body.find(item=>item?.id==='selector-option')?.layout?.resultVariables?.value?.declarationId
+  })()`)
+  await click('#skills-detail [data-sentence-node="selector-cell"] [data-sentence-row-action="down"]')
+  await until(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    const cell=body.findIndex(item=>item?.id==='selector-cell')
+    const cellDeclaration=body.findIndex(item=>item?.id===${JSON.stringify(movedCellBinding)})
+    const option=body.findIndex(item=>item?.id==='selector-option')
+    const optionDeclaration=body.findIndex(item=>item?.id===${JSON.stringify(movedOptionBinding)})
+    return cell>=0 && cellDeclaration===cell+1 && option>=0 && optionDeclaration===option+1 && option<cell
+  })()`)
+  const movedCellOrder = await evaluate(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    return {
+      cell:body.findIndex(item=>item?.id==='selector-cell'),
+      cellDeclaration:body.findIndex(item=>item?.id===${JSON.stringify(movedCellBinding)}),
+      option:body.findIndex(item=>item?.id==='selector-option'),
+      optionDeclaration:body.findIndex(item=>item?.id===${JSON.stringify(movedOptionBinding)}),
+    }
+  })()`)
+  assert.equal(movedCellOrder.cellDeclaration, movedCellOrder.cell + 1)
+  assert.equal(movedCellOrder.optionDeclaration, movedCellOrder.option + 1)
+  assert.ok(movedCellOrder.option < movedCellOrder.cell)
+  await click('#skills-detail [data-sentence-node="selector-cell"] [data-sentence-row-action="up"]')
+  await until(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    const cell=body.findIndex(item=>item?.id==='selector-cell')
+    const cellDeclaration=body.findIndex(item=>item?.id===${JSON.stringify(movedCellBinding)})
+    const option=body.findIndex(item=>item?.id==='selector-option')
+    const optionDeclaration=body.findIndex(item=>item?.id===${JSON.stringify(movedOptionBinding)})
+    return cell>=0 && cellDeclaration===cell+1 && option>=0 && optionDeclaration===option+1 && cell<option
+  })()`)
+  await click('#skills-detail [data-sentence-node="selector-delete"] [data-sentence-row-action="delete"]')
+  await until(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    return !body.some(item=>item?.id==='selector-delete') && !body.some(item=>item?.id===${JSON.stringify(deleteBinding)})
+  })()`)
+  const deletedSelectorState = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.code.graph.body||[]
+    const declarationId=${JSON.stringify(deleteBinding)}
+    return {producer:body.some(item=>item?.id==='selector-delete'),declaration:body.some(item=>item?.id===declarationId),visible:Boolean(declarationId&&document.querySelector('[data-sentence-node="'+declarationId+'"]'))}
+  })()`)
+  assert.deepEqual(deletedSelectorState, { producer: false, declaration: false, visible: false })
+
   // A missing declaration behind an old resultVariables link must not reserve
   // the name. Once a real declaration exists, a second producer is rejected;
   // prototype names remain rejected by the local binding validator.
@@ -356,6 +782,15 @@ try {
   })()`)
   assert.equal(reusedPort?.inputs?.initial?.node, 'multiple-result')
   assert.equal(reusedPort?.inputs?.initial?.port, 'placement')
+  const reusedPortRow = await evaluate(`(()=>{
+    const body=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body||[]
+    const producer=body.find(item=>item?.id==='multiple-result')
+    const declarationId=producer?.layout?.resultVariables?.placement?.declarationId
+    return {declarationId,visible:Boolean(declarationId&&document.querySelector('[data-sentence-node="'+declarationId+'"]'))}
+  })()`)
+  assert.equal(typeof reusedPortRow.declarationId, 'string')
+  assert.equal(reusedPortRow.visible, false)
+  assert.equal(await evaluate("Boolean(document.querySelector('[data-sentence-node=\"manual-output-declare\"]'))"), true)
 
   // A legacy resultNames edit remains available and still writes its metadata.
   const legacy = await evaluate(`(()=>{
@@ -404,7 +839,22 @@ try {
   const values = new Map()
   const events = []
   let handleId = 0
-  const flow = { refs: { player: () => 'player-red' }, cards: { gain: () => ({ instance: null, success: true, placement: 'hand' }) }, execution: {
+  const flow = {
+    refs: { player: () => 'player-red', holder: () => 'piece-one' },
+    skills: { current: () => ({ instance: 'skill-one' }), field: () => ({ value: 2, defined: true }) },
+    clusters: { current: () => ({ group: 'cluster-one' }), attribution: group => group },
+    query: { hasPlayer: () => true, hasPiece: () => true },
+    values: { require: value => value },
+    containers: { authorMapItems: value => value.entries },
+    choice: {
+      authorTarget: (_config, id) => id === 'selector-piece'
+        ? { instanceId: 'piece-one' }
+        : id === 'selector-piece-second' ? { instanceId: 'piece-two' } : { x: 2, y: 3 },
+      authorOption: () => ['一', '二'],
+    },
+    effects: { damage: () => ({ success: true, damage: 1 }), apply: () => ({ success: true, damage: 1 }) },
+    cards: { gain: () => ({ instance: null, success: true, placement: 'hand' }) },
+    execution: {
     declare(_type, _schemas, initial) {
       const handle = { id: ++handleId }
       values.set(handle, initial)
@@ -421,9 +871,16 @@ try {
       events.push(['read', value])
       return { value, success: true }
     },
-  } }
+    },
+  }
   const execute = new Function('flow', `return (${compiled.code})`)(flow)
-  assert.deepEqual(execute({}), { value: false })
+  assert.deepEqual(execute({}), {
+    value: false,
+    piece: 'piece-one',
+    pieceSecond: 'piece-two',
+    cell: { x: 2, y: 3 },
+    selected: ['一', '二'],
+  })
   assert.deepEqual(events.slice(0, 3), [['declare', true], ['write', false], ['read', false]])
 
   // Reopen the same document after persistence; the explicit declaration and
@@ -449,6 +906,23 @@ try {
   assert.deepEqual(reopenedWriter?.inputs?.value, { kind: 'literal', value: false })
   const reopenedReturn = await evaluate(`(()=>JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}').gameplayModules.entries.code.graph.body.find(item=>item?.kind==='return'))()`)
   assert.deepEqual(reopenedReturn?.values?.value, { kind: 'output', node: 'read-target', port: 'value' })
+  const reopenedSelectorRows = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#skills-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.code.graph.body||[]
+    const selectors=[['selector-piece','piece'],['selector-piece-second','piece'],['selector-cell','cell'],['selector-option','value']]
+    return selectors.map(([node,port])=>{
+      const link=body.find(item=>item?.id===node)?.layout?.resultVariables?.[port]
+      return {node, declarationId:link?.declarationId, producerVisible:Boolean(document.querySelector('[data-sentence-node="'+node+'"]')), declarationVisible:Boolean(link?.declarationId&&document.querySelector('[data-sentence-node="'+link.declarationId+'"]'))}
+    })
+  })()`)
+  assert.equal(reopenedSelectorRows.length, 4)
+  assert.ok(reopenedSelectorRows.every(item => typeof item.declarationId === 'string' && item.declarationId.length > 0))
+  assert.deepEqual(reopenedSelectorRows.map(({ node, producerVisible, declarationVisible }) => ({ node, producerVisible, declarationVisible })), [
+    { node: 'selector-piece', producerVisible: true, declarationVisible: false },
+    { node: 'selector-piece-second', producerVisible: true, declarationVisible: false },
+    { node: 'selector-cell', producerVisible: true, declarationVisible: false },
+    { node: 'selector-option', producerVisible: true, declarationVisible: false },
+  ])
   const boundUi = await evaluate(`(()=>{
     const row=document.querySelector('#skills-detail [data-sentence-node="compare-result"]')
     const button=row?.querySelector('[data-sentence-save-result="compare-result:value"]')
@@ -503,6 +977,46 @@ try {
   assert.deepEqual(cardBinding.declaration?.inputs?.initial, { kind: 'output', node: 'current-hand', port: 'card' })
   assert.equal(cardBinding.link?.name, '手牌变量')
   assert.equal(cardBinding.link?.declarationId, cardBinding.declaration?.id)
+
+  // On a non-skill surface a v3 damage row without an abilityGroup input is
+  // lowered as unattributed. The sentence must say that explicitly instead
+  // of offering a decorative current-cluster label or synthetic slot.
+  await click('#cards-detail [data-sentence-add-effect]')
+  await until("Boolean(document.querySelector('#cards-detail [data-sentence-popover=\"module\"]'))")
+  await evaluate(`(()=>{
+    const items=[...document.querySelectorAll('#cards-detail [data-sentence-popover="module"] [data-sentence-module="author.effect.damage"]')]
+    const item=items.at(-1);if(!item)throw new Error('card typed damage module missing')
+    item.click()
+  })()`)
+  await delay(100)
+  const cardDamageId = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#cards-detail [data-json-source]').value||'{}')
+    return [...(source.gameplayModules?.entries?.code?.graph?.body||[])].reverse().find(item=>item?.module==='author.effect.damage')?.id
+  })()`)
+  assert.equal(typeof cardDamageId, 'string')
+  await click(`#cards-detail [data-sentence-module-editor="${cardDamageId}"]`)
+  await until(`Boolean(document.querySelector('#cards-detail [data-sentence-inline-editor="${cardDamageId}"]'))`)
+  await evaluate(`(()=>{
+    const panel=document.querySelector('#cards-detail [data-sentence-inline-editor="${cardDamageId}"]')
+    const select=panel?.querySelector('[data-sentence-module-select]')
+    if(!select)throw new Error('card typed damage version selector missing')
+    const expected=${JSON.stringify('author.effect.damage\0' + '3')}
+    if(select.value!==expected){select.value=expected;select.dispatchEvent(new Event('change',{bubbles:true}))}
+  })()`)
+  await delay(100)
+  await click(`#cards-detail [data-sentence-inline-editor="${cardDamageId}"] .sentence-popover-close`)
+  await until(`Boolean(document.querySelector('#cards-detail [data-sentence-node="${cardDamageId}"]'))`)
+  const cardDamageText = await evaluate(`(()=>{
+    const row=document.querySelector('#cards-detail [data-sentence-node="${cardDamageId}"]')
+    return {text:row?.innerText||'',current:Boolean(row?.querySelector('[data-sentence-auto-current-cluster="true"]'))}
+  })()`)
+  assert.match(cardDamageText.text, /不归因于能力组/u)
+  assert.doesNotMatch(cardDamageText.text, /当前能力组/u)
+  assert.equal(cardDamageText.current, false)
+  const cardDamageScreenshot = await call('Page.captureScreenshot', { format: 'png', fromSurface: true })
+  fs.writeFileSync(path.join(evidence, 'damage-v3-card-unattributed.png'), Buffer.from(cardDamageScreenshot.data, 'base64'))
+  await click(`#cards-detail [data-sentence-node="${cardDamageId}"] [data-sentence-row-action="delete"]`)
+  await until(`!Boolean(document.querySelector('#cards-detail [data-sentence-node="${cardDamageId}"]'))`)
 
   await click('#cards-detail [data-sentence-add-effect]')
   await until("Boolean(document.querySelector('#cards-detail [data-sentence-module=\"author.extension.declare\"]'))")
@@ -576,6 +1090,111 @@ try {
   assert.ok(savedCardBody.some(item => item?.module === 'local.declare' && item?.parameters?.name === '手牌变量'))
   assert.ok(savedCardBody.some(item => item?.module === 'extension.declare-instance' && item?.parameters?.name === '护甲'))
   assert.ok(savedCardBody.some(item => item?.module === 'extension.write-instance' && item?.parameters?.name === '护甲'))
+
+  // Rule v3 damage starts without an ability-group input. Its honest default
+  // is unattributed, but the author can switch the attribution policy to
+  // current; that choice must materialize ref.current-cluster instead of
+  // leaving a compiler-only implicit fallback.
+  await evaluate("document.querySelector('[data-tab=rules]').click()")
+  await until(`Boolean(document.querySelector('#rules-list [data-entity-id=${JSON.stringify(ruleId)}]'))`)
+  await click(`#rules-list [data-entity-id="${ruleId}"]`)
+  await until("Boolean(document.querySelector('#rules-detail [data-sentence-node=\"rule-return\"]'))")
+  await click('#rules-detail [data-sentence-add-effect]')
+  await until("Boolean(document.querySelector('#rules-detail [data-sentence-popover=\"module\"]'))")
+  await evaluate(`(()=>{
+    const items=[...document.querySelectorAll('#rules-detail [data-sentence-popover="module"] [data-sentence-module="author.effect.damage"]')]
+    const item=items.at(-1);if(!item)throw new Error('rule typed damage module missing')
+    item.click()
+  })()`)
+  await delay(100)
+  const ruleDamageId = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#rules-detail [data-json-source]').value||'{}')
+    return [...(source.gameplayModules?.entries?.skillCode?.graph?.body||[])].reverse().find(item=>item?.module==='author.effect.damage')?.id
+  })()`)
+  assert.equal(typeof ruleDamageId, 'string')
+  await click(`#rules-detail [data-sentence-module-editor="${ruleDamageId}"]`)
+  await until(`Boolean(document.querySelector('#rules-detail [data-sentence-inline-editor="${ruleDamageId}"]'))`)
+  await evaluate(`(()=>{
+    const panel=document.querySelector('#rules-detail [data-sentence-inline-editor="${ruleDamageId}"]')
+    const select=panel?.querySelector('[data-sentence-module-select]')
+    if(!select)throw new Error('rule typed damage version selector missing')
+    const expected=${JSON.stringify('author.effect.damage\0' + '3')}
+    if(select.value!==expected){select.value=expected;select.dispatchEvent(new Event('change',{bubbles:true}))}
+  })()`)
+  await delay(100)
+  await click(`#rules-detail [data-sentence-inline-editor="${ruleDamageId}"] .sentence-popover-close`)
+  await until(`Boolean(document.querySelector('#rules-detail [data-sentence-node="${ruleDamageId}"]'))`)
+  const ruleDefaultText = await evaluate(`(()=>{
+    const row=document.querySelector('#rules-detail [data-sentence-node="${ruleDamageId}"]')
+    return {text:row?.innerText||'',toggle:Boolean(row?.querySelector('[data-sentence-auto-unattributed="true"]'))}
+  })()`)
+  assert.match(ruleDefaultText.text, /不归因于能力组/u)
+  assert.equal(ruleDefaultText.toggle, true)
+  await click(`#rules-detail [data-sentence-node="${ruleDamageId}"] [data-sentence-auto-unattributed="true"]`)
+  await until(`Boolean(document.querySelector('#rules-detail [data-sentence-inline-editor="${ruleDamageId}"][data-sentence-slot-editor="parameter:attribution"]'))`)
+  const ruleAttributionEditor = await evaluate(`(()=>{
+    const panel=document.querySelector('#rules-detail [data-sentence-inline-editor="${ruleDamageId}"]')
+    return {select:Boolean(panel?.querySelector('[data-sentence-literal-enum="attribution"]')),pending:Boolean(panel?.querySelector('[data-sentence-pending-parameter]'))}
+  })()`)
+  assert.deepEqual(ruleAttributionEditor, { select: true, pending: false })
+  await evaluate(`(()=>{
+    const select=document.querySelector('#rules-detail [data-sentence-literal-enum="attribution"]')
+    if(!select)throw new Error('rule attribution selector missing')
+    select.value=JSON.stringify('current')
+    select.dispatchEvent(new Event('change',{bubbles:true}))
+  })()`)
+  await until(`(()=>{
+    const source=JSON.parse(document.querySelector('#rules-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.skillCode.graph.body||[]
+    const damage=body.find(item=>item?.id===${JSON.stringify(ruleDamageId)})
+    const ref=damage?.inputs?.abilityGroup
+    const producer=ref?.kind==='output' ? body.find(item=>item?.id===ref.node) : null
+    return ref?.kind==='output' && ref.port==='group' && producer?.module==='ref.current-cluster'
+  })()`)
+  await click(`#rules-detail [data-sentence-inline-editor="${ruleDamageId}"] .sentence-popover-close`)
+  await applyRuleModuleInputExpression(ruleDamageId, 'source', '当前棋子')
+  await applyRuleModuleInputExpression(ruleDamageId, 'target', '当前棋子')
+  await applyRuleModuleInputExpression(ruleDamageId, 'amount', '1')
+  const ruleDamageDraft = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#rules-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.skillCode.graph.body||[]
+    const damage=body.find(item=>item?.id===${JSON.stringify(ruleDamageId)})
+    const ref=damage?.inputs?.abilityGroup
+    const producer=ref?.kind==='output' ? body.find(item=>item?.id===ref.node) : null
+    return {damage,producerModule:producer?.module||''}
+  })()`)
+  assert.equal(ruleDamageDraft.damage?.version, '3')
+  assert.equal(ruleDamageDraft.damage?.parameters?.attribution, 'current')
+  assert.equal(ruleDamageDraft.damage?.inputs?.abilityGroup?.port, 'group')
+  assert.equal(ruleDamageDraft.producerModule, 'ref.current-cluster')
+  await until("document.querySelector('#studio-save')?.disabled===false")
+  await click('#studio-save')
+  await delay(140)
+  const savedRule = JSON.parse(fs.readFileSync(path.join(project, 'data/rules', ruleId + '.json'), 'utf8'))
+  const savedRuleBody = savedRule.gameplayModules.entries.skillCode.graph.body || []
+  const savedRuleDamage = savedRuleBody.find(item=>item?.id===ruleDamageId)
+  const savedRuleRef = savedRuleDamage?.inputs?.abilityGroup
+  assert.equal(savedRuleDamage?.parameters?.attribution, 'current')
+  assert.equal(savedRuleRef?.port, 'group')
+  assert.equal(savedRuleBody.find(item=>item?.id===savedRuleRef?.node)?.module, 'ref.current-cluster')
+  await click(`#rules-list [data-entity-id="${ruleId}"]`)
+  await delay(120)
+  await until(`Boolean(document.querySelector('#rules-detail [data-sentence-node="${ruleDamageId}"]'))`)
+  const reopenedRule = await evaluate(`(()=>{
+    const source=JSON.parse(document.querySelector('#rules-detail [data-json-source]').value||'{}')
+    const body=source.gameplayModules.entries.skillCode.graph.body||[]
+    const damage=body.find(item=>item?.id===${JSON.stringify(ruleDamageId)})
+    const ref=damage?.inputs?.abilityGroup
+    const producer=ref?.kind==='output' ? body.find(item=>item?.id===ref.node) : null
+    return {attribution:damage?.parameters?.attribution,ref,producerModule:producer?.module||''}
+  })()`)
+  assert.deepEqual(reopenedRule, {
+    attribution: 'current',
+    ref: { kind: 'output', node: reopenedRule.ref.node, port: 'group' },
+    producerModule: 'ref.current-cluster',
+  })
+  const ruleDamageScreenshot = await call('Page.captureScreenshot', { format: 'png', fromSurface: true })
+  fs.writeFileSync(path.join(evidence, 'damage-v3-rule-current-cluster.png'), Buffer.from(ruleDamageScreenshot.data, 'base64'))
 } finally {
   socket?.close()
   if (child.exitCode === null) child.kill()

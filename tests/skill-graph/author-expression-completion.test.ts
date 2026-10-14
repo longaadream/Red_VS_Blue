@@ -47,6 +47,11 @@ describe('author expression lexical suggestions', () => {
     expect(suggestions('当前技能.')).toContainEqual({ label: '当前技能.所属棋子', value: '当前技能.所属棋子', kind: '棋子' })
     expect(suggestions('当前棋子.')).toContainEqual({ label: '当前棋子.能力组', value: '当前棋子.能力组', kind: '元组<结构体>' })
   })
+  it('offers the authenticated current ability-group root on executable skill and rule surfaces', () => {
+    expect(completeAuthorExpression('', { surface: 'skill' })).toContainEqual({ label: '当前能力组', value: '当前能力组', kind: '能力组实例' })
+    expect(completeAuthorExpression('', { surface: 'rule' })).toContainEqual({ label: '当前能力组', value: '当前能力组', kind: '能力组实例' })
+    expect(completeAuthorExpression('', { surface: 'card' })).not.toContainEqual({ label: '当前能力组', value: '当前能力组', kind: '能力组实例' })
+  })
   it('keeps the current hand as a typed instance while exposing its closed fields', () => {
     const context = { surface: 'card' as const }
     expect(completeAuthorExpression('当前手牌.', context)).toContainEqual({ label: '当前手牌.实例标识', value: '当前手牌.实例标识', kind: '文本' })

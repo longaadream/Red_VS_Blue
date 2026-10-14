@@ -3,20 +3,20 @@
   "artifacts": [
     {
       "collection": "rules",
-      "sha256": "5abebbba4dad96cf4bbc563e785a544d9a18857ba6bf1b304b60fd164eeb7908",
-      "id": "content-fd1cc64b-43ad-480b-8424-378d87a43517",
+      "sha256": "3320b8851bf9171d8257b6e164de64268ec6bc2a4211d1ef12d5ea38603313cd",
+      "id": "content-1ead51df-e3bf-4fd9-918e-d4cbd7b91a37",
       "file": "dissolve.json"
     },
     {
       "collection": "skills",
-      "sha256": "1be4fd122e56c953d6827722ac42e91055374a1613a36ac1f8bf2d60ce41dc43",
-      "id": "content-69eac751-7a02-4099-9cb6-14b2582ea8a7",
+      "sha256": "a2da2a64b00ede2b5d4a14ae7d428456a85127409cd75f96ececc79bcd974a65",
+      "id": "content-9900d482-d349-4b35-b88a-8f76879d632e",
       "file": "fireball.json"
     },
     {
       "collection": "skills",
-      "sha256": "998a700e9cdc354df20a97251eed6feac4e9ed6e650e763732dd9921d789f0d1",
-      "id": "content-b3859c2e-d927-40ee-a753-6db20be0b93f",
+      "sha256": "5aa1ad75e117c3b21b2a0ddb7fa4b169b1109e2aea4fd49ea873c7d572441bd9",
+      "id": "content-004d7013-d152-4da3-aecb-7f393a709940",
       "file": "shadowclone.json"
     }
   ],

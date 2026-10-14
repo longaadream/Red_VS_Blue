@@ -118,13 +118,14 @@ describe('author skill instance modules', () => {
     expect(current.allowedSurfaces).toEqual(['skill', 'pending'])
     expect(field.outputs?.find(output => output.name === 'value')).toMatchObject({ type: 'unknown' })
     expect(field.outputs?.find(output => output.name === 'value')?.nullable).toBeUndefined()
-    expect(field.parameters?.[0]?.enum).toEqual(['currentCooldown', 'usesRemaining', 'skillId', 'level', 'owner'])
+    expect(field.parameters?.[0]?.enum).toEqual(['currentCooldown', 'usesRemaining', 'skillId', 'level', 'owner', 'powerMultiplier'])
     expect(field.outputParameterTypeBindings?.value.types).toEqual({
       currentCooldown: 'number',
       usesRemaining: 'number',
       skillId: 'string',
       level: 'number',
       owner: 'piece',
+      powerMultiplier: 'number',
     })
     expect(write.parameters?.[0]?.enum).toEqual(['currentCooldown', 'usesRemaining', 'level'])
     expect(write.parameters?.[0]?.enum).not.toContain('skillId')
@@ -156,6 +157,46 @@ describe('author skill instance modules', () => {
 
     expect(state.compiled.diagnostics).toEqual([])
     expect(state.run(state.context, state.flow, state.battle)).toEqual(5)
+  })
+
+  it('reads the readonly multiplier from the installed skill definition', () => {
+    const state = execute(expressionGraph('当前技能.倍率 * 2'), [{ skillId: 'current-skill', currentCooldown: 4 }])
+    state.battle.skillsById['current-skill'] = { id: 'current-skill', powerMultiplier: 1.5 } as never
+
+    expect(state.compiled.diagnostics).toEqual([])
+    expect(state.run(state.context, state.flow, state.battle)).toEqual(3)
+    expect(state.piece.skills[0]).not.toHaveProperty('powerMultiplier')
+
+    const write = graph([
+      call('current', 'ref.current-skill'),
+      call('write', 'author.skill-instance.write', {
+        instance: output('current', 'instance'),
+        value: literal(2),
+      }, { field: 'powerMultiplier' }),
+      { kind: 'return', id: 'done', value: output('write', 'success') },
+    ], [{ name: 'value', type: 'boolean' }])
+    expect(() => compileGameplayModuleGraph(write, registry)).toThrow()
+  })
+
+  it('composes the Chinese multiplier alias with a piece field', () => {
+    const state = execute(expressionGraph('当前棋子.攻击力 * 当前技能.倍率'), [{ skillId: 'current-skill' }])
+    state.piece.attack = 4
+    state.battle.skillsById['current-skill'] = { id: 'current-skill', powerMultiplier: 1.5 } as never
+
+    expect(state.compiled.diagnostics).toEqual([])
+    expect(state.run(state.context, state.flow, state.battle)).toBe(6)
+  })
+
+  it('invalidates the readonly multiplier when its definition value is unavailable', () => {
+    const state = execute(expressionGraph('当前技能.倍率 * 2'), [{ skillId: 'current-skill' }])
+    const diagnostics = createGameplayModuleDiagnosticHost('skill', {}, () => undefined)
+    const restore = installGameplayModuleDiagnosticHost(state.context, diagnostics)
+    try {
+      expect(state.run(state.context, state.flow, state.battle)).toBeUndefined()
+    } finally {
+      restore()
+    }
+    expect(diagnostics.diagnostics).toHaveLength(1)
   })
 
   it('invalidates a statement when a current skill field is absent', () => {

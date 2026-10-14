@@ -236,7 +236,12 @@
     }
     if (isRedundantResultMessage(descriptor, statement, kind, name) && !options.allowUnsetOptional) return false
     if (kind === 'parameter') {
-      if (/^author\.effect\.(damage|heal)$/.test(id) && String(statement.version || descriptor?.version) === '2' && (['sourceType', 'targetType', 'amountType', 'resultType', 'legacyNormalSpelling'].includes(name) || id === 'author.effect.heal' && name === 'damageType')) return false
+      if (/^author\.effect\.(damage|heal)$/.test(id) && ['2', '3'].includes(String(statement.version || descriptor?.version)) && (['sourceType', 'targetType', 'amountType', 'resultType', 'legacyNormalSpelling'].includes(name) || id === 'author.effect.heal' && name === 'damageType')) return false
+      // v3 still stores the attribution policy for queue compatibility. A
+      // valid current/unattributed policy is rendered as Chinese prose; an
+      // invalid authored value stays visible so the inspector can repair it.
+      if (id === 'author.effect.damage' && String(statement.version || descriptor?.version) === '3' && name === 'attribution'
+        && ['current', 'unattributed'].includes(String(statement.parameters?.attribution))) return false
       if (['author.effect.summon', 'author.piece.display'].includes(id) && ['sourceType', 'templateType', 'destinationType', 'displayType'].includes(name)) return false
       if (id === 'author.card.gain' && name === 'extensionType' || id === 'local.write' && name === 'valueType') return false
       if (id === 'author.cluster.acquire' && name === 'definitionType') return false
@@ -283,19 +288,29 @@
   }
 
   define('author.effect.damage', ctx => {
+    const typedCluster = String(ctx.statement?.version) === '3'
     // The default current-context policy stays folded into the ordinary
     // sentence. An explicit unattributed choice remains visible and editable
     // in Chinese while its stable graph ID stays `unattributed`.
     const hasExplicitAttribution = Boolean(ctx.statement?.parameters && Object.prototype.hasOwnProperty.call(ctx.statement.parameters, 'attribution'))
-    const showAttribution = ctx.isVisible('parameter', 'attribution') && hasExplicitAttribution && ctx.statement.parameters.attribution !== 'current'
+    const typedAttributionValue = ctx.statement?.parameters?.attribution
+    const showAttribution = ctx.isVisible('parameter', 'attribution') && hasExplicitAttribution && typedAttributionValue !== 'current'
     const attributionSlot = ctx.isVisible('parameter', 'attribution') ? ctx.slot('parameter', 'attribution') : null
+    const typedAttributionSlot = typedCluster && showAttribution && typedAttributionValue !== 'unattributed' && attributionSlot
+    const clusterSlot = typedCluster
+      ? (ctx.isVisible('input', 'abilityGroup') ? ctx.input('abilityGroup') : '当前能力组')
+      : null
     return ctx.parts(
       '对', ctx.input('target'), '造成', ctx.input('amount'), '点', ctx.parameter('damageType'), '伤害，来源为', ctx.input('source'),
-      ...(showAttribution && attributionSlot ? ['，归属方式为', attributionSlot] : []),
+      ...(typedCluster
+        ? (typedAttributionValue === 'unattributed'
+          ? ['，不归因于能力组']
+          : ['，归因于', clusterSlot, ...(typedAttributionSlot ? ['，归属方式为', typedAttributionSlot] : [])])
+        : (showAttribution && attributionSlot ? ['，归属方式为', attributionSlot] : [])),
       ...(ctx.isVisible('parameter', 'skillId') ? ['，技能为', ctx.parameter('skillId')] : []),
       ...(ctx.isVisible('input', 'killerPlayer') ? ['，击杀归属于', ctx.input('killerPlayer')] : []),
     )
-  }, { slotOrder: ['target', 'amount', 'damageType', 'source', 'attribution', 'skillId', 'killerPlayer'], category: 'combat' })
+  }, { slotOrder: ['target', 'amount', 'damageType', 'source', 'abilityGroup', 'attribution', 'skillId', 'killerPlayer'], category: 'combat' })
 
   define('rule.remove-id-raw', ctx => {
     const captured = String(ctx.statement?.version) === '2' && ctx.statement?.parameters?.targetType === 'record'

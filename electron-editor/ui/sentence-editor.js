@@ -1088,9 +1088,12 @@
         if (statement.kind === 'return') throw new Error('返回语句是流程终点，不能直接删除。')
         const ids = statementIds(statement)
         const authorIds = authorStatementGroupIdsForRow(statement)
+        const resultBindingIds = resultBindingGroupIds(coreFor(options), graph, statement, scopePath)
         for (const id of authorIds) ids.add(id)
+        for (const id of resultBindingIds) ids.add(id)
+        const ownedIds = new Set([...authorIds, ...resultBindingIds])
         const owned = []
-        for (const item of location.statements) if (item !== statement && authorIds.has(item?.id)) owned.push(item)
+        for (const item of location.statements) if (item !== statement && ownedIds.has(item?.id)) owned.push(item)
         let expanded = true
         while (expanded) {
           expanded = false
@@ -1136,8 +1139,11 @@
         const authorIds = authorStatementGroupIdsForRow(statement)
         const authorFacade = record(statement?.layout?.authorStatement)
         {
-          const movingIds = authorFacade ? authorIds : new Set([statement.id])
           const core = coreFor(options)
+          const resultBindingIds = resultBindingGroupIds(core, graph, statement, scopePath)
+          const movingIds = authorFacade
+            ? new Set([...authorIds, ...resultBindingIds])
+            : resultBindingIds
           const groupFor = new Map()
           for (const item of location.statements) {
             const metadata = record(item?.layout?.authorStatement) ? item.layout.authorStatement : null
@@ -1148,6 +1154,7 @@
           }
           const isProjectionHidden = item => {
             if (!record(item)) return true
+            if (resultBindingDeclaration(core, graph, item, scopePath)) return true
             if (item.layout?.authorExpression && statementForLexicalId(graph, item.layout.authorExpression.owner, scopePath)) return true
             if (isProjectedPureCall(core, graph, item, scopePath)) return true
             const consumedContext = item.kind === 'call'
@@ -1177,11 +1184,13 @@
             return -1
           }
           const neighborIndex = visibleIndex(operation === 'up' ? -1 : 1)
+          if (neighborIndex < 0 && resultBindingIds.size > 1) return
           if (neighborIndex < 0) return
           if (neighborIndex >= 0) {
             const neighbor = location.statements[neighborIndex]
             if (neighbor?.kind === 'return') throw new Error('返回语句必须保持在分支末尾。')
-            const neighborIds = groupFor.get(neighbor?.id) || new Set([neighbor?.id])
+            const neighborIds = new Set(groupFor.get(neighbor?.id) || [neighbor?.id])
+            for (const id of resultBindingGroupIds(core, graph, neighbor, scopePath)) neighborIds.add(id)
             const neighborItems = location.statements.filter(item => neighborIds.has(item?.id))
             const movingReferencesNeighbor = movingItems.some(item => [...neighborIds].some(id => statementReferences(item, id)))
             const neighborReferencesMoving = neighborItems.some(item => [...movingIds].some(id => statementReferences(item, id)))
@@ -1237,7 +1246,7 @@
       number: '数值', boolean: '布尔值', string: '文本', piece: '棋子', player: '玩家',
       cell: '地格', path: '路径', card: '卡牌', content: '内容', status: '状态',
       event: '事件', choice: '选择', record: '记录', object: '对象', list: '元组', set: '集合',
-      map: '映射', nullable: '可空值', enum: '选项', json: '任意数据', null: '空值', never: '空', unknown: '未知', any: '任意值',
+      map: '映射', nullable: '可空值', enum: '选项', json: '任意数据', null: '空值', never: '空', unknown: '未知', any: '任意值', 'cluster-instance': '能力组实例', 'cluster-instances': '能力组实例列表',
     }
     if (record(type)) {
       if (type.kind === 'list') return `元组<${typeLabel(type.element)}>`
@@ -1265,9 +1274,15 @@
     'skill-instance': '技能实例',
     'rule-instance': '规则实例',
     'status-instance': '状态实例',
-    'cluster-instance': '组合实例',
+    'cluster-instance': '能力组实例',
     'tile-effect': '地格效果',
   })[domain] || ''
+  function contextualTypeLabel(type, definition = null, descriptor = null, name = '') {
+    const explicitDomain = definition?.domain || descriptor?.outputDomains?.[name]
+    const domain = explicitDomain || (descriptor?.id === 'ref.current-cluster' && name === 'group' ? 'cluster-instance' : null)
+      || (definition?.name === 'abilityGroup' ? 'cluster-instance' : null)
+    return domain ? (authorDomainLabel(domain) || typeLabel(type)) : typeLabel(type)
+  }
   const authoredValueLabel = value => authorDomainLabel(value?.domain) || (value ? typeLabel(value.type) : '未知')
   function portValueType(port) {
     const type = port?.type ?? port?.valueType ?? 'unknown'
@@ -1634,6 +1649,7 @@
         'ref.current-skill': 'skill',
         'ref.current-card': 'card',
         'ref.current-rule': 'rule',
+        'ref.current-cluster': 'cluster',
         'card.instance-reference': 'card',
         'status.find-instance': 'status',
       }[source.module]
@@ -1805,6 +1821,93 @@
     if (Object.values(statement.layout?.resultVariables || {}).some(value => (typeof value === 'string' ? value : value?.name)?.trim())) return false
     const descriptor = descriptorForGraphStatement(core, graph, statement, scopePath)
     return pureDescriptor(descriptor) && graphUsesAnyOutput(graph, new Set([statement.id]), scopePath)
+  }
+
+  // Saving a result creates an executable local handle immediately after the
+  // producer. The handle is part of the graph's runtime IR, while the
+  // producer row owns the author-facing result. Keep the relationship
+  // explicit so a hand-authored local.declare remains visible. A link only
+  // counts as generated when the producer still exposes the saved port and
+  // its current type still accepts the declaration's value type. This keeps
+  // old/stale declarations visible instead of hiding a broken association.
+  function resultBindingValidation(core, graph, producer, port, binding, scopePath = []) {
+    if (!record(binding) || typeof binding.declarationId !== 'string') {
+      return { valid: false, reason: '缺少关联的局部变量声明' }
+    }
+    const declaration = statementLocationForLexicalId(graph, binding.declarationId, scopePath)?.statement
+    if (declaration?.kind !== 'call' || declaration.module !== 'local.declare') {
+      return { valid: false, reason: '关联的局部变量声明不存在' }
+    }
+    const initial = declaration.inputs?.initial
+    if (initial?.kind !== 'output' || initial.node !== producer?.id || initial.port !== port) {
+      return { valid: false, reason: '关联的初始返回值已变化' }
+    }
+    if (binding.name && binding.name !== declaration.parameters?.name) {
+      return { valid: false, reason: '关联的变量名已变化' }
+    }
+
+    let output = null
+    let outputType = null
+    if (producer?.kind === 'call') {
+      const descriptor = descriptorForGraphStatement(core, graph, producer, scopePath)
+      output = (Array.isArray(descriptor?.outputs) ? descriptor.outputs : []).find(item => item?.name === port) || null
+      if (!output) return { valid: false, reason: '返回端口已不存在', declaration }
+      outputType = outputValueType(core, graph, { kind: 'output', node: producer.id, port }, scopePath)
+        || descriptorOutputType(descriptor, port, producer, input => outputValueType(core, graph, input, scopePath))
+    } else if (['record.create', 'record.get', 'record.with'].includes(producer?.kind) && port === 'value') {
+      output = { name: 'value' }
+      outputType = producer.kind === 'record.create'
+        ? { kind: 'record', schema: producer.schema }
+        : producer.kind === 'record.get'
+          ? (recordFieldType(core, graph, producer.record, producer.field, scopePath) || 'unknown')
+          : (recordSchemaType(core, graph, producer.record, new Set(), scopePath) || 'unknown')
+    } else {
+      return { valid: false, reason: '结果来源已不再提供该返回端口', declaration }
+    }
+
+    const declaredType = serializedValueType(declaration.parameters?.valueType ?? binding.valueType, null)
+    if (knownResultType(outputType) && knownResultType(declaredType) && !compatibleType(outputType, declaredType)) {
+      return { valid: false, reason: '返回类型已变化', declaration, output, outputType, declaredType }
+    }
+    return { valid: true, declaration, output, outputType, declaredType }
+  }
+
+  function resultBindingDeclaration(core, graph, statement, scopePath = []) {
+    if (statement?.kind !== 'call' || statement.module !== 'local.declare') return null
+    const initial = statement.inputs?.initial
+    if (initial?.kind !== 'output' || !initial.node || !initial.port) return null
+    const producerLocation = statementLocationForLexicalId(graph, initial.node, scopePath)
+    const producer = producerLocation?.statement
+    if (!producer) return null
+    const binding = producer.layout?.resultVariables?.[initial.port]
+    if (!record(binding) || binding.declarationId !== statement.id) return null
+    const validation = resultBindingValidation(core, graph, producer, initial.port, binding, producerLocation?.scopePath || scopePath)
+    if (!validation.valid) return null
+    return { producer, binding, output: validation.output, outputType: validation.outputType }
+  }
+
+  function invalidResultBindingEntries(core, graph, statement, scopePath = []) {
+    const resultVariables = statement?.layout?.resultVariables
+    if (!record(resultVariables)) return []
+    return Object.entries(resultVariables)
+      .filter(([, binding]) => record(binding) && typeof binding.declarationId === 'string')
+      .map(([port, binding]) => ({ port, binding, validation: resultBindingValidation(core, graph, statement, port, binding, scopePath) }))
+      .filter(item => !item.validation.valid)
+  }
+
+  function resultBindingGroupIds(core, graph, statement, scopePath = []) {
+    const ids = new Set(statement?.id ? [statement.id] : [])
+    const linkedDeclaration = resultBindingDeclaration(core, graph, statement, scopePath)
+    if (linkedDeclaration?.producer?.id) ids.add(linkedDeclaration.producer.id)
+    const resultVariables = statement?.layout?.resultVariables
+    if (!record(resultVariables)) return ids
+    for (const binding of Object.values(resultVariables)) {
+      if (!record(binding) || typeof binding.declarationId !== 'string') continue
+      const declaration = statementLocationForLexicalId(graph, binding.declarationId, scopePath)?.statement
+      const linked = resultBindingDeclaration(core, graph, declaration, scopePath)
+      if (linked?.producer?.id === statement.id) ids.add(declaration.id)
+    }
+    return ids
   }
 
   function schemaBoundType(baseType, binding, statement) {
@@ -2389,6 +2492,18 @@
     return { statement, output: reference(statement.id, output.name), scopePath: consumerScopePath, draft: applied.next, diagnostic: applied.diagnostic }
   }
 
+  function explicitResultBindingName(core, graph, source, value, scopePath = []) {
+    const binding = source?.layout?.resultVariables?.[value?.port]
+    if (!record(binding) || typeof binding.declarationId !== 'string') return ''
+    const declaration = statementLocationForLexicalId(graph, binding.declarationId, scopePath)?.statement
+    const linked = resultBindingDeclaration(core, graph, declaration, scopePath)
+    if (linked?.producer?.id !== source?.id || linked.binding !== binding) return ''
+    const name = declaration.parameters?.name
+    return typeof name === 'string' && name.trim() && (!binding.name || binding.name === name)
+      ? name.trim()
+      : ''
+  }
+
   function expressionValueLabel(core, graph, value, trail = new Set(), scopePath = []) {
     if (!record(value)) return '未设置'
     if (value.kind === 'literal') return literalDisplay(value.value)
@@ -2401,6 +2516,8 @@
       const owner = author && statementForLexicalId(graph, author.owner, sourceScopePath)
       const authored = owner?.layout?.authorExpressions?.[author?.input]
       if (authored && jsonValue(authored.value) === jsonValue(value)) return authored.source
+      const savedBindingName = explicitResultBindingName(core, graph, source, value, sourceScopePath)
+      if (savedBindingName) return savedBindingName
       if (source?.layout?.resultNames?.[value.port]) return source.layout.resultNames[value.port]
       if (source?.kind === 'record.get' && !trail.has(value.node)) {
         const nextTrail = new Set(trail); nextTrail.add(value.node)
@@ -2424,6 +2541,7 @@
           'ref.current-card': '当前手牌',
           'ref.current-skill': '当前技能',
           'ref.current-rule': '当前规则',
+          'ref.current-cluster': '当前能力组',
           'ref.event-player': '事件玩家',
           'ref.event-piece': '当前事件棋子',
           'ref.rule-piece': '当前规则持有棋子',
@@ -2788,7 +2906,7 @@
     if (!disabled && (controls.forceExpression || !structuredLiteralType(expectedType)) && typeof controls.renderExpression === 'function' && typeof core?.lowerAuthorExpression === 'function' && window.ExpressionInput?.mount) return controls.renderExpression(graph, statement, definition, current)
     const wrapper = node('div', undefined, 'sentence-value-editor')
     const literalGraph = scopeDefinition(graph, controls.scopePath || []).graph || graph
-    const title = node('span', `${semanticSlotLabel(definition, definition?.name)} · ${typeLabel(expectedType)}`, 'sentence-field-label')
+    const title = node('span', `${semanticSlotLabel(definition, definition?.name)} · ${contextualTypeLabel(expectedType, definition)}`, 'sentence-field-label')
     const source = document.createElement('select')
     source.setAttribute('aria-label', title.textContent)
     source.dataset.sentenceValueSource = definition?.name || ''
@@ -2869,6 +2987,7 @@
     let scopePath = []
     let message = null
     let messageKind = 'info'
+    let resultVariableMessageKey = null
     let trialPending = false
     let activeDraft = null
     let pendingCollapseFocusKey = null
@@ -2877,6 +2996,7 @@
     const expressionEditors = new Set()
     const expressionDrafts = new Map()
     const resultVariableDrafts = new Map()
+    const resultVariableDraftErrors = new Map()
     // Author facade fields are editor drafts until the whole declaration or
     // assignment is applied. Keep them outside the graph so an IME-triggered
     // render (or closing and reopening the inspector) cannot discard text.
@@ -2954,6 +3074,8 @@
       expressionDrafts.clear()
       authorStatementDrafts.clear()
       resultVariableDrafts.clear()
+      resultVariableDraftErrors.clear()
+      resultVariableMessageKey = null
       const rawDrafts = state.expressions ?? state.expressionDrafts
       const drafts = Array.isArray(rawDrafts)
         ? rawDrafts
@@ -3037,6 +3159,7 @@
           'ref.current-card': 'card-instance',
           'ref.current-skill': 'skill-instance',
           'ref.current-rule': 'rule-instance',
+          'ref.current-cluster': 'cluster-instance',
         }
         const domain = domainByModule[source?.module]
         bindings[name] = { value: clone(ref.value), type: ref.type, ...(domain ? { domain } : {}),
@@ -3895,11 +4018,14 @@
         return null
       }
       const wrapper = node('div', undefined, 'sentence-author-expression')
-      wrapper.dataset.sentenceAuthorExpression = definition.name
+      // Keep the explicit field: prefix on DOM hooks so focused record-field
+      // editors remain addressable beside the bare metadata key used by old
+      // saved graphs. The latter continues to be used internally below.
+      wrapper.dataset.sentenceAuthorExpression = originalDefinitionName
       if (renderOptions.hidden) wrapper.hidden = true
       const header = node('div', undefined, 'sentence-author-expression-header')
       const label = node('span', semanticSlotLabel(definition, definition.name), 'sentence-field-label')
-      const status = node('span', `需要${typeLabel(expected)}`, 'sentence-author-expression-type')
+      const status = node('span', `需要${contextualTypeLabel(expected, definition)}`, 'sentence-author-expression-type')
       const editorHost = node('div')
       const footer = node('div', undefined, 'sentence-author-expression-footer')
       header.append(label, status); wrapper.append(header, editorHost, footer)
@@ -3907,6 +4033,10 @@
       const extensions = extensionMapDeclarations(graph, path, statement.id).filter(item => item.kind === 'value').map(item => ({ ...item, type: serializedValueType(item.valueType, 'record') }))
       const context = { surface: graph.surface, bindings, schemas, extensions, expectedType: expected }
       let value = expressionDrafts.get(key) ?? expressionText(graph, statement, definition, current, path, bindings, authorExpressionName)
+      // A missing typed tuple is an empty author expression, not an omitted
+      // editor. Keep this as an editor draft only; the graph remains sparse
+      // until the author presses 应用.
+      if (!String(value || '').trim() && current == null && originalDefinitionName.startsWith('field:') && expected?.kind === 'list') value = '{}'
       let valid = false
       const validate = () => {
         try {
@@ -3914,8 +4044,8 @@
           const inferred = inferredParameters(lowered.type)
           valid = derivesChoiceMapType ? Boolean(inferred) : Boolean(inferred) || compatibleType(lowered.type, expected)
           const actualLabel = authoredValueLabel(lowered)
-          status.textContent = valid ? actualLabel : `需要${typeLabel(expected)}，当前为${actualLabel}`
-        } catch (error) { valid = false; status.textContent = value.trim() ? error.message : `需要${typeLabel(expected)}` }
+          status.textContent = valid ? actualLabel : `需要${contextualTypeLabel(expected, definition)}，当前为${actualLabel}`
+        } catch (error) { valid = false; status.textContent = value.trim() ? error.message : `需要${contextualTypeLabel(expected, definition)}` }
         status.dataset.valid = String(valid)
         apply.disabled = !valid
       }
@@ -4032,10 +4162,10 @@
           else render()
         } catch (error) { status.textContent = error.message || String(error); status.dataset.valid = 'false' }
       }, 'sentence-author-expression-apply')
-          apply.dataset.sentenceApplyExpression = authorExpressionName
+          apply.dataset.sentenceApplyExpression = originalDefinitionName
       footer.append(node('small', 'Tab 补全 · Ctrl / ⌘ + Enter 应用'), apply)
       const widget = window.ExpressionInput.mount(editorHost, {
-        value, label: semanticSlotLabel(definition, definition.name), placeholder: `输入${typeLabel(expected)}表达式`,
+        value, label: semanticSlotLabel(definition, definition.name), placeholder: `输入${contextualTypeLabel(expected, definition)}表达式`,
         getSuggestions: (_query, details) => core.completeAuthorExpression(details.prefix, context)
           .filter(item => !bindings[item.value]?.generatedName),
         getParameterHint: details => core.authorExpressionParameterHint?.(details.prefix, context),
@@ -4248,6 +4378,49 @@
       message = text
       messageKind = kind
       render()
+    }
+
+    function reportResultVariableError(draftKey, text) {
+      const localized = authorDiagnostic(text)
+      resultVariableDraftErrors.set(draftKey, localized)
+      resultVariableMessageKey = draftKey
+      message = localized
+      messageKind = 'error'
+      render()
+    }
+
+    function clearResultVariableError(draftKey) {
+      const previous = resultVariableDraftErrors.get(draftKey)
+      if (!previous) return false
+      resultVariableDraftErrors.delete(draftKey)
+      if (resultVariableMessageKey === draftKey) {
+        resultVariableMessageKey = null
+        if (messageKind === 'error' && message === previous) {
+          message = null
+          messageKind = 'info'
+        }
+      }
+      return true
+    }
+
+    function clearResultVariableMessage() {
+      if (resultVariableMessageKey === null) return false
+      const activeError = resultVariableDraftErrors.get(resultVariableMessageKey)
+      resultVariableMessageKey = null
+      if (messageKind === 'error' && activeError && message === activeError) {
+        // The corresponding draft keeps its inline diagnostic. Clearing the
+        // transient banner lets another bound viewer open without erasing
+        // that draft or masking an unrelated editor error.
+        message = null
+        messageKind = 'info'
+        // A read-only result viewer toggles its panel in place and therefore
+        // does not render the whole editor. Remove the already-rendered
+        // banner here as well so an old draft error cannot leak across rows.
+        for (const banner of container.querySelectorAll('.sentence-message.error')) {
+          if (banner.textContent === activeError) banner.remove()
+        }
+      }
+      return true
     }
 
     function focusTargetForPopover(popover) {
@@ -4552,7 +4725,7 @@
       } catch (error) { report(error.message || String(error), 'error') }
     }
 
-    function structuralValue(graph, statement, definition, current, assign, path = scopePath) {
+    function structuralValue(graph, statement, definition, current, assign, path = scopePath, editorOptions = {}) {
       // Legacy graphs sometimes omit a type on a structured slot. If its
       // current value is a literal, infer only that slot's editor type; the
       // original unknown fields remain untouched in the graph.
@@ -4567,9 +4740,14 @@
         catalog: authorReferenceCatalog(options.catalog),
         getCatalog: typeof options.getCatalog === 'function' ? () => authorReferenceCatalog(options.getCatalog()) : undefined,
         referenceResolver: authorContentReference,
-        forceExpression: openPopover?.control === 'expression'
-          && openPopover.statementId === statement.id
-          && openPopover.inputName === definition.name,
+        // A focused record-field token uses the same author-expression editor
+        // even for structured field types (such as tuples). The full
+        // structured editor still owns literal/object controls; this focused
+        // row editor keeps one consistent expression path for an empty field.
+        forceExpression: Boolean(editorOptions.forceExpression)
+          || (openPopover?.control === 'expression'
+            && openPopover.statementId === statement.id
+            && openPopover.inputName === definition.name),
         onAuthorExpression: () => {
           const returnPopover = openPopover?.returnPopover || openPopover
           openPopover = { control: 'expression', statementId: statement.id, inputName: definition.name, slotKind: 'input', slotName: definition.name, scopePath: path, ...(returnPopover ? { returnPopover } : {}) }
@@ -4636,6 +4814,26 @@
       return { schema, fields: Array.isArray(schema?.fields) ? schema.fields : [] }
     }
 
+    // A schema field is an editable target as soon as the schema is selected,
+    // even when the author has not supplied a value yet.  Keep the graph
+    // sparse until the shared slot editor writes a value, but make the field
+    // discoverable in the row and in the field popover.
+    function recordFieldProjection(statement, graph, path = scopePath) {
+      const editorGraph = graphWithAuthorSchemas(core, schemaGraphForScope(graph, path))
+      const schemaRef = statement?.kind === 'record.create'
+        ? statement.schema
+        : recordSchemaType(core, graph, statement?.record, new Set(), path)?.schema
+      const definitions = recordFieldDefinitions(editorGraph, schemaRef).fields
+      const fieldNames = []
+      for (const field of definitions) {
+        if (field?.name && !fieldNames.includes(field.name)) fieldNames.push(field.name)
+      }
+      for (const fieldName of Object.keys(statement?.fields || {})) {
+        if (!fieldNames.includes(fieldName)) fieldNames.push(fieldName)
+      }
+      return { editorGraph, schemaRef, definitions, fieldNames }
+    }
+
     function renderStructuredSlotEditor(statement, graph, path = scopePath) {
       const focus = (openPopover?.control === 'slot' || openPopover?.control === 'expression') && openPopover.statementId === statement.id ? openPopover : null
       const panel = node('div', undefined, 'sentence-inline-editor sentence-structured-editor sentence-slot-only-editor')
@@ -4659,10 +4857,10 @@
         ? recordFieldDefinitions(editorGraph, recordSchemaRef).fields.find(field => field.name === recordFieldName)
         : null
       let expressionDefinition = null
-      const input = (label, type, value, assign) => {
+      const input = (label, type, value, assign, editorOptions = {}) => {
         expressionDefinition = { name, label, type: type === 'any' && value?.kind === 'literal' ? literalTypeOfValue(value.value) : type }
         slotHeading.textContent = `编辑${label}`
-        panel.append(structuralValue(graph, statement, expressionDefinition, value, assign, path))
+        panel.append(structuralValue(graph, statement, expressionDefinition, value, assign, path, editorOptions))
       }
       const textField = (label, value, onChange, dataName) => {
         const field = node('label', undefined, 'sentence-editor-field')
@@ -4728,7 +4926,7 @@
       } else if (isRecordStatement && (name.startsWith('field:') || recordFieldDefinition)) {
         const fieldName = recordFieldName
         const definition = recordFieldDefinition || { name: fieldName, label: fieldName, type: 'any' }
-        input(semanticSlotLabel(definition, fieldName), portValueType(definition), statement.fields?.[fieldName], value => updateStructural(statement.id, item => { item.fields = { ...(item.fields || {}), [fieldName]: value } }, path))
+        input(semanticSlotLabel(definition, fieldName), portValueType(definition), statement.fields?.[fieldName], value => updateStructural(statement.id, item => { item.fields = { ...(item.fields || {}), [fieldName]: value } }, path), { forceExpression: Boolean(recordFieldDefinition) })
       } else if (statement.kind === 'return' && name.startsWith('return:')) {
         const outputName = name.slice('return:'.length)
         const output = (scopeDefinition(graph, path).graph?.outputs || []).find(item => item.name === outputName)
@@ -4774,24 +4972,26 @@
       const top = node('div', undefined, 'sentence-inline-editor-top')
       top.append(node('strong', '编辑记录字段', 'sentence-inline-editor-title'), action('关闭编辑', closePopover, 'sentence-popover-close'))
       panel.append(top)
-      const fields = Object.keys(statement.fields || {})
-      if (!fields.length) {
+      const { definitions, fieldNames } = recordFieldProjection(statement, graph, path)
+      if (!fieldNames.length) {
         panel.append(node('p', '这条记录还没有字段。', 'sentence-inline-editor-copy'))
         return panel
       }
-      const schemaRef = statement.kind === 'record.create'
-        ? statement.schema
-        : recordSchemaType(core, graph, statement.record, new Set(), path)?.schema
-      const schema = schemaForGraph(graphWithAuthorSchemas(core, schemaGraphForScope(graph, path)), schemaRef)
-      const definitions = new Map((Array.isArray(schema?.fields) ? schema.fields : []).map(field => [field.name, field]))
+      const definitionByName = new Map(definitions.map(field => [field.name, field]))
       const list = node('div', undefined, 'sentence-record-fields-list')
-      for (const fieldName of fields) {
+      for (const fieldName of fieldNames) {
         const field = node('div', undefined, 'sentence-record-field sentence-record-field-editor')
-        const definition = definitions.get(fieldName)
+        const definition = definitionByName.get(fieldName)
         const label = definition?.label || fieldName
         field.append(node('span', `${label}：`, 'sentence-field-label'))
-        const referenceInfo = recordFieldReferenceInfo(statement, fieldName, statement.fields[fieldName], graph, path)
-        const display = referenceInfo?.text || recordFieldValueLabel(statement, statement.fields[fieldName], graph, path, fieldName)
+        const hasValue = own(statement.fields || {}, fieldName)
+        const value = hasValue ? statement.fields[fieldName] : undefined
+        const referenceInfo = hasValue ? recordFieldReferenceInfo(statement, fieldName, value, graph, path) : null
+        const display = hasValue
+          ? (referenceInfo?.text || recordFieldValueLabel(statement, value, graph, path, fieldName))
+          : definition
+            ? `未填写（${typeLabel(portValueType(definition))}）`
+            : '未填写'
         field.append(slotToken(display, statement.id, 'property', `field:${fieldName}`, path, label, {
           returnPopover: { control: 'record-fields', statementId: statement.id, scopePath: path },
           ...(referenceInfo?.missing ? { referenceMissing: true, referenceId: Array.isArray(referenceInfo.raw) ? referenceInfo.raw.join('、') : referenceInfo.raw } : {}),
@@ -4866,7 +5066,7 @@
                 if (!own(item.fields, field.name) && own(field, 'default')) item.fields[field.name] = literal(clone(field.default))
               }
             }
-          }, path), path))
+          }, path), path, { forceExpression: true }))
         }
         if (statement.kind === 'record.create') {
           selectField(panel, '结构定义', schemaRef, schemaValues, value => updateStructural(statement.id, (item, ownerGraph) => {
@@ -4890,7 +5090,7 @@
         if (definitions.length) selectField(panel, '字段名', statement.field || '', definitions.map(field => ({ value: field.name, label: `${fieldDisplayLabel(field)} · ${typeLabel(portValueType(field))}` })), value => updateStructural(statement.id, item => { item.field = value }, path), 'sentenceRecordField')
         else panel.append(node('p', `请先选择可解析的记录；字段“${statement.field || '未设置'}”会继续保留并参与诊断。`, 'sentence-invalid-field sentence-pending-field'))
         const recordDefinition = recordType || { kind: 'record', schema: '' }
-        panel.append(structuralValue(graph, statement, { name: 'record', label: '记录值', type: recordDefinition }, statement.record, value => updateStructural(statement.id, item => { item.record = value }, path), path))
+        panel.append(structuralValue(graph, statement, { name: 'record', label: '记录值', type: recordDefinition }, statement.record, value => updateStructural(statement.id, item => { item.record = value }, path), path, { forceExpression: true }))
       } else if (statement.kind === 'collection' || statement.kind?.startsWith?.('collection.')) {
         const methodValues = ['map', 'filter', 'reduce'].map(value => ({ value, label: value === 'map' ? '映射' : value === 'filter' ? '筛选' : '汇总' }))
         selectField(panel, '处理方式', statement.method || 'map', methodValues, value => updateStructural(statement.id, item => { item.kind = 'collection'; item.method = value }, path), 'sentenceCollectionMethod')
@@ -4920,7 +5120,7 @@
           ['min', '最少选择', 'number'], ['max', '最多选择', 'number'], ['minSelections', '最少选择（兼容）', 'number'], ['maxSelections', '最多选择（兼容）', 'number'],
           ['canCancel', '允许中止本次效果', 'boolean'], ['resumeOnCancel', '中止后继续流程', 'boolean'], ['message', '提示文字', 'string'],
         ]
-        for (const [key, label, type] of fields) if (own(statement, key)) panel.append(structuralValue(graph, statement, { name: key, label, type }, statement[key], value => updateStructural(statement.id, item => { item[key] = value }, path), path))
+        for (const [key, label, type] of fields) if (own(statement, key)) panel.append(structuralValue(graph, statement, { name: key, label, type }, statement[key], value => updateStructural(statement.id, item => { item[key] = value }, path), path, { forceExpression: key === 'payload' }))
         if (statement.min !== undefined && statement.minSelections !== undefined) panel.append(node('p', 'min 与 minSelections 不能同时使用；请保留一个字段。', 'sentence-invalid-field'))
         if (statement.max !== undefined && statement.maxSelections !== undefined) panel.append(node('p', 'max 与 maxSelections 不能同时使用；请保留一个字段。', 'sentence-invalid-field'))
       } else {
@@ -5075,7 +5275,7 @@
         typeField.append(typeEditor)
         panel.append(typeField)
         panel.append(sourceField('初始表达式', 'initialSource', draftValues.initialSource, '例如：0 或 当前棋子.攻击力'))
-        panel.append(node('small', `对象类型：${({ piece: '棋子', player: '玩家', battle: '全局', skill: '技能实例', status: '状态实例', rule: '规则实例', card: '卡牌实例', cluster: '组合实例', 'tile-effect': '地格效果' })[metadata.scope] || '待推导'}`, 'sentence-field-help'))
+        panel.append(node('small', `对象类型：${({ piece: '棋子', player: '玩家', battle: '全局', skill: '技能实例', status: '状态实例', rule: '规则实例', card: '卡牌实例', cluster: '能力组实例', 'tile-effect': '地格效果' })[metadata.scope] || '待推导'}`, 'sentence-field-help'))
       } else {
         panel.append(sourceField('目标字段/变量', 'targetSource', draftValues.targetSource, '例如：次数 或 当前棋子.动量'))
         panel.append(sourceField('值表达式', 'valueSource', draftValues.valueSource, '例如：次数 + 1'))
@@ -5228,13 +5428,22 @@
         // remain in the graph for deterministic lowering, while authors edit
         // the typed inputs and Chinese semantic choices instead.
         || ['sourceType', 'targetType', 'amountType', 'resultType', 'templateType', 'destinationType', 'displayType', 'extensionType', 'definitionType', 'blockType', 'argsType', 'legacyNormalSpelling', 'entityKind'].includes(parameter?.name)
-        || ['author.effect.damage', 'author.effect.heal'].includes(descriptor.id) && parameter?.name === 'skillId'
+        || ['author.effect.damage', 'author.effect.heal'].includes(descriptor.id)
+          && ['2', '3'].includes(String(statement.version || descriptor.version))
+          && parameter?.name === 'skillId'
         // Older editor bundles had no sentence metadata API. Keep this narrow
         // fallback so a legacy catalog still hides the instance discriminator.
         || extensionInstanceDescriptor && parameter?.name === 'entityKind'
       const isAuthorableParameter = parameter => {
         if (!parameter) return false
         if (isInternalAuthorParameter(parameter)) return false
+        // The typed damage sentence exposes an attribution toggle even when
+        // the template has folded the default into prose. A focused toggle
+        // must open the real enum editor instead of the generic prerequisite
+        // warning used for dependent parameters.
+        if (descriptor.id === 'author.effect.damage' && String(statement.version || descriptor.version) === '3'
+          && parameter.name === 'attribution'
+          && focusedSlot?.slotKind === 'parameter' && focusedSlot.slotName === 'attribution') return true
         if (/^author\.effect\.(damage|heal)$/.test(descriptor.id) && statement.version === '2' && (['sourceType', 'targetType', 'amountType', 'resultType'].includes(parameter.name) || descriptor.id === 'author.effect.heal' && parameter.name === 'damageType')) return false
         if (descriptor.id === 'rule.remove-id-raw' && String(descriptor.version) === '2' && parameter.name === 'targetType') return false
         if (['author.effect.summon', 'author.piece.display'].includes(descriptor.id) && ['sourceType', 'templateType', 'destinationType', 'displayType'].includes(parameter.name)) return false
@@ -5464,6 +5673,14 @@
             if (derived) item.parameters = { ...(item.parameters || {}), ...derived }
           }, path)
         }
+        const updateDamageAttribution = value => {
+          updateParameter(item => { item.parameters = { ...(item.parameters || {}), [parameter.name]: value } })
+          if (descriptor.id === 'author.effect.damage' && String(statement.version || descriptor.version) === '3'
+            && parameter.name === 'attribution' && value === 'current') {
+            try { ensureTypedDamageCurrentCluster(statement, descriptor, graph, path) }
+            catch (error) { report(error?.message || String(error), 'error') }
+          }
+        }
         if (isValueTypeParameter) {
           const current = serializedValueType(statement.parameters?.[parameter.name], 'number')
           control = typeControl(current, value => updateParameter(item => {
@@ -5482,7 +5699,7 @@
           control.dataset.sentenceKeyFieldParameter = parameter.name
           if (!values.length) control.title = '请先选择已声明的记录类型。'
         } else {
-          control = literalControl(statement.parameters?.[parameter.name] ?? defaultForType(effectiveParameter), effectiveParameter, value => updateParameter(item => { item.parameters = { ...(item.parameters || {}), [parameter.name]: value } }), false, {
+          control = literalControl(statement.parameters?.[parameter.name] ?? defaultForType(effectiveParameter), effectiveParameter, value => updateDamageAttribution(value), false, {
             graph: editorGraph,
             schemaRegistry: options.schemaRegistry || options.objectSchemaRegistry,
             catalog: authorReferenceCatalog(options.catalog),
@@ -5559,7 +5776,7 @@
       }
       if (!focusedSlot && Array.isArray(descriptor.outputs) && descriptor.outputs.length) {
         panel.append(node('h4', '输出', 'sentence-inline-editor-section'))
-        panel.append(node('p', descriptor.outputs.map(output => `${semanticSlotLabel(output, output.name)} · ${typeLabel(descriptorOutputType(descriptor, output.name, statement, input => outputValueType(core, editorGraph, input, path)))}`).join('、'), 'sentence-inline-editor-output'))
+        panel.append(node('p', descriptor.outputs.map(output => `${semanticSlotLabel(output, output.name)} · ${contextualTypeLabel(descriptorOutputType(descriptor, output.name, statement, input => outputValueType(core, editorGraph, input, path)), output, descriptor, output.name)}`).join('、'), 'sentence-inline-editor-output'))
       }
       if (focusedSlot) {
         const slots = [
@@ -5592,6 +5809,18 @@
 
     function slotToken(text, statementId, slotKind, slotName, path = scopePath, label = '', tokenOptions = {}) {
       const button = action(text, () => {
+        // Some typed templates intentionally fold a default reference into
+        // prose.  The first click must materialize that reference before the
+        // focused editor is opened, otherwise the author sees a label that
+        // cannot be edited and the graph keeps relying on an implicit
+        // compiler fallback.
+        if (typeof tokenOptions.beforeOpen === 'function') {
+          try { tokenOptions.beforeOpen() }
+          catch (error) {
+            report(error?.message || String(error), 'error')
+            return
+          }
+        }
         openPopover = {
           control: 'slot', statementId, slotKind, slotName, scopePath: path,
           ...(tokenOptions.returnPopover ? { returnPopover: tokenOptions.returnPopover } : {}),
@@ -5601,6 +5830,8 @@
       button.dataset.sentenceSlotEditor = `${statementId || ''}:${slotKind}:${slotName || ''}`
       button.dataset.sentenceSlotKind = slotKind
       button.dataset.sentenceSlotName = slotName || ''
+      if (tokenOptions.autoCurrentCluster) button.dataset.sentenceAutoCurrentCluster = 'true'
+      if (tokenOptions.autoUnattributed) button.dataset.sentenceAutoUnattributed = 'true'
       if (tokenOptions.referenceMissing) {
         button.dataset.sentenceReferenceMissing = 'true'
         if (tokenOptions.referenceId) button.dataset.sentenceReferenceId = String(tokenOptions.referenceId)
@@ -5637,7 +5868,19 @@
       return fragments
     }
 
-    function semanticParameterDisplay(name, value, definition) {
+    function parameterReferenceInfo(statement, name, value) {
+      if (name !== 'skillId' || !['author.effect.damage', 'author.effect.heal'].includes(statement?.module)) return null
+      let catalog = authorReferenceCatalog(options.catalog)
+      if (typeof options.getCatalog === 'function') {
+        try { catalog = authorReferenceCatalog(options.getCatalog() || catalog) } catch { /* retain the last catalog snapshot */ }
+      }
+      const info = authorReferenceValueInfo(value, 'skills', catalog)
+      return info ? { ...info, collection: 'skills' } : null
+    }
+
+    function semanticParameterDisplay(name, value, definition, statement) {
+      const reference = parameterReferenceInfo(statement, name, value)
+      if (reference) return reference.missing ? '缺失的技能引用' : reference.text
       if (name === 'valueType') return typeLabel(serializedValueType(value, portValueType(definition)))
       if (name === 'sourceType' && ['piece', 'record'].includes(value)) return value === 'piece' ? '棋子来源' : '本次执行来源'
       if (name === 'mode' && ['new-instance', 'return-instance', 'declaration'].includes(value)) {
@@ -5677,6 +5920,7 @@
       const definition = kind === 'parameter'
         ? (Array.isArray(descriptor?.parameters) ? descriptor.parameters : []).find(item => item.name === name)
         : descriptorInputDefinition(descriptor, (Array.isArray(descriptor?.inputs) ? descriptor.inputs : []).find(item => item.name === name), statement)
+      if (fragment?.unattributedFallback) return { text: '不归因于能力组', kind, name, label: semanticSlotLabel(definition, name) }
       let value = kind === 'parameter' ? statement.parameters?.[name] : statement.inputs?.[name]
       if (value === undefined && !descriptor) {
         if (name?.startsWith?.('field:')) value = statement.fields?.[name.slice('field:'.length)]
@@ -5687,14 +5931,22 @@
       const semanticLabel = semanticSlotLabel(definition, name)
       const empty = fragment?.empty || semanticLabel || '待填写'
       if (value === undefined || value === null || value === '') return { text: empty, kind, name, label: semanticLabel }
+      const reference = kind === 'parameter' ? parameterReferenceInfo(statement, name, value) : null
       const display = kind === 'parameter'
-        ? (statement?.kind === 'record.create' && name === 'schema' ? recordCreateDisplayLabel(statement, graph, path) : semanticParameterDisplay(name, value, definition))
+        ? (statement?.kind === 'record.create' && name === 'schema' ? recordCreateDisplayLabel(statement, graph, path) : semanticParameterDisplay(name, value, definition, statement))
         : record(value) ? projectionValueLabel(statement, fragment, value, graph, path) : contextualLiteralDisplay(statement, value, graph, path)
-      return { text: display || empty, kind, name, label: semanticLabel }
+      return {
+        text: display || empty,
+        kind,
+        name,
+        label: semanticLabel,
+        ...(reference?.missing ? { referenceMissing: true, referenceId: reference.raw } : {}),
+      }
     }
 
     function sentenceFragmentAvailability(descriptor, statement, fragment) {
       if (!descriptor || !fragment || (fragment.kind !== 'input' && fragment.kind !== 'parameter') || !fragment.name) return null
+      if (fragment.autoCurrentCluster || fragment.unattributedFallback) return true
       const definition = fragment.kind === 'input'
         ? (Array.isArray(descriptor.inputs) ? descriptor.inputs : []).find(item => item.name === fragment.name)
         : (Array.isArray(descriptor.parameters) ? descriptor.parameters : []).find(item => item.name === fragment.name)
@@ -5798,6 +6050,59 @@
       return valueLabel(core, graph, value, path)
     }
 
+    function typedDamageClusterFallback(descriptor, statement, graph, fragment) {
+      if (descriptor?.id !== 'author.effect.damage' || String(statement?.version || descriptor?.version) !== '3') return null
+      if (own(statement?.inputs, 'abilityGroup')) return null
+      const text = typeof fragment === 'string' ? fragment : fragment?.text
+      if (fragment?.kind === 'input' && fragment.name === 'abilityGroup') {
+        const inputFragment = { ...fragment }
+        delete inputFragment.text
+        if (graph?.surface === 'skill') return { ...inputFragment, empty: '当前能力组', autoCurrentCluster: true }
+        if (['rule', 'triggerSkill', 'pending'].includes(String(graph?.surface))) {
+          return { kind: 'parameter', name: 'attribution', empty: '不归因于能力组', unattributedFallback: true }
+        }
+        return '不归因于能力组'
+      }
+      if (fragment?.kind === 'parameter' && fragment.name === 'attribution') {
+        const parameterFragment = { ...fragment }
+        delete parameterFragment.text
+        return { ...parameterFragment, empty: '不归因于能力组', unattributedFallback: true }
+      }
+      if (text === '不归因于能力组') {
+        // Rule/trigger flows can opt back into the current cluster. Cards do
+        // not have a current-cluster execution context, so keep their honest
+        // default as prose until the author provides a supported input.
+        if (['rule', 'triggerSkill', 'pending'].includes(String(graph?.surface))) {
+          return { kind: 'parameter', name: 'attribution', empty: '不归因于能力组', unattributedFallback: true }
+        }
+        return '不归因于能力组'
+      }
+      if (text !== '当前能力组') return null
+      // The skill surface has a meaningful current cluster at runtime. Keep
+      // that default authorable by projecting it as a synthetic slot until
+      // the first click creates the explicit ref.current-cluster call.
+      if (graph?.surface === 'skill') return { kind: 'input', name: 'abilityGroup', empty: '当前能力组', autoCurrentCluster: true }
+      // Core lowering treats a missing group on cards/rules as unattributed,
+      // even if an old graph retained the serialized `current` policy. Do not
+      // present the stale policy as a fake current-cluster reference.
+      if (['rule', 'triggerSkill', 'pending'].includes(String(graph?.surface))) {
+        return { kind: 'parameter', name: 'attribution', empty: '不归因于能力组', unattributedFallback: true }
+      }
+      return '不归因于能力组'
+    }
+
+    function ensureTypedDamageCurrentCluster(statement, descriptor, graph, path) {
+      if (descriptor?.id !== 'author.effect.damage' || String(statement?.version || descriptor?.version) !== '3') return
+      if (!['skill', 'rule', 'triggerSkill', 'pending'].includes(String(graph?.surface)) || own(statement?.inputs, 'abilityGroup')) return
+      const expectedType = descriptorInputType(descriptor, 'abilityGroup', statement)
+      if (!expectedType) throw new Error('当前能力组输入类型未注册，无法创建默认引用。')
+      // A newly inserted damage row can still be incomplete. The graph
+      // compiler may return a save diagnostic for that partial state while
+      // preserving the editor draft; keep the real reference and let the
+      // focused input editor repair the remaining required values.
+      createPureExpression(options, statement.id, 'abilityGroup', expectedType, 'ref.current-cluster', '1', path)
+    }
+
     function appendSentenceTemplate(expression, descriptor, statement, graph, path, suppliedFragments = null) {
       const supplied = suppliedFragments || sentenceTemplate(descriptor, statement, {
         graph,
@@ -5805,7 +6110,13 @@
         valueLabel: value => valueLabel(core, graph, value, path),
         literalDisplay,
       })
-      const fragments = supplied || genericTemplate(descriptor, statement)
+      const rawFragments = supplied || genericTemplate(descriptor, statement)
+      const fragments = []
+      for (const fragment of rawFragments) {
+        const fallback = typedDamageClusterFallback(descriptor, statement, graph, fragment)
+        if (fallback !== null) fragments.push(fallback)
+        else fragments.push(fragment)
+      }
       expression.dataset.sentenceTemplate = statement.module || ''
       for (const fragment of fragments) {
         if (typeof fragment === 'string' || fragment?.text !== undefined) {
@@ -5819,7 +6130,16 @@
         if (availability === false && !authoredFragmentValue(statement, fragment)) continue
         const resolved = fragmentText(descriptor, statement, fragment, graph, path)
         if (resolved.kind && resolved.name) {
-          expression.append(slotToken(resolved.text, statement.id, resolved.kind, resolved.name, path, semanticSlotLabel(resolved, resolved.name), { pending: availability === false }))
+          expression.append(slotToken(resolved.text, statement.id, resolved.kind, resolved.name, path, semanticSlotLabel(resolved, resolved.name), {
+            pending: availability === false,
+            referenceMissing: resolved.referenceMissing,
+            referenceId: resolved.referenceId,
+            ...(fragment.autoCurrentCluster ? {
+              autoCurrentCluster: true,
+              beforeOpen: () => ensureTypedDamageCurrentCluster(statement, descriptor, graph, path),
+            } : {}),
+            ...(fragment.unattributedFallback ? { autoUnattributed: true } : {}),
+          }))
         } else expression.append(node('span', resolved.text || '待填写', 'sentence-template-text'))
       }
     }
@@ -5947,6 +6267,20 @@
         row.dataset.sentenceExpressionInput = String(expressionMeta.input)
       }
       const expression = node('div', undefined, 'sentence-row-expression')
+      const appendRecordFields = (fieldNames, suffix = '。') => {
+        if (!fieldNames.length) return false
+        expression.append(node('span', '，填写', 'sentence-template-text'))
+        const fieldTrigger = action(`${fieldNames.length}个字段`, () => {
+          openPopover = { control: 'record-fields', statementId: statement.id, scopePath: path }
+          render()
+        }, 'sentence-inline-token sentence-record-fields-token')
+        fieldTrigger.dataset.sentenceRecordFields = statement.id || ''
+        fieldTrigger.setAttribute('aria-pressed', openPopover?.control === 'record-fields' && openPopover.statementId === statement.id ? 'true' : 'false')
+        fieldTrigger.classList.toggle('is-selected', openPopover?.control === 'record-fields' && openPopover.statementId === statement.id)
+        fieldTrigger.title = '在右侧编辑记录字段'
+        expression.append(fieldTrigger, node('span', suffix, 'sentence-template-text'))
+        return true
+      }
       const authorStatement = authorStatementMetadata(statement)
       const authorDraft = authorStatement
         ? authorStatementDrafts.get(authorStatementDraftKey(statement.id, path))
@@ -6003,7 +6337,7 @@
           )
         }
       } else {
-      const structuralTemplate = statement?.kind !== 'call' && statement?.kind !== 'record.create' ? sentenceStatementTemplate(statement, { graph, path }) : null
+      const structuralTemplate = statement?.kind !== 'call' && !['record.create', 'record.with'].includes(statement?.kind) ? sentenceStatementTemplate(statement, { graph, path }) : null
       if (structuralTemplate) {
         appendSentenceTemplate(expression, null, statement, graph, path, structuralTemplate)
       } else if (statement?.kind === 'call') {
@@ -6046,21 +6380,12 @@
         expression.append(node('span', '对', 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.items, path), statement.id, 'input', 'items', path, '集合'), node('span', `执行${method}，再继续后续步骤。`, 'sentence-template-text'))
       } else if (statement?.kind === 'record.create') {
         expression.append(node('span', '创建一条', 'sentence-template-text'), slotToken(recordCreateDisplayLabel(statement, graph, path), statement.id, 'property', 'schema', path, '结构定义'), node('span', '记录', 'sentence-template-text'))
-        const fields = Object.keys(statement.fields || {})
-        if (fields.length) {
-          expression.append(node('span', '，填写', 'sentence-template-text'))
-          const fieldTrigger = action(`${fields.length}个字段`, () => {
-            openPopover = { control: 'record-fields', statementId: statement.id, scopePath: path }
-            render()
-          }, 'sentence-inline-token sentence-record-fields-token')
-          fieldTrigger.dataset.sentenceRecordFields = statement.id || ''
-          fieldTrigger.setAttribute('aria-pressed', openPopover?.control === 'record-fields' && openPopover.statementId === statement.id ? 'true' : 'false')
-          fieldTrigger.classList.toggle('is-selected', openPopover?.control === 'record-fields' && openPopover.statementId === statement.id)
-          fieldTrigger.title = '在右侧编辑记录字段'
-          expression.append(fieldTrigger, node('span', '。', 'sentence-template-text'))
-        }
+        appendRecordFields(recordFieldProjection(statement, graph, path).fieldNames)
       } else if (statement?.kind === 'record.with') {
-        expression.append(node('span', '更新', 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.record, path), statement.id, 'input', 'record', path, '记录'), node('span', '中的字段后继续。', 'sentence-template-text'))
+        expression.append(node('span', '更新', 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.record, path), statement.id, 'input', 'record', path, '记录'))
+        if (!appendRecordFields(recordFieldProjection(statement, graph, path).fieldNames, '后继续。')) {
+          expression.append(node('span', '中的字段后继续。', 'sentence-template-text'))
+        }
       } else if (statement?.kind === 'record.get') {
         expression.append(node('span', '读取', 'sentence-template-text'), slotToken(valueLabel(core, graph, statement.record, path), statement.id, 'input', 'record', path, '记录'), node('span', '的字段', 'sentence-template-text'), slotToken(statement.field || '字段名', statement.id, 'property', 'field', path, '字段名'), node('span', '。', 'sentence-template-text'))
       } else if (statement?.kind === 'while') {
@@ -6082,7 +6407,8 @@
         const descriptor = statement.kind === 'call' ? descriptorForCurrent(graph, statement, path)
           : { outputs: [{ name: 'value', label: statement.kind === 'record.get' ? '字段值' : '记录' }] }
         const outputs = (descriptor?.outputs || []).filter(output => output.name !== 'success' || descriptor.outputs.length === 1)
-        if (outputs.length) {
+        const invalidBindings = invalidResultBindingEntries(core, graph, statement, path)
+        if (outputs.length || invalidBindings.length) {
           const results = node('div', undefined, 'sentence-result-names')
           results.append(node('span', '返回值绑定', 'sentence-result-heading'))
           for (const output of outputs) {
@@ -6106,11 +6432,15 @@
               ? statementLocation(graph, binding.declarationId, path)?.statement
               : null
             const adjacentDeclaration = producerLocation?.statements?.[producerLocation.index + 1]
-            const declarationForBinding = [linkedDeclaration, adjacentDeclaration]
+            const declarationCandidate = [linkedDeclaration, adjacentDeclaration]
               .filter(item => item?.module === 'local.declare')
               .find(item => item.inputs?.initial?.kind === 'output'
                 && item.inputs.initial.node === statement.id
                 && item.inputs.initial.port === output.name)
+            const declarationForBinding = declarationCandidate
+              && resultBindingDeclaration(core, graph, declarationCandidate, path)?.producer?.id === statement.id
+              ? declarationCandidate
+              : null
             const bindingName = declarationForBinding?.parameters?.name
               || (binding && !binding.declarationId ? binding.name : '')
             const draftKey = resultVariableDraftKey(statement.id, output.name, path)
@@ -6120,7 +6450,7 @@
             const draftName = typeof existingDraft?.name === 'string' ? existingDraft.name : bindingName
             const card = node('div', undefined, 'sentence-result-binding')
             const header = node('div', undefined, 'sentence-result-binding-header')
-            const outputText = node('span', `${outputLabel(descriptor, output.name)} · ${typeLabel(outputType)}`, 'sentence-result-binding-label')
+            const outputText = node('span', `${outputLabel(descriptor, output.name)} · ${contextualTypeLabel(outputType, output, descriptor, output.name)}`, 'sentence-result-binding-label')
             if (bindingName) header.append(node('span', `将${outputLabel(descriptor, output.name)}存入${bindingName}`, 'sentence-result-binding-summary'))
             const openButton = action(declarationForBinding ? `查看变量（${bindingName}）` : bindingName ? `保存返回值（${bindingName}）` : '保存返回值', null, 'sentence-result-save')
             openButton.dataset.sentenceSaveResult = `${statement.id}:${output.name}`
@@ -6130,7 +6460,7 @@
             editor.dataset.sentenceResultVariableEditor = `${statement.id}:${output.name}`
             const editorOpen = existingDraft?.open === true
             editor.hidden = !editorOpen
-            const typeText = node('span', `推导类型：${typeLabel(outputType)}`, 'sentence-result-binding-type')
+            const typeText = node('span', `推导类型：${contextualTypeLabel(outputType, output, descriptor, output.name)}`, 'sentence-result-binding-type')
             const nameLabel = node('label', undefined, 'sentence-result-binding-field')
             nameLabel.append(node('span', '变量名', 'sentence-result-binding-field-label'))
             const input = node('input')
@@ -6149,11 +6479,19 @@
             applyButton.dataset.sentenceResultVariableApply = `${statement.id}:${output.name}`
             applyButton.disabled = !typeKnown || Boolean(declarationForBinding)
             const cancelButton = action('取消', () => {
+              clearResultVariableError(draftKey)
               if (resultVariableDrafts.delete(draftKey)) notifyEditorStateChange()
               editor.hidden = true
             }, 'sentence-result-cancel')
             editorActions.append(applyButton, cancelButton)
             editor.append(typeText, nameLabel)
+            const draftError = resultVariableDraftErrors.get(draftKey)
+            if (draftError) {
+              const warning = node('small', draftError, 'sentence-result-binding-diagnostic sentence-result-variable-error')
+              warning.dataset.sentenceResultVariableError = draftKey
+              warning.setAttribute('role', 'alert')
+              editor.append(warning)
+            }
             if (!typeKnown) editor.append(node('small', '返回值类型暂不可推导，完善输入后再保存。', 'sentence-result-binding-diagnostic'))
             editor.append(editorActions)
             const rememberDraft = () => {
@@ -6174,6 +6512,7 @@
               }, 0)
             })
             input.addEventListener('input', event => {
+              clearResultVariableError(draftKey)
               rememberDraft()
               if (event.isComposing || event.inputType === 'insertCompositionText') composingControls.add(input)
             })
@@ -6192,7 +6531,9 @@
                 // keeps save/training guards clear while the read-only panel
                 // is open, including after a stale restored draft.
                 const removedDraft = resultVariableDrafts.delete(draftKey)
-                if (removedDraft) notifyEditorStateChange()
+                const removedError = clearResultVariableError(draftKey)
+                const clearedResultMessage = clearResultVariableMessage()
+                if (removedDraft || removedError || clearedResultMessage) notifyEditorStateChange()
                 editor.hidden = !editor.hidden
                 if (!editor.hidden) {
                   input.focus()
@@ -6217,9 +6558,10 @@
             }
             applyButton.onclick = () => {
               const name = input.value.trim()
-              if (!typeKnown) { report('返回值类型暂不可推导，暂不能创建局部变量。', 'error'); return }
-              if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name)) { report('变量名须以文字或下划线开头。', 'error'); return }
-              if (['当前棋子', '当前玩家', '当前手牌', '当前技能', '当前规则', '当前事件', '全局', '当前对局', '每项', 'true', 'false', 'null', '__proto__', 'prototype', 'constructor'].includes(name)) { report('此名称已用于当前上下文，请换一个变量名。', 'error'); return }
+              if (!typeKnown) { reportResultVariableError(draftKey, '返回值类型暂不可推导，暂不能创建局部变量。'); return }
+              if (!name) { reportResultVariableError(draftKey, '请填写变量名。'); return }
+              if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name)) { reportResultVariableError(draftKey, '变量名须以文字或下划线开头。'); return }
+              if (['当前棋子', '当前玩家', '当前手牌', '当前技能', '当前规则', '当前事件', '全局', '当前对局', '每项', 'true', 'false', 'null', '__proto__', 'prototype', 'constructor'].includes(name)) { reportResultVariableError(draftKey, '此名称已用于当前上下文，请换一个变量名。'); return }
               let committed = false
               const draftBeforeCommit = resultVariableDrafts.get(draftKey)
               resultVariableDrafts.delete(draftKey)
@@ -6282,9 +6624,12 @@
                   },
                 }
                 committed = true
-              }, path)
+              }, path, error => reportResultVariableError(draftKey, error))
               committed = committed && applied
-              if (committed) notifyEditorStateChange()
+              if (committed) {
+                clearResultVariableError(draftKey)
+                notifyEditorStateChange()
+              }
               if (!committed && draftBeforeCommit) {
                 resultVariableDrafts.set(draftKey, draftBeforeCommit)
                 render()
@@ -6301,6 +6646,7 @@
               legacyInput.setAttribute('aria-label', `${outputLabel(descriptor, output.name)}变量名`)
               legacyInput.addEventListener('change', () => {
                 const nextLegacyName = legacyInput.value.trim(), previous = statement.layout?.resultNames?.[output.name] || defaultName
+                if (!nextLegacyName) { report('请填写变量名。', 'error'); return }
                 if (!/^[\p{L}_][\p{L}\p{N}_]*$/u.test(nextLegacyName)) { report('变量名须以文字或下划线开头。', 'error'); return }
                 if (['当前棋子', '当前玩家', '当前手牌', '当前技能', '当前规则', '当前事件', '全局', '当前对局', '每项', 'true', 'false', 'null', '__proto__', 'prototype', 'constructor'].includes(nextLegacyName)) { report('此名称已用于当前上下文，请换一个变量名。', 'error'); return }
                 mutateGraph(next => {
@@ -6320,6 +6666,11 @@
               card.append(header, legacy, editor)
             } else card.append(header, editor)
             results.append(card)
+          }
+          for (const invalid of invalidBindings) {
+            const diagnostic = node('small', `返回值绑定已失效（${invalid.port}）：${invalid.validation.reason}。请重新保存返回值。`, 'sentence-result-binding-diagnostic')
+            diagnostic.dataset.sentenceResultBindingInvalid = `${statement.id}:${invalid.port}`
+            results.append(diagnostic)
           }
           row.append(results)
         }
@@ -6370,6 +6721,7 @@
       }
       for (const statement of Array.isArray(statements) ? statements : []) {
         if (authorGeneratedIds.has(statement?.id) && !authorStatementMetadata(statement)) continue
+        if (resultBindingDeclaration(core, graph, statement, path)) continue
         if (statement?.layout?.authorExpression && statementForLexicalId(graph, statement.layout.authorExpression.owner, path)) continue
         // Legacy graphs carry no sentence-expression ownership metadata.  A
         // consumed pure call is still a value-producing implementation detail;
@@ -6440,7 +6792,7 @@
       return list
     }
 
-    function mutateGraph(mutator, path = scopePath) {
+    function mutateGraph(mutator, path = scopePath, onError = null) {
       try {
         const scrollSnapshot = captureScrollOffsets()
         const generation = renderGeneration
@@ -6455,7 +6807,12 @@
         restoreScrollOffsets(scrollSnapshot)
         return true
       }
-      catch (error) { report(error.message || String(error), 'error'); return false }
+      catch (error) {
+        const text = error.message || String(error)
+        if (typeof onError === 'function') onError(text)
+        else report(text, 'error')
+        return false
+      }
     }
 
     function typeControl(current, onChange, graph, datasetName = 'sentenceType') {

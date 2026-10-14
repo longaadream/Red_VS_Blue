@@ -133,7 +133,7 @@ test('standard registry modules expose each required slot exactly once', () => {
         const inferred = kind === 'parameter' && (
           templates.isDerivedParameter(descriptor, statement, definition.name)
           || inferredParameters[descriptor.id]?.includes(definition.name)
-          || /^author\.effect\.(damage|heal)$/.test(descriptor.id) && descriptor.version === '2' && (['sourceType', 'targetType', 'amountType', 'resultType', 'legacyNormalSpelling'].includes(definition.name) || descriptor.id === 'author.effect.heal' && definition.name === 'damageType')
+          || /^author\.effect\.(damage|heal)$/.test(descriptor.id) && ['2', '3'].includes(descriptor.version) && (['sourceType', 'targetType', 'amountType', 'resultType', 'legacyNormalSpelling'].includes(definition.name) || descriptor.id === 'author.effect.heal' && definition.name === 'damageType')
           || (/^set\./.test(descriptor.id) || /^map\.(create|get|set|delete|count)$/.test(descriptor.id) || /^map\.(has-key|keys|values)$/.test(descriptor.id) && descriptor.version === '2') && ['containerType', 'keyType', 'valueType', 'keysType', 'valuesType', 'itemsType'].includes(definition.name)
         )
         assert.equal(count, inferred ? 0 : 1, `${descriptor.id} ${kind}.${definition.name} appeared ${count} times`)
@@ -301,6 +301,28 @@ test('damage sentence keeps the agreed Chinese slot order', () => {
     parameters: { damageType: 'true', attribution: 'unattributed' },
   })
   assert.equal(rendered(unattributedFragments), '对【input:target】造成【input:amount】点【parameter:damageType】伤害，来源为【input:source】，归属方式为【parameter:attribution】')
+
+  const typedDescriptor = standardCatalog.find(item => item.id === 'author.effect.damage' && item.version === '3')
+  assert.ok(typedDescriptor)
+  const typedFragments = templates.describeCall(typedDescriptor, {
+    module: typedDescriptor.id, version: '3',
+    inputs: { source: {}, target: {}, amount: {} },
+    parameters: { damageType: 'normal' },
+  })
+  assert.equal(rendered(typedFragments), '对【input:target】造成【input:amount】点【parameter:damageType】伤害，来源为【input:source】，归因于当前能力组')
+  assert.ok(typedFragments.optional.some(slot => slot.kind === 'input' && slot.name === 'abilityGroup'))
+  const explicitTypedFragments = templates.describeCall(typedDescriptor, {
+    module: typedDescriptor.id, version: '3',
+    inputs: { source: {}, target: {}, amount: {}, abilityGroup: {} },
+    parameters: { damageType: 'normal' },
+  })
+  assert.equal(rendered(explicitTypedFragments), '对【input:target】造成【input:amount】点【parameter:damageType】伤害，来源为【input:source】，归因于【input:abilityGroup】')
+  const typedUnattributedFragments = templates.describeCall(typedDescriptor, {
+    module: typedDescriptor.id, version: '3',
+    inputs: { source: {}, target: {}, amount: {} },
+    parameters: { damageType: 'true', attribution: 'unattributed' },
+  })
+  assert.equal(rendered(typedUnattributedFragments), '对【input:target】造成【input:amount】点【parameter:damageType】伤害，来源为【input:source】，不归因于能力组')
 })
 
 test('dynamic card copy exposes typed inputs and an editable natural sentence', () => {

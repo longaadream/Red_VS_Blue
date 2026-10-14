@@ -843,7 +843,7 @@ try {
     const targetId = await addModule('#cards-detail', 'author.choice.target-piece', '1')
     await saveSentenceOutput('#cards-detail', targetId, 'piece', 'target')
 
-    const damageId = await addModule('#cards-detail', 'author.effect.damage', '2')
+    const damageId = await addModule('#cards-detail', 'author.effect.damage', '3')
     await applySlotExpression('#cards-detail', damageId, 'source', '当前棋子')
     await applySlotExpression('#cards-detail', damageId, 'target', 'target')
     await applySlotExpression('#cards-detail', damageId, 'amount', '1')
@@ -857,6 +857,9 @@ try {
     const namedTarget = graph.body.find(statement => statement.id === targetId)
     const authoredDamage = graph.body.find(statement => statement.id === damageId)
     const authoredHeal = graph.body.find(statement => statement.id === healId)
+    assert.equal(authoredDamage?.version, '3', 'new card damage uses the current typed ability-group interface')
+    assert.equal(authoredDamage?.inputs?.abilityGroup, undefined, 'a card without an ability group must not fabricate one')
+    assert.match(await evaluate(`document.querySelector(${selector(`#cards-detail [data-sentence-node="${damageId}"]`)})?.textContent || ''`), /不归因于能力组/u, 'the card sentence shows the actual unattributed policy')
     assert.equal(namedTarget?.layout?.resultVariables?.piece?.name, 'target', 'card target choice must expose the saved target binding')
     const targetDeclaration = graph.body.find(statement => statement.module === 'local.declare' && statement.parameters?.name === 'target')
     assert.deepEqual(targetDeclaration?.inputs?.initial, { kind: 'output', node: targetId, port: 'piece' }, 'card target binding must be initialized from the choice output')
@@ -1310,24 +1313,33 @@ try {
   await check('Keyboard more menu, Escape and focus restoration stay inside the inspector surface', async () => {
     await cdpCall('Emulation.setDeviceMetricsOverride', { width: 1487, height: 1058, deviceScaleFactor: 1, mobile: false })
     await openSkill('naruto-shadow-clone')
-    const menuState = await evaluate(`(()=>{const menu=document.querySelector('#skills-detail [data-sentence-row-menu]');const summary=menu?.querySelector('summary');summary?.focus();return {menu:Boolean(menu),summaryFocused:document.activeElement===summary,open:menu?.open===true}})()`)
+    const menuState = await evaluate(`(()=>{const menu=document.querySelector('#skills-detail [data-sentence-row-menu]');const summary=menu?.querySelector('summary');summary?.focus();return {menu:Boolean(menu),summaryFocused:document.activeElement===summary,open:menu?.open===true,nodeId:menu?.closest('[data-sentence-node]')?.dataset.sentenceNode||''}})()`)
     assert.equal(menuState.summaryFocused, true)
     await dispatchKey('Enter', 'Enter', 13)
     const opened = await evaluate("(()=>{const menu=document.querySelector('#skills-detail [data-sentence-row-menu]');return {open:menu?.open===true,actionVisible:menu?.querySelector('.sentence-row-actions')?.getClientRects().length>0,active:document.activeElement?.tagName||''}})()")
     assert.equal(opened.open, true)
     assert.equal(opened.actionVisible, true)
     await click('#skills-detail [data-sentence-row-menu] [data-sentence-row-action="edit"]')
-    await until("Boolean(document.querySelector('#skills-detail [data-sentence-inspector] [data-sentence-inline-editor]'))", 'menu editor in inspector')
-    const selected = await evaluate("(()=>{const editor=document.querySelector('#skills-detail [data-sentence-inspector] [data-sentence-inline-editor]');return {editor:editor?.dataset.sentenceInlineEditor||'',inspectorCount:document.querySelectorAll('#skills-detail [data-sentence-inspector]').length,editors:document.querySelectorAll('#skills-detail [data-sentence-inline-editor]').length}})()")
+    const inspectorEditorSelector = '#skills-detail [data-sentence-inspector] [data-sentence-inline-editor], #skills-detail [data-sentence-inspector] .sentence-author-statement-editor'
+    try {
+      await until(`Boolean(document.querySelector(${selector(inspectorEditorSelector)}))`, 'menu editor in inspector')
+    } catch (error) {
+      const inspectorState = await evaluate("(()=>{const panel=document.querySelector('#skills-detail [data-sentence-inspector]');return {text:panel?.innerText||'',html:panel?.innerHTML?.slice(0,24000)||''}})()")
+      fs.writeFileSync(path.join(evidence, 'keyboard-menu-inspector-failure.json'), JSON.stringify({ menuState, inspectorState }, null, 2) + '\n')
+      throw error
+    }
+    const selected = await evaluate(`(()=>{const editors=[...document.querySelectorAll(${selector(inspectorEditorSelector)})];const editor=editors[0];return {editor:editor?.dataset.sentenceInlineEditor||editor?.dataset.sentenceAuthorStatement||'',inspectorCount:document.querySelectorAll('#skills-detail [data-sentence-inspector]').length,editors:editors.length,totalEditors:document.querySelectorAll('#skills-detail [data-sentence-inline-editor], #skills-detail .sentence-author-statement-editor').length}})()`)
     assert.equal(selected.inspectorCount, 1)
     assert.equal(selected.editors, 1)
+    assert.equal(selected.totalEditors, 1, 'the row editor exists only inside the single inspector')
     // HTMLElement.click() does not move focus like a real pointer click.
     // Focus a control inside the rendered inspector so the production shell
     // can receive the keyboard Escape event and restore focus to the row.
-    await evaluate("document.querySelector('#skills-detail [data-sentence-inspector] [data-sentence-inline-editor] button, #skills-detail [data-sentence-inspector] [data-sentence-inline-editor] input, #skills-detail [data-sentence-inspector] [data-sentence-inline-editor] select')?.focus()")
+    await evaluate(`(()=>{const editor=document.querySelector(${selector(inspectorEditorSelector)});editor?.querySelector('button,input,select')?.focus()})()`)
     await dispatchKey('Escape', 'Escape', 27)
-    const closed = await evaluate("(()=>{const editor=document.querySelector('#skills-detail [data-sentence-inspector] [data-sentence-inline-editor]');const active=document.activeElement;return {editor:Boolean(editor),activeDataset:{...(active?.dataset||{})},activeText:active?.textContent||''}})()")
+    const closed = await evaluate(`(()=>{const editor=document.querySelector(${selector(inspectorEditorSelector)});const active=document.activeElement;return {editor:Boolean(editor),activeDataset:{...(active?.dataset||{})},activeText:active?.textContent||'',nodeId:active?.closest('[data-sentence-node]')?.dataset.sentenceNode||''}})()`)
     assert.equal(closed.editor, false)
+    assert.equal(closed.nodeId, menuState.nodeId, 'Escape restores focus to the exact originating row')
     assert.ok(
       closed.activeDataset.sentenceModuleEditor
       || closed.activeDataset.sentenceStructuredEditor

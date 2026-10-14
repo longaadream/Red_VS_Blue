@@ -88,6 +88,28 @@ async function until(expression) {
   throw new Error(`UI condition timed out: ${expression}`)
 }
 
+async function reloadEditor() {
+  await call('Page.enable')
+  let timer
+  let onLoad
+  const loaded = new Promise((resolve, reject) => {
+    onLoad = event => {
+      const message = JSON.parse(event.data)
+      if (message.method === 'Page.loadEventFired') resolve()
+    }
+    socket.addEventListener('message', onLoad)
+    timer = setTimeout(() => reject(new Error('Editor reload did not complete')), 30000)
+  })
+  try {
+    // Page.reload acknowledges before the new document commits. Waiting for
+    // its load event prevents the next selector wait from accepting old DOM.
+    await Promise.all([loaded, call('Page.reload')])
+  } finally {
+    clearTimeout(timer)
+    socket.removeEventListener('message', onLoad)
+  }
+}
+
 async function click(selector) {
   await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw new Error('missing ${selector}');e.scrollIntoView({block:'center',inline:'nearest'});const r=e.getBoundingClientRect();if(!e.offsetParent||r.width<=0||r.height<=0)throw new Error('control is not visible: ${selector}');e.click()})()`)
   await delay(80)
@@ -126,7 +148,7 @@ async function graph() {
 }
 
 async function openSkillNamed(skillId = id) {
-  await until("document.body.classList.contains('studio-surface') && Boolean(document.querySelector('#skills-list .entity-item'))")
+  await until("document.body.classList.contains('studio-surface') && Boolean(document.querySelector('[data-tab=skills]')) && Boolean(document.querySelector('#skills-list .entity-item'))")
   await evaluate(`(()=>{
     document.querySelector('[data-tab=skills]').click()
     const item=document.querySelector('#skills-list [data-entity-id='+${JSON.stringify(skillId)}+']') || [...document.querySelectorAll('#skills-list .entity-item')].find(node=>node.querySelector('.id')?.textContent===${JSON.stringify(skillId)})
@@ -368,7 +390,7 @@ try {
   assert.equal(persisted.gameplayModules.entries.code.graph.continuations.length, 1)
   assert.deepEqual(persisted.summonCapability, summonCapabilityDraft, 'saved content retains the structured summon declaration')
 
-  await call('Page.reload')
+  await reloadEditor()
   await openSkill()
   await until("Boolean(document.querySelector('#skills-detail [data-sentence-graph-summary]'))")
   const reopened = await graph()
@@ -422,7 +444,7 @@ try {
   siblingSeed.contentGraphCompilerVersion = skillFixture.compilerVersion
   fs.writeFileSync(path.join(project, 'data/skills', `${id}.json`), JSON.stringify(siblingSeed, null, 2) + '\n')
 
-  await call('Page.reload')
+  await reloadEditor()
   await openSkill()
   const fieldSelector = '#skills-detail [data-sentence-entry]'
   const outputTypeSelector = '#skills-detail [data-sentence-port="outputs:value"] [data-sentence-type-kind]'
@@ -472,7 +494,7 @@ try {
   assert.equal(Object.hasOwn(multiSaved, 'contentGraph'), false)
   assert.equal(Object.hasOwn(multiSaved, 'contentGraphEntries'), false)
 
-  await call('Page.reload')
+  await reloadEditor()
   await openSkill()
   await until(`document.querySelector(${JSON.stringify(fieldSelector)})?.value === 'code'`)
   await change(fieldSelector, 'previewCode')
@@ -496,9 +518,11 @@ try {
   const rangeDraft = gameplayCore.applyGameplayModuleGraph({ id: rangeId, name: '变量与范围', kind: 'active', type: 'normal' }, rangeGraph)
   fs.writeFileSync(path.join(project, 'data/skills', `${rangeId}.json`), JSON.stringify(rangeDraft, null, 2) + '\n')
   fs.writeFileSync(path.join(project, 'data/skills/manifest.json'), JSON.stringify([id, rangeId]) + '\n')
-  await call('Page.reload')
+  await reloadEditor()
   await openSkillNamed(rangeId)
   await click('#skills-detail [data-sentence-slot-editor="range:input:offsets"]')
+  await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=\"offsets\"] .ei-editor') || document.querySelector('#skills-detail [data-sentence-direct-expression=\"offsets\"]'))")
+  if (await evaluate("Boolean(document.querySelector('#skills-detail [data-sentence-direct-expression=\"offsets\"]'))")) await click('#skills-detail [data-sentence-direct-expression="offsets"]')
   await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=\"offsets\"] .ei-editor'))")
   await evaluate(`(()=>{const button=[...document.querySelectorAll('#skills-detail [data-sentence-author-expression="offsets"] button')].find(item=>item.textContent==='绘制相对范围');if(!button)throw new Error('missing range picker');button.click()})()`)
   await until("Boolean(document.querySelector('#skills-detail .sentence-range-picker'))")
@@ -514,9 +538,11 @@ try {
   await click('#skills-detail [data-sentence-apply-expression="offsets"]')
   await until("JSON.parse(document.querySelector('#skills-detail [data-json-source]').value).gameplayModules.entries.code.graph.body.find(node=>node.id==='range')?.layout?.authorExpressions?.offsets?.source?.includes('坐标(0, 1)')")
   await saveAll()
-  await call('Page.reload')
+  await reloadEditor()
   await openSkillNamed(rangeId)
   await click('#skills-detail [data-sentence-slot-editor="range:input:offsets"]')
+  await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=\"offsets\"] .ei-editor') || document.querySelector('#skills-detail [data-sentence-direct-expression=\"offsets\"]'))")
+  if (await evaluate("Boolean(document.querySelector('#skills-detail [data-sentence-direct-expression=\"offsets\"]'))")) await click('#skills-detail [data-sentence-direct-expression="offsets"]')
   await until("Boolean(document.querySelector('#skills-detail [data-sentence-author-expression=\"offsets\"] .ei-editor'))")
   await evaluate(`(()=>{const button=[...document.querySelectorAll('#skills-detail [data-sentence-author-expression="offsets"] button')].find(item=>item.textContent==='绘制相对范围');if(!button)throw new Error('missing range picker after save');button.click()})()`)
   await until("Boolean(document.querySelector('#skills-detail .sentence-range-picker'))")

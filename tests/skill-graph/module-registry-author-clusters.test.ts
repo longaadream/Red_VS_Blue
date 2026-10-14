@@ -88,17 +88,22 @@ function pendingGraph(
 describe('author Cluster module descriptors', () => {
   it('publishes acquire, list, and remove as active atomic operations', () => {
     expect(AUTHOR_CLUSTER_MODULES.map(entry => entry.id)).toEqual([
+      'ref.current-cluster',
       'author.cluster.acquire',
       'author.cluster.list',
       'author.cluster.remove',
     ])
     for (const entry of AUTHOR_CLUSTER_MODULES) {
-      expect(entry.allowedSurfaces).toEqual(['skill', 'card', 'rule', 'triggerSkill', 'pending'])
+      expect(entry.allowedSurfaces).toEqual(entry.id === 'ref.current-cluster'
+        ? ['skill', 'rule', 'triggerSkill', 'pending']
+        : ['skill', 'card', 'rule', 'triggerSkill', 'pending'])
       expect(entry.allowedSurfaces).not.toContain('preview')
-      expect(entry.effects.pure).toBe(entry.id === 'author.cluster.list')
+      expect(entry.effects.pure).toBe(entry.id === 'author.cluster.list' || entry.id === 'ref.current-cluster')
       expect(entry.effects.previewSafe).toBe(false)
       expect(entry.ui?.authoring).toBe('standard')
     }
+
+    expect(descriptor('ref.current-cluster').outputs).toEqual([{ name: 'group', type: 'record', label: '能力组实例' }])
 
     const acquire = descriptor('author.cluster.acquire')
     expect(acquire.inputs.map(port => port.name)).toEqual(['piece', 'definition'])
@@ -114,6 +119,7 @@ describe('author Cluster module descriptors', () => {
   })
 
   it('lowers every operation through flow and uses ctx.flow for pending effects', () => {
+    expect(lower('ref.current-cluster', 'skill', {})).toBe('flow.clusters.current()')
     expect(lower('author.cluster.acquire', 'skill', { piece: 'pieceId', definition: 'definition' }, { definitionType: 'record' }))
       .toBe('flow.clusters.acquire(pieceId,definition)')
     expect(lower('author.cluster.list', 'card', { piece: 'pieceId' }))

@@ -2,7 +2,7 @@
 
 由 `scripts/generate-gameplay-module-api.ts` 从工作台实际注册目录生成。修改接口后重新生成，不在本文另行维护一套参数。
 
-当前提供 **264** 个原子接口。此数量不包括旧资源内部适配器，不表示游戏内容、编辑器操作或运行行为已全部验收。
+当前提供 **267** 个原子接口。此数量不包括旧资源内部适配器，不表示游戏内容、编辑器操作或运行行为已全部验收。
 
 工作台只提供通用原子语句和流程结构。旧内容适配器仅供内部读取与诊断，不出现在新增语句或表达式目录中，包括高级选项。
 
@@ -15,12 +15,12 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 | 分类 | 已登记模块数 |
 | --- | ---: |
 | 查询与选择 | 18 |
-| 战斗效果 | 7 |
+| 战斗效果 | 8 |
 | 状态与规则 | 27 |
-| 变量与数据 | 81 |
+| 变量与数据 | 82 |
 | 流程控制 | 9 |
 | 计算与容器 | 60 |
-| 棋盘与召唤 | 34 |
+| 棋盘与召唤 | 35 |
 | 卡牌与能力 | 28 |
 
 ## 查询与选择
@@ -728,6 +728,48 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 值类型由类型选择器确定（表中的 record 是注册表占位类型）：`{"inputs":{"source":{"parameter":"sourceType"},"target":{"parameter":"targetType"},"amount":{"parameter":"amountType"}},"outputs":{"result":{"parameter":"resultType"}}}`。
 
 执行声明：写入 heal、events；事件 beforeHealDealt、afterHealDealt。
+
+### 造成伤害（能力组归因）
+
+接口：`author.effect.damage@3`。
+
+作者目录：原子语句。
+
+通过当前或指定能力组实例归因造成伤害；主动技能默认使用当前能力组，其他入口未填写能力组时不归因。支持单目标、目标元组与保留来源。
+
+允许入口：skill、card、rule、triggerSkill、pending。
+
+**输入**
+
+| 名称 | 含义 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `source` | 来源 | `piece` | 是 |  |
+| `target` | 目标 | `piece` | 是 |  |
+| `amount` | 伤害量 | `number` | 是 |  |
+| `abilityGroup` | 能力组归因 | `record` | 否 |  |
+| `killerPlayer` | 击杀归属 | `player`（可空） | 否 |  |
+
+**参数**
+
+| 名称 | 含义 | 类型 | 必填 | 默认值 / 可选值 |
+| --- | --- | --- | --- | --- |
+| `sourceType` | 来源类型 | `string` | 是 | 默认 piece；piece / player / card / record |
+| `targetType` | 目标类型 | `string` | 是 | 默认 piece；piece / record / {"kind":"list","element":"piece"} |
+| `amountType` | 数值类型 | `string` | 是 | 默认 number |
+| `resultType` | 结果类型 | `string` | 是 | 默认 record |
+| `damageType` | 伤害类型 | `string` | 是 | 默认 normal；normal / true |
+| `legacyNormalSpelling` | 旧日志伤害名称 | `string` | 是 | 默认 physical；physical / magical |
+| `attribution` | 归属方式 | `string` | 是 | 默认 current；current / unattributed |
+
+**输出**
+
+| 名称 | 含义 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `result` | 结算结果 | `record` | 是 |  |
+
+值类型由类型选择器确定（表中的 record 是注册表占位类型）：`{"inputs":{"source":{"parameter":"sourceType"},"target":{"parameter":"targetType"},"amount":{"parameter":"amountType"}},"outputs":{"result":{"parameter":"resultType"}}}`。
+
+执行声明：写入 damage、events；事件 beforeDamageDealt、afterDamageDealt。
 
 ### 原子提交扩展和地格表现
 
@@ -2173,13 +2215,17 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 
 **参数**
 
-无。
+| 名称 | 含义 | 类型 | 必填 | 默认值 / 可选值 |
+| --- | --- | --- | --- | --- |
+| `snapshotType` | 副本类型 | `string` | 是 | 默认 author.piece-instance@1 |
 
 **输出**
 
 | 名称 | 含义 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | `snapshot` | 实例副本 | `record` | 是 |  |
+
+记录类型由参数选择的结构声明确定：`{"outputs":{"snapshot":{"parameter":"snapshotType"}}}`。
 
 执行声明：纯计算；读取 pieces、extensions、rules。
 
@@ -2604,7 +2650,7 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 
 | 名称 | 含义 | 类型 | 必填 | 默认值 / 可选值 |
 | --- | --- | --- | --- | --- |
-| `field` | field | `string` | 是 | currentCooldown / usesRemaining / skillId / level / owner |
+| `field` | field | `string` | 是 | currentCooldown / usesRemaining / skillId / level / owner / powerMultiplier |
 
 **输出**
 
@@ -2622,8 +2668,35 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 | `skillId` | `string` |
 | `level` | `number` |
 | `owner` | `piece` |
+| `powerMultiplier` | `number` |
 
 执行声明：纯计算；读取 execution-context、skills。
+
+### 当前能力组实例
+
+接口：`ref.current-cluster@1`。
+
+作者目录：原子语句。
+
+取得当前执行的主动技能或规则所属的实际能力组实例；没有唯一有效归属时由运行时使语句失效。
+
+允许入口：skill、rule、triggerSkill、pending。
+
+**输入**
+
+无。
+
+**参数**
+
+无。
+
+**输出**
+
+| 名称 | 含义 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `group` | 能力组实例 | `record` | 是 |  |
+
+执行声明：纯计算；读取 execution-context、pieces。
 
 ### 创建空记录
 
@@ -6922,9 +6995,9 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 | --- | --- | --- | --- | --- |
 | `mode` | 召唤方式 | `string` | 是 | 默认 new-instance；new-instance / return-instance |
 | `sourceType` | 来源类型 | `string` | 是 | 默认 piece；piece / record |
-| `templateType` | 棋子类型 | `string` | 是 | 默认 record |
+| `templateType` | 棋子类型 | `string` | 是 | 默认 {"kind":"record","schema":"author.piece-template@1"} |
 | `destinationType` | 落点类型 | `string` | 是 | 默认 cell |
-| `displayType` | 显示类型 | `string` | 是 | 默认 record |
+| `displayType` | 显示类型 | `string` | 是 | 默认 {"kind":"record","schema":"author.piece-display@1"} |
 | `currentHp` | 回场生命值 | `number` | 否 |  |
 
 **输出**
@@ -6962,9 +7035,9 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 | --- | --- | --- | --- | --- |
 | `mode` | 召唤方式 | `string` | 是 | 默认 new-instance；new-instance / return-instance / declaration |
 | `sourceType` | 来源类型 | `string` | 是 | 默认 piece；piece / record |
-| `templateType` | 棋子类型 | `string` | 是 | 默认 record |
+| `templateType` | 棋子类型 | `string` | 是 | 默认 {"kind":"record","schema":"author.piece-template@1"} |
 | `destinationType` | 落点类型 | `string` | 是 | 默认 cell |
-| `displayType` | 显示类型 | `string` | 是 | 默认 record |
+| `displayType` | 显示类型 | `string` | 是 | 默认 {"kind":"record","schema":"author.piece-display@1"} |
 | `currentHp` | 回场生命值 | `number` | 否 |  |
 
 **输出**
@@ -6998,7 +7071,7 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 
 | 名称 | 含义 | 类型 | 必填 | 默认值 / 可选值 |
 | --- | --- | --- | --- | --- |
-| `displayType` | 显示类型 | `string` | 是 | 默认 record |
+| `displayType` | 显示类型 | `string` | 是 | 默认 {"kind":"record","schema":"author.piece-display@1"} |
 | `audience` | 可见对象 | `string` | 是 | 默认 public；public / owner / allies / enemies / spectators |
 
 **输出**
@@ -7338,6 +7411,39 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 | `distance` | distance | `number` | 是 |  |
 
 执行声明：纯计算；读取 position。
+
+### 消灭棋子
+
+接口：`lifecycle.destroy@1`。
+
+作者目录：原子语句。
+
+直接消灭目标并进行正式死亡结算；不造成伤害，不经过护盾或伤害减免。目标已离场时跳过。
+
+允许入口：skill、card、rule、triggerSkill、pending。
+
+**输入**
+
+| 名称 | 含义 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `target` | 目标 | `piece` | 是 |  |
+| `source` | 来源 | `piece` | 否 |  |
+
+**参数**
+
+| 名称 | 含义 | 类型 | 必填 | 默认值 / 可选值 |
+| --- | --- | --- | --- | --- |
+| `targetType` | 目标类型 | `string` | 是 | 默认 piece；piece / {"kind":"list","element":"piece"} |
+
+**输出**
+
+| 名称 | 含义 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `success` | 是否消灭 | `boolean` | 是 |  |
+
+值类型由类型选择器确定（表中的 record 是注册表占位类型）：`{"inputs":{"target":{"parameter":"targetType"}}}`。
+
+执行声明：写入 pieces、health、graveyard；事件 onPieceDied。
 
 ### 批量位移
 
@@ -8041,7 +8147,7 @@ extension 列表只建议当前上下文已声明的变量；也可以自定义�
 
 作者目录：原子语句。
 
-按结构化能力组定义为指定棋子获得一组Skill与Rule，并返回本次能力组实例。
+按结构化能力组定义为指定棋子获得一组主动技能与规则，并返回本次能力组实例。
 
 允许入口：skill、card、rule、triggerSkill、pending。
 

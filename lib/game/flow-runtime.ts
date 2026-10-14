@@ -584,6 +584,107 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
     const matches = target?.abilityGroups?.filter(group => group.instanceId === reference.instanceId) ?? []
     return matches.length === 1 ? matches[0] : undefined
   }
+  /**
+   * Resolve the ability group that owns the exact current Skill or Rule
+   * instance.  Provenance is persisted on the member instance, so this never
+   * infers a group from its first Skill member or from a definition ID.
+   */
+  const currentCluster = (): { group: object } => {
+    const hasRuleIdentity = Boolean(context.ruleInstance || context.ruleInstanceId || context.rule?.id || context.ruleId)
+    const hasSkillIdentity = Boolean(context.skillInstance || context.skillInstanceId || context.skill?.id || context.skillId)
+    // Rule hosts retain the triggering event's skillId on the same context.
+    // Prefer the concrete rule identity and its rulePiece on rule-like
+    // surfaces, and only use an exact installed Skill instance for a
+    // triggerSkill context when no rule identity is present.
+    const prefersSkill = surface === 'skill'
+      ? hasSkillIdentity
+      : surface === 'triggerSkill'
+        ? !hasRuleIdentity && Boolean(context.skillInstance || context.skillInstanceId)
+        : surface === 'pending'
+          ? !hasRuleIdentity && hasSkillIdentity
+          : false
+    let owner: any
+    let memberKind: 'skill' | 'rule'
+    let memberId: string
+    let member: any
+
+    if (prefersSkill) {
+      const candidateOwner = context.piece ?? context.sourcePiece
+      owner = typeof candidateOwner?.instanceId === 'string'
+        ? battle.pieces.find(candidate => candidate.instanceId === candidateOwner.instanceId)
+        : undefined
+      const skillId = context.skill?.id ?? context.skillId
+      const candidates = owner?.skills?.filter((candidate: any) => context.skillInstance
+        ? candidate === context.skillInstance
+        : typeof context.skillInstanceId === 'string'
+          ? candidate?.instanceId === context.skillInstanceId && (skillId === undefined || candidate?.skillId === skillId)
+          : candidate?.skillId === skillId) ?? []
+      if (!owner || candidates.length === 0) throw new Error('flow: 当前主动技能实例不存在，无法取得当前能力组')
+      if (candidates.length !== 1) throw new Error('flow: 当前主动技能实例不唯一，无法取得当前能力组')
+      member = candidates[0]
+      memberKind = 'skill'
+      memberId = member.skillId
+    } else {
+      const candidateOwner = context.rulePiece ?? context.piece ?? context.sourcePiece
+      owner = typeof candidateOwner?.instanceId === 'string'
+        ? battle.pieces.find(candidate => candidate.instanceId === candidateOwner.instanceId)
+        : undefined
+      const ruleId = context.ruleId ?? context.rule?.id
+      const candidates = owner?.rules?.filter((candidate: any) => context.ruleInstance
+        ? candidate === context.ruleInstance
+        : typeof context.ruleInstanceId === 'string'
+          ? candidate?.instanceId === context.ruleInstanceId && (ruleId === undefined || candidate?.id === ruleId)
+          : typeof ruleId === 'string' && candidate?.id === ruleId) ?? []
+      if (!owner || candidates.length === 0) throw new Error('flow: 当前规则实例不存在，无法取得当前能力组')
+      if (candidates.length !== 1) throw new Error('flow: 当前规则实例不唯一，无法取得当前能力组')
+      member = candidates[0]
+      memberKind = 'rule'
+      memberId = member.id
+    }
+
+    const ids = member?.abilityGroupIds
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some((id: unknown) => typeof id !== 'string' || id.length === 0)) {
+      throw new Error('flow: 当前主动技能或规则没有有效能力组归属')
+    }
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length !== ids.length) throw new Error('flow: 当前主动技能或规则的能力组归属重复')
+    const groups = Array.isArray(owner.abilityGroups) ? owner.abilityGroups : []
+    const resolved = uniqueIds.map(id => groups.filter((group: any) => group?.instanceId === id))
+    if (resolved.some(matches => matches.length !== 1)) throw new Error('flow: 当前主动技能或规则的能力组实例已经失效')
+    if (resolved.some(matches => memberKind === 'skill'
+      ? !Array.isArray(matches[0].skills) || !matches[0].skills.includes(memberId)
+      : !Array.isArray(matches[0].rules) || !matches[0].rules.includes(memberId))) {
+      throw new Error('flow: 当前能力组不包含实际主动技能或规则成员')
+    }
+
+    const requested = context.clusterInstanceId
+    if (requested !== undefined && (typeof requested !== 'string' || requested.length === 0)) {
+      throw new Error('flow: 当前能力组实例标识无效')
+    }
+    const selectedId = requested ?? (uniqueIds.length === 1 ? uniqueIds[0] : undefined)
+    if (!selectedId) throw new Error('flow: 当前主动技能或规则属于多个能力组，请明确能力组实例')
+    if (!uniqueIds.includes(selectedId)) throw new Error('flow: 指定能力组不属于当前主动技能或规则')
+    const group = groups.find((candidate: any) => candidate?.instanceId === selectedId)
+    if (!group) throw new Error('flow: 当前能力组实例已经失效')
+    // Return the same JSON-compatible identity shape as clusters.list().
+    // Unlike an execution-local WeakMap handle, this reference can be kept in
+    // an execution local or pending payload and re-authenticated by owner and
+    // instance identity after the next flow runtime is created.
+    return { group: { ...json(group), ownerPieceId: owner.instanceId } }
+  }
+  /**
+   * Legacy damage/event records still carry a string skillId.  Generated
+   * single-member roots use their stable `skills:`/`rules:` suffix; custom
+   * multi-member groups retain their own group ID.  No member array position
+   * participates in this mapping.
+   */
+  const clusterAttribution = (reference: any): string => {
+    const resolved = clusterReference(reference)
+    const group = resolved?.group ?? stableCluster(reference)
+    if (!group || typeof group.id !== 'string' || group.id.length === 0) throw new Error('flow: 能力组实例已经失效')
+    const normalized = /^(?:skills|rules):(.+)$/u.exec(group.id)?.[1] ?? group.id
+    return key(normalized)
+  }
   const stableTileEffect = (reference: any): Record<string, unknown> | undefined => {
     const handleReference = tileEffectReference(reference)
     if (handleReference) return handleReference
@@ -1793,8 +1894,8 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
         })
         return { instances, present: true }
       },
-      field: (handle: object | null, field: 'skillId' | 'kind' | 'currentCooldown' | 'definitionExists' | 'usesRemaining' | 'level' | 'owner') => {
-        if (!['skillId', 'kind', 'currentCooldown', 'definitionExists', 'usesRemaining', 'level', 'owner'].includes(field)) throw new Error('flow: 无效技能实例字段')
+      field: (handle: object | null, field: 'skillId' | 'kind' | 'currentCooldown' | 'definitionExists' | 'usesRemaining' | 'level' | 'owner' | 'powerMultiplier') => {
+        if (!['skillId', 'kind', 'currentCooldown', 'definitionExists', 'usesRemaining', 'level', 'owner', 'powerMultiplier'].includes(field)) throw new Error('flow: 无效技能实例字段')
         const reference = skillReference(handle)
         if (!reference) throw new Error('flow: 技能实例已经失效')
         const skill = reference.skill
@@ -1802,7 +1903,12 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
           ? Boolean(battle.skillsById && Object.prototype.hasOwnProperty.call(battle.skillsById, skill.skillId))
           : field === 'owner' ? reference.target.instanceId : field === 'kind'
             ? battle.skillsById?.[skill.skillId]?.kind
-            : skill[field]
+            : field === 'powerMultiplier'
+              ? (() => {
+                  const multiplier = battle.skillsById?.[skill.skillId]?.powerMultiplier
+                  return typeof multiplier === 'number' && Number.isFinite(multiplier) ? multiplier : undefined
+                })()
+              : skill[field]
         return { value: value === undefined ? null : value, defined: value !== undefined }
       },
       setInstanceCooldown: (handle: object | null, value: number) => {
@@ -1856,12 +1962,14 @@ export function createFlowRuntime(battle: BattleState, context: any, surface: Fl
       invoke: (block: unknown, argumentsValue: Record<string, unknown>, expected?: { type: import('../skill-graph/module-types').GameplayValueType; schemas: readonly import('../skill-graph/module-types').GameplayRecordSchema[] }) => call('invokeAuthorCodeBlock', block, argumentsValue, expected),
     },
     clusters: {
+      current: () => currentCluster(),
       acquire: (id: string, definition: AuthorClusterDefinition) => {
         piece(id)
         const group = call('acquireAuthorCluster', id, json(definition))
         return { ...json(group), ownerPieceId: id }
       },
       list: (id: string) => (piece(id).abilityGroups ?? []).map(group => ({ ...json(group), ownerPieceId: id })),
+      attribution: (group: object) => clusterAttribution(group),
       remove: (group: { ownerPieceId: string; instanceId: string }) => {
         if (!group || typeof group.ownerPieceId !== 'string' || typeof group.instanceId !== 'string') throw new Error('flow: 无效能力组实例')
         piece(group.ownerPieceId)

@@ -3,6 +3,7 @@ import type { GameplayModuleDescriptor, GameplayValueType } from './module-types
 const recordType: GameplayValueType = 'record'
 const recordListType: GameplayValueType = { kind: 'list', element: recordType }
 const activeSurfaces = ['skill', 'card', 'rule', 'triggerSkill', 'pending'] as const
+const currentClusterSurfaces = ['skill', 'rule', 'triggerSkill', 'pending'] as const
 
 function flow(ctx: Parameters<NonNullable<GameplayModuleDescriptor['lower']>>[0]): string {
   return ctx.surface === 'pending' ? 'ctx.flow' : 'flow'
@@ -11,10 +12,26 @@ function flow(ctx: Parameters<NonNullable<GameplayModuleDescriptor['lower']>>[0]
 /** Runtime Cluster operations. The production registry may opt into these descriptors explicitly. */
 export const AUTHOR_CLUSTER_MODULES: readonly GameplayModuleDescriptor[] = Object.freeze([
   {
+    id: 'ref.current-cluster',
+    version: '1',
+    label: '当前能力组实例',
+    description: '取得当前执行的主动技能或规则所属的实际能力组实例；没有唯一有效归属时由运行时使语句失效。',
+    inputs: [],
+    outputs: [{ name: 'group', type: recordType, label: '能力组实例' }],
+    allowedSurfaces: currentClusterSurfaces,
+    effects: {
+      pure: true,
+      previewSafe: false,
+      reads: ['execution-context', 'pieces'],
+    },
+    lower: ctx => `${flow(ctx)}.clusters.current()`,
+    ui: { category: 'reference', authoring: 'standard' },
+  },
+  {
     id: 'author.cluster.acquire',
     version: '1',
     label: '获得能力组',
-    description: '按结构化能力组定义为指定棋子获得一组Skill与Rule，并返回本次能力组实例。',
+    description: '按结构化能力组定义为指定棋子获得一组主动技能与规则，并返回本次能力组实例。',
     inputs: [
       { name: 'piece', type: 'piece', label: '棋子' },
       { name: 'definition', type: 'record', label: '能力组定义' },

@@ -11,6 +11,8 @@ import { toPublicBattleState } from '../../lib/game/deployment'
 import { clearRuleCache, clearSkillDefinitionCache, dealDamage } from '../../lib/game/skills'
 import { assertContentGraphArtifact } from '../../electron-editor/content-graph'
 import { asPieceInstance, makePiece, makeState } from '../helpers/minimal-state'
+import { createAuthorClusterRuntime } from '../../lib/game/author-clusters'
+import { planAuthorClusterInitialization } from '../../lib/game/author-cluster-initialization'
 
 // These fixtures must be copied from successful developer-authoring-smoke UI
 // output. Do not construct or repair a graph here: the saved program is what
@@ -57,6 +59,14 @@ function scenario(skill: any) {
   state.players[0].actionPoints = 5
   state.players[0].chargePoints = 5
   state.skillsById[skill.id] = skill
+
+  // Use the same authoritative static Cluster bootstrap as battle setup. The
+  // editor fixture intentionally supplies only the authored skill document,
+  // so this keeps the test host realistic without manufacturing a group in
+  // the fixture state.
+  const clusterRuntime = createAuthorClusterRuntime({})
+  const plan = planAuthorClusterInitialization(caster, { skills: state.skillsById })
+  for (const definition of plan.definitions) clusterRuntime.adopt(caster, definition)
   return state
 }
 

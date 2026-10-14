@@ -60,6 +60,23 @@ function lowerV2(
   return typeof value === 'string' ? value : 'expression' in value ? value.expression : `${value.statements};${value.result ?? ''}`
 }
 
+function lowerV3(
+  parameters: Record<string, GameplayLiteral> = {},
+  inputs: Record<string, string> = { source: 'source', target: 'target', amount: 'amount' },
+): string {
+  const entry = getGameplayModule('author.effect.damage', '3')
+  if (!entry) throw new Error('missing author effect damage v3 module')
+  const effectiveParameters: Record<string, GameplayLiteral> = {
+    sourceType: 'piece', targetType: 'piece', amountType: 'number', resultType: 'record', damageType: 'normal',
+    ...parameters,
+  }
+  const value: GameplayNativeLoweringResult = entry.lower({
+    surface: 'skill', callId: 'test-v3-damage', moduleId: entry.id, moduleVersion: entry.version,
+    inputs, parameters: effectiveParameters, outputPorts: entry.outputs, emitLiteral: item => JSON.stringify(item),
+  })
+  return typeof value === 'string' ? value : 'expression' in value ? value.expression : `${value.statements};${value.result ?? ''}`
+}
+
 function runExpression(source: string, scope: Record<string, unknown> = {}): unknown {
   const names = Object.keys(scope)
   const values = names.map(name => scope[name])
@@ -195,6 +212,60 @@ describe('generic author choice and target atoms', () => {
     const captured = vi.fn(() => ({ results: [] }))
     runExpression(lower, { flow: { effects: { damageManyCaptured: captured } }, sourceHandle: {}, targetIds: [], amount: 1 })
     expect(captured).toHaveBeenCalledWith({}, [], 1, 'physical', undefined, 'unattributed')
+  })
+
+  it('uses a typed current Cluster for v3 attribution without exposing a skill ID parameter', () => {
+    const entry = getGameplayModule('author.effect.damage', '3')
+    expect(entry?.inputs.find(input => input.name === 'abilityGroup')).toMatchObject({ type: 'record', optional: true })
+    expect(entry?.parameters?.some(parameter => parameter.name === 'skillId')).toBe(false)
+
+    const source = lowerV3()
+    expect(source).toContain('flow.clusters.current().group')
+    expect(source).toContain('flow.clusters.attribution')
+    const apply = vi.fn(() => ({ success: true, damage: 4 }))
+    const attribution = vi.fn(() => 'group-attribution')
+    runExpression(source, {
+      source: 'source-1', target: 'target-1', amount: 4,
+      flow: { clusters: { current: () => ({ group: {} }), attribution }, effects: { apply } },
+    })
+    expect(attribution).toHaveBeenCalledWith({})
+    expect(apply).toHaveBeenCalledWith('damage', 'source-1', 'piece', 'target-1', 4, 'normal', 'group-attribution')
+
+    const explicit = lowerV3({}, { source: 'source', target: 'target', amount: 'amount', abilityGroup: 'group' })
+    expect(explicit).toContain('flow.clusters.attribution(group)')
+    expect(explicit).not.toContain('clusters.current')
+  })
+
+  it('keeps card and player-rule v3 damage executable without inventing a current group', () => {
+    const entry = getGameplayModule('author.effect.damage', '3')!
+    const parameters = { sourceType: 'piece', targetType: 'piece', amountType: 'number', resultType: 'record', damageType: 'normal', attribution: 'current' } as const
+    const lowered = entry.lower({
+      surface: 'card', callId: 'test-v3-card', moduleId: entry.id, moduleVersion: entry.version,
+      inputs: { source: 'source', target: 'target', amount: 'amount' }, parameters,
+      outputPorts: entry.outputs, emitLiteral: value => JSON.stringify(value),
+    }) as string
+    expect(lowered).toContain('undefined)')
+    expect(lowered).not.toContain('clusters.current')
+
+    const explicit = entry.lower({
+      surface: 'rule', callId: 'test-v3-rule', moduleId: entry.id, moduleVersion: entry.version,
+      inputs: { source: 'source', target: 'target', amount: 'amount', abilityGroup: 'group' }, parameters,
+      outputPorts: entry.outputs, emitLiteral: value => JSON.stringify(value),
+    }) as string
+    expect(explicit).toContain('flow.clusters.attribution(group)')
+  })
+
+  it('keeps v3 captured and unattributed queue lowering shapes', () => {
+    const captured = lowerV3({
+      sourceType: 'record', targetType: { kind: 'list', element: 'piece' }, amountType: 'number', resultType: 'record',
+    }, { source: 'sourceHandle', target: 'targetIds', amount: 'amount' })
+    expect(captured).toContain('flow.effects.damageManyCaptured(sourceHandle,targetIds,amount,"physical",flow.clusters.attribution(flow.clusters.current().group))')
+
+    const unattributed = lowerV3({
+      attribution: 'unattributed', sourceType: 'record', targetType: { kind: 'list', element: 'piece' }, amountType: 'number', resultType: 'record',
+    }, { source: 'sourceHandle', target: 'targetIds', amount: 'amount' })
+    expect(unattributed).toContain('flow.effects.damageManyCaptured(sourceHandle,targetIds,amount,"physical",undefined,"unattributed")')
+    expect(unattributed).not.toContain('clusters.current')
   })
 
   it('compiles a dynamic option output and atomic target output through the public registry', () => {

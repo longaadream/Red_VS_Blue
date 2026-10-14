@@ -126,6 +126,7 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
       'ref.current-skill': 'skill-instance',
       'ref.current-card': 'card-instance',
       'ref.current-rule': 'rule-instance',
+      'ref.current-cluster': 'cluster-instance',
       'status.query-instances': 'status-instances',
       'status.instances': 'status-instances',
       'status.instances-by-id': 'status-instances',
@@ -133,7 +134,7 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
       'skill.instances': 'skill-instances',
       'author.cluster.list': 'cluster-instances',
     }
-    const domain = output.name === 'value' || output.name === 'instance' || output.name === 'card' || output.name === 'status' || output.name === 'statuses' || output.name === 'instances' || output.name === 'groups'
+    const domain = output.name === 'value' || output.name === 'instance' || output.name === 'card' || output.name === 'status' || output.name === 'statuses' || output.name === 'instances' || output.name === 'groups' || module === 'ref.current-cluster'
       ? domainByModule[module]
       : undefined
     return { value: { kind: 'output', node: nodeId, port: output.name }, type: output.nullable ? { kind: 'nullable', value: type } : type, ...(domain ? { domain } : {}) }
@@ -304,12 +305,13 @@ export function lowerAuthorExpression(source: string, options: AuthorExpressionC
       if (bound) return bound.local
         ? { ...call(body, 'local.read', { handle: { value: bound.value, type: 'record' } }, { valueType: encodedType(bound.type) }, 'value', '1'), ...(bound.domain ? { domain: bound.domain } : {}) }
         : bound
-      const root = own({ 当前棋子: 'ref.holder', 当前玩家: 'ref.player', 当前手牌: 'ref.current-card', 当前技能: 'ref.current-skill', 当前规则: 'ref.current-rule' }, node.name)
+      const root = own({ 当前棋子: 'ref.holder', 当前玩家: 'ref.player', 当前手牌: 'ref.current-card', 当前技能: 'ref.current-skill', 当前规则: 'ref.current-rule', 当前能力组: 'ref.current-cluster' }, node.name)
       if (root) {
         const result = call(body, root, {})
         if (root === 'ref.current-skill') return { ...result, domain: 'skill-instance' }
         if (root === 'ref.current-card') return { ...result, domain: 'card-instance' }
         if (root === 'ref.current-rule') return { ...result, domain: 'rule-instance' }
+        if (root === 'ref.current-cluster') return { ...result, domain: 'cluster-instance' }
         return result
       }
       return fail(node, `变量「${node.name}」尚未声明`)

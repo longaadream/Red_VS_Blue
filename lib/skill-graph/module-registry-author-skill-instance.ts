@@ -30,6 +30,10 @@ const CURRENT_SKILL_FIELDS: Readonly<Record<string, GameplayValueType>> = Object
   skillId: stringType,
   level: numberType,
   owner: pieceType,
+  // The multiplier is part of the verified Skill definition selected by the
+  // concrete instance.  It is deliberately read-only here: authors may
+  // change runtime cooldown/count/level, but cannot mutate content metadata.
+  powerMultiplier: numberType,
 })
 
 const WRITABLE_CURRENT_SKILL_FIELDS: readonly string[] = ['currentCooldown', 'usesRemaining', 'level']
